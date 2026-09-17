@@ -15,7 +15,6 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [role, setRole] = useState<UserRole>('admin');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -36,7 +35,7 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
             data: {
               full_name: fullName,
               phone_number: phoneNumber,
-              role: role,
+              role: 'subscriber',
             },
           },
         });
@@ -49,7 +48,7 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
             id: data.user.id,
             full_name: fullName,
             phone_number: phoneNumber,
-            role: role,
+            role: 'subscriber',
           });
 
           if (profileError) {
@@ -90,7 +89,7 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
           </div>
           <h2 className="text-2xl font-bold text-white tracking-tight">ChitFund Manager</h2>
           <p className="text-xs text-slate-400 mt-1">
-            {isSignUp ? 'Create your authenticated account' : 'Sign in to access your dashboard'}
+            {isSignUp ? 'Create your subscriber account' : 'Sign in to access your dashboard'}
           </p>
         </div>
 
@@ -140,26 +139,6 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
                     placeholder="+91 98765 43210"
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                   />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Role Type</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['admin', 'manager', 'subscriber'] as UserRole[]).map((r) => (
-                    <button
-                      type="button"
-                      key={r}
-                      onClick={() => setRole(r)}
-                      className={`py-2 px-3 rounded-lg text-xs font-semibold border capitalize transition-all ${
-                        role === r
-                          ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
                 </div>
               </div>
             </>
