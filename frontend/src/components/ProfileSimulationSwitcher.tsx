@@ -2,9 +2,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useSimulation, Profile } from '../context/SimulationContext';
+import { useAuth } from '../context/AuthContext';
 import { UserSquare, ShieldAlert, ChevronDown, Check, User } from 'lucide-react';
 
 export default function ProfileSimulationSwitcher() {
+  const { profile } = useAuth();
   const { simulatedUser, testProfiles, switchSimulatedUser } = useSimulation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -19,6 +21,11 @@ export default function ProfileSimulationSwitcher() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Subscribers cannot access role simulation switcher
+  if (profile?.role === 'subscriber') {
+    return null;
+  }
 
   const getRoleBadgeColor = (role: Profile['role']) => {
     switch (role) {

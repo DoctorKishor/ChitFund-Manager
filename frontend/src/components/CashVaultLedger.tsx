@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useWallet, WalletType } from '../context/WalletContext';
 import { useSimulation } from '../context/SimulationContext';
+import { useAuth } from '../context/AuthContext';
 import { 
   Wallet, 
   Landmark, 
@@ -13,9 +14,9 @@ import {
   AlertCircle, 
   Mic, 
   Coins, 
-  Scale,
-  Plus,
-  Trash2
+  Scale, 
+  Plus, 
+  Trash2 
 } from 'lucide-react';
 
 interface Relocation {
@@ -54,6 +55,8 @@ interface MemberCollection {
 export default function CashVaultLedger() {
   const { balances, updateBalance } = useWallet();
   const { simulatedUser } = useSimulation();
+  const { profile } = useAuth();
+  const activeAdminName = profile?.fullName || simulatedUser.fullName;
 
   // 1. Core State Hooks
   const [relocations, setRelocations] = useState<Relocation[]>([
@@ -149,7 +152,7 @@ export default function CashVaultLedger() {
       amount,
       tag: spendTag,
       description: spendDesc || `Quick draw under tag: ${spendTag}`,
-      adminName: simulatedUser.fullName,
+      adminName: activeAdminName,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setPersonalDraws([newDraw, ...personalDraws]);
