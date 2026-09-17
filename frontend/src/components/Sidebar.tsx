@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useSimulation } from '../context/SimulationContext';
+import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, 
   Gavel, 
@@ -23,9 +24,11 @@ interface SidebarProps {
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { currentUser, simulatedUser } = useSimulation();
+  const { simulatedUser } = useSimulation();
+  const { profile, signOut } = useAuth();
 
-  const isUserAdminOrManager = simulatedUser.role === 'admin' || simulatedUser.role === 'manager';
+  const activeUserRole = profile?.role || simulatedUser.role;
+  const isUserAdminOrManager = activeUserRole === 'admin' || activeUserRole === 'manager';
 
   const navItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
@@ -129,17 +132,17 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             {!isCollapsed && (
               <div className="flex flex-col overflow-hidden">
                 <span className="text-sm font-semibold text-gray-900 truncate">
-                  {currentUser.fullName}
+                  {profile?.fullName || simulatedUser.fullName}
                 </span>
-                <span className="text-xs text-gray-500 truncate">
-                  {currentUser.role.toUpperCase()} (Primary)
+                <span className="text-xs text-gray-500 truncate capitalize">
+                  {activeUserRole} (Supabase)
                 </span>
               </div>
             )}
           </div>
           {!isCollapsed && (
             <button 
-              onClick={() => alert('Simulating Google Sign Out...')}
+              onClick={() => signOut()}
               title="Sign Out"
               className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-gray-100 transition-all duration-200 shrink-0"
             >

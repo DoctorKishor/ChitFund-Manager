@@ -5,9 +5,27 @@ import Sidebar from '@/components/Sidebar';
 import TopStatusRibbon from '@/components/TopStatusRibbon';
 import ProfileSimulationSwitcher from '@/components/ProfileSimulationSwitcher';
 import DashboardContent from '@/components/DashboardContent';
+import AuthScreen from '@/components/AuthScreen';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Home() {
+  const { user, profile, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs text-slate-400 font-medium">Connecting to Supabase...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
 
   const getTabTitle = (tab: string) => {
     switch (tab) {
