@@ -527,12 +527,12 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
 
       // Find auction logs for this group where winner matches this member or profile
       const groupWins = auctionLogs.filter(
-        l => l.group_id === g.id && (l.winner_profile_id === memberId || l.winner_member_id === enroll.id || l.winner_name === memberProfile?.full_name)
+        l => l.group_id === g.id && (l.winning_bidder_id === memberId || l.winner_profile_id === memberId || l.winner_member_id === enroll.id || l.winner_name === memberProfile?.full_name)
       );
 
       groupWins.forEach(win => {
         const totalVal = Number(g.total_value) || 200000;
-        const discountBid = Number(win.winning_bid || 0);
+        const discountBid = Number(win.winning_discount ?? win.winning_bid ?? 0);
         const netPayout = Number(win.net_payout) || (totalVal - discountBid);
 
         // Find associated payout transaction
@@ -580,27 +580,27 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       </div>
 
       {/* Main Profile Header Card */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-5">
+      <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-7 shadow-2xs space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-extrabold text-2xl flex items-center justify-center shadow-md">
               {memberInitial}
             </div>
-            <div>
+            <div className="space-y-1">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <h2 className="text-xl font-bold text-gray-900">{memberName}</h2>
-                <span className="text-[11px] font-semibold bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-snug">{memberName}</h2>
+                <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full">
                   {memberEnrollments.length} {memberEnrollments.length === 1 ? 'active chit' : 'active chits'}
                 </span>
-                <span className="text-[11px] font-bold bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                <span className="text-xs font-bold bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full border border-indigo-100">
                   +{formatCurrency(totalPaidIn)} paid in
                 </span>
-                <span className="text-[11px] font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-semibold bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full">
                   Portal · {memberProfile?.role === 'subscriber' ? 'Active' : 'Admin'}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
-                <Phone size={12} className="text-gray-400" />
+              <p className="text-xs text-gray-500 flex items-center gap-2 font-medium">
+                <Phone size={13} className="text-gray-400" />
                 <span>{memberProfile?.phone_number || 'No phone recorded'}</span>
               </p>
             </div>
@@ -609,7 +609,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
           <div className="flex gap-2 shrink-0">
             <button
               onClick={() => handleOpenRecordPayment()}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all flex items-center gap-1.5"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95"
             >
               <Plus size={15} />
               <span>Record Payment</span>
@@ -618,52 +618,52 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         </div>
 
         {/* Status / Settlement Banner */}
-        <div className={`p-4 rounded-xl border flex items-center justify-between text-xs font-semibold ${
+        <div className={`p-4 rounded-2xl border flex items-center justify-between text-xs font-semibold ${
           allSettled 
             ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' 
             : 'bg-amber-50/80 border-amber-200 text-amber-900'
         }`}>
           <div className="flex items-center gap-2">
             {allSettled ? <CheckCircle2 size={16} className="text-emerald-600 shrink-0" /> : <AlertCircle size={16} className="text-amber-600 shrink-0" />}
-            <span>
+            <span className="leading-normal">
               {allSettled 
                 ? 'All settled for current cycle · nothing due' 
                 : 'Outstanding dues pending collection for active chit cycles'}
             </span>
           </div>
-          <span className="text-[11px] font-mono">
+          <span className="text-xs font-mono font-bold tracking-wider">
             {allSettled ? '0 DUE' : 'PAYMENT REQUIRED'}
           </span>
         </div>
 
         {/* 3 Metric Stat Boxes */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4.5 space-y-1">
             <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              <ArrowDownLeft size={13} className="text-emerald-600" />
+              <ArrowDownLeft size={14} className="text-emerald-600" />
               <span>Paid In</span>
             </div>
-            <div className="text-xl font-bold text-emerald-700 mt-1">
+            <div className="text-xl sm:text-2xl font-extrabold text-emerald-700 leading-none">
               {formatCurrency(totalPaidIn)}
             </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4.5 space-y-1">
             <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              <ArrowUpRight size={13} className="text-amber-600" />
+              <ArrowUpRight size={14} className="text-amber-600" />
               <span>Paid Out</span>
             </div>
-            <div className="text-xl font-bold text-amber-700 mt-1">
+            <div className="text-xl sm:text-2xl font-extrabold text-amber-700 leading-none">
               {formatCurrency(totalPaidOut)}
             </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4.5 space-y-1">
             <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              <Clock size={13} className="text-slate-500" />
+              <Clock size={14} className="text-slate-500" />
               <span>To Go</span>
             </div>
-            <div className="text-xl font-bold text-slate-900 mt-1">
+            <div className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-none">
               {formatCurrency(totalRemainingToGo)}
             </div>
           </div>
@@ -671,12 +671,12 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
 
         {/* Progress Bar */}
         {totalExpectedDue > 0 && (
-          <div className="space-y-1.5 pt-1">
-            <div className="flex justify-between text-[11px] font-semibold text-gray-500">
+          <div className="space-y-2 pt-1">
+            <div className="flex justify-between text-xs font-semibold text-gray-500">
               <span>Installment Completion Progress</span>
-              <span>{Math.min(100, Math.round((totalPaidIn / totalExpectedDue) * 100))}%</span>
+              <span className="font-bold text-gray-900">{Math.min(100, Math.round((totalPaidIn / totalExpectedDue) * 100))}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
               <div
                 className="bg-emerald-600 h-full rounded-full transition-all duration-300"
                 style={{ width: `${Math.min(100, (totalPaidIn / totalExpectedDue) * 100)}%` }}
@@ -687,7 +687,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       </div>
 
       {/* 4 Interactive Subtabs Bar (Chits | Payments | Prizes | Activity) */}
-      <div className="flex items-center bg-gray-200/80 p-1 rounded-2xl border border-gray-300/60 max-w-md">
+      <div className="flex items-center bg-gray-200/80 p-1.5 rounded-2xl border border-gray-300/60 max-w-md">
         {[
           { id: 'chits', label: 'Chits', count: memberEnrollments.length },
           { id: 'payments', label: 'Payments', count: memberTransactions.length },
@@ -701,13 +701,13 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
               onClick={() => setActiveSubtab(tab.id as any)}
               className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all duration-150 flex items-center justify-center gap-1.5 ${
                 isActive
-                  ? 'bg-white text-gray-900 shadow-sm'
+                  ? 'bg-white text-gray-900 shadow-2xs'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               <span>{tab.label}</span>
               {tab.count !== undefined && (
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                   isActive ? 'bg-gray-100 text-gray-800' : 'bg-gray-300/70 text-gray-600'
                 }`}>
                   {tab.count}
@@ -726,7 +726,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
           </div>
 
           {memberEnrollments.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 text-xs">
+            <div className="bg-white border border-gray-200 rounded-3xl p-8 text-center text-gray-400 text-xs">
               No chit group enrollments found for this subscriber.
             </div>
           ) : (
@@ -746,19 +746,19 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
                 const groupWonPrize = prizesWon.find(p => p.groupId === g.id);
 
                 return (
-                  <div key={enroll.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
+                  <div key={enroll.id} className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-bold text-gray-900">{g.name}</h3>
-                          <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base font-bold text-gray-900 leading-snug">{g.name}</h3>
+                          <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg border border-indigo-100">
                             Ticket #{enroll.ticket_number}
                           </span>
-                          <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">
+                          <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg border border-emerald-200">
                             On track
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-xs text-gray-500 mt-1 leading-normal">
                           {formatCurrency(totalVal)} total value · {duration} months duration · Monthly: {formatCurrency(memberInst)}
                         </p>
                       </div>
@@ -769,7 +769,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
                             setActiveSubtab('payments');
                             setSelectedChitFilter(g.id);
                           }}
-                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 py-1 px-2.5 rounded-lg hover:bg-indigo-50 transition-colors"
                         >
                           <span>View payments</span>
                           <ChevronRight size={14} />
@@ -778,16 +778,16 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
                     </div>
 
                     {/* Group Monthly Progress */}
-                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3.5 flex justify-between items-center text-xs">
+                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 flex justify-between items-center text-xs">
                       <div>
                         <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">Total Paid for Group</span>
-                        <span className="text-base font-bold text-emerald-900">{formatCurrency(groupPaid)}</span>
+                        <span className="text-base font-bold text-emerald-900 mt-0.5 block">{formatCurrency(groupPaid)}</span>
                       </div>
                       {groupWonPrize && (
                         <div className="text-right">
                           <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider block">Auction Winner</span>
-                          <span className="font-bold text-amber-800 flex items-center gap-1">
-                            <Trophy size={13} className="text-amber-600" />
+                          <span className="font-bold text-amber-800 flex items-center gap-1 mt-0.5">
+                            <Trophy size={14} className="text-amber-600" />
                             Won prize ({formatCurrency(groupWonPrize.netPayout)})
                           </span>
                         </div>
@@ -806,7 +806,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         <div className="space-y-4">
           
           {/* Search and Filters Bar */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row gap-3 items-center justify-between">
             <div className="relative w-full sm:w-72">
               <Search size={14} className="absolute left-3.5 top-3 text-gray-400" />
               <input
@@ -842,7 +842,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
 
               <button
                 onClick={() => handleOpenRecordPayment()}
-                className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 shrink-0"
+                className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5 shrink-0 active:scale-95 shadow-2xs"
               >
                 <Plus size={14} />
                 <span>Record</span>
@@ -851,7 +851,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
           </div>
 
           {/* Transactions Ledger List */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-3">
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <span className="text-xs font-bold text-gray-900">
                 {filteredPayments.length} receipts found
@@ -859,7 +859,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
             </div>
 
             {filteredPayments.length === 0 ? (
-              <div className="py-8 text-center text-gray-400 text-xs">
+              <div className="py-10 text-center text-gray-400 text-xs">
                 No payment transactions match the selected filters.
               </div>
             ) : (
@@ -872,27 +872,27 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
                   const isCollection = tx.type === 'collection';
 
                   return (
-                    <div key={tx.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/60 rounded-xl px-3 transition-colors">
+                    <div key={tx.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-slate-50/80 rounded-2xl px-3.5 transition-colors">
                       <div className="flex items-center gap-3.5">
                         {/* Date Pill */}
-                        <div className="w-11 h-11 rounded-xl bg-gray-100 border border-gray-200 flex flex-col items-center justify-center shrink-0">
+                        <div className="w-11 h-11 rounded-2xl bg-gray-100 border border-gray-200 flex flex-col items-center justify-center shrink-0">
                           <span className="text-[9px] font-bold text-gray-500 uppercase">{monthName}</span>
                           <span className="text-sm font-extrabold text-gray-900 leading-none">{dayNum}</span>
                         </div>
 
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-gray-900">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-gray-900 leading-snug">
                               {groupObj?.name || 'Chit Group'}
                             </span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                               isCollection 
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                                 : 'bg-amber-50 text-amber-700 border-amber-200'
                             }`}>
                               {isCollection ? 'Collection' : 'Prize Payout'}
                             </span>
-                            <span className="text-[10px] font-mono bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded">
+                            <span className="text-[10px] font-mono font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md">
                               {tx.wallet_type?.replace(/_/g, ' ').toUpperCase() || 'CASH'}
                             </span>
                             {tx.verification_proof_url && (
@@ -900,20 +900,20 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
                                 href={tx.verification_proof_url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-[9px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded flex items-center gap-0.5"
+                                className="text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md flex items-center gap-1"
                               >
-                                <Paperclip size={9} /> Receipt
+                                <Paperclip size={10} /> Receipt
                               </a>
                             )}
                           </div>
-                          <p className="text-[11px] text-gray-500 mt-0.5 max-w-md truncate">
+                          <p className="text-xs text-gray-500 max-w-md truncate leading-normal">
                             {tx.notes || 'Monthly chit installment payment'}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2.5 justify-between sm:justify-end">
-                        <span className={`text-sm font-extrabold mr-1 ${
+                      <div className="flex items-center gap-3 justify-between sm:justify-end">
+                        <span className={`text-sm sm:text-base font-extrabold mr-1 ${
                           isCollection ? 'text-emerald-600' : 'text-amber-600'
                         }`}>
                           {isCollection ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
@@ -926,26 +926,26 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
                               target="_blank"
                               rel="noreferrer"
                               title="Share receipt on WhatsApp"
-                              className="p-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
+                              className="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors active:scale-95"
                             >
-                              <Share2 size={13} />
+                              <Share2 size={14} />
                             </a>
                           )}
                           <button
                             type="button"
                             onClick={() => handleOpenEditPayment(tx)}
                             title="Edit receipt"
-                            className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-lg transition-colors"
+                            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-xl transition-colors active:scale-95"
                           >
-                            <Edit3 size={13} />
+                            <Edit3 size={14} />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeletePayment(tx)}
                             title="Delete receipt"
-                            className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-200 hover:border-rose-200 rounded-lg transition-colors"
+                            className="p-2 text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-200 hover:border-rose-200 rounded-xl transition-colors active:scale-95"
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </div>

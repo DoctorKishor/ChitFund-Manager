@@ -29,7 +29,7 @@ export default function TopStatusRibbon() {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 w-full">
       {WALLET_LIST.map((wallet) => {
         const Icon = wallet.icon;
         const balance = balances[wallet.key];
@@ -38,7 +38,7 @@ export default function TopStatusRibbon() {
         return (
           <div
             key={wallet.key}
-            className={`relative overflow-hidden bg-white border rounded-xl p-4 flex items-center justify-between shadow-sm transition-all duration-300 ${
+            className={`relative overflow-hidden bg-white border rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between shadow-xs transition-all duration-300 ${
               isFlashing
                 ? 'border-green-500 bg-green-50 scale-[1.02] shadow-md ring-2 ring-green-500/10'
                 : 'border-gray-200 hover:border-gray-300'
@@ -50,19 +50,19 @@ export default function TopStatusRibbon() {
               <span className={`relative inline-flex rounded-full h-2 w-2 ${isFlashing ? 'bg-green-500' : 'bg-indigo-600'}`}></span>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <div className={`p-2.5 rounded-lg border ${
+            <div className="flex items-center space-x-2.5 sm:space-x-3 w-full sm:w-auto">
+              <div className={`p-2 sm:p-2.5 rounded-lg border shrink-0 ${
                 isFlashing 
                   ? 'bg-green-100 border-green-200 text-green-700' 
                   : 'bg-gray-50 border-gray-150 text-gray-700'
               }`}>
-                <Icon size={20} />
+                <Icon size={18} className="sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider block truncate">
                   {wallet.label}
                 </span>
-                <span className={`text-lg font-bold tracking-tight transition-colors duration-300 ${
+                <span className={`text-base sm:text-lg font-bold tracking-tight block truncate transition-colors duration-300 ${
                   isFlashing ? 'text-green-600 font-extrabold' : 'text-gray-900'
                 }`}>
                   {formatCurrency(balance)}
@@ -71,7 +71,7 @@ export default function TopStatusRibbon() {
             </div>
 
             {/* Quick Micro Sparkline Indicator */}
-            <div className="flex items-center text-xs text-gray-400 space-x-1 shrink-0">
+            <div className="hidden sm:flex items-center text-xs text-gray-400 space-x-1 shrink-0">
               <TrendingUp size={12} className={isFlashing ? 'text-green-500' : 'text-indigo-600'} />
               <span className="font-medium text-[10px] text-gray-500">Realtime</span>
             </div>

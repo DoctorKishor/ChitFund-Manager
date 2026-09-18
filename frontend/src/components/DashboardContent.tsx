@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useWallet } from '../context/WalletContext';
+import { useWallet, WalletType } from '../context/WalletContext';
 import { supabase } from '../utils/supabase/client';
 import LiveAuctionEngine from './LiveAuctionEngine';
 import CashVaultLedger from './CashVaultLedger';
 import MemberMatrix from './MemberMatrix';
 import CommunicationBroadcastCenter from './CommunicationBroadcastCenter';
+import ReportsCenter from './ReportsCenter';
 import { 
   DollarSign, 
   Users, 
@@ -53,7 +54,13 @@ import {
   Info,
   Sparkles,
   RotateCcw,
-  Paperclip
+  Paperclip,
+  Layers,
+  Filter,
+  Bell,
+  MessageSquare,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 
 // ── Utility: First Sunday on-or-after the 10th of a given month ──────────────
@@ -915,6 +922,8 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [quickPaymentAmount, setQuickPaymentAmount] = useState<string>('');
   const [paymentDateType, setPaymentDateType] = useState<'today' | 'yesterday' | 'custom'>('today');
   const [customPaymentDate, setCustomPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [paymentAllocationMode, setPaymentAllocationMode] = useState<'auto' | 'custom'>('auto');
+  const [paymentCustomMonths, setPaymentCustomMonths] = useState<number[]>([]);
   const [paymentNote, setPaymentNote] = useState<string>('');
   const [paymentReceiptUrl, setPaymentReceiptUrl] = useState<string>('');
   const [receiptFileToUpload, setReceiptFileToUpload] = useState<File | null>(null);
@@ -925,6 +934,135 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [isMarkingAllPaid, setIsMarkingAllPaid] = useState<boolean>(false);
   const [isClosingMonth, setIsClosingMonth] = useState<boolean>(false);
+
+  // Winner Prize Payout Disbursal Hub States
+  const [showDisbursePayoutModal, setShowDisbursePayoutModal] = useState<boolean>(false);
+  const [disbursePayoutAmount, setDisbursePayoutAmount] = useState<string>('');
+  const [disbursePayoutWallet, setDisbursePayoutWallet] = useState<WalletType>('dad_bank');
+  const [disbursePayoutDateType, setDisbursePayoutDateType] = useState<'today' | 'yesterday' | 'custom'>('today');
+  const [disbursePayoutCustomDate, setDisbursePayoutCustomDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [disbursePayoutNote, setDisbursePayoutNote] = useState<string>('');
+  const [disbursePayoutReceiptUrl, setDisbursePayoutReceiptUrl] = useState<string>('');
+  const [disburseReceiptFileToUpload, setDisburseReceiptFileToUpload] = useState<File | null>(null);
+  const [isProcessingDisbursal, setIsProcessingDisbursal] = useState<boolean>(false);
+  const [disburseDeductThisMonth, setDisburseDeductThisMonth] = useState<boolean>(false);
+  const [disburseDeductArrearMonths, setDisburseDeductArrearMonths] = useState<number[]>([]);
+  const [disburseDeductAdvanceMonths, setDisburseDeductAdvanceMonths] = useState<number[]>([]);
+
+  // Smooth Auto-Centering Refs & Effects for Selected Month & Active Chit Group Sliders
+  const monthButtonsRef = useRef<Map<number, HTMLButtonElement>>(new Map());
+  const chitGroupButtonsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const activeMonthBtn = monthButtonsRef.current.get(selectedDashboardMonth);
+      if (activeMonthBtn) {
+        activeMonthBtn.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center',
+        });
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [selectedDashboardMonth, activeDashboardGroupId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const activeGroupBtn = chitGroupButtonsRef.current.get(activeDashboardGroupId);
+      if (activeGroupBtn) {
+        activeGroupBtn.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center',
+        });
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [activeDashboardGroupId]);
+
+  // ── Remind All Modal States & Handlers (ChitBase Style) ─────────────────────────
+  const [showRemindModal, setShowRemindModal] = useState<boolean>(false);
+  const [remindModalTab, setRemindModalTab] = useState<'individual' | 'group'>('individual');
+  const [remindPhoneInputs, setRemindPhoneInputs] = useState<{ [memberId: string]: string }>({});
+  const [savingMemberPhoneId, setSavingMemberPhoneId] = useState<string | null>(null);
+  const [remindCopied, setRemindCopied] = useState<boolean>(false);
+
+  // Helper: Generate individual subscriber WhatsApp reminder URL
+  const generateMemberReminderWhatsAppUrl = (
+    member: any,
+    dueAmount: number,
+    group: any,
+    monthNum: number,
+    phoneOverride?: string
+  ) => {
+    const rawPhone = phoneOverride || member.phone || '';
+    const cleanDigits = normalizePhone(rawPhone);
+    const effectivePhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+    const chitName = group?.name || 'Chit Fund';
+
+    const text = `*Chit Fund Payment Reminder* 🔔\n\nDear *${member.name}* (Ticket #${member.ticket}),\n\nThis is a gentle reminder for your chit installment of *₹${dueAmount.toLocaleString('en-IN')}* for *${chitName}* (Month ${monthNum}).\n\nKindly arrange to settle the pending balance at your earliest convenience.\n\nThank you! 🙏`;
+
+    if (effectivePhone) {
+      return `https://wa.me/${effectivePhone}?text=${encodeURIComponent(text)}`;
+    }
+    return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+  };
+
+  // Helper: Save phone number permanently to profile & open WhatsApp
+  const handleSavePhoneAndSend = async (
+    member: any,
+    dueAmount: number,
+    group: any,
+    monthNum: number
+  ) => {
+    const enteredPhone = remindPhoneInputs[member.id]?.trim();
+    if (!enteredPhone) {
+      alert('Please enter a valid phone number.');
+      return;
+    }
+    const cleanDigits = normalizePhone(enteredPhone);
+    if (cleanDigits.length < 10) {
+      alert('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    try {
+      setSavingMemberPhoneId(member.id);
+
+      if (member.profileId) {
+        const { error: profErr } = await supabase
+          .from('profiles')
+          .update({ phone_number: cleanDigits })
+          .eq('id', member.profileId);
+        if (profErr) {
+          console.warn('Error updating profile phone:', profErr.message);
+        }
+      }
+
+      setDashboardGroupMembers(prev =>
+        prev.map(m => (m.id === member.id ? { ...m, phone: cleanDigits } : m))
+      );
+
+      const url = generateMemberReminderWhatsAppUrl(member, dueAmount, group, monthNum, cleanDigits);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      alert(`Failed to save phone number: ${err.message}`);
+    } finally {
+      setSavingMemberPhoneId(null);
+    }
+  };
+
+  // Helper: Generate Group Broadcast Message text
+  const generateGroupBroadcastText = (pendingMembersList: any[], group: any, monthNum: number) => {
+    const chitName = group?.name || 'Chit Fund';
+    const totalDue = pendingMembersList.reduce((sum, m) => sum + (m.remaining || 0), 0);
+    const memberLines = pendingMembersList
+      .map(m => `• *${m.name}* (Ticket #${m.ticket}) — *₹${(m.remaining || 0).toLocaleString('en-IN')}* pending`)
+      .join('\n');
+
+    return `🔔 *${chitName} — Month ${monthNum} Payment Reminder* 🔔\n\nDear Members,\nPlease find the collection status for Month ${monthNum}:\n\n${memberLines}\n\n*Total Pending: ₹${totalDue.toLocaleString('en-IN')}*\n\nKindly settle the pending dues via Cash or UPI at your earliest convenience.\n\nThank you! 🙏`;
+  };
 
   // Helper: client-side image downscaling & compression to protect Supabase 500MB DB & 1GB Storage limits
   // Compresses any 5-10MB mobile photo down to ~30-50 KB without quality loss for receipts
@@ -1081,16 +1219,44 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         setDashboardTransactions(txData);
       }
 
-      // 3. Fetch auction logs for this group
+      // 3. Fetch auction logs for this group joined with winner profiles
       const { data: logsData, error: logsError } = await supabase
         .from('auction_logs')
-        .select('*')
+        .select(`
+          *,
+          winning_bidder:winning_bidder_id (
+            id,
+            full_name,
+            phone_number
+          )
+        `)
         .eq('group_id', groupId)
         .order('month', { ascending: true });
 
       if (logsError) console.warn('Error fetching auction logs for dashboard:', logsError.message);
       if (logsData) {
-        setDashboardAuctionLogs(logsData);
+        setDashboardAuctionLogs(
+          logsData.map((l: any) => {
+            const prof = Array.isArray(l.winning_bidder) ? l.winning_bidder[0] : l.winning_bidder;
+            let bidStreamWinner = '';
+            let bidStreamTicket: number | null = null;
+            if (Array.isArray(l.bid_stream) && l.bid_stream.length > 0) {
+              const maxBid = l.bid_stream.reduce((prev: any, curr: any) => (Number(curr.amount) > Number(prev.amount) ? curr : prev), l.bid_stream[0]);
+              bidStreamWinner = maxBid?.memberName || '';
+              bidStreamTicket = maxBid?.ticketNumber || null;
+            }
+            const discountAmt = Number(l.winning_discount ?? l.winning_bid ?? 0);
+            return {
+              ...l,
+              winning_discount: discountAmt,
+              winning_bid: discountAmt,
+              winner_name: prof?.full_name || bidStreamWinner || 'Subscriber',
+              winner_profile_id: l.winning_bidder_id,
+              winner_phone: prof?.phone_number || '',
+              winner_ticket: bidStreamTicket,
+            };
+          })
+        );
       }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -1107,11 +1273,12 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
   // Helper: compute total collections paid by member for a specific month
   const getMemberPaidAmountForMonth = (profileIdOrMemberId: string, month: number) => {
+    const monthPattern = new RegExp(`\\bMonth\\s+${month}\\b`, 'i');
     return dashboardTransactions
       .filter(t => 
         t.type === 'collection' && 
         (t.profile_id === profileIdOrMemberId || t.group_member_id === profileIdOrMemberId) &&
-        (t.notes?.includes(`Month ${month}`) || !t.notes)
+        (t.notes ? monthPattern.test(t.notes) : true)
       )
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   };
@@ -1136,7 +1303,155 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     return `${monthName} '${yearShort} M${monthNum}${monthNum === 1 ? ' (1st Auction)' : ''}`;
   };
 
-  // 1-Tap Record Quick Payment Handler
+  // Helper: compute smart multi-month payment allocations for live breakdown preview
+  const computePaymentAllocations = (
+    member: any,
+    amountStr: string,
+    mode: 'auto' | 'custom',
+    customMonths: number[]
+  ) => {
+    const totalAmount = parseFloat(amountStr) || 0;
+    if (!member || !activeDashboardGroupId || totalAmount <= 0) {
+      return { allocations: [], deferredArrears: [], unallocated: totalAmount, totalAllocated: 0, monthsSummary: [] };
+    }
+
+    const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId) || localGroups[0];
+    const duration = activeGroup?.duration || activeGroup?.memberCount || 20;
+    const totalChitVal = activeGroup?.totalValue || 200000;
+    const baseInst = Math.round(totalChitVal / (activeGroup?.memberCount || duration || 1));
+    const memberInst = member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : baseInst;
+
+    const activeCurrentCycleMonth = (activeGroup?.currentMonth !== undefined && activeGroup?.currentMonth !== null) 
+      ? Number(activeGroup.currentMonth) 
+      : 0;
+
+    // Build month breakdown for all months from 0 to duration - 1
+    const monthsData: {
+      month: number;
+      label: string;
+      expectedDue: number;
+      alreadyPaid: number;
+      remainingDue: number;
+      isArrear: boolean;
+      isCurrent: boolean;
+      isFuture: boolean;
+    }[] = [];
+
+    for (let m = 0; m < duration; m++) {
+      const alreadyPaid = getMemberPaidAmountForMonth(member.profileId || member.id, m);
+      const isArrear = m < activeCurrentCycleMonth;
+      const isCurrent = m === activeCurrentCycleMonth;
+      const isFuture = m > activeCurrentCycleMonth;
+      const expectedDue = memberInst;
+      const remainingDue = Math.max(0, expectedDue - alreadyPaid);
+
+      monthsData.push({
+        month: m,
+        label: `M${m}`,
+        expectedDue,
+        alreadyPaid,
+        remainingDue,
+        isArrear,
+        isCurrent,
+        isFuture,
+      });
+    }
+
+    const allocations: {
+      month: number;
+      amount: number;
+      type: 'arrear' | 'current' | 'advance';
+      statusAfter: 'cleared' | 'partial' | 'overpaid';
+      priorPaid: number;
+      due: number;
+    }[] = [];
+
+    const deferredArrears: {
+      month: number;
+      remainingDue: number;
+    }[] = [];
+
+    let remainingToAllocate = totalAmount;
+
+    if (mode === 'auto') {
+      // FIFO Order: 1) Past unpaid arrears (< activeCurrentCycleMonth), 2) Active current month (=== activeCurrentCycleMonth), 3) Upcoming advance months (> activeCurrentCycleMonth)
+      const orderedMonths = [
+        ...monthsData.filter(m => m.isArrear && m.remainingDue > 0),
+        ...monthsData.filter(m => m.isCurrent),
+        ...monthsData.filter(m => m.isFuture),
+      ];
+
+      for (const m of orderedMonths) {
+        if (remainingToAllocate <= 0) break;
+        const targetDue = m.remainingDue > 0 ? m.remainingDue : m.expectedDue;
+        const canTake = targetDue > 0 ? targetDue : memberInst;
+        const applying = Math.min(remainingToAllocate, canTake);
+        if (applying > 0) {
+          allocations.push({
+            month: m.month,
+            amount: applying,
+            type: m.isArrear ? 'arrear' : m.isCurrent ? 'current' : 'advance',
+            statusAfter: (m.alreadyPaid + applying) >= m.expectedDue ? 'cleared' : 'partial',
+            priorPaid: m.alreadyPaid,
+            due: m.expectedDue,
+          });
+          remainingToAllocate -= applying;
+        }
+      }
+    } else {
+      // Custom / Targeted Mode: Apply only to selected months
+      const selectedSet = new Set(customMonths);
+      
+      // Identify deferred past arrears that are NOT selected
+      monthsData.filter(m => m.isArrear && m.remainingDue > 0 && !selectedSet.has(m.month)).forEach(m => {
+        deferredArrears.push({ month: m.month, remainingDue: m.remainingDue });
+      });
+
+      // Allocate in order among selected months
+      const selectedMonthsData = monthsData.filter(m => selectedSet.has(m.month));
+      for (const m of selectedMonthsData) {
+        if (remainingToAllocate <= 0) break;
+        const targetDue = m.remainingDue > 0 ? m.remainingDue : m.expectedDue;
+        const canTake = targetDue > 0 ? targetDue : memberInst;
+        const applying = Math.min(remainingToAllocate, canTake);
+        if (applying > 0) {
+          allocations.push({
+            month: m.month,
+            amount: applying,
+            type: m.isArrear ? 'arrear' : m.isCurrent ? 'current' : 'advance',
+            statusAfter: (m.alreadyPaid + applying) >= m.expectedDue ? 'cleared' : 'partial',
+            priorPaid: m.alreadyPaid,
+            due: m.expectedDue,
+          });
+          remainingToAllocate -= applying;
+        }
+      }
+    }
+
+    // Surplus cash handling
+    if (remainingToAllocate > 0) {
+      if (allocations.length > 0) {
+        allocations[allocations.length - 1].amount += remainingToAllocate;
+        allocations[allocations.length - 1].statusAfter = 'overpaid';
+      } else {
+        allocations.push({
+          month: activeCurrentCycleMonth,
+          amount: remainingToAllocate,
+          type: 'current',
+          statusAfter: 'overpaid',
+          priorPaid: 0,
+          due: memberInst,
+        });
+      }
+      remainingToAllocate = 0;
+    }
+
+    const totalAllocated = totalAmount - remainingToAllocate;
+
+    return { allocations, deferredArrears, unallocated: remainingToAllocate, totalAllocated, monthsSummary: monthsData };
+  };
+
+  // 1-Tap Record Quick Payment Handler (with Smart Multi-Month Allocation)
   const handleRecordQuickPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recordingPaymentMember || !activeDashboardGroupId) return;
@@ -1177,42 +1492,66 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       }
 
       const effectiveDateStr = computeEffectivePaymentDate(paymentDateType, customPaymentDate);
-      const defaultNote = `Month ${selectedDashboardMonth} collection payment - Ticket #${recordingPaymentMember.ticket} (${recordingPaymentMember.name})`;
-      const finalNote = paymentNote.trim() ? `${defaultNote} — Note: ${paymentNote.trim()}` : defaultNote;
+      
+      // 2. Compute allocations
+      const { allocations } = computePaymentAllocations(
+        recordingPaymentMember,
+        quickPaymentAmount,
+        paymentAllocationMode,
+        paymentCustomMonths
+      );
 
-      // 2. Insert collection transaction (only tiny ~80 byte URL saved in database)
-      const { error: txErr } = await supabase
-        .from('transactions')
-        .insert({
+      if (allocations.length === 0) {
+        alert('Please specify at least one target month or enter a valid amount.');
+        return;
+      }
+
+      // 3. Build atomic collection rows per allocated month
+      const rowsToInsert = allocations.map(item => {
+        const typeLabel = item.type === 'arrear' 
+          ? ' (Arrear Cleared)' 
+          : item.type === 'advance' 
+            ? ' (Advance Pre-paid)' 
+            : '';
+        const defaultNote = `Month ${item.month}${typeLabel} collection payment - Ticket #${recordingPaymentMember.ticket} (${recordingPaymentMember.name})`;
+        const finalNote = paymentNote.trim() ? `${defaultNote} — Note: ${paymentNote.trim()}` : defaultNote;
+
+        return {
           group_id: activeDashboardGroupId,
           profile_id: recordingPaymentMember.profileId || null,
           group_member_id: recordingPaymentMember.id || null,
           wallet_type: paymentWalletType,
           type: 'collection',
           status: 'completed',
-          amount: amt,
+          amount: item.amount,
           notes: finalNote,
           verification_proof_url: finalReceiptUrl,
           created_at: effectiveDateStr,
           created_by: profile?.id || null,
-        });
+        };
+      });
+
+      const { error: txErr } = await supabase
+        .from('transactions')
+        .insert(rowsToInsert);
 
       if (txErr) {
         alert('Failed to record payment in database: ' + txErr.message);
         return;
       }
 
-      // 3. Increment global treasury balance for this wallet
+      // 4. Increment global treasury balance for this wallet by total amount
       await updateBalance(paymentWalletType as any, amt);
 
-      // 4. Update audit logs
+      // 5. Update audit logs with allocation summary
+      const summaryStr = allocations.map(a => `M${a.month}: ₹${a.amount.toLocaleString('en-IN')}`).join(', ');
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       setAuditLogs(prev => [
         {
           timestamp: `Today, ${timeStr}`,
           table: 'transactions',
-          desc: `COLLECTION: Received ₹${amt.toLocaleString('en-IN')} via ${paymentWalletType.replace(/_/g, ' ')} from ${recordingPaymentMember.name} (Ticket #${recordingPaymentMember.ticket}, Month ${selectedDashboardMonth})`,
+          desc: `COLLECTION: Received ₹${amt.toLocaleString('en-IN')} via ${paymentWalletType.replace(/_/g, ' ')} from ${recordingPaymentMember.name} (Ticket #${recordingPaymentMember.ticket}) — [${summaryStr}]`,
           executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
         },
         ...prev,
@@ -1224,6 +1563,8 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       setPaymentReceiptUrl('');
       setReceiptFileToUpload(null);
       setPaymentDateType('today');
+      setPaymentAllocationMode('auto');
+      setPaymentCustomMonths([]);
       await fetchDashboardData(activeDashboardGroupId);
     } catch (err: any) {
       console.error('Error processing quick payment:', err);
@@ -1429,6 +1770,217 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     } finally {
       setIsProcessingPayment(false);
     }
+  };
+
+  // ── Winner Prize Payout Disbursal Handlers ──────────────────────────────────
+  const handleOpenDisburseModal = (remainingDue: number) => {
+    setDisbursePayoutAmount(remainingDue > 0 ? remainingDue.toString() : '');
+    setDisbursePayoutWallet('dad_bank');
+    setDisbursePayoutDateType('today');
+    setDisbursePayoutCustomDate(new Date().toISOString().split('T')[0]);
+    setDisbursePayoutNote('');
+    setDisbursePayoutReceiptUrl('');
+    setDisburseReceiptFileToUpload(null);
+    setDisburseDeductThisMonth(false);
+    setDisburseDeductArrearMonths([]);
+    setDisburseDeductAdvanceMonths([]);
+    setShowDisbursePayoutModal(true);
+  };
+
+  const handleDisburseReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) {
+      alert('Photo size exceeds 15MB limit. Please choose a smaller image.');
+      return;
+    }
+    setDisburseReceiptFileToUpload(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setDisbursePayoutReceiptUrl(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRecordPrizePayoutSubmit = async (
+    e: React.FormEvent,
+    activeGroup: any,
+    currentMonthAuction: any,
+    netPrizePot: number,
+    remainingDue: number,
+    deductionsList: { month: number; amount: number; label: string }[] = []
+  ) => {
+    e.preventDefault();
+    if (!activeGroup || !currentMonthAuction) return;
+
+    const netCashAmount = Number(disbursePayoutAmount) || 0;
+    const totalDeductions = deductionsList.reduce((sum, d) => sum + d.amount, 0);
+
+    if (netCashAmount <= 0 && totalDeductions <= 0) {
+      alert('Please enter a valid disbursal or deduction amount.');
+      return;
+    }
+
+    const currentBal = balances[disbursePayoutWallet as keyof typeof balances] || 0;
+    if (netCashAmount > 0 && currentBal < netCashAmount) {
+      const confirmProceed = window.confirm(
+        `Warning: Selected vault (${disbursePayoutWallet.replace(/_/g, ' ')}) has ${formatCurrency(currentBal)}, which is less than the payout amount (${formatCurrency(netCashAmount)}).\n\nDo you still wish to record this payout?`
+      );
+      if (!confirmProceed) return;
+    }
+
+    try {
+      setIsProcessingDisbursal(true);
+
+      const effectiveDate = computeEffectivePaymentDate(disbursePayoutDateType, disbursePayoutCustomDate);
+      const winningBid = Number(currentMonthAuction.winning_discount ?? currentMonthAuction.winning_bid ?? 0);
+      const winnerProfileId = currentMonthAuction.winning_bidder_id || currentMonthAuction.winner_profile_id || currentMonthAuction.winner_id;
+      const memberMatch = dashboardGroupMembers.find(m => 
+        (winnerProfileId && (m.profileId === winnerProfileId || m.id === winnerProfileId)) ||
+        (currentMonthAuction.winner_name && m.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
+      );
+      const winnerName = memberMatch?.name || currentMonthAuction.winner_name || currentMonthAuction.winning_bidder?.full_name || 'Subscriber';
+
+      let finalReceiptUrl = disbursePayoutReceiptUrl || null;
+      if (disburseReceiptFileToUpload) {
+        try {
+          const compressedBlob = await compressImage(disburseReceiptFileToUpload);
+          const reader = new FileReader();
+          const base64Data = await new Promise<string>((resolve) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(compressedBlob);
+          });
+          finalReceiptUrl = base64Data;
+        } catch (compErr) {
+          console.warn('Disbursal receipt compression warning:', compErr);
+        }
+      }
+
+      const deductionSummaryStr = deductionsList.length > 0 
+        ? ` (Offset ${deductionsList.map(d => `M${d.month}: ${formatCurrency(d.amount)}`).join(', ')})`
+        : '';
+      const noteText = `Month ${selectedDashboardMonth} Winner Prize Payout - ${winnerName} (Discount: ${formatCurrency(winningBid)})${deductionSummaryStr}${disbursePayoutNote.trim() ? ` — Note: ${disbursePayoutNote.trim()}` : ''}`;
+
+      // 1. If net cash handed over > 0, insert 'payout' transaction and debit wallet
+      if (netCashAmount > 0) {
+        const { error: txError } = await supabase
+          .from('transactions')
+          .insert({
+            group_id: activeGroup.id,
+            group_member_id: memberMatch?.id || null,
+            profile_id: memberMatch?.profileId || (winnerProfileId || null),
+            type: 'payout',
+            status: 'completed',
+            amount: netCashAmount,
+            wallet_type: disbursePayoutWallet,
+            notes: noteText,
+            verification_proof_url: finalReceiptUrl,
+            created_at: effectiveDate,
+            created_by: profile?.id || null,
+          });
+
+        if (txError) {
+          alert(`Failed to save prize payout: ${txError.message}`);
+          return;
+        }
+
+        // Debit treasury wallet by net cash amount
+        await updateBalance(disbursePayoutWallet as any, -netCashAmount);
+      }
+
+      // 2. For each deducted month, insert 'collection' transaction automatically
+      if (deductionsList.length > 0) {
+        const collectionRows = deductionsList.map(d => ({
+          group_id: activeGroup.id,
+          group_member_id: memberMatch?.id || null,
+          profile_id: memberMatch?.profileId || (winnerProfileId || null),
+          type: 'collection',
+          status: 'completed',
+          amount: d.amount,
+          wallet_type: disbursePayoutWallet,
+          notes: `Month ${d.month} installment auto-settled & deducted from Month ${selectedDashboardMonth} Winner Prize Payout — Ticket #${memberMatch?.ticket || 1} (${winnerName})`,
+          created_at: effectiveDate,
+          created_by: profile?.id || null,
+        }));
+
+        const { error: collError } = await supabase
+          .from('transactions')
+          .insert(collectionRows);
+
+        if (collError) {
+          console.warn('Auto collection insert note:', collError.message);
+        }
+      }
+
+      // 3. Audit Log
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'transactions',
+          desc: `PRIZE SETTLEMENT: Paid ${formatCurrency(netCashAmount)} net cash to ${winnerName} for Month ${selectedDashboardMonth} via ${disbursePayoutWallet.replace(/_/g, ' ')}${deductionSummaryStr}`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+
+      setShowDisbursePayoutModal(false);
+      setDisbursePayoutAmount('');
+      setDisbursePayoutNote('');
+      setDisbursePayoutReceiptUrl('');
+      setDisburseReceiptFileToUpload(null);
+      setDisburseDeductThisMonth(false);
+      setDisburseDeductArrearMonths([]);
+      setDisburseDeductAdvanceMonths([]);
+      await fetchDashboardData(activeDashboardGroupId);
+      alert(`✅ Successfully recorded prize settlement for ${winnerName}!\n• Net Cash Paid Out: ${formatCurrency(netCashAmount)}${deductionSummaryStr ? `\n• Dues Settled & Marked PAID: ${deductionSummaryStr}` : ''}`);
+    } catch (err: any) {
+      alert(`Error recording prize disbursal: ${err.message}`);
+    } finally {
+      setIsProcessingDisbursal(false);
+    }
+  };
+
+  const handleSharePayoutWhatsApp = (
+    activeGroup: any,
+    winnerName: string,
+    winnerPhone: string,
+    monthNum: number,
+    netPrizePot: number,
+    winningBid: number,
+    totalDisbursed: number,
+    remainingDue: number,
+    recentWalletName?: string,
+    deductionsSummary?: string
+  ) => {
+    const rawDigits = normalizePhone(winnerPhone);
+    const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const text = encodeURIComponent(
+`🏆 *CHIT PRIZE SETTLEMENT RECEIPT*
+───────────────────────
+🏢 *Group:* ${activeGroup.name}
+🗓️ *Month:* Month ${monthNum} (${getDashboardMonthLabel(activeGroup, monthNum)})
+👤 *Winner Subscriber:* ${winnerName}
+💰 *Total Chit Value:* ${formatCurrency(activeGroup.totalValue)}
+📉 *Winning Discount Bid:* ${formatCurrency(winningBid)}
+───────────────────────
+💵 *Gross Prize Pot Due:* ${formatCurrency(netPrizePot)}
+${deductionsSummary ? `➖ *Installment Deductions / Offsets:*\n${deductionsSummary}\n───────────────────────\n` : ''}💸 *Net Cash Transferred:* ${formatCurrency(totalDisbursed)}
+${recentWalletName ? `🏦 *Disbursed Via:* ${recentWalletName}\n` : ''}📅 *Date:* ${dateStr}
+⚖️ *Remaining Balance Due:* ${formatCurrency(remainingDue)}
+───────────────────────
+${remainingDue === 0 ? '✅ *STATUS: FULLY SETTLED*' : '⏳ *STATUS: PARTIALLY SETTLED*'}
+Thank you for being a valued member of our Chit Fund family! 🙏`
+    );
+
+    const waUrl = rawDigits.length === 10
+      ? `https://wa.me/91${rawDigits}?text=${text}`
+      : `https://wa.me/?text=${text}`;
+
+    window.open(waUrl, '_blank');
   };
 
   // Mark All Paid Handler
@@ -2055,6 +2607,9 @@ Thank you for your prompt payment! 🙏`;
         const baseInstallment = Math.round(totalChitVal / (activeGroup?.memberCount || totalDuration || 1));
         const isLaaba = (activeGroup?.kaiIruppuPool || 0) >= totalChitVal;
         const defaultDue = isLaaba ? 0 : baseInstallment;
+        const activeCycle = (activeGroup?.currentMonth !== undefined && activeGroup?.currentMonth !== null)
+          ? Number(activeGroup.currentMonth)
+          : 0;
 
         // Compute dues, paid, status for each member
         const memberStats = dashboardGroupMembers.map(member => {
@@ -2062,11 +2617,23 @@ Thank you for your prompt payment! 🙏`;
           const paid = getMemberPaidAmountForMonth(member.profileId || member.id, selectedDashboardMonth);
           const remaining = Math.max(0, effectiveDue - paid);
           const status = remaining === 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid';
+
+          // Calculate cumulative balance owed across all months up to the current active running cycle
+          let totalDueUpToActiveCycle = 0;
+          let totalPaidUpToActiveCycle = 0;
+          for (let m = 0; m <= activeCycle; m++) {
+            const mDue = isLaaba ? 0 : (member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : defaultDue);
+            totalDueUpToActiveCycle += mDue;
+            totalPaidUpToActiveCycle += getMemberPaidAmountForMonth(member.profileId || member.id, m);
+          }
+          const totalPendingToday = Math.max(0, totalDueUpToActiveCycle - totalPaidUpToActiveCycle);
+
           return {
             ...member,
             effectiveDue,
             paid,
             remaining,
+            totalPendingToday,
             status,
           };
         });
@@ -2093,11 +2660,11 @@ Thank you for your prompt payment! 🙏`;
         );
 
         return (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Top Chit Groups Pill Switcher Bar */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-3 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider shrink-0 px-2 flex items-center gap-1.5">
+            <div className="bg-white border border-gray-200 rounded-2xl p-2.5 sm:p-3 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none flex-nowrap scroll-smooth">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider shrink-0 px-1.5 sm:px-2 flex items-center gap-1.5">
                   <Briefcase size={13} className="text-indigo-600" />
                   Chits:
                 </span>
@@ -2109,13 +2676,20 @@ Thank you for your prompt payment! 🙏`;
                     return (
                       <button
                         key={group.id}
+                        ref={(el) => {
+                          if (el) {
+                            chitGroupButtonsRef.current.set(group.id, el);
+                          } else {
+                            chitGroupButtonsRef.current.delete(group.id);
+                          }
+                        }}
                         onClick={() => {
                           setActiveDashboardGroupId(group.id);
                           setSelectedDashboardMonth(group.currentMonth !== undefined && group.currentMonth !== null ? group.currentMonth : 0);
                         }}
-                        className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border ${
+                        className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border whitespace-nowrap active:scale-95 ${
                           isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm shadow-indigo-100 ring-2 ring-indigo-500/20'
+                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs ring-2 ring-indigo-500/20'
                             : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
                         }`}
                       >
@@ -2141,7 +2715,7 @@ Thank you for your prompt payment! 🙏`;
               {/* Action Button: Create New Group */}
               <button
                 onClick={() => setShowWizard(true)}
-                className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all shrink-0 shadow-sm"
+                className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-xl transition-all shrink-0 shadow-2xs active:scale-95 w-full sm:w-auto"
               >
                 <Plus size={14} />
                 <span>New Group</span>
@@ -2150,16 +2724,17 @@ Thank you for your prompt payment! 🙏`;
 
             {/* Horizontal Month Carousel Navigator */}
             {activeGroup && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-3 shadow-sm flex items-center justify-between gap-2">
+              <div className="bg-white border border-gray-200 rounded-2xl p-2 sm:p-3 shadow-2xs flex items-center justify-between gap-1.5 sm:gap-2">
                 <button
                   onClick={() => setSelectedDashboardMonth(prev => Math.max(0, prev - 1))}
                   disabled={selectedDashboardMonth <= 0}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0"
+                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0 active:scale-95"
+                  aria-label="Previous month"
                 >
                   <ChevronLeft size={16} />
                 </button>
 
-                <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 px-1">
+                <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none py-1 px-1 flex-nowrap scroll-smooth">
                   {monthsRange.map((mNum) => {
                     const isSelected = (selectedDashboardMonth === mNum);
                     const isOngoingCurrent = ((activeGroup.currentMonth ?? 0) === mNum);
@@ -2168,12 +2743,19 @@ Thank you for your prompt payment! 🙏`;
                     return (
                       <button
                         key={mNum}
+                        ref={(el) => {
+                          if (el) {
+                            monthButtonsRef.current.set(mNum, el);
+                          } else {
+                            monthButtonsRef.current.delete(mNum);
+                          }
+                        }}
                         onClick={() => setSelectedDashboardMonth(mNum)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border ${
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border whitespace-nowrap active:scale-95 ${
                           isSelected
                             ? mNum === 0
-                              ? 'bg-amber-600 text-white border-amber-700 shadow-sm ring-2 ring-amber-500/20'
-                              : 'bg-gray-900 text-white border-black shadow-sm ring-2 ring-gray-900/10'
+                              ? 'bg-amber-600 text-white border-amber-700 shadow-xs ring-2 ring-amber-500/20'
+                              : 'bg-gray-900 text-white border-black shadow-xs ring-2 ring-gray-900/10'
                             : isOngoingCurrent
                             ? mNum === 0
                               ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300 ring-1 ring-amber-200'
@@ -2202,20 +2784,21 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   onClick={() => setSelectedDashboardMonth(prev => Math.min(totalDuration, prev + 1))}
                   disabled={selectedDashboardMonth >= totalDuration}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0"
+                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0 active:scale-95"
+                  aria-label="Next month"
                 >
                   <ChevronRight size={16} />
                 </button>
               </div>
             )}
 
-            {/* Collection Progress Hero Card */}
+            {/* Collection Progress Hero Card (Single Full-Width Card) */}
             {activeGroup && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm relative overflow-hidden space-y-5">
-                <div className="flex flex-col lg:flex-row justify-between lg:items-start gap-4">
+              <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-2xs relative overflow-hidden space-y-5 sm:space-y-6">
+                <div className="flex flex-col lg:flex-row justify-between lg:items-start gap-4 sm:gap-6">
                   <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className={`text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-lg border ${
                         selectedDashboardMonth === 0
                           ? 'bg-amber-50 text-amber-800 border-amber-200'
                           : 'bg-indigo-50 text-indigo-700 border-indigo-100'
@@ -2227,14 +2810,14 @@ Thank you for your prompt payment! 🙏`;
                         )}
                       </span>
                       {isLaaba && selectedDashboardMonth > 0 && (
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1">
                           <Sparkles size={11} /> Laaba Seetu Active
                         </span>
                       )}
                     </div>
                     
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-extrabold text-gray-900 tracking-tight">
+                    <div className="flex items-baseline gap-2.5 mt-2">
+                      <span className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight leading-none">
                         {formatCurrency(actualCollectionsTotal)}
                       </span>
                       <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -2242,42 +2825,58 @@ Thank you for your prompt payment! 🙏`;
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-5 mt-2.5 text-xs text-gray-500 font-medium">
                       <span>Target: <strong className="text-gray-900 font-bold">{formatCurrency(targetCollectionsTotal)}</strong></span>
-                      <span className="text-gray-300">•</span>
+                      <span className="text-gray-300 hidden sm:inline">•</span>
                       <span>Pending: <strong className="text-amber-600 font-bold">{formatCurrency(pendingCollectionsTotal)}</strong></span>
                     </div>
                   </div>
 
-                  {/* Actions & Fraction Progress */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-center">
+                  {/* Actions & Paid Progress */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-center flex items-center justify-between sm:block shadow-2xs">
                       <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Paid Members</span>
-                      <div className="text-sm font-extrabold text-gray-900 mt-0.5">
+                      <div className="text-base font-black text-gray-900 sm:mt-0.5">
                         <span className="text-emerald-600">{paidList.length}</span> / {dashboardGroupMembers.length}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
                       <button
                         onClick={handleMarkAllPaid}
                         disabled={isMarkingAllPaid || pendingList.length === 0}
-                        className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+                        className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-xs disabled:opacity-40 disabled:pointer-events-none active:scale-95"
                       >
                         <CheckCheck size={14} />
-                        <span>{isMarkingAllPaid ? 'Recording...' : 'Mark All Paid'}</span>
+                        <span className="truncate">{isMarkingAllPaid ? 'Recording...' : 'Mark All Paid'}</span>
                       </button>
+
+                      {/* Remind All Pending Members WhatsApp Hub Button */}
+                      {pendingList.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRemindModalTab('individual');
+                            setShowRemindModal(true);
+                          }}
+                          className="flex items-center justify-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-2xs active:scale-95"
+                          title="Send individual or group WhatsApp reminders to pending members"
+                        >
+                          <Send size={13} className="text-emerald-600" />
+                          <span className="truncate">Remind All ({pendingList.length})</span>
+                        </button>
+                      )}
 
                       {/* In-App Revert Active Month Button */}
                       {(activeGroup.currentMonth ?? 0) > 0 && (
                         <button
                           onClick={handleRevertMonth}
                           disabled={isClosingMonth}
-                          className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-sm border border-gray-200"
+                          className="flex items-center justify-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-xs border border-gray-200 active:scale-95"
                           title={`Roll back active cycle to Month ${(activeGroup.currentMonth ?? 1) - 1}`}
                         >
                           <RotateCcw size={13} className="text-gray-500" />
-                          <span>Revert to M{(activeGroup.currentMonth ?? 1) - 1}</span>
+                          <span className="truncate">Revert to M{(activeGroup.currentMonth ?? 1) - 1}</span>
                         </button>
                       )}
 
@@ -2285,19 +2884,19 @@ Thank you for your prompt payment! 🙏`;
                         <button
                           onClick={handleCloseMonth}
                           disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
-                          className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+                          className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs disabled:opacity-40 disabled:pointer-events-none active:scale-95"
                         >
                           <Rocket size={14} />
-                          <span>{isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M1'}</span>
+                          <span className="truncate">{isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M1'}</span>
                         </button>
                       ) : (
                         <button
                           onClick={handleCloseMonth}
                           disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
-                          className="flex items-center gap-1.5 bg-gray-900 hover:bg-black text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+                          className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs disabled:opacity-40 disabled:pointer-events-none active:scale-95"
                         >
                           <ArrowRight size={14} />
-                          <span>{isClosingMonth ? 'Closing...' : 'Close Month'}</span>
+                          <span className="truncate">{isClosingMonth ? 'Closing...' : 'Close Month'}</span>
                         </button>
                       )}
                     </div>
@@ -2305,140 +2904,364 @@ Thank you for your prompt payment! 🙏`;
                 </div>
 
                 {/* Smooth Progress Bar */}
-                <div className="space-y-1.5">
+                <div className="space-y-2 pt-1">
                   <div className="w-full bg-gray-100 rounded-full h-3.5 overflow-hidden p-0.5 border border-gray-200">
                     <div
-                      className="bg-gradient-to-r from-indigo-600 to-emerald-500 h-full rounded-full transition-all duration-500 shadow-sm"
+                      className="bg-gradient-to-r from-indigo-600 to-emerald-500 h-full rounded-full transition-all duration-500 shadow-xs"
                       style={{ width: `${completionPct}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-[11px] text-gray-500 font-semibold">
+                  <div className="flex justify-between text-xs text-gray-500 font-semibold">
                     <span>{completionPct}% Collected</span>
                     <span>{pendingList.length} members remaining</span>
                   </div>
                 </div>
 
-                {/* Bottom Winner / Cycle Pill */}
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                      <Trophy size={14} />
-                    </div>
-                    <div>
-                      {selectedDashboardMonth === 0 ? (
-                        <div className="text-xs">
-                          <span className="font-bold text-amber-900">Month 0: Launch Month — Organizer Profit Phase</span>
-                          <span className="text-gray-600 ml-1.5">
-                            (Full {formatCurrency(totalChitVal)} pot collected is allocated directly to the Organizer as Organizer Profit · No auction held)
-                          </span>
+                {/* ── Prominent Winner Prize Pot & Disbursal Hub Card ────────────────────────── */}
+                {(() => {
+                  if (selectedDashboardMonth === 0) {
+                    return (
+                      <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                            <Rocket size={20} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-extrabold text-amber-950 uppercase tracking-wider">
+                                Month 0: Launch Month — Organizer Profit Phase
+                              </span>
+                              <span className="bg-amber-200 text-amber-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                                No Auction
+                              </span>
+                            </div>
+                            <p className="text-xs text-amber-800 mt-0.5">
+                              The full <strong>{formatCurrency(totalChitVal)}</strong> collected pool is reserved and allocated directly to the Organizer as <strong>Organizer Profit</strong>.
+                            </p>
+                          </div>
                         </div>
-                      ) : currentMonthAuction ? (
-                        <div className="text-xs">
-                          <span className="font-bold text-gray-900">
-                            Won · {currentMonthAuction.winner_name || 'Subscriber'}
-                          </span>
-                          <span className="text-gray-500 ml-1.5">
-                            (Winning Discount: <strong className="text-indigo-600">{formatCurrency(currentMonthAuction.winning_bid || 0)}</strong> · Net Payout: <strong className="text-emerald-600">{formatCurrency(totalChitVal - (currentMonthAuction.winning_bid || 0))}</strong>)
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-gray-600 flex items-center gap-1.5">
-                          <span>Auction for Month {selectedDashboardMonth} has not been conducted yet.</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Auction Date / Link */}
-                  <div className="flex items-center gap-2">
-                    {(() => {
-                      const { display, isOrientation } = getGroupAuctionDate(activeGroup.id, selectedDashboardMonth);
-                      return (
-                        <span className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
-                          <CalendarDays size={12} className={isOrientation ? "text-amber-600" : "text-indigo-600"} />
-                          <span>{isOrientation ? 'Session:' : 'Auction:'} <strong className="text-gray-800">{display}</strong></span>
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
+                        <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-amber-200">
+                          {(() => {
+                            const { display } = getGroupAuctionDate(activeGroup.id, 0);
+                            return (
+                              <span className="text-xs text-amber-900 font-bold flex items-center gap-1.5 bg-white/70 border border-amber-200 px-3 py-1.5 rounded-xl shadow-2xs">
+                                <CalendarDays size={13} className="text-amber-700" />
+                                <span>{display}</span>
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (!currentMonthAuction) {
+                    return (
+                      <div className="bg-gray-50 border border-dashed border-gray-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-gray-200 text-gray-500 flex items-center justify-center shrink-0">
+                            <Trophy size={16} />
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-gray-700">
+                              Auction for Month {selectedDashboardMonth} has not taken place yet
+                            </div>
+                            <p className="text-[11px] text-gray-400">
+                              Conduct live bidding in the Live Auction Engine to declare this month's winning subscriber and unlock prize disbursal.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {(() => {
+                            const { display } = getGroupAuctionDate(activeGroup.id, selectedDashboardMonth);
+                            return (
+                              <span className="text-xs text-indigo-700 font-bold flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl">
+                                <CalendarDays size={13} className="text-indigo-600" />
+                                <span>Scheduled: <strong>{display}</strong></span>
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Auction Won Month — Render full Disbursal Hub Card!
+                  const winningBid = Number(currentMonthAuction.winning_discount ?? currentMonthAuction.winning_bid ?? 0);
+                  const netPrizePot = Math.max(0, totalChitVal - winningBid);
+                  const winnerProfileId = currentMonthAuction.winning_bidder_id || currentMonthAuction.winner_profile_id || currentMonthAuction.winner_id;
+                  const winnerMember = dashboardGroupMembers.find(m => 
+                    (winnerProfileId && (m.profileId === winnerProfileId || m.id === winnerProfileId)) ||
+                    (currentMonthAuction.winner_name && m.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
+                  );
+                  const winnerName = winnerMember?.name || currentMonthAuction.winner_name || currentMonthAuction.winning_bidder?.full_name || 'Subscriber';
+                  const winnerPhone = winnerMember?.phone || currentMonthAuction.winner_phone || currentMonthAuction.winning_bidder?.phone_number || '';
+                  const winnerTicketNum = winnerMember?.ticket || currentMonthAuction.winner_ticket;
+
+                  // Find payout transactions for this month
+                  const monthPattern = new RegExp(`\\bMonth\\s+${selectedDashboardMonth}\\b`, 'i');
+                  const monthPayoutTxs = dashboardTransactions.filter(t =>
+                    t.type === 'payout' && (t.notes ? monthPattern.test(t.notes) : true)
+                  );
+                  const totalPrizeDisbursed = monthPayoutTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+                  const remainingPrizeDue = Math.max(0, netPrizePot - totalPrizeDisbursed);
+                  const isSettled = remainingPrizeDue === 0 && (totalPrizeDisbursed > 0 || netPrizePot === 0);
+                  const isPartial = totalPrizeDisbursed > 0 && remainingPrizeDue > 0;
+
+                  return (
+                    <div className={`rounded-2xl border-2 p-4 sm:p-5 shadow-sm space-y-4 transition-all ${
+                      isSettled 
+                        ? 'bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-white border-emerald-300' 
+                        : isPartial
+                        ? 'bg-gradient-to-br from-amber-50/70 via-yellow-50/40 to-white border-amber-300'
+                        : 'bg-gradient-to-br from-rose-50/60 via-indigo-50/40 to-white border-rose-300'
+                    }`}>
+                      {/* Top Header: Winner Badge & Disbursal Status */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-gray-200/70 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+                            isSettled ? 'bg-emerald-600 text-white' : isPartial ? 'bg-amber-600 text-white' : 'bg-indigo-600 text-white'
+                          }`}>
+                            <Trophy size={20} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500">
+                                Month {selectedDashboardMonth} Auction Winner
+                              </span>
+                              {winnerTicketNum && (
+                                <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.2 rounded-md">
+                                  Ticket #{winnerTicketNum}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
+                              <span>{winnerName}</span>
+                              {winnerPhone && (
+                                <a 
+                                  href={`tel:${normalizePhone(winnerPhone)}`} 
+                                  className="text-gray-400 hover:text-emerald-600 transition-colors p-1"
+                                  title={`Call ${winnerName}`}
+                                >
+                                  <Phone size={13} />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Disbursal Status Badge */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isSettled ? (
+                            <span className="bg-emerald-600 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5">
+                              <CheckCheck size={14} /> Fully Disbursed
+                            </span>
+                          ) : isPartial ? (
+                            <span className="bg-amber-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5">
+                              <AlertCircle size={14} /> Partially Disbursed
+                            </span>
+                          ) : (
+                            <span className="bg-rose-600 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 animate-pulse">
+                              <AlertCircle size={14} /> Disbursal Pending
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Financial Figures Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                        <div className="bg-white/90 border border-gray-200/80 rounded-xl p-3 shadow-2xs">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Winning Discount</span>
+                          <span className="text-sm sm:text-base font-extrabold text-indigo-700 font-mono">
+                            {formatCurrency(winningBid)}
+                          </span>
+                          <span className="text-[9px] text-gray-400 block mt-0.5">Pooled to Kai Iruppu</span>
+                        </div>
+
+                        <div className="bg-white/90 border border-gray-200/80 rounded-xl p-3 shadow-2xs">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Net Prize Pot Due</span>
+                          <span className="text-sm sm:text-base font-extrabold text-gray-900 font-mono">
+                            {formatCurrency(netPrizePot)}
+                          </span>
+                          <span className="text-[9px] text-gray-400 block mt-0.5">Total Chit − Winning Bid</span>
+                        </div>
+
+                        <div className="bg-white/90 border border-gray-200/80 rounded-xl p-3 shadow-2xs">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Disbursed So Far</span>
+                          <span className={`text-sm sm:text-base font-extrabold font-mono ${totalPrizeDisbursed > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                            {formatCurrency(totalPrizeDisbursed)}
+                          </span>
+                          <span className="text-[9px] text-gray-400 block mt-0.5">{monthPayoutTxs.length} transfer(s)</span>
+                        </div>
+
+                        <div className={`border rounded-xl p-3 shadow-2xs ${
+                          remainingPrizeDue > 0 ? 'bg-rose-50/80 border-rose-200' : 'bg-emerald-50/80 border-emerald-200'
+                        }`}>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider block ${
+                            remainingPrizeDue > 0 ? 'text-rose-700' : 'text-emerald-700'
+                          }`}>
+                            {remainingPrizeDue > 0 ? 'Balance Pending' : 'Balance Settled'}
+                          </span>
+                          <span className={`text-sm sm:text-base font-extrabold font-mono ${
+                            remainingPrizeDue > 0 ? 'text-rose-700' : 'text-emerald-700'
+                          }`}>
+                            {formatCurrency(remainingPrizeDue)}
+                          </span>
+                          <span className="text-[9px] text-gray-500 block mt-0.5">
+                            {remainingPrizeDue === 0 ? '✓ Zero balance' : 'Pay to winner'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons & Recent Payout Receipts */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* 1-Tap Disburse Prize Button */}
+                          <button
+                            onClick={() => handleOpenDisburseModal(remainingPrizeDue)}
+                            className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs active:scale-95"
+                          >
+                            <Banknote size={15} />
+                            <span>{remainingPrizeDue > 0 ? `Disburse Prize (₹${remainingPrizeDue.toLocaleString('en-IN')})` : 'Disburse Additional / Re-disburse'}</span>
+                          </button>
+
+                          {/* WhatsApp Payout Receipt Generator Button */}
+                          <button
+                            onClick={() => handleSharePayoutWhatsApp(
+                              activeGroup,
+                              winnerName,
+                              winnerPhone,
+                              selectedDashboardMonth,
+                              netPrizePot,
+                              winningBid,
+                              totalPrizeDisbursed,
+                              remainingPrizeDue,
+                              monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
+                            )}
+                            className="flex items-center justify-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs active:scale-95"
+                            title="Generate & Send WhatsApp Payout Receipt"
+                          >
+                            <Send size={13} className="text-emerald-700" />
+                            <span>WhatsApp Receipt</span>
+                          </button>
+                        </div>
+
+                        {/* Recent Disbursals Miniature Tag */}
+                        {monthPayoutTxs.length > 0 && (
+                          <div className="flex items-center gap-2 overflow-x-auto text-[11px] text-gray-600">
+                            <span className="font-bold text-gray-400 uppercase text-[9px]">Receipts:</span>
+                            {monthPayoutTxs.map((tx, idx) => (
+                              <span key={tx.id || idx} className="bg-white border border-gray-200 px-2.5 py-1 rounded-lg font-medium shrink-0 flex items-center gap-1.5 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                <strong>{formatCurrency(tx.amount)}</strong>
+                                <span className="text-gray-400 capitalize">({tx.wallet_type?.replace(/_/g, ' ')})</span>
+                                {tx.verification_proof_url && (
+                                  <a href={tx.verification_proof_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800" title="View attached receipt">
+                                    <Paperclip size={11} />
+                                  </a>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
             {/* "Yet to Pay" Section (Pending Member Action Cards) */}
             {activeGroup && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-sm">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs">
+                <div className="flex justify-between items-center border-b border-gray-100 pb-3.5">
                   <div>
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                      <Users size={16} className="text-indigo-600" />
+                    <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
+                      <Users size={18} className="text-indigo-600" />
                       <span>{pendingList.length} yet to pay</span>
-                      <span className="text-xs font-normal text-gray-500">
+                      <span className="text-xs font-normal text-gray-500 hidden sm:inline">
                         ({partialCount} partial · {unpaidCount} unpaid)
                       </span>
                     </h3>
                   </div>
-                  <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
-                    Month {selectedDashboardMonth} Dues
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {pendingList.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRemindModalTab('individual');
+                          setShowRemindModal(true);
+                        }}
+                        className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-xl transition-all active:scale-95 shadow-2xs"
+                      >
+                        <Send size={13} className="text-emerald-600" />
+                        <span>Remind All</span>
+                      </button>
+                    )}
+                    <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg">
+                      Month {selectedDashboardMonth} Dues
+                    </span>
+                  </div>
                 </div>
 
                 {loadingDashboardData ? (
-                  <div className="py-8 text-center text-gray-400 text-xs flex items-center justify-center gap-2">
-                    <RefreshCw size={14} className="animate-spin text-indigo-600" />
+                  <div className="py-10 text-center text-gray-400 text-xs flex items-center justify-center gap-2">
+                    <RefreshCw size={15} className="animate-spin text-indigo-600" />
                     <span>Loading subscriber dues...</span>
                   </div>
                 ) : pendingList.length === 0 ? (
-                  <div className="py-8 text-center bg-emerald-50/50 border border-emerald-100 rounded-xl space-y-1">
-                    <CheckCircle2 size={24} className="mx-auto text-emerald-600" />
-                    <p className="text-xs font-bold text-emerald-800">All subscribers have paid for Month {selectedDashboardMonth}!</p>
-                    <p className="text-[11px] text-emerald-600">Total collected: {formatCurrency(actualCollectionsTotal)}</p>
+                  <div className="py-10 text-center bg-emerald-50/50 border border-emerald-100 rounded-2xl space-y-1.5">
+                    <CheckCircle2 size={28} className="mx-auto text-emerald-600" />
+                    <p className="text-sm font-bold text-emerald-900">All subscribers have paid for Month {selectedDashboardMonth}!</p>
+                    <p className="text-xs text-emerald-600 font-medium">Total collected: {formatCurrency(actualCollectionsTotal)}</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     {pendingList.map((member) => {
                       const initial = member.name.charAt(0).toUpperCase() || 'S';
                       return (
                         <div
                           key={member.id}
-                          className="bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-xl p-3.5 flex items-center justify-between gap-3 transition-colors shadow-xs"
+                          className="bg-gray-50/80 hover:bg-white border border-gray-200/90 hover:border-gray-300 rounded-2xl p-4 sm:p-4.5 flex items-center justify-between gap-3 sm:gap-4 transition-all shadow-2xs"
                         >
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
                             {/* Avatar */}
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
+                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-2xs">
                               {initial}
                             </div>
 
-                            <div className="min-w-0 space-y-0.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-gray-900 text-xs truncate">{member.name}</span>
-                                <span className="text-[10px] font-bold bg-gray-200 text-gray-700 px-1.5 py-0.2 rounded font-mono">
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-gray-900 text-sm leading-snug">{member.name}</span>
+                                <span className="text-[10px] font-bold bg-gray-200/80 text-gray-700 px-2 py-0.5 rounded-md font-mono shrink-0">
                                   #{member.ticket}
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-2 text-[11px]">
+                              <div className="flex items-center gap-2 text-xs leading-normal flex-wrap">
                                 {member.status === 'partial' ? (
-                                  <span className="text-amber-700 font-bold bg-amber-100/70 border border-amber-200 px-1.5 py-0.2 rounded text-[9px] uppercase">
+                                  <span className="text-amber-800 font-extrabold bg-amber-100/80 border border-amber-200 px-2 py-0.5 rounded-md text-[9px] uppercase tracking-wider shrink-0">
                                     Partial
                                   </span>
                                 ) : (
-                                  <span className="text-rose-700 font-bold bg-rose-100/70 border border-rose-200 px-1.5 py-0.2 rounded text-[9px] uppercase">
+                                  <span className="text-rose-800 font-extrabold bg-rose-100/80 border border-rose-200 px-2 py-0.5 rounded-md text-[9px] uppercase tracking-wider shrink-0">
                                     Unpaid
                                   </span>
                                 )}
-                                <span className="text-gray-500">
-                                  Due: <strong className="text-gray-900">{formatCurrency(member.remaining)}</strong>
+                                <span className="text-gray-500 font-medium whitespace-nowrap">
+                                  Due: <strong className="text-gray-900 font-extrabold">{formatCurrency(member.remaining)}</strong>
                                 </span>
                                 {member.paid > 0 && (
-                                  <span className="text-emerald-600 font-medium">
+                                  <span className="text-emerald-600 font-medium hidden sm:inline">
                                     (Paid: {formatCurrency(member.paid)})
                                   </span>
                                 )}
                               </div>
 
                               {member.status === 'partial' && (
-                                <div className="w-28 bg-gray-200 rounded-full h-1.5 overflow-hidden mt-1">
+                                <div className="w-28 sm:w-32 bg-gray-200 rounded-full h-1.5 overflow-hidden mt-1.5">
                                   <div
                                     className="bg-amber-500 h-full rounded-full"
                                     style={{ width: `${Math.min(100, (member.paid / member.effectiveDue) * 100)}%` }}
@@ -2448,23 +3271,30 @@ Thank you for your prompt payment! 🙏`;
                             </div>
                           </div>
 
-                          {/* 1-Tap Record Button */}
-                          <button
-                            onClick={() => {
-                              setRecordingPaymentMember(member);
-                              setEditingTransaction(null);
-                              setQuickPaymentAmount(member.remaining.toString());
-                              setPaymentWalletType('cash_in_hand');
-                              setPaymentDateType('today');
-                              setCustomPaymentDate(new Date().toISOString().split('T')[0]);
-                              setPaymentNote('');
-                              setPaymentReceiptUrl('');
-                            }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm shrink-0 flex items-center gap-1.5"
-                          >
-                            <Coins size={13} />
-                            <span>Record</span>
-                          </button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* 1-Tap Record Button */}
+                            <button
+                              onClick={() => {
+                                setRecordingPaymentMember(member);
+                                setEditingTransaction(null);
+                                const defaultAmount = (member.totalPendingToday > 0 
+                                  ? member.totalPendingToday 
+                                  : (member.remaining > 0 ? member.remaining : 20000));
+                                setQuickPaymentAmount(defaultAmount.toString());
+                                setPaymentWalletType('cash_in_hand');
+                                setPaymentAllocationMode('auto');
+                                setPaymentCustomMonths([selectedDashboardMonth]);
+                                setPaymentDateType('today');
+                                setCustomPaymentDate(new Date().toISOString().split('T')[0]);
+                                setPaymentNote('');
+                                setPaymentReceiptUrl('');
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-xs shrink-0 flex items-center gap-1.5 active:scale-95"
+                            >
+                              <Coins size={13} />
+                              <span>Record</span>
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -2476,7 +3306,7 @@ Thank you for your prompt payment! 🙏`;
                   <div className="pt-2 border-t border-gray-100">
                     <button
                       onClick={() => setHidePaidMembers(!hidePaidMembers)}
-                      className="text-xs font-bold text-gray-600 hover:text-gray-900 flex items-center gap-1.5 py-1"
+                      className="text-xs font-bold text-gray-600 hover:text-gray-900 flex items-center gap-1.5 py-1 active:scale-95"
                     >
                       {hidePaidMembers ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                       <span>{hidePaidMembers ? 'Show' : 'Hide'} Paid Members ({paidList.length})</span>
@@ -2528,7 +3358,7 @@ Thank you for your prompt payment! 🙏`;
 
             {/* Payments Breakdown Ledger & WhatsApp Sharing */}
             {activeGroup && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-5 space-y-3 sm:space-y-4 shadow-2xs">
                 <div className="flex justify-between items-center border-b border-gray-100 pb-3">
                   <div>
                     <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
@@ -2536,10 +3366,10 @@ Thank you for your prompt payment! 🙏`;
                       <span>Payments Breakdown Ledger</span>
                     </h3>
                     <p className="text-[11px] text-gray-500 mt-0.5">
-                      Live transaction receipts for Month {selectedDashboardMonth} with edit/delete & 1-click WhatsApp sharing
+                      Live receipts for Month {selectedDashboardMonth} with WhatsApp share &amp; edit
                     </p>
                   </div>
-                  <span className="text-xs font-bold text-gray-500">
+                  <span className="text-xs font-bold text-gray-500 shrink-0">
                     {currentMonthTransactions.length} receipts
                   </span>
                 </div>
@@ -2559,31 +3389,31 @@ Thank you for your prompt payment! 🙏`;
                         : 'Today';
 
                       return (
-                        <div key={tx.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-gray-50/50 rounded-lg px-2">
-                          <div className="flex items-center gap-3">
+                        <div key={tx.id} className="py-2.5 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-gray-50/50 rounded-lg px-2">
+                          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                             <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
                               #{ticketNum}
                             </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-gray-900">{memberName}</span>
-                                <span className="text-[10px] font-mono bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-gray-900 truncate">{memberName}</span>
+                                <span className="text-[10px] font-mono bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded shrink-0">
                                   {tx.wallet_type?.replace(/_/g, ' ').toUpperCase() || 'CASH'}
                                 </span>
                                 {tx.verification_proof_url && (
-                                  <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded flex items-center gap-0.5">
+                                  <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded flex items-center gap-0.5 shrink-0">
                                     <Paperclip size={9} /> Receipt
                                   </span>
                                 )}
                               </div>
                               <div className="flex items-center gap-2 text-[10px] text-gray-400">
                                 <span>{dateStr}</span>
-                                {tx.notes && <span className="text-gray-500 italic max-w-xs truncate">· {tx.notes}</span>}
+                                {tx.notes && <span className="text-gray-500 italic max-w-[150px] sm:max-w-xs truncate">· {tx.notes}</span>}
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 justify-between sm:justify-end">
+                          <div className="flex items-center gap-2 justify-between sm:justify-end shrink-0 pt-1 sm:pt-0">
                             <span className="text-xs font-bold text-emerald-600 mr-1">
                               +{formatCurrency(Number(tx.amount || 0))}
                             </span>
@@ -2596,10 +3426,10 @@ Thank you for your prompt payment! 🙏`;
                                   target="_blank"
                                   rel="noreferrer"
                                   title="Share receipt on WhatsApp"
-                                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition-colors"
+                                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition-colors active:scale-95"
                                 >
                                   <Share2 size={12} />
-                                  <span className="hidden sm:inline">Share</span>
+                                  <span className="text-[10px]">Share</span>
                                 </a>
                               )}
 
@@ -2608,7 +3438,7 @@ Thank you for your prompt payment! 🙏`;
                                 type="button"
                                 onClick={() => handleOpenEditPayment(tx)}
                                 title="Edit payment"
-                                className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-lg transition-colors"
+                                className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-lg transition-colors active:scale-95"
                               >
                                 <Edit3 size={13} />
                               </button>
@@ -2618,7 +3448,7 @@ Thank you for your prompt payment! 🙏`;
                                 type="button"
                                 onClick={() => handleDeletePayment(tx)}
                                 title="Delete payment receipt"
-                                className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-200 hover:border-rose-200 rounded-lg transition-colors"
+                                className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-200 hover:border-rose-200 rounded-lg transition-colors active:scale-95"
                               >
                                 <Trash2 size={13} />
                               </button>
@@ -2634,10 +3464,10 @@ Thank you for your prompt payment! 🙏`;
 
             {/* Unified Quick Record & Edit Payment Modal */}
             {(recordingPaymentMember || editingTransaction) && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
                 <form
                   onSubmit={editingTransaction ? handleSavePaymentEdit : handleRecordQuickPayment}
-                  className="bg-white rounded-2xl border border-gray-200 p-6 w-full max-w-md space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
+                  className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 w-full max-w-md space-y-3.5 sm:space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
                 >
                   {/* Modal Header */}
                   <div className="flex justify-between items-center border-b border-gray-100 pb-3">
@@ -2695,8 +3525,17 @@ Thank you for your prompt payment! 🙏`;
                         <div className="text-right shrink-0">
                           {recordingPaymentMember ? (
                             <>
-                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Remaining Due</span>
-                              <span className="font-bold text-amber-600">{formatCurrency(recordingPaymentMember.remaining)}</span>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                                {recordingPaymentMember.totalPendingToday > recordingPaymentMember.remaining ? 'Total Due Today' : 'Remaining Due'}
+                              </span>
+                              <span className="font-extrabold text-amber-600 text-sm">
+                                {formatCurrency(recordingPaymentMember.totalPendingToday > 0 ? recordingPaymentMember.totalPendingToday : recordingPaymentMember.remaining)}
+                              </span>
+                              {recordingPaymentMember.totalPendingToday > recordingPaymentMember.remaining && (
+                                <span className="text-[9px] text-gray-500 font-medium block">
+                                  (M{selectedDashboardMonth} Due: {formatCurrency(recordingPaymentMember.remaining)})
+                                </span>
+                              )}
                             </>
                           ) : (
                             <>
@@ -2709,50 +3548,105 @@ Thank you for your prompt payment! 🙏`;
                     );
                   })()}
 
-                  {/* Payment Amount Input */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Payment Amount (₹)</label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-2.5 text-base text-gray-400 font-bold">₹</span>
+                  {/* Payment Amount Input (Large Centered High-Legibility Input for Parents) */}
+                  <div className="space-y-1.5 text-center">
+                    <label className="text-[11px] text-gray-500 font-extrabold uppercase tracking-wider block">
+                      Payment Amount (₹)
+                    </label>
+                    <div className="relative max-w-[320px] mx-auto">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-400 select-none">
+                        ₹
+                      </span>
                       <input
                         type="number"
                         required
-                        placeholder="Amount"
+                        placeholder="0"
                         value={quickPaymentAmount}
                         onChange={(e) => setQuickPaymentAmount(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-2 text-base font-bold text-gray-900 focus:outline-none"
+                        className="w-full bg-white border-2 border-gray-200 focus:border-indigo-600 rounded-2xl pl-10 pr-6 py-3.5 text-2xl sm:text-3xl font-black text-gray-900 tracking-tight shadow-xs text-center focus:outline-none transition-all"
                       />
                     </div>
                   </div>
 
-                  {/* Quick Preset Chips */}
-                  <div className="flex gap-2">
-                    {recordingPaymentMember && recordingPaymentMember.remaining > 0 && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setQuickPaymentAmount(recordingPaymentMember.remaining.toString())}
-                          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-1.5 rounded-lg transition-colors border border-gray-200"
-                        >
-                          Full ({formatCurrency(recordingPaymentMember.remaining)})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setQuickPaymentAmount(Math.floor(recordingPaymentMember.remaining / 2).toString())}
-                          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-1.5 rounded-lg transition-colors border border-gray-200"
-                        >
-                          Half ({formatCurrency(Math.floor(recordingPaymentMember.remaining / 2))})
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setQuickPaymentAmount('')}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-4 py-1.5 rounded-lg transition-colors border border-gray-200"
-                    >
-                      Clear
-                    </button>
-                  </div>
+                  {/* Payment Distribution Preview Card */}
+                  {recordingPaymentMember && parseFloat(quickPaymentAmount) > 0 && (
+                    <div className="space-y-2 bg-slate-50 border border-gray-200 rounded-xl p-3 animate-in fade-in duration-150">
+                      <div className="flex justify-between items-center border-b border-gray-200 pb-1.5">
+                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Coins size={12} className="text-emerald-600" />
+                          <span>How this payment applies:</span>
+                        </span>
+                        <span className="text-xs font-black text-gray-900">
+                          Total: {formatCurrency(parseFloat(quickPaymentAmount))}
+                        </span>
+                      </div>
+
+                      {(() => {
+                        const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId) || localGroups[0];
+                        let baseDate = new Date();
+                        if (activeGroup?.startDate) {
+                          const parsed = new Date(activeGroup.startDate);
+                          if (!isNaN(parsed.getTime())) baseDate = parsed;
+                        }
+
+                        const { allocations } = computePaymentAllocations(
+                          recordingPaymentMember,
+                          quickPaymentAmount,
+                          'auto',
+                          []
+                        );
+
+                        if (allocations.length === 0) return null;
+
+                        return (
+                          <div className="space-y-1.5">
+                            {allocations.map((alloc) => {
+                              const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + alloc.month, 1);
+                              const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+                              const yearShort = d.getFullYear().toString().slice(-2);
+                              const formattedMonthLabel = alloc.month === 0 
+                                ? `${monthName} '${yearShort} (M0 Launch)`
+                                : `${monthName} '${yearShort} (M${alloc.month})`;
+
+                              const badgeStyle = alloc.type === 'arrear'
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                : alloc.type === 'current'
+                                  ? 'bg-indigo-100 text-indigo-800 border-indigo-200'
+                                  : 'bg-purple-100 text-purple-800 border-purple-200';
+
+                              const typeName = alloc.type === 'arrear'
+                                ? 'Old Dues Cleared'
+                                : alloc.type === 'current'
+                                  ? 'Month Settled'
+                                  : 'Advance Credit';
+
+                              return (
+                                <div
+                                  key={alloc.month}
+                                  className="flex items-center justify-between text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-2 shadow-2xs"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-gray-900">{formattedMonthLabel}</span>
+                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${badgeStyle}`}>
+                                      {typeName}
+                                    </span>
+                                    {alloc.statusAfter === 'partial' && (
+                                      <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                        Partial (Remaining: {formatCurrency(Math.max(0, alloc.due - (alloc.priorPaid + alloc.amount)))})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="font-black text-gray-900">
+                                    {formatCurrency(alloc.amount)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {/* 4-Wallet Selector (Receiving Account / Vault) */}
                   <div className="space-y-1.5">
@@ -3015,108 +3909,35 @@ Thank you for your prompt payment! 🙏`;
       );
 
     case 'reports':
-      return (
-        <div className="space-y-6">
-          
-          {/* Analytical Overview Suite */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
-            <div className="border-b border-gray-100 pb-3">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <BarChart3 size={16} className="text-indigo-650" />
-                Reports & Real-Time Portfolio Analytics
-              </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Real-time metrics compiled directly from your active Supabase chit groups and treasury ledger.
-              </p>
-            </div>
-
-            {/* Quick Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Total Active Groups</span>
-                <span className="text-xl font-bold text-gray-900 mt-1 block">{localGroups.filter(g => g.active).length}</span>
-                <span className="text-[10px] text-indigo-600 mt-1 block">Live from Supabase</span>
-              </div>
-
-              <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Total Value Managed</span>
-                <span className="text-xl font-bold text-gray-900 mt-1 block">
-                  {formatCurrency(localGroups.reduce((acc, g) => acc + (g.totalValue || 0), 0))}
-                </span>
-                <span className="text-[10px] text-gray-500 mt-1 block">Across all active groups</span>
-              </div>
-
-              <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Treasury Cash Liquid</span>
-                <span className="text-xl font-bold text-green-600 mt-1 block">
-                  {formatCurrency(balances.cash_in_hand)}
-                </span>
-                <span className="text-[10px] text-gray-500 mt-1 block">Physical Cash Box</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick analytic statistics columns */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Average Monthly Dividend</span>
-              <span className="text-lg font-bold text-gray-900 mt-1 block">
-                {localGroups.length === 0 ? '₹0' : formatCurrency(0)}
-              </span>
-              <span className="text-[10px] text-gray-400 mt-1 block">
-                {localGroups.length === 0 ? 'No active auctions yet' : 'Calculated per active auction'}
-              </span>
-            </div>
-
-            <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Collected Funds (Actual)</span>
-              <span className="text-lg font-bold text-gray-900 mt-1 block">{formatCurrency(actualCollections)}</span>
-              <span className="text-[10px] text-gray-500 mt-1 block">
-                Target baseline: {formatCurrency(targetCollections)}
-              </span>
-            </div>
-
-            <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Total Outstanding Dues</span>
-              <span className="text-lg font-bold text-amber-600 mt-1 block">
-                {formatCurrency(Math.max(0, targetCollections - actualCollections))}
-              </span>
-              <span className="text-[10px] text-gray-500 mt-1 block">
-                {fifoMembers.filter(m => getMemberTotalDue(m) > 0).length} pending subscribers
-              </span>
-            </div>
-          </div>
-
-        </div>
-      );
+      return <ReportsCenter />;
 
     case 'chits':
       const selectedWorkspaceGroup = localGroups.find(g => g.id === selectedWorkspaceGroupId);
 
       return (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           
           {/* 1. CHIT GROUP WORKSPACE VIEW */}
           {selectedWorkspaceGroupId && selectedWorkspaceGroup && !showWizard ? (
-            <div className="space-y-5 animate-in fade-in duration-200">
+            <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200">
               
               {/* Workspace Top Navigation Bar */}
-              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => setSelectedWorkspaceGroupId(null)}
-                    className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+                    className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs w-fit active:scale-95"
                   >
                     <ArrowLeft size={14} /> Back to Directory
                   </button>
                   <div className="h-5 w-px bg-gray-200 hidden sm:block"></div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className={`w-2.5 h-2.5 rounded-full ${
                       selectedWorkspaceGroup.status === 'draft' ? 'bg-amber-500' : selectedWorkspaceGroup.status === 'completed' ? 'bg-purple-500' : 'bg-green-500 animate-pulse'
                     }`}></span>
-                    <h3 className="text-base font-bold text-gray-900">{selectedWorkspaceGroup.name}</h3>
-                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${
+                    <h3 className="text-sm sm:text-base font-bold text-gray-900 truncate max-w-[180px] sm:max-w-none">{selectedWorkspaceGroup.name}</h3>
+                    <span className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${
                       selectedWorkspaceGroup.status === 'draft'
                         ? 'bg-amber-50 text-amber-700 border-amber-200'
                         : selectedWorkspaceGroup.status === 'completed'
@@ -3125,17 +3946,17 @@ Thank you for your prompt payment! 🙏`;
                     }`}>
                       {selectedWorkspaceGroup.status ? selectedWorkspaceGroup.status.toUpperCase() : 'ACTIVE'}
                     </span>
-                    <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-150 px-2 py-0.5 rounded">
+                    <span className="text-[9px] sm:text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-150 px-2 py-0.5 rounded">
                       Month {selectedWorkspaceGroup.currentMonth} of {selectedWorkspaceGroup.duration}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                   <button
                     type="button"
                     onClick={() => openEditGroupModal(selectedWorkspaceGroup)}
-                    className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+                    className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors active:scale-95"
                   >
                     <Edit3 size={13} className="text-gray-500" /> Edit Details
                   </button>
@@ -3146,40 +3967,40 @@ Thank you for your prompt payment! 🙏`;
                       setDeletePhraseInput('');
                       setDeleteSliderVal(0);
                     }}
-                    className="border border-red-200 bg-red-50/60 hover:bg-red-100 text-red-700 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+                    className="border border-red-200 bg-red-50/60 hover:bg-red-100 text-red-700 font-bold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs active:scale-95"
                   >
-                    <Trash2 size={13} className="text-red-600" /> Delete Group
+                    <Trash2 size={13} className="text-red-600" /> Delete
                   </button>
                 </div>
               </div>
 
-              {/* Group Key Metric Statistics */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-white border border-gray-200 p-3.5 rounded-xl shadow-sm">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Pool Value</span>
-                  <span className="text-lg font-bold text-gray-900 mt-0.5 block">{formatCurrency(selectedWorkspaceGroup.totalValue)}</span>
-                  <span className="text-[10px] text-gray-400">{selectedWorkspaceGroup.duration} Member Tickets</span>
+              {/* Group Key Metric Statistics (2x2 on mobile, 4 on desktop) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+                <div className="bg-white border border-gray-200 p-3 sm:p-3.5 rounded-2xl shadow-2xs">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block truncate">Total Pool Value</span>
+                  <span className="text-base sm:text-lg font-bold text-gray-900 mt-0.5 block truncate">{formatCurrency(selectedWorkspaceGroup.totalValue)}</span>
+                  <span className="text-[10px] text-gray-400 truncate block">{selectedWorkspaceGroup.duration} Tickets</span>
                 </div>
 
-                <div className="bg-white border border-gray-200 p-3.5 rounded-xl shadow-sm">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Monthly Installment</span>
-                  <span className="text-lg font-bold text-indigo-600 mt-0.5 block">
+                <div className="bg-white border border-gray-200 p-3 sm:p-3.5 rounded-2xl shadow-2xs">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block truncate">Monthly Installment</span>
+                  <span className="text-base sm:text-lg font-bold text-indigo-600 mt-0.5 block truncate">
                     {formatCurrency(selectedWorkspaceGroup.totalValue / selectedWorkspaceGroup.duration)}
                   </span>
-                  <span className="text-[10px] text-gray-400">per ticket / month</span>
+                  <span className="text-[10px] text-gray-400 truncate block">per member</span>
                 </div>
 
-                <div className="bg-white border border-gray-200 p-3.5 rounded-xl shadow-sm">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Accumulated Pool</span>
-                  <span className="text-lg font-bold text-emerald-600 mt-0.5 block">
+                <div className="bg-white border border-gray-200 p-3 sm:p-3.5 rounded-2xl shadow-2xs">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block truncate">Accumulated Pool</span>
+                  <span className="text-base sm:text-lg font-bold text-emerald-600 mt-0.5 block truncate">
                     {formatCurrency(selectedWorkspaceGroup.kaiIruppuPool || 0)}
                   </span>
-                  <span className="text-[10px] text-emerald-700 font-medium">Kai Iruppu (Discount Pool)</span>
+                  <span className="text-[10px] text-emerald-700 font-medium truncate block">Kai Iruppu</span>
                 </div>
 
-                <div className="bg-white border border-gray-200 p-3.5 rounded-xl shadow-sm">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Scheduled Auction</span>
-                  <span className="text-xs font-bold text-gray-800 mt-1 block">
+                <div className="bg-white border border-gray-200 p-3 sm:p-3.5 rounded-2xl shadow-2xs">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block truncate">Scheduled Auction</span>
+                  <span className="text-xs sm:text-xs font-bold text-gray-800 mt-1 block truncate">
                     {getGroupAuctionDate(selectedWorkspaceGroup.id).display}
                   </span>
                   <button
@@ -3197,7 +4018,7 @@ Thank you for your prompt payment! 🙏`;
 
               {/* Month 0 / Launch Status Banner */}
               {selectedWorkspaceGroup.currentMonth === 0 ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
@@ -3228,27 +4049,27 @@ Thank you for your prompt payment! 🙏`;
                       ]);
                       alert(`✅ Launch confirmed! ₹${selectedWorkspaceGroup.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
                     }}
-                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow shrink-0"
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs shrink-0 active:scale-95 w-full sm:w-auto"
                   >
-                    <Rocket size={14} /> Confirm Launch &amp; Roll to Month 1
+                    <Rocket size={14} /> Confirm Launch &amp; Roll to M1
                   </button>
                 </div>
               ) : (
-                <div className="bg-indigo-50/60 border border-indigo-150 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                <div className="bg-indigo-50/60 border border-indigo-150 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
                   <div className="space-y-0.5">
                     <h4 className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
                       <Coins size={14} className="text-indigo-600" />
                       Month {selectedWorkspaceGroup.currentMonth} Auction Cycle Active
                     </h4>
                     <p className="text-xs text-indigo-800">
-                      All eligible non-winning subscribers can place live discount bids. Maximum prize pot: <strong>{formatCurrency(selectedWorkspaceGroup.totalValue)}</strong>.
+                      Eligible subscribers can place live discount bids. Maximum prize pot: <strong>{formatCurrency(selectedWorkspaceGroup.totalValue)}</strong>.
                     </p>
                   </div>
                 </div>
               )}
 
               {/* Enrolled Member Ticket Roster Matrix */}
-              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+              <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-5 space-y-3 sm:space-y-4 shadow-2xs">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-gray-150 pb-3">
                   <div>
                     <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
@@ -3256,52 +4077,52 @@ Thank you for your prompt payment! 🙏`;
                       Enrolled Ticket Matrix &amp; Physical Book Sync
                     </h4>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Live status of all {selectedWorkspaceGroup.duration} assigned tickets, winning eligibility, and pocket book sync
+                      Live status of assigned tickets, winning eligibility, and pocket book sync
                     </p>
                   </div>
-                  <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded">
+                  <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-full w-fit">
                     Total: {workspaceMembers.length} / {selectedWorkspaceGroup.duration} Tickets
                   </span>
                 </div>
 
                 {loadingWorkspaceMembers ? (
                   <div className="py-8 text-center text-xs text-gray-400 flex items-center justify-center gap-2">
-                    <RefreshCw size={14} className="animate-spin" /> Loading enrolled ticket matrix from Supabase...
+                    <RefreshCw size={14} className="animate-spin text-indigo-600" /> Loading enrolled ticket matrix from Supabase...
                   </div>
                 ) : workspaceMembers.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                  <div className="py-8 text-center text-xs text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                     No individual member tickets linked to this group yet.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
                     {workspaceMembers.map((member) => (
                       <div 
                         key={member.id} 
-                        className={`p-3.5 rounded-xl border transition-all space-y-2.5 ${
+                        className={`p-3 sm:p-3.5 rounded-2xl border transition-all space-y-2.5 ${
                           member.hasWon
-                            ? 'bg-gray-50 border-gray-250 opacity-80'
-                            : 'bg-white border-gray-200 shadow-sm hover:border-gray-300'
+                            ? 'bg-gray-50/80 border-gray-200 opacity-80'
+                            : 'bg-white border-gray-200 shadow-2xs hover:border-gray-300'
                         }`}
                       >
                         <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold w-6 h-6 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150 flex items-center justify-center shrink-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs font-bold w-7 h-7 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-150 flex items-center justify-center shrink-0">
                               #{member.ticket}
                             </span>
-                            <div>
-                              <strong className="text-xs text-gray-900 block truncate max-w-[140px]">{member.name}</strong>
-                              <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                <Phone size={10} /> {member.phone || 'No phone'}
+                            <div className="min-w-0">
+                              <strong className="text-xs text-gray-900 block truncate max-w-[130px] sm:max-w-[160px]">{member.name}</strong>
+                              <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5 truncate">
+                                <Phone size={10} className="shrink-0" /> {member.phone || 'No phone'}
                               </span>
                             </div>
                           </div>
 
                           {member.hasWon ? (
-                            <span className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded">
-                              Already Won
+                            <span className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">
+                              Won
                             </span>
                           ) : (
-                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
                               Eligible
                             </span>
                           )}
@@ -3313,7 +4134,7 @@ Thank you for your prompt payment! 🙏`;
                           <button
                             type="button"
                             onClick={() => handleToggleWorkspaceBookSync(member.id, member.bookSynced)}
-                            className={`font-bold px-2.5 py-1 rounded transition-colors flex items-center gap-1 ${
+                            className={`font-bold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 active:scale-95 ${
                               member.bookSynced
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                                 : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
@@ -3339,65 +4160,65 @@ Thank you for your prompt payment! 🙏`;
             </div>
           ) : !showWizard ? (
             /* 2. DIRECTORY VIEW */
-            <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-200">
               
                {/* Summary Header banner */}
-              <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-4">
                 <div>
-                  <h3 className="text-base font-bold text-gray-900">Chit Groups Directory</h3>
+                  <h3 className="text-sm sm:text-base font-bold text-gray-900">Chit Groups Directory</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Active Groups: <strong className="text-gray-700">{localGroups.filter(g => g.active).length}</strong> | Total Value Managed: <strong className="text-indigo-600">{formatCurrency(localGroups.reduce((acc, g) => acc + g.totalValue, 0))}</strong>
+                    Active Groups: <strong className="text-gray-700">{localGroups.filter(g => g.active).length}</strong> · Value: <strong className="text-indigo-600">{formatCurrency(localGroups.reduce((acc, g) => acc + g.totalValue, 0))}</strong>
                   </p>
                 </div>
 
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => setShowWizard(true)}
-                    className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors shadow"
+                    className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 sm:py-2 rounded-xl transition-all shadow-xs active:scale-95 w-full sm:w-auto text-center"
                   >
                     + New Group
                   </button>
                 </div>
               </div>
 
-              {/* Filter Actions row */}
-              <div className="flex flex-wrap gap-2">
+              {/* Filter Actions row (Horizontally scrollable on small mobile screens) */}
+              <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-1 flex-nowrap sm:flex-wrap">
                 <button
                   onClick={() => setGroupFilter('all')}
-                  className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all ${
+                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 ${
                     groupFilter === 'all'
-                      ? 'bg-indigo-50 text-indigo-600 border-indigo-150'
-                      : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900'
+                      ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs ring-2 ring-indigo-500/20'
+                      : 'bg-white border-gray-200 text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  Show All ({localGroups.length})
+                  All ({localGroups.length})
                 </button>
                 <button
                   onClick={() => setGroupFilter('active')}
-                  className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all ${
+                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 ${
                     groupFilter === 'active'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-1 ring-emerald-200'
-                      : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900'
+                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs ring-2 ring-emerald-500/20'
+                      : 'bg-white border-gray-200 text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   Active ({localGroups.filter(g => g.status === 'active' || (!g.status && g.active)).length})
                 </button>
                 <button
                   onClick={() => setGroupFilter('draft')}
-                  className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all ${
+                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 ${
                     groupFilter === 'draft'
-                      ? 'bg-amber-50 text-amber-700 border-amber-200 ring-1 ring-amber-200'
-                      : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900'
+                      ? 'bg-amber-600 text-white border-amber-700 shadow-2xs ring-2 ring-amber-500/20'
+                      : 'bg-white border-gray-200 text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   Draft ({localGroups.filter(g => g.status === 'draft').length})
                 </button>
                 <button
                   onClick={() => setGroupFilter('completed')}
-                  className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all ${
+                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 ${
                     groupFilter === 'completed'
-                      ? 'bg-purple-50 text-purple-700 border-purple-200 ring-1 ring-purple-200'
-                      : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900'
+                      ? 'bg-purple-600 text-white border-purple-700 shadow-2xs ring-2 ring-purple-500/20'
+                      : 'bg-white border-gray-200 text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   Completed ({localGroups.filter(g => g.status === 'completed').length})
@@ -3405,15 +4226,15 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* Groups Card Directory Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {localGroups.filter(g => {
                   if (groupFilter === 'all') return true;
                   if (groupFilter === 'draft') return g.status === 'draft';
                   if (groupFilter === 'completed') return g.status === 'completed';
                   return g.status === 'active' || (!g.status && g.active);
                 }).length === 0 ? (
-                  <div className="col-span-full py-12 px-6 bg-white border border-gray-200 rounded-xl text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
-                    <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <div className="col-span-full py-12 px-6 bg-white border border-gray-200 rounded-2xl text-center flex flex-col items-center justify-center space-y-3 shadow-2xs">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                       <Briefcase size={24} />
                     </div>
                     <div className="space-y-1">
@@ -3424,7 +4245,7 @@ Thank you for your prompt payment! 🙏`;
                     </div>
                     <button
                       onClick={() => setShowWizard(true)}
-                      className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors shadow"
+                      className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-xs active:scale-95"
                     >
                       + Create First Group
                     </button>
@@ -3441,16 +4262,16 @@ Thank you for your prompt payment! 🙏`;
                     const progressPercent = (g.currentMonth / g.duration) * 100;
                     
                     return (
-                      <div key={g.id} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm hover:border-gray-300 transition-colors flex flex-col justify-between">
+                      <div key={g.id} className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 shadow-2xs hover:border-gray-300 transition-colors flex flex-col justify-between">
                         <div className="space-y-3">
                           {/* Card Top */}
                           <div className="flex justify-between items-start">
-                            <div className="flex flex-col space-y-1">
+                            <div className="flex flex-col space-y-1 min-w-0">
                               <div className="flex items-center space-x-2">
                                 <span className={`w-2 h-2 rounded-full shrink-0 ${
                                   g.status === 'draft' ? 'bg-amber-500' : g.status === 'completed' ? 'bg-purple-500' : 'bg-green-500 animate-pulse'
                                 }`}></span>
-                                <h4 className="text-xs font-bold text-gray-900 truncate max-w-[140px]">{g.name}</h4>
+                                <h4 className="text-xs sm:text-sm font-bold text-gray-900 truncate max-w-[150px] sm:max-w-[180px]">{g.name}</h4>
                               </div>
                               <div>
                                 <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border inline-block ${
@@ -3466,14 +4287,14 @@ Thank you for your prompt payment! 🙏`;
                             </div>
 
                             {/* Quick Action Icons */}
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 shrink-0">
                               <button
                                 type="button"
                                 title="Edit chit details"
                                 onClick={() => openEditGroupModal(g)}
-                                className="p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors active:scale-95"
                               >
-                                <Edit3 size={13} />
+                                <Edit3 size={14} />
                               </button>
                               <button
                                 type="button"
@@ -3483,9 +4304,9 @@ Thank you for your prompt payment! 🙏`;
                                   setDeletePhraseInput('');
                                   setDeleteSliderVal(0);
                                 }}
-                                className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors active:scale-95"
                               >
-                                <Trash2 size={13} />
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </div>
@@ -3502,9 +4323,9 @@ Thank you for your prompt payment! 🙏`;
                                 <span>Progress</span>
                                 <span>Month {g.currentMonth} of {g.duration}</span>
                               </div>
-                              <div className="w-full bg-gray-105 rounded-full h-1.5 overflow-hidden">
+                              <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
                                 <div 
-                                  className="bg-indigo-650 h-full rounded-full transition-all duration-350"
+                                  className="bg-indigo-600 h-full rounded-full transition-all duration-300"
                                   style={{ width: `${progressPercent}%` }}
                                 ></div>
                               </div>
@@ -3512,10 +4333,10 @@ Thank you for your prompt payment! 🙏`;
                           )}
 
                           {/* Metadata Tracks */}
-                          <div className="space-y-1.5 text-[10px] text-gray-500">
+                          <div className="space-y-1.5 text-[10px] sm:text-[11px] text-gray-500">
                             <div className="flex justify-between">
                               <span>Total Pool:</span>
-                              <strong className="text-gray-700">{formatCurrency(g.totalValue)}</strong>
+                              <strong className="text-gray-900">{formatCurrency(g.totalValue)}</strong>
                             </div>
                             <div className="flex justify-between">
                               <span>Monthly Installment:</span>
@@ -3536,7 +4357,7 @@ Thank you for your prompt payment! 🙏`;
                                     <strong className={isOverride ? 'text-amber-600' : 'text-gray-700'}>{display}</strong>
                                     <button
                                       onClick={() => { setRescheduleGroupId(g.id); setRescheduleInputVal(auctionDateOverrides[g.id] || ''); }}
-                                      className="text-[8px] font-bold text-indigo-650 bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded hover:bg-indigo-100 transition-colors"
+                                      className="text-[8px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded hover:bg-indigo-100 transition-colors"
                                     >
                                       Edit
                                     </button>
@@ -3569,9 +4390,9 @@ Thank you for your prompt payment! 🙏`;
                                 ]);
                                 alert(`✅ Launch confirmed! ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
                               }}
-                              className="w-full bg-amber-600 hover:bg-amber-755 text-white font-bold text-[10px] py-2 rounded flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95"
                             >
-                              <Rocket size={12} /> Confirm Launch &amp; Roll to Month 1
+                              <Rocket size={13} /> Confirm Launch &amp; Roll to M1
                             </button>
                           </div>
                         ) : (
@@ -3582,9 +4403,9 @@ Thank you for your prompt payment! 🙏`;
                                 setSelectedWorkspaceGroupId(g.id);
                                 fetchWorkspaceMembers(g.id);
                               }}
-                              className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 text-indigo-700 font-bold text-[10px] py-1.5 rounded transition-all flex items-center justify-center gap-1"
+                              className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 text-indigo-700 font-bold text-xs py-2 rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95"
                             >
-                              <Briefcase size={11} /> Dashboard
+                              <Briefcase size={12} /> Workspace
                             </button>
                             <button
                               onClick={() => {
@@ -3596,7 +4417,7 @@ Thank you for your prompt payment! 🙏`;
                                 setLocalGroups(prev => [copy, ...prev]);
                                 alert(`Chit Group template "${g.name}" duplicated successfully!`);
                               }}
-                              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-[10px] py-1.5 rounded transition-all"
+                              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs py-2 rounded-xl transition-all active:scale-95"
                             >
                               Duplicate
                             </button>
@@ -3610,12 +4431,12 @@ Thank you for your prompt payment! 🙏`;
             </div>
           ) : (
             /* 3. SETUP WIZARD VIEW */
-            <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
               
               {/* Setup Wizard Progress Indicator */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Chit Setup Wizard</h3>
+              <div className="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                <div className="flex items-center justify-between sm:justify-start space-x-2">
+                  <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider">Chit Setup Wizard</h3>
                   <button
                     onClick={() => setShowWizard(false)}
                     className="text-[10px] text-gray-500 hover:text-gray-900 underline font-semibold ml-2"
@@ -3623,60 +4444,60 @@ Thank you for your prompt payment! 🙏`;
                     Cancel Wizard
                   </button>
                 </div>
-                <div className="flex items-center space-x-6">
-                  <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-6 w-full sm:w-auto">
+                  <div className="flex items-center space-x-1.5 sm:space-x-2">
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                       wizardStep === 1 
-                        ? 'bg-gray-900 text-white shadow shadow-black/30' 
+                        ? 'bg-gray-900 text-white shadow-xs' 
                         : wizardStep > 1 
                           ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
                           : 'bg-gray-100 text-gray-400'
                     }`}>
                       {wizardStep > 1 ? <Check size={12} /> : '1'}
                     </span>
-                    <span className={`text-xs font-semibold ${wizardStep === 1 ? 'text-gray-900' : 'text-gray-400'}`}>Basic Info</span>
+                    <span className={`text-[11px] sm:text-xs font-semibold ${wizardStep === 1 ? 'text-gray-900 font-bold' : 'text-gray-400'}`}>Basic</span>
                   </div>
                   
-                  <div className="w-8 h-px bg-gray-200"></div>
+                  <div className="flex-1 sm:flex-none sm:w-8 h-px bg-gray-200"></div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1.5 sm:space-x-2">
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                       wizardStep === 2 
-                        ? 'bg-gray-900 text-white shadow shadow-black/30' 
+                        ? 'bg-gray-900 text-white shadow-xs' 
                         : wizardStep > 2 
                           ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
                           : 'bg-gray-100 text-gray-400'
                     }`}>
                       {wizardStep > 2 ? <Check size={12} /> : '2'}
                     </span>
-                    <span className={`text-xs font-semibold ${wizardStep === 2 ? 'text-gray-900' : 'text-gray-400'}`}>Assign Members</span>
+                    <span className={`text-[11px] sm:text-xs font-semibold ${wizardStep === 2 ? 'text-gray-900 font-bold' : 'text-gray-400'}`}>Members</span>
                   </div>
 
-                  <div className="w-8 h-px bg-gray-200"></div>
+                  <div className="flex-1 sm:flex-none sm:w-8 h-px bg-gray-200"></div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1.5 sm:space-x-2">
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                       wizardStep === 3 
-                        ? 'bg-gray-900 text-white shadow shadow-black/30' 
+                        ? 'bg-gray-900 text-white shadow-xs' 
                         : 'bg-gray-100 text-gray-400'
                     }`}>
                       3
                     </span>
-                    <span className={`text-xs font-semibold ${wizardStep === 3 ? 'text-gray-900' : 'text-gray-400'}`}>Monthly Plan</span>
+                    <span className={`text-[11px] sm:text-xs font-semibold ${wizardStep === 3 ? 'text-gray-900 font-bold' : 'text-gray-400'}`}>Plan</span>
                   </div>
                 </div>
               </div>
 
               {/* STEP 1: BASIC INFO */}
               {wizardStep === 1 && (
-                <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-5 shadow-sm">
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs">
                   <div className="border-b border-gray-150 pb-3">
                     <h4 className="text-sm font-bold text-gray-900">Step 1: Basic Information</h4>
                     <p className="text-xs text-gray-500 mt-0.5">Define name, monthly pool targets, and chit duration</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                    <div className="space-y-1.5">
                       <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Group Name</label>
                       <input
                         type="text"
@@ -3684,11 +4505,11 @@ Thank you for your prompt payment! 🙏`;
                         placeholder="e.g. G-Elite-Weekly-301"
                         value={newGroupName}
                         onChange={(e) => setNewGroupName(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none"
                       />
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Total Pool Value (₹)</label>
                       <input
                         type="number"
@@ -3696,16 +4517,16 @@ Thank you for your prompt payment! 🙏`;
                         placeholder="e.g. 100000"
                         value={newGroupValue}
                         onChange={(e) => setNewGroupValue(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none"
                       />
                       {/* Target Presets */}
-                      <div className="flex gap-1.5 mt-1.5">
+                      <div className="grid grid-cols-4 gap-1.5 mt-1.5">
                         {[{ label: '₹1L', val: 100000 }, { label: '₹2L', val: 200000 }, { label: '₹5L', val: 500000 }, { label: '₹10L', val: 1000000 }].map(preset => (
                           <button
                             key={preset.label}
                             type="button"
                             onClick={() => setNewGroupValue(preset.val.toString())}
-                            className="bg-gray-55 hover:bg-gray-105 border border-gray-200 text-[9px] text-gray-600 font-bold px-2 py-1 rounded transition-colors"
+                            className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] text-gray-700 font-bold py-1.5 rounded-lg transition-colors text-center active:scale-95"
                           >
                             {preset.label}
                           </button>
@@ -3713,7 +4534,7 @@ Thank you for your prompt payment! 🙏`;
                       </div>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Duration / Member Count (Months)</label>
                       <input
                         type="number"
@@ -3723,16 +4544,16 @@ Thank you for your prompt payment! 🙏`;
                         placeholder="e.g. 20"
                         value={newGroupDuration}
                         onChange={(e) => handleDurationChange(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none"
                       />
                       {/* Duration Presets */}
-                      <div className="flex gap-1.5 mt-1.5">
+                      <div className="grid grid-cols-4 gap-1.5 mt-1.5">
                         {[10, 20, 25, 50].map(val => (
                           <button
                             key={val}
                             type="button"
                             onClick={() => handleDurationChange(val.toString())}
-                            className="bg-gray-55 hover:bg-gray-105 border border-gray-200 text-[9px] text-gray-600 font-bold px-2.5 py-1 rounded transition-colors"
+                            className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] text-gray-700 font-bold py-1.5 rounded-lg transition-colors text-center active:scale-95"
                           >
                             {val}m
                           </button>
@@ -3740,25 +4561,25 @@ Thank you for your prompt payment! 🙏`;
                       </div>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Launch Date / Month 0 Start</label>
                       <input
                         type="date"
                         required
                         value={newGroupStartDate}
                         onChange={(e) => setNewGroupStartDate(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none font-semibold"
+                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none font-semibold"
                       />
                       <span className="text-[10px] text-gray-400 block">Sets the start month for Month 0 Launch calculations</span>
                     </div>
                   </div>
 
-                  <div className="flex justify-end pt-4 border-t border-gray-150">
+                  <div className="flex justify-end pt-3 sm:pt-4 border-t border-gray-150">
                     <button
                       type="button"
                       disabled={!newGroupName.trim() || !newGroupValue || !newGroupDuration}
                       onClick={() => setWizardStep(2)}
-                      className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow"
+                      className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs active:scale-95 w-full sm:w-auto"
                     >
                       Next: Assign Members <ArrowRight size={14} />
                     </button>
@@ -3768,14 +4589,14 @@ Thank you for your prompt payment! 🙏`;
 
               {/* STEP 2: ASSIGN MEMBERS */}
               {wizardStep === 2 && (
-                <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-6 shadow-sm">
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-6 shadow-2xs">
                   <div className="border-b border-gray-150 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <h4 className="text-sm font-bold text-gray-900">Step 2: Assign Group Members</h4>
                       <p className="text-xs text-gray-500 mt-0.5">Search &amp; assign subscribers to each ticket slot or register new members</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-bold px-3 py-1 rounded border transition-colors ${
+                      <span className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-colors w-fit ${
                         enrollments.every(e => e.name !== '')
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                           : 'bg-indigo-50 text-indigo-600 border-indigo-150'
@@ -3786,7 +4607,7 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Fast Search & Auto-Suggest Combobox */}
-                  <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 space-y-2">
+                  <div className="bg-gray-50/80 border border-gray-200 rounded-2xl p-3 sm:p-3.5 space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
                         Quick Search &amp; Assign Subscriber
@@ -3817,7 +4638,7 @@ Thank you for your prompt payment! 🙏`;
                           </span>
                           <input
                             type="text"
-                            placeholder="Type member name to search or register... (↑/↓ to navigate, Enter to select)"
+                            placeholder="Type name to search or register..."
                             value={memberSearchQuery}
                             onFocus={() => {
                               setIsSearchDropdownOpen(true);
@@ -3864,7 +4685,7 @@ Thank you for your prompt payment! 🙏`;
                                 setIsSearchDropdownOpen(false);
                               }
                             }}
-                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 rounded-lg pl-9 pr-20 py-2 text-xs font-semibold text-gray-900 focus:outline-none shadow-sm"
+                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 rounded-xl pl-9 pr-20 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none shadow-2xs"
                           />
                           {memberSearchQuery && (
                             <button
@@ -3873,7 +4694,7 @@ Thank you for your prompt payment! 🙏`;
                                 setMemberSearchQuery('');
                                 setIsSearchDropdownOpen(false);
                               }}
-                              className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                              className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 p-1"
                             >
                               <X size={14} />
                             </button>
@@ -3937,11 +4758,11 @@ Thank you for your prompt payment! 🙏`;
                                         <span className="text-[9px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded">Enrolled</span>
                                       ) : isHighlighted ? (
                                         <span className="text-[10px] font-bold text-white bg-indigo-600 px-2.5 py-0.5 rounded shadow-sm">
-                                          ↵ Enter to Assign
+                                          ↵ Assign
                                         </span>
                                       ) : (
                                         <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded hover:bg-indigo-100">
-                                          Assign to Next Slot →
+                                          Assign →
                                         </span>
                                       )}
                                     </div>
@@ -3965,21 +4786,21 @@ Thank you for your prompt payment! 🙏`;
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                        Enrolled Chit Ticket Spots ({enrollments.filter(e => e.name !== '').length} of {newGroupDuration})
+                        Enrolled Tickets ({enrollments.filter(e => e.name !== '').length} of {newGroupDuration})
                       </h5>
                       <span className="text-[10px] text-gray-400">
-                        {enrollments.some(e => e.name === '') ? 'Click directory below or search above to fill' : '✓ All tickets assigned!'}
+                        {enrollments.some(e => e.name === '') ? 'Fill open slots' : '✓ All tickets assigned!'}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[260px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 max-h-[260px] overflow-y-auto pr-1">
                       {enrollments.map((slot, index) => (
                         <div 
                           key={index} 
-                          className={`flex gap-2.5 items-center p-3 rounded-xl border transition-all ${
+                          className={`flex gap-2.5 items-center p-2.5 sm:p-3 rounded-2xl border transition-all ${
                             slot.name 
-                              ? 'bg-white border-gray-200 shadow-sm' 
-                              : 'border-dashed border-gray-250 bg-gray-50/50'
+                              ? 'bg-white border-gray-200 shadow-2xs' 
+                              : 'border-dashed border-gray-200 bg-gray-50/50'
                           }`}
                         >
                           <span className={`text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
@@ -4003,7 +4824,7 @@ Thank you for your prompt payment! 🙏`;
                                 type="button"
                                 onClick={() => handleClearSlot(index)}
                                 title="Unassign member from this slot"
-                                className="text-red-600 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded border border-red-200 shrink-0 bg-red-50/50 hover:bg-red-50 transition-colors flex items-center gap-1"
+                                className="text-red-600 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-red-200 shrink-0 bg-red-50/50 hover:bg-red-50 transition-colors flex items-center gap-1 active:scale-95"
                               >
                                 <Trash2 size={11} /> Clear
                               </button>
@@ -4018,12 +4839,12 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* Master Member Directory */}
                   <div className="space-y-3 border-t border-gray-150 pt-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div>
-                        <h5 className="text-[10px] font-bold text-indigo-650 uppercase tracking-wider">
+                        <h5 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
                           Master Subscriber Directory ({masterDirectory.length})
                         </h5>
-                        <p className="text-[11px] text-gray-500">Click any subscriber to assign to next available slot</p>
+                        <p className="text-[11px] text-gray-500">Tap any subscriber to assign to next open slot</p>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -4034,17 +4855,17 @@ Thank you for your prompt payment! 🙏`;
                             setNewMemberPhone('');
                             setShowCreateMemberModal(true);
                           }}
-                          className="bg-gray-900 hover:bg-black text-white font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
+                          className="bg-gray-900 hover:bg-black text-white font-bold text-[11px] px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs shrink-0 active:scale-95 w-full sm:w-auto justify-center"
                         >
                           <UserPlus size={13} /> + Add Member
                         </button>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[170px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 max-h-[170px] overflow-y-auto pr-1">
                       {masterDirectory.length === 0 ? (
-                        <div className="col-span-full py-6 text-center text-xs text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                          No subscribers found in database. Click <strong>&quot;+ Add Member&quot;</strong> above to create your first subscriber.
+                        <div className="col-span-full py-6 text-center text-xs text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                          No subscribers found in database. Tap <strong>&quot;+ Add Member&quot;</strong> to create one.
                         </div>
                       ) : (
                         masterDirectory.map((member, i) => {
@@ -4056,10 +4877,10 @@ Thank you for your prompt payment! 🙏`;
                               type="button"
                               disabled={isAlreadyAdded}
                               onClick={() => handleAssignExistingMember(member)}
-                              className={`p-3 rounded-xl border text-left transition-all relative ${
+                              className={`p-2.5 sm:p-3 rounded-2xl border text-left transition-all relative active:scale-95 ${
                                 isAlreadyAdded 
                                   ? 'bg-gray-50 border-gray-200 opacity-50 cursor-not-allowed' 
-                                  : 'bg-white hover:bg-indigo-50/40 border-gray-200 hover:border-indigo-300 shadow-sm'
+                                  : 'bg-white hover:bg-indigo-50/40 border-gray-200 hover:border-indigo-300 shadow-2xs'
                               }`}
                             >
                               <div className="flex items-start justify-between gap-1">
@@ -4083,22 +4904,22 @@ Thank you for your prompt payment! 🙏`;
                     <button
                       type="button"
                       onClick={() => setWizardStep(1)}
-                      className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-lg transition-colors"
+                      className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
                     >
                       Back
                     </button>
 
-                    <div className="flex items-center gap-3">
-                      <span className="text-[11px] text-gray-500 font-medium">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+                      <span className="text-[11px] text-gray-500 font-medium text-center sm:text-right">
                         <strong>{enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration}</strong> assigned
                         {enrollments.some(e => !e.name || e.name.trim() === '') && (
-                          <span className="text-amber-600 font-bold ml-1.5">(Creates in Draft Mode)</span>
+                          <span className="text-amber-600 font-bold ml-1.5 block sm:inline">(Creates in Draft Mode)</span>
                         )}
                       </span>
                       <button
                         type="button"
                         onClick={() => setWizardStep(3)}
-                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow transition-all"
+                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
                       >
                         Next: Monthly Plan <ArrowRight size={14} />
                       </button>
@@ -4109,63 +4930,63 @@ Thank you for your prompt payment! 🙏`;
 
               {/* STEP 3: MONTHLY PLAN REVIEW */}
               {wizardStep === 3 && (
-                <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-6 shadow-sm">
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-6 shadow-2xs">
                   <div className="border-b border-gray-150 pb-3">
                     <h4 className="text-sm font-bold text-gray-900">Step 3: Review Monthly Plan</h4>
                     <p className="text-xs text-gray-500 mt-0.5">Verify baseline payments and member lists before finalizing</p>
                   </div>
 
                   {/* Review Summary Details Card */}
-                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                  <div className="p-3.5 sm:p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-3 sm:space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 text-xs">
                       <div>
-                        <span className="text-gray-400 block">Group Name</span>
-                        <strong className="text-gray-800 mt-1 block">{newGroupName}</strong>
+                        <span className="text-gray-400 block text-[10px] uppercase font-bold">Group Name</span>
+                        <strong className="text-gray-900 mt-0.5 block truncate">{newGroupName}</strong>
                       </div>
                       <div>
-                        <span className="text-gray-400 block">Chit Value (Pool)</span>
-                        <strong className="text-indigo-650 mt-1 block">{formatCurrency(Number(newGroupValue))}</strong>
+                        <span className="text-gray-400 block text-[10px] uppercase font-bold">Chit Value (Pool)</span>
+                        <strong className="text-indigo-600 mt-0.5 block truncate">{formatCurrency(Number(newGroupValue))}</strong>
                       </div>
                       <div>
-                        <span className="text-gray-400 block">Member spots / Duration</span>
-                        <strong className="text-gray-800 mt-1 block">{newGroupDuration} months</strong>
+                        <span className="text-gray-400 block text-[10px] uppercase font-bold">Duration</span>
+                        <strong className="text-gray-900 mt-0.5 block truncate">{newGroupDuration} months</strong>
                       </div>
                       <div>
-                        <span className="text-gray-400 block">Baseline Fixed Monthly Due</span>
-                        <strong className="text-emerald-700 mt-1 block">
+                        <span className="text-gray-400 block text-[10px] uppercase font-bold">Monthly Installment</span>
+                        <strong className="text-emerald-700 mt-0.5 block truncate">
                           {formatCurrency(Number(newGroupValue) / Number(newGroupDuration))}/member
                         </strong>
                       </div>
                     </div>
 
-                    <div className="border-t border-gray-150 pt-3">
+                    <div className="border-t border-gray-200/80 pt-3">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-bold text-gray-550 uppercase tracking-wider block">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
                           Enrolled Subscribers ({enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration})
                         </span>
                         {enrollments.some(e => !e.name || e.name.trim() === '') && (
                           <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                            Will Create in Draft Mode
+                            Draft Mode
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2 max-h-36 overflow-y-auto">
                         {enrollments.map((slot, index) => (
-                          <span key={index} className={`border text-[10px] px-2.5 py-1 rounded shadow-sm ${
-                            slot.name ? 'bg-white border-gray-200 text-gray-700 font-semibold' : 'bg-amber-50/50 border-amber-200 text-amber-700 italic'
+                          <span key={index} className={`border text-[10px] px-2.5 py-1 rounded-lg shadow-2xs ${
+                            slot.name ? 'bg-white border-gray-200 text-gray-800 font-semibold' : 'bg-amber-50/50 border-amber-200 text-amber-700 italic'
                           }`}>
-                            Ticket #{index + 1}: {slot.name || 'Unassigned (Open Slot)'}
+                            Ticket #{index + 1}: {slot.name || 'Open Slot'}
                           </span>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex justify-between pt-4 border-t border-gray-150">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 sm:pt-4 border-t border-gray-150">
                     <button
                       type="button"
                       onClick={() => setWizardStep(2)}
-                      className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-lg transition-colors"
+                      className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
                     >
                       Back
                     </button>
@@ -4173,7 +4994,7 @@ Thank you for your prompt payment! 🙏`;
                       type="button"
                       disabled={isCreatingGroup}
                       onClick={handleCreateGroup}
-                      className={`font-bold text-xs px-6 py-2.5 rounded-lg transition-colors duration-155 flex items-center justify-center gap-1.5 shadow ${
+                      className={`font-bold text-xs px-6 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95 ${
                         isCreatingGroup
                           ? 'bg-gray-400 text-white cursor-not-allowed'
                           : 'bg-gray-900 hover:bg-black text-white'
@@ -5759,6 +6580,808 @@ Thank you for your prompt payment! 🙏`;
           </div>
         </div>
       )}
+
+      {/* ── Disburse Winner Prize Payout Modal ────────────────────────────────────── */}
+      {showDisbursePayoutModal && (() => {
+        const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId) || localGroups[0];
+        const totalDuration = activeGroup?.duration || activeGroup?.memberCount || 20;
+        const totalChitVal = activeGroup?.totalValue || 200000;
+        const currentMonthAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(selectedDashboardMonth));
+        const winningBid = currentMonthAuction ? Number(currentMonthAuction.winning_discount ?? currentMonthAuction.winning_bid ?? 0) : 0;
+        const netPrizePot = currentMonthAuction ? Math.max(0, totalChitVal - winningBid) : 0;
+        const winnerProfileId = currentMonthAuction?.winning_bidder_id || currentMonthAuction?.winner_profile_id || currentMonthAuction?.winner_id;
+        const winnerMember = dashboardGroupMembers.find(m => 
+          (winnerProfileId && (m.profileId === winnerProfileId || m.id === winnerProfileId)) ||
+          (currentMonthAuction?.winner_name && m.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
+        );
+        const winnerName = winnerMember?.name || currentMonthAuction?.winner_name || currentMonthAuction?.winning_bidder?.full_name || 'Subscriber';
+        const winnerPhone = winnerMember?.phone || currentMonthAuction?.winner_phone || currentMonthAuction?.winning_bidder?.phone_number || '';
+        const winnerInst = Number(winnerMember?.customInstallment || Math.round(totalChitVal / totalDuration));
+
+        // Robust Winner monthly payment calculation helper
+        const getWinnerPaidForMonth = (mNum: number) => {
+          return dashboardTransactions
+            .filter(t => {
+              if (t.type !== 'collection') return false;
+              const matchesMember = (
+                (winnerMember?.profileId && t.profile_id === winnerMember.profileId) ||
+                (winnerMember?.id && t.group_member_id === winnerMember.id) ||
+                (currentMonthAuction?.winner_name && t.notes && t.notes.toLowerCase().includes(currentMonthAuction.winner_name.toLowerCase()))
+              );
+              if (!matchesMember) return false;
+              if (!t.notes) return Number(mNum) === Number(activeGroup?.currentMonth || 0);
+              const match = t.notes.match(/\bMonth\s+(\d+)\b/i);
+              if (match) {
+                return Number(match[1]) === Number(mNum);
+              }
+              return Number(mNum) === Number(activeGroup?.currentMonth || 0);
+            })
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        };
+
+        const isLaabaMonth = (activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && selectedDashboardMonth > 0;
+        const currentExpectedDue = isLaabaMonth ? 0 : winnerInst;
+        const currentMonthPaid = getWinnerPaidForMonth(selectedDashboardMonth);
+        const currentMonthUnpaid = Math.max(0, currentExpectedDue - currentMonthPaid);
+
+        // Past Arrears calculation (Months 0 to selectedDashboardMonth - 1)
+        const arrearCandidates: { month: number; unpaid: number; expected: number; paid: number }[] = [];
+        for (let m = 0; m < selectedDashboardMonth; m++) {
+          const paid = getWinnerPaidForMonth(m);
+          const exp = (activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && m > 0 ? 0 : winnerInst;
+          const unpaid = Math.max(0, exp - paid);
+          arrearCandidates.push({ month: m, unpaid, expected: exp, paid });
+        }
+        const unpaidArrears = arrearCandidates.filter(a => a.unpaid > 0);
+
+        // Advance Candidate Months (Next up to 4 months)
+        const advanceCandidates: number[] = [];
+        for (let m = selectedDashboardMonth + 1; m <= Math.min(selectedDashboardMonth + 4, totalDuration - 1); m++) {
+          advanceCandidates.push(m);
+        }
+
+        // Active Deductions List
+        const activeDeductionsList: { month: number; amount: number; label: string }[] = [];
+        if (disburseDeductThisMonth && currentMonthUnpaid > 0) {
+          activeDeductionsList.push({
+            month: selectedDashboardMonth,
+            amount: currentMonthUnpaid,
+            label: `Month ${selectedDashboardMonth} Installment`,
+          });
+        }
+        disburseDeductArrearMonths.forEach(m => {
+          const paid = getWinnerPaidForMonth(m);
+          const exp = (activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && m > 0 ? 0 : winnerInst;
+          const unpaid = Math.max(0, exp - paid);
+          if (unpaid > 0) {
+            activeDeductionsList.push({
+              month: m,
+              amount: unpaid,
+              label: `Month ${m} Arrear`,
+            });
+          }
+        });
+        disburseDeductAdvanceMonths.forEach(m => {
+          const paid = getWinnerPaidForMonth(m);
+          const exp = winnerInst;
+          const unpaid = Math.max(0, exp - paid);
+          const amt = unpaid > 0 ? unpaid : winnerInst;
+          activeDeductionsList.push({
+            month: m,
+            amount: amt,
+            label: `Month ${m} Advance`,
+          });
+        });
+
+        const totalDeductionsAmount = activeDeductionsList.reduce((sum, d) => sum + d.amount, 0);
+
+        const monthPattern = new RegExp(`\\bMonth\\s+${selectedDashboardMonth}\\b`, 'i');
+        const monthPayoutTxs = dashboardTransactions.filter(t =>
+          t.type === 'payout' && (t.notes ? monthPattern.test(t.notes) : true)
+        );
+        const totalPrizeDisbursed = monthPayoutTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        const remainingPrizeDue = Math.max(0, netPrizePot - totalPrizeDisbursed);
+        const amountNum = Number(disbursePayoutAmount) || 0;
+
+        // Interactive deduction toggle handlers that automatically synchronize net cash amount
+        const toggleThisMonthDeduction = () => {
+          const nextVal = !disburseDeductThisMonth;
+          setDisburseDeductThisMonth(nextVal);
+          const otherDeductions = (
+            disburseDeductArrearMonths.reduce((sum, m) => sum + Math.max(0, winnerInst - getWinnerPaidForMonth(m)), 0) +
+            disburseDeductAdvanceMonths.reduce((sum, m) => {
+              const u = Math.max(0, winnerInst - getWinnerPaidForMonth(m));
+              return sum + (u > 0 ? u : winnerInst);
+            }, 0)
+          );
+          const thisMonthAmt = nextVal ? currentMonthUnpaid : 0;
+          const newNet = Math.max(0, remainingPrizeDue - (otherDeductions + thisMonthAmt));
+          setDisbursePayoutAmount(newNet.toString());
+        };
+
+        const toggleArrearMonth = (m: number) => {
+          const nextList = disburseDeductArrearMonths.includes(m)
+            ? disburseDeductArrearMonths.filter(x => x !== m)
+            : [...disburseDeductArrearMonths, m];
+          setDisburseDeductArrearMonths(nextList);
+
+          const thisMonthAmt = disburseDeductThisMonth ? currentMonthUnpaid : 0;
+          const arrearAmt = nextList.reduce((sum, x) => sum + Math.max(0, winnerInst - getWinnerPaidForMonth(x)), 0);
+          const advanceAmt = disburseDeductAdvanceMonths.reduce((sum, x) => {
+            const u = Math.max(0, winnerInst - getWinnerPaidForMonth(x));
+            return sum + (u > 0 ? u : winnerInst);
+          }, 0);
+          const newNet = Math.max(0, remainingPrizeDue - (thisMonthAmt + arrearAmt + advanceAmt));
+          setDisbursePayoutAmount(newNet.toString());
+        };
+
+        const toggleAdvanceMonth = (m: number) => {
+          const nextList = disburseDeductAdvanceMonths.includes(m)
+            ? disburseDeductAdvanceMonths.filter(x => x !== m)
+            : [...disburseDeductAdvanceMonths, m];
+          setDisburseDeductAdvanceMonths(nextList);
+
+          const thisMonthAmt = disburseDeductThisMonth ? currentMonthUnpaid : 0;
+          const arrearAmt = disburseDeductArrearMonths.reduce((sum, x) => sum + Math.max(0, winnerInst - getWinnerPaidForMonth(x)), 0);
+          const advanceAmt = nextList.reduce((sum, x) => {
+            const u = Math.max(0, winnerInst - getWinnerPaidForMonth(x));
+            return sum + (u > 0 ? u : winnerInst);
+          }, 0);
+          const newNet = Math.max(0, remainingPrizeDue - (thisMonthAmt + arrearAmt + advanceAmt));
+          setDisbursePayoutAmount(newNet.toString());
+        };
+
+        const walletOptions: { id: WalletType; label: string; icon: string; bal: number }[] = [
+          { id: 'dad_bank', label: "Dad's Bank", icon: '🏦', bal: balances.dad_bank },
+          { id: 'cash_in_hand', label: 'Cash in Hand', icon: '💵', bal: balances.cash_in_hand },
+          { id: 'kishor_bank', label: "Kishor UPI", icon: '📱', bal: balances.kishor_bank },
+          { id: 'mom_bank', label: "Mom's Bank", icon: '🏛️', bal: balances.mom_bank },
+        ];
+
+        return (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+            <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-lg space-y-3.5 shadow-2xl my-auto animate-in zoom-in-95 duration-150 max-h-[94vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="flex justify-between items-center border-b border-gray-100 pb-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 shadow-xs">
+                    <Banknote size={19} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight leading-tight">
+                      Disburse Prize Payout
+                    </h4>
+                    <p className="text-[11px] text-gray-500 font-medium truncate">
+                      {activeGroup?.name} · M{selectedDashboardMonth} Winner: <strong className="text-gray-900">{winnerName}</strong>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDisbursePayoutModal(false)}
+                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center shrink-0 transition-colors"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Pot Summary Pill */}
+              <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Gross Prize Pot</span>
+                  <span className="text-base sm:text-lg font-extrabold text-gray-900 font-mono">{formatCurrency(netPrizePot)}</span>
+                  <span className="text-[10px] text-gray-500 block">
+                    (₹{totalChitVal.toLocaleString('en-IN')} − ₹{winningBid.toLocaleString('en-IN')} bid)
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Remaining Due</span>
+                  <span className={`text-base sm:text-lg font-extrabold font-mono ${remainingPrizeDue > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {formatCurrency(remainingPrizeDue)}
+                  </span>
+                  {totalPrizeDisbursed > 0 && (
+                    <span className="text-[10px] text-emerald-700 font-bold block">
+                      ✓ {formatCurrency(totalPrizeDisbursed)} already paid
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Net Settlement Offsets Section ── */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <CheckCircle2 size={14} className="text-indigo-600 shrink-0" />
+                    <span className="text-xs font-bold text-gray-900 truncate">
+                      Installment Offsets (Optional)
+                    </span>
+                  </div>
+                  {totalDeductionsAmount > 0 && (
+                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md shrink-0">
+                      − {formatCurrency(totalDeductionsAmount)} offset
+                    </span>
+                  )}
+                </div>
+
+                {/* 1. Past Pending Balances / Arrears Status */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                    1. Past Pending Balances / Arrears
+                  </span>
+                  {unpaidArrears.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {unpaidArrears.map(a => {
+                        const isChecked = disburseDeductArrearMonths.includes(a.month);
+                        return (
+                          <button
+                            key={a.month}
+                            type="button"
+                            onClick={() => toggleArrearMonth(a.month)}
+                            className={`w-full flex items-center justify-between p-2 rounded-xl border text-left transition-all ${
+                              isChecked
+                                ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-400/40'
+                                : 'bg-white border-amber-200/80 hover:bg-amber-50/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
+                                isChecked ? 'bg-amber-600 border-amber-700 text-white' : 'bg-white border-amber-300'
+                              }`}>
+                                {isChecked && <Check size={11} className="stroke-[3]" />}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold text-amber-950 truncate">
+                                  Deduct Month {a.month} Past Arrear
+                                </div>
+                                <span className="text-[10px] text-amber-800">
+                                  Owes {formatCurrency(a.unpaid)} from M{a.month}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-xs font-extrabold text-rose-600 font-mono shrink-0">
+                              −{formatCurrency(a.unpaid)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between bg-emerald-50/70 border border-emerald-200/80 rounded-xl px-2.5 py-1.5 text-emerald-800 text-xs font-medium">
+                      <span className="flex items-center gap-1.5 truncate">
+                        <Check size={13} className="text-emerald-600 shrink-0" />
+                        <span>No Past Arrears Pending</span>
+                      </span>
+                      <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded shrink-0 font-mono">
+                        ₹0 Due
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Current Month Installment Deduction Toggle */}
+                <div className="space-y-1 pt-1 border-t border-slate-200">
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                    2. Current Month Installment (Month {selectedDashboardMonth})
+                  </span>
+                  {currentMonthUnpaid > 0 ? (
+                    <button
+                      type="button"
+                      onClick={toggleThisMonthDeduction}
+                      className={`w-full flex items-center justify-between p-2 sm:p-2.5 rounded-xl border text-left transition-all ${
+                        disburseDeductThisMonth
+                          ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-400/40'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded border flex items-center justify-center shrink-0 transition-all ${
+                          disburseDeductThisMonth ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-gray-300'
+                        }`}>
+                          {disburseDeductThisMonth && <Check size={12} className="stroke-[3]" />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5 flex-wrap">
+                            <span>Deduct Month {selectedDashboardMonth} Due</span>
+                            <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-100/80 px-1.5 py-0.2 rounded">
+                              Mark PAID 🟢
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-gray-500 block">
+                            Current due: {formatCurrency(currentMonthUnpaid)}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-extrabold text-rose-600 font-mono shrink-0">
+                        −{formatCurrency(currentMonthUnpaid)}
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-between bg-emerald-50/80 border border-emerald-200 rounded-xl px-2.5 py-1.5 text-emerald-800 text-xs font-medium">
+                      <span className="flex items-center gap-1.5 truncate">
+                        <Check size={13} className="text-emerald-600 shrink-0" />
+                        <span>Month {selectedDashboardMonth} Due Already Paid</span>
+                      </span>
+                      <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded shrink-0 font-mono">
+                        {formatCurrency(currentMonthPaid)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Pre-pay Advance Upcoming Months (Clean 2-Column Grid) */}
+                {advanceCandidates.length > 0 && (
+                  <div className="space-y-1 pt-1 border-t border-slate-200">
+                    <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                      3. Pre-pay Advance Months (Optional)
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {advanceCandidates.map(m => {
+                        const isSelected = disburseDeductAdvanceMonths.includes(m);
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => toggleAdvanceMonth(m)}
+                            className={`w-full py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs ring-2 ring-indigo-400/30'
+                                : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-200'
+                            }`}
+                          >
+                            <span className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                              isSelected ? 'bg-white text-indigo-700' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {isSelected ? '✓' : '+'}
+                            </span>
+                            <span>Month {m}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Calculation Summary Footer Pill */}
+                {totalDeductionsAmount > 0 && (
+                  <div className="bg-white border border-indigo-100 rounded-xl p-2.5 flex items-center justify-between text-xs font-medium">
+                    <div className="space-y-0.5">
+                      <span className="text-[11px] text-gray-500 block">Gross Prize: {formatCurrency(netPrizePot)}</span>
+                      <span className="text-[11px] text-rose-600 font-semibold block">Deductions Offset: −{formatCurrency(totalDeductionsAmount)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">Net Cash Paid</span>
+                      <span className="text-sm font-extrabold text-indigo-900 font-mono">
+                        = {formatCurrency(Math.max(0, remainingPrizeDue - totalDeductionsAmount))}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <form onSubmit={(e) => handleRecordPrizePayoutSubmit(e, activeGroup, currentMonthAuction, netPrizePot, remainingPrizeDue, activeDeductionsList)} className="space-y-3">
+                {/* Net Cash Handed Over Input */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider truncate">
+                      Net Cash Payout (₹)
+                    </label>
+                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-md shrink-0">
+                      Due: {formatCurrency(Math.max(0, remainingPrizeDue - totalDeductionsAmount))}
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400">₹</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={totalChitVal * 2}
+                      value={disbursePayoutAmount}
+                      onChange={(e) => setDisbursePayoutAmount(e.target.value)}
+                      placeholder="0"
+                      className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border-2 border-gray-200 focus:border-emerald-500 focus:bg-white rounded-2xl text-2xl font-extrabold text-gray-900 focus:outline-none transition-all font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Source Wallet Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                    Paid From Which Vault / Bank?
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {walletOptions.map(w => {
+                      const isSelected = disbursePayoutWallet === w.id;
+                      const isLowBal = w.bal < amountNum && amountNum > 0;
+                      return (
+                        <button
+                          key={w.id}
+                          type="button"
+                          onClick={() => setDisbursePayoutWallet(w.id)}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-500/20'
+                              : 'bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm">{w.icon}</span>
+                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                              isSelected ? 'bg-emerald-700 text-white' : isLowBal ? 'bg-amber-100 text-amber-800' : 'bg-gray-200 text-gray-700'
+                            }`}>
+                              {formatCurrency(w.bal)}
+                            </span>
+                          </div>
+                          <div className="text-xs font-bold truncate">{w.label}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Disbursal Date Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                    Payment Date
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDisbursePayoutDateType('today')}
+                      className={`py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                        disbursePayoutDateType === 'today'
+                          ? 'bg-gray-900 text-white border-black shadow-xs'
+                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDisbursePayoutDateType('yesterday')}
+                      className={`py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                        disbursePayoutDateType === 'yesterday'
+                          ? 'bg-gray-900 text-white border-black shadow-xs'
+                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      Yesterday
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDisbursePayoutDateType('custom')}
+                      className={`py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                        disbursePayoutDateType === 'custom'
+                          ? 'bg-gray-900 text-white border-black shadow-xs'
+                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      Custom Date
+                    </button>
+                  </div>
+                  {disbursePayoutDateType === 'custom' && (
+                    <input
+                      type="date"
+                      value={disbursePayoutCustomDate}
+                      onChange={(e) => setDisbursePayoutCustomDate(e.target.value)}
+                      className="w-full mt-1 px-3 py-1.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-semibold text-gray-900 focus:outline-none focus:border-indigo-500"
+                    />
+                  )}
+                </div>
+
+                {/* Reference Note & Receipt Upload */}
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                      Reference Note / Cheque No. (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={disbursePayoutNote}
+                      onChange={(e) => setDisbursePayoutNote(e.target.value)}
+                      placeholder="e.g. Cheque #492019 or IMPS Ref #81920"
+                      className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-semibold text-gray-900 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Receipt Photo Attachment */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Paperclip size={13} className="text-gray-400" />
+                        Attach Receipt / Cheque Photo (Optional)
+                      </span>
+                      {disbursePayoutReceiptUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDisbursePayoutReceiptUrl('');
+                            setDisburseReceiptFileToUpload(null);
+                          }}
+                          className="text-rose-600 hover:text-rose-700 text-[10px] font-bold"
+                        >
+                          Remove Photo
+                        </button>
+                      )}
+                    </label>
+                    {disbursePayoutReceiptUrl ? (
+                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
+                        <img src={disbursePayoutReceiptUrl} alt="Receipt preview" className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <label className="border-2 border-dashed border-gray-200 hover:border-gray-300 rounded-xl p-2.5 flex items-center justify-center gap-2 cursor-pointer bg-gray-50/50 transition-colors">
+                        <Paperclip size={14} className="text-gray-400" />
+                        <span className="text-xs text-gray-500 font-semibold">Tap to attach cheque / transfer screenshot</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleDisburseReceiptUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="flex gap-2.5 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowDisbursePayoutModal(false)}
+                    className="flex-1 py-3 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isProcessingDisbursal || (amountNum <= 0 && totalDeductionsAmount <= 0)}
+                    className="flex-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95"
+                  >
+                    {isProcessingDisbursal ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" /> Recording Disbursal...
+                      </>
+                    ) : (
+                      <>
+                        <Banknote size={15} /> Disburse {formatCurrency(amountNum)}
+                        {totalDeductionsAmount > 0 ? ` (+ Settle ${formatCurrency(totalDeductionsAmount)})` : ''}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Remind All Modal (ChitBase Feature) ─────────────────────────────────── */}
+      {showRemindModal && (() => {
+        const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId) || localGroups[0];
+        const isLaaba = (activeGroup?.kaiIruppuPool || 0) >= (activeGroup?.totalValue || 200000);
+        const totalChitVal = activeGroup?.totalValue || 200000;
+        const totalDuration = activeGroup?.duration || activeGroup?.memberCount || 20;
+        const baseInstallment = Math.round(totalChitVal / (activeGroup?.memberCount || totalDuration || 1));
+        const defaultDue = isLaaba ? 0 : baseInstallment;
+
+        // Compute pending members list
+        const pendingMembersList = dashboardGroupMembers
+          .map(member => {
+            const effectiveDue = isLaaba ? 0 : (member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : defaultDue);
+            const paid = getMemberPaidAmountForMonth(member.profileId || member.id, selectedDashboardMonth);
+            const remaining = Math.max(0, effectiveDue - paid);
+            return {
+              ...member,
+              effectiveDue,
+              paid,
+              remaining,
+            };
+          })
+          .filter(m => m.remaining > 0);
+
+        const groupBroadcastMsg = generateGroupBroadcastText(pendingMembersList, activeGroup, selectedDashboardMonth);
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+            <div className="bg-white rounded-3xl max-w-md sm:max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 tracking-tight">
+                    Remind All
+                  </h3>
+                  <p className="text-xs font-semibold text-gray-500 mt-0.5">
+                    {pendingMembersList.length} pending {pendingMembersList.length === 1 ? 'member' : 'members'} · Month {selectedDashboardMonth}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRemindModal(false)}
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Segmented Tab Switcher (Group Message vs Individual) */}
+              <div className="bg-gray-100/90 p-1 rounded-2xl flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setRemindModalTab('group')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                    remindModalTab === 'group'
+                      ? 'bg-white text-gray-900 shadow-2xs font-extrabold'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Group Message
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRemindModalTab('individual')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                    remindModalTab === 'individual'
+                      ? 'bg-white text-gray-900 shadow-2xs font-extrabold'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Individual
+                </button>
+              </div>
+
+              {/* Description Sub-note */}
+              <p className="text-xs text-gray-500 leading-relaxed">
+                {remindModalTab === 'individual'
+                  ? "Members with a saved number get a direct WhatsApp link. Add a number for others. It's saved to their profile permanently."
+                  : `Compile a single broadcast reminder containing all ${pendingMembersList.length} pending members to paste into your WhatsApp group.`}
+              </p>
+
+              {/* Tab 1: Individual Reminders */}
+              {remindModalTab === 'individual' && (
+                <div className="space-y-3 pt-1">
+                  {pendingMembersList.length === 0 ? (
+                    <div className="py-8 text-center bg-emerald-50/60 border border-emerald-100 rounded-2xl space-y-1.5">
+                      <CheckCircle2 size={28} className="mx-auto text-emerald-600" />
+                      <p className="text-xs font-bold text-emerald-900">All members have paid for Month {selectedDashboardMonth}!</p>
+                      <p className="text-[11px] text-emerald-600">No pending dues to remind.</p>
+                    </div>
+                  ) : (
+                    pendingMembersList.map((member) => {
+                      const hasPhone = !!(member.phone && member.phone.trim().length >= 10);
+                      const currentInputPhone = remindPhoneInputs[member.id] !== undefined ? remindPhoneInputs[member.id] : (member.phone || '');
+
+                      return (
+                        <div
+                          key={member.id}
+                          className="bg-white border border-gray-200/90 hover:border-gray-300 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-2.5 transition-all"
+                        >
+                          {/* Member Title & Pending Amount */}
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <h4 className="font-extrabold text-xs sm:text-sm text-gray-900 leading-snug">
+                                  {member.name}
+                                </h4>
+                                <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded font-mono">
+                                  #{member.ticket}
+                                </span>
+                              </div>
+                              <p className="text-xs font-bold text-gray-500 mt-0.5">
+                                <strong className="text-gray-900 font-extrabold">{formatCurrency(member.remaining)}</strong> pending
+                              </p>
+                            </div>
+
+                            {hasPhone && (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                                <Phone size={10} /> Saved
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Phone input & Send Button */}
+                          <div className="flex items-center gap-2">
+                            {hasPhone ? (
+                              <div className="flex-1 flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold text-gray-700 min-w-0">
+                                <Phone size={12} className="text-emerald-600 shrink-0" />
+                                <span className="font-mono truncate">+91 {member.phone}</span>
+                              </div>
+                            ) : (
+                              <input
+                                type="tel"
+                                placeholder="Add phone number"
+                                value={currentInputPhone}
+                                onChange={(e) =>
+                                  setRemindPhoneInputs(prev => ({
+                                    ...prev,
+                                    [member.id]: e.target.value,
+                                  }))
+                                }
+                                className="flex-1 px-3.5 py-2 bg-white border border-gray-300 focus:border-emerald-500 rounded-xl text-xs font-semibold text-gray-900 focus:outline-none min-w-0"
+                              />
+                            )}
+
+                            {hasPhone ? (
+                              <a
+                                href={generateMemberReminderWhatsAppUrl(member, member.remaining, activeGroup, selectedDashboardMonth)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="bg-[#10B981] hover:bg-[#059669] text-white font-extrabold text-xs px-4 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 shrink-0"
+                              >
+                                <Send size={13} />
+                                <span>Send</span>
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleSavePhoneAndSend(member, member.remaining, activeGroup, selectedDashboardMonth)}
+                                disabled={savingMemberPhoneId === member.id}
+                                className="bg-[#10B981] hover:bg-[#059669] text-white font-extrabold text-xs px-3.5 sm:px-4 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 shrink-0 disabled:opacity-50"
+                              >
+                                {savingMemberPhoneId === member.id ? (
+                                  <RefreshCw size={13} className="animate-spin" />
+                                ) : (
+                                  <Check size={13} />
+                                )}
+                                <span>Save &amp; Send</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              {/* Tab 2: Group Broadcast Message */}
+              {remindModalTab === 'group' && (
+                <div className="space-y-3 pt-1">
+                  <div className="relative bg-gray-50 border border-gray-200 rounded-2xl p-3.5 sm:p-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-gray-700 border-b border-gray-200 pb-2">
+                      <span className="flex items-center gap-1.5">
+                        <MessageSquare size={13} className="text-emerald-600" />
+                        WhatsApp Group Broadcast Template
+                      </span>
+                      <span className="text-[10px] font-mono text-gray-400">
+                        {pendingMembersList.length} Subscribers
+                      </span>
+                    </div>
+
+                    <pre className="text-xs font-sans text-gray-800 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto select-all bg-white p-3 rounded-xl border border-gray-200">
+                      {groupBroadcastMsg}
+                    </pre>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(groupBroadcastMsg);
+                        setRemindCopied(true);
+                        setTimeout(() => setRemindCopied(false), 2000);
+                      }}
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl border border-gray-200 transition-colors active:scale-95"
+                    >
+                      {remindCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                      <span>{remindCopied ? 'Copied to Clipboard!' : 'Copy Message'}</span>
+                    </button>
+
+                    <a
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(groupBroadcastMsg)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white font-extrabold text-xs rounded-xl transition-all shadow-xs active:scale-95 text-center"
+                    >
+                      <Send size={14} />
+                      <span>Share to Group</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

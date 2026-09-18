@@ -274,10 +274,10 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
       
-      {/* Top Search and Add Member Control Bar (Matching ChitBase) */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
+      {/* Top Search and Add Member Control Bar */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="relative w-full sm:w-96">
           <Search size={15} className="absolute left-3.5 top-3 text-gray-400" />
           <input
@@ -285,7 +285,7 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
             placeholder="Search name, phone, tickets, chits..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-9 pr-3 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none shadow-2xs"
           />
         </div>
 
@@ -296,7 +296,7 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
 
           <button
             onClick={handleOpenAddModal}
-            className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 shrink-0"
+            className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 active:scale-95"
           >
             <Plus size={15} />
             <span>Add Member</span>
@@ -304,25 +304,151 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
         </div>
       </div>
 
-      {/* Members Directory Table */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      {/* ── MOBILE MEMBER CARDS STREAM (md:hidden) ── */}
+      <div className="md:hidden space-y-3.5">
+        {filteredMembers.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-3xl p-8 text-center text-gray-400 text-xs shadow-2xs">
+            No members found matching your search. Use &quot;Add Member&quot; to enroll new subscribers.
+          </div>
+        ) : (
+          filteredMembers.map((member) => {
+            const initial = member.fullName.charAt(0).toUpperCase();
+            const isSubscriber = member.role === 'subscriber';
+            const cleanPhone = normalizePhoneDigits(member.phoneNumber);
+
+            return (
+              <div
+                key={member.id}
+                onClick={() => setSelectedMemberId(member.id)}
+                className="bg-white border border-gray-200 hover:border-gray-300 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs transition-all active:scale-[0.99] cursor-pointer"
+              >
+                {/* Member Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-2xl bg-slate-900 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-2xs">
+                      {initial}
+                    </div>
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-gray-900 text-sm leading-snug">{member.fullName}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                          isSubscriber 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        }`}>
+                          {isSubscriber ? 'Active' : 'Admin'}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-gray-400 font-mono block">
+                        ID: {member.id.slice(0, 8)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions: Edit & Delete */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenEditModal(e, member)}
+                      title="Edit member"
+                      className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors active:scale-95"
+                    >
+                      <Edit3 size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteMember(e, member)}
+                      title="Remove member"
+                      className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors active:scale-95"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                    <ChevronRight size={18} className="text-gray-400 ml-0.5" />
+                  </div>
+                </div>
+
+                {/* Enrolled Chits Badges */}
+                {member.groups.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-0.5">
+                    {member.groups.map((g, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 bg-gray-50 text-gray-800 text-xs font-semibold px-2.5 py-1 rounded-xl border border-gray-200/80"
+                      >
+                        <span>{g.name}</span>
+                        <strong className="text-indigo-600 font-mono">#{g.ticket}</strong>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Footer with Direct Phone/WhatsApp & Physical Book Sync */}
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2.5 text-xs">
+                  {/* Quick Contact buttons */}
+                  <div className="flex items-center gap-2">
+                    {cleanPhone ? (
+                      <>
+                        <a
+                          href={`tel:+91${cleanPhone}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs px-3 py-1.5 rounded-xl border border-gray-200 active:scale-95 transition-all"
+                        >
+                          <Phone size={12} className="text-indigo-600" />
+                          <span>Call</span>
+                        </a>
+                        <a
+                          href={`https://wa.me/91${cleanPhone}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs px-3 py-1.5 rounded-xl border border-emerald-200 active:scale-95 transition-all"
+                        >
+                          <span>WhatsApp</span>
+                        </a>
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">No phone</span>
+                    )}
+                  </div>
+
+                  {/* Pocket Book Sync Toggle */}
+                  <button
+                    onClick={(e) => handleToggleSync(e, member.id)}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all inline-flex items-center gap-1.5 active:scale-95 ${
+                      member.physicalBookSynced
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-rose-50 text-rose-700 border-rose-200'
+                    }`}
+                  >
+                    <BookOpen size={13} />
+                    <span>{member.physicalBookSynced ? 'SYNCED' : 'PENDING'}</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* ── DESKTOP MEMBERS DIRECTORY TABLE (hidden md:block) ── */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded-3xl shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-gray-50/80 border-b border-gray-200 text-[10px] uppercase tracking-wider text-gray-400 font-bold">
               <tr>
-                <th className="py-3.5 px-5">Name</th>
-                <th className="py-3.5 px-4">Phone</th>
-                <th className="py-3.5 px-4">Enrolled Chits & Tickets</th>
-                <th className="py-3.5 px-4">Portal Status</th>
-                <th className="py-3.5 px-4 text-center">Physical Ledger</th>
-                <th className="py-3.5 px-5 text-right">Actions</th>
+                <th className="py-4 px-6">Name</th>
+                <th className="py-4 px-5">Phone</th>
+                <th className="py-4 px-5">Enrolled Chits &amp; Tickets</th>
+                <th className="py-4 px-5">Portal Status</th>
+                <th className="py-4 px-5 text-center">Physical Ledger</th>
+                <th className="py-4 px-6 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-gray-700">
               {filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-400 text-xs">
-                    No members found matching your search. Use "Add Member" to enroll new subscribers.
+                  <td colSpan={6} className="py-14 text-center text-gray-400 text-xs">
+                    No members found matching your search. Use &quot;Add Member&quot; to enroll new subscribers.
                   </td>
                 </tr>
               ) : (
@@ -337,16 +463,16 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                       className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                     >
                       {/* Name with Avatar */}
-                      <td className="py-3.5 px-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                             {initial}
                           </div>
                           <div>
-                            <span className="font-bold text-gray-900 block text-xs group-hover:text-indigo-600 transition-colors">
+                            <span className="font-bold text-gray-900 block text-xs group-hover:text-indigo-600 transition-colors leading-snug">
                               {member.fullName}
                             </span>
-                            <span className="text-[10px] text-gray-400 font-mono">
+                            <span className="text-[11px] text-gray-400 font-mono mt-0.5 block">
                               ID: {member.id.slice(0, 8)}
                             </span>
                           </div>
@@ -354,18 +480,18 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                       </td>
 
                       {/* Phone */}
-                      <td className="py-3.5 px-4 font-mono font-medium text-gray-600">
+                      <td className="py-4 px-5 font-mono font-medium text-gray-600 text-xs">
                         {member.phoneNumber || '—'}
                       </td>
 
                       {/* Enrolled Chits */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-4 px-5">
                         {member.groups.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
                             {member.groups.map((g, idx) => (
                               <span
                                 key={idx}
-                                className="inline-flex items-center gap-1 bg-gray-100 text-gray-800 text-[10px] font-semibold px-2 py-0.5 rounded-md border border-gray-200"
+                                className="inline-flex items-center gap-1 bg-gray-100 text-gray-800 text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-gray-200"
                               >
                                 <span>{g.name}</span>
                                 <strong className="text-indigo-600 font-mono">#{g.ticket}</strong>
@@ -373,13 +499,13 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                             ))}
                           </div>
                         ) : (
-                          <span className="text-gray-400 italic text-[11px]">No active groups</span>
+                          <span className="text-gray-400 italic text-xs">No active groups</span>
                         )}
                       </td>
 
                       {/* Portal */}
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      <td className="py-4 px-5">
+                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border ${
                           isSubscriber 
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                             : 'bg-indigo-50 text-indigo-700 border-indigo-200'
@@ -390,40 +516,40 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                       </td>
 
                       {/* Physical Book Sync */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-4 px-5 text-center">
                         <button
                           onClick={(e) => handleToggleSync(e, member.id)}
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all inline-flex items-center gap-1 ${
+                          className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all inline-flex items-center gap-1.5 ${
                             member.physicalBookSynced
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                               : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
                           }`}
                         >
-                          <BookOpen size={11} />
+                          <BookOpen size={13} />
                           <span>{member.physicalBookSynced ? 'SYNCED' : 'PENDING'}</span>
                         </button>
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3.5 px-5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
                             onClick={(e) => handleOpenEditModal(e, member)}
                             title="Edit member profile"
-                            className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
                           >
-                            <Edit3 size={13} />
+                            <Edit3 size={14} />
                           </button>
                           <button
                             type="button"
                             onClick={(e) => handleDeleteMember(e, member)}
                             title="Remove member"
-                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={14} />
                           </button>
-                          <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-600 transition-colors ml-1" />
+                          <ChevronRight size={16} className="text-gray-300 group-hover:text-gray-600 transition-colors ml-1" />
                         </div>
                       </td>
                     </tr>

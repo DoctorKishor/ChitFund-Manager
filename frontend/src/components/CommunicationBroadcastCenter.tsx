@@ -85,9 +85,9 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             currentMonth: currentM,
             poolValue: Number(g.total_value),
             auctionDate: 'First Sunday after 10th',
-            winnerName: latestLog?.winner_name || 'Active Auction',
-            winningDiscount: Number(latestLog?.winning_bid || 0),
-            netPayout: Number(latestLog?.net_payout || g.total_value),
+            winnerName: latestLog?.winner_name || (Array.isArray(latestLog?.bid_stream) && latestLog.bid_stream[0]?.memberName) || 'Active Auction',
+            winningDiscount: Number(latestLog?.winning_discount ?? latestLog?.winning_bid ?? 0),
+            netPayout: Number(latestLog?.net_payout || (Number(g.total_value) - Number(latestLog?.winning_discount ?? latestLog?.winning_bid ?? 0))),
             dividend: 0,
             fixedInstallment: installment,
           };
@@ -130,29 +130,30 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   };
 
   const formatWhatsAppUrl = () => {
-    return `https://web.whatsapp.com/send?text=${encodeURIComponent(broadcastText)}`;
+    // api.whatsapp.com opens native WhatsApp on mobile devices and WhatsApp Web on desktop
+    return `https://api.whatsapp.com/send?text=${encodeURIComponent(broadcastText)}`;
   };
 
   const selectedMeta = groupsMetadata[activeGroupKey];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
       
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-2xl p-4 sm:p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
-              <MessageSquare size={22} />
+            <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl shrink-0">
+              <MessageSquare size={20} />
             </div>
-            <h2 className="text-xl font-bold tracking-tight">Communication & WhatsApp Broadcaster</h2>
+            <h2 className="text-base sm:text-xl font-bold tracking-tight">Communication & WhatsApp Broadcaster</h2>
           </div>
-          <p className="text-xs text-emerald-200/80">
+          <p className="text-xs text-emerald-200/80 leading-relaxed">
             Generate and broadcast monthly pre-auction notices and post-auction winner summaries directly to subscribers.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs font-semibold px-3 py-1.5 bg-white/10 rounded-xl border border-white/10 flex items-center gap-1.5">
             <Sparkles size={13} className="text-emerald-400" />
             1-Click WhatsApp Blast
@@ -161,7 +162,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
       </div>
 
       {/* Organization Signature Configuration Card */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shadow-sm">
         <div>
           <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
             <FileText size={14} className="text-indigo-600" />
@@ -173,16 +174,16 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           type="text"
           value={signatureLine}
           onChange={(e) => setSignatureLine(e.target.value)}
-          className="w-full sm:w-80 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-gray-900 focus:outline-none font-semibold shadow-xs"
+          className="w-full sm:w-80 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-gray-900 focus:outline-none font-semibold shadow-2xs"
           placeholder="e.g. Dr. Kishor Anbazhakan's Organization"
         />
       </div>
 
       {/* One-Tap WhatsApp Broadcast Center */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-5">
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-gray-100 pb-4">
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-gray-100 pb-3 sm:pb-4">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
               <Send size={18} />
             </div>
             <div>
@@ -191,12 +192,12 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             </div>
           </div>
           
-          <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200">
+          <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 w-full sm:w-auto">
             <button
               onClick={() => setTemplateType('pre-auction')}
-              className={`text-xs font-bold px-3.5 py-1.5 rounded-lg transition-all duration-150 ${
+              className={`flex-1 sm:flex-initial text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-lg transition-all duration-150 text-center ${
                 templateType === 'pre-auction' 
-                  ? 'bg-slate-900 text-white shadow-sm' 
+                  ? 'bg-slate-900 text-white shadow-2xs' 
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -204,9 +205,9 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             </button>
             <button
               onClick={() => setTemplateType('post-auction')}
-              className={`text-xs font-bold px-3.5 py-1.5 rounded-lg transition-all duration-150 ${
+              className={`flex-1 sm:flex-initial text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-lg transition-all duration-150 text-center ${
                 templateType === 'post-auction' 
-                  ? 'bg-slate-900 text-white shadow-sm' 
+                  ? 'bg-slate-900 text-white shadow-2xs' 
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -215,14 +216,14 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-          <div className="space-y-4 lg:col-span-1">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 items-start">
+          <div className="space-y-3 sm:space-y-4 lg:col-span-1">
             <div className="space-y-1.5">
               <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Select Chit Group</label>
               <select
                 value={activeGroupKey}
                 onChange={(e) => setActiveGroupKey(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
               >
                 {Object.values(groupsMetadata).map((group) => (
                   <option key={group.id} value={group.id}>
@@ -240,11 +241,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   <span className="font-bold text-gray-900">Month {selectedMeta.currentMonth}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Next Auction Date:</span>
+                  <span className="text-gray-500">Next Auction:</span>
                   <span className="font-bold text-indigo-700">{selectedMeta.auctionDate}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Fixed Installment:</span>
+                  <span className="text-gray-500">Installment Due:</span>
                   <span className="font-bold text-emerald-700">₹{selectedMeta.fixedInstallment.toLocaleString('en-IN')}</span>
                 </div>
               </div>
@@ -259,13 +260,13 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
               rows={7}
               value={broadcastText}
               onChange={(e) => setBroadcastText(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl p-3.5 text-xs text-gray-800 font-mono focus:outline-none resize-none leading-relaxed shadow-xs"
+              className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl p-3.5 text-xs text-gray-800 font-mono focus:outline-none resize-none leading-relaxed shadow-2xs"
             />
 
-            <div className="flex flex-wrap gap-2 justify-end pt-1">
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end pt-1">
               <button
                 onClick={handleCopyText}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2 rounded-xl flex items-center space-x-1.5 transition-colors border border-gray-200"
+                className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center space-x-1.5 transition-colors border border-gray-200"
               >
                 {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
                 <span>{copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}</span>
@@ -275,10 +276,10 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                 href={formatWhatsAppUrl()}
                 target="_blank"
                 rel="noreferrer"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center space-x-1.5 transition-colors shadow-sm"
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center space-x-1.5 transition-colors shadow-2xs text-center"
               >
                 <Send size={14} />
-                <span>Share via WhatsApp Web</span>
+                <span>Share via WhatsApp</span>
               </a>
             </div>
           </div>

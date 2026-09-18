@@ -16,7 +16,13 @@ import {
   Coins, 
   Scale, 
   Plus, 
-  Trash2 
+  Trash2,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Sparkles,
+  Banknote,
+  CheckCircle2,
+  X
 } from 'lucide-react';
 
 interface Relocation {
@@ -57,23 +63,70 @@ export default function CashVaultLedger() {
   const { profile } = useAuth();
   const activeAdminName = profile?.fullName || 'Admin';
 
-  // 1. Clean Starting State Hooks (Real data starts empty)
+  // State
   const [relocations, setRelocations] = useState<Relocation[]>([]);
   const [personalDraws, setPersonalDraws] = useState<PersonalDraw[]>([]);
   const [liabilities, setLiabilities] = useState<DebtLiability[]>([]);
   const [collections, setCollections] = useState<MemberCollection[]>([]);
   const [availableGroups, setAvailableGroups] = useState<{ id: string; name: string }[]>([]);
 
-  // Fetch groups from Supabase
+  // Fetch groups and recent collections from Supabase
   useEffect(() => {
-    const fetchGroups = async () => {
-      const { data } = await supabase.from('chit_groups').select('id, name');
-      if (data && data.length > 0) {
-        setAvailableGroups(data);
-        setSplitGroup(data[0].name);
+    const fetchInitialData = async () => {
+      try {
+        const { data: groups } = await supabase.from('chit_groups').select('id, name');
+        if (groups && groups.length > 0) {
+          setAvailableGroups(groups);
+          setSplitGroup(groups[0].name);
+        }
+
+        // Fetch members with dues from group_members joined with profiles and chit_groups
+        const { data: membersData } = await supabase
+          .from('group_members')
+          .select(`
+            id,
+            ticket_number,
+            custom_installment,
+            profiles:profile_id (
+              id,
+              full_name
+            ),
+            chit_groups (
+              id,
+              name,
+              total_value,
+              duration_months,
+              current_month,
+              kai_iruppu_pool
+            )
+          `)
+          .limit(20);
+
+        if (membersData && membersData.length > 0) {
+          const parsedCols: MemberCollection[] = membersData.map((m: any) => {
+            const prof = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+            const g = Array.isArray(m.chit_groups) ? m.chit_groups[0] : m.chit_groups;
+            const totalVal = Number(g?.total_value) || 200000;
+            const duration = Number(g?.duration_months) || 20;
+            const baseInst = Math.round(totalVal / duration);
+            const due = m.custom_installment !== null ? Number(m.custom_installment) : baseInst;
+
+            return {
+              id: m.id,
+              memberName: prof?.full_name || `Member #${m.ticket_number}`,
+              totalDue: due,
+              amountLogged: 0,
+              targetVault: 'cash_in_hand',
+              status: 'completed',
+            };
+          });
+          setCollections(parsedCols);
+        }
+      } catch (e) {
+        console.error('Error loading cash ledger initial data:', e);
       }
     };
-    fetchGroups();
+    fetchInitialData();
   }, []);
 
   // Form states
@@ -101,9 +154,7 @@ export default function CashVaultLedger() {
     }).format(val);
   };
 
-  // 2. Action handlers
-  
-  // ATM Relocation: Debit bank instantly, place in pending inflow queue
+  // Action handlers
   const handleATMRelocation = (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(relocateAmount);
@@ -112,10 +163,8 @@ export default function CashVaultLedger() {
       return;
     }
 
-    // Debit bank instantly
     updateBalance(relocateSource, -amount);
 
-    // Queue inflow relocation
     const newReloc: Relocation = {
       id: Math.random().toString(),
       source: relocateSource,
@@ -126,13 +175,11 @@ export default function CashVaultLedger() {
     setRelocateAmount('');
   };
 
-  // Verify ATM delivery: Remove pending inflow, credit physical cash box
   const handleVerifyRelocation = (id: string, amount: number) => {
     setRelocations(prev => prev.filter(r => r.id !== id));
-    updateBalance('cash_in_hand', amount); // Credit cash box
+    updateBalance('cash_in_hand', amount);
   };
 
-  // Fast Spend / Personal Draw: Debit Cash Box instantly
   const handlePersonalDraw = (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(spendAmount);
@@ -141,10 +188,8 @@ export default function CashVaultLedger() {
       return;
     }
 
-    // Debit Cash Box instantly
     updateBalance('cash_in_hand', -amount);
 
-    // Add to personal draws list
     const newDraw: PersonalDraw = {
       id: Math.random().toString(),
       amount,
@@ -158,7 +203,6 @@ export default function CashVaultLedger() {
     setSpendDesc('');
   };
 
-  // Payout Split: debit chosen wallet by paid amount, log outstanding debt liability
   const handlePayoutSplit = (e: React.FormEvent) => {
     e.preventDefault();
     const total = Number(splitTotal);
@@ -174,10 +218,8 @@ export default function CashVaultLedger() {
       return;
     }
 
-    // Debit paid amount from chosen wallet
     updateBalance(splitSourceWallet, -paid);
 
-    // Record liability
     const newLiab: DebtLiability = {
       id: Math.random().toString(),
       groupName: splitGroup,
@@ -190,15 +232,12 @@ export default function CashVaultLedger() {
     setSplitPaid('');
   };
 
-  // Log Partial Payment collection
   const handleLogPartialPayment = (e: React.FormEvent, memberId: string) => {
     e.preventDefault();
     const pay = Number(partialPaymentVal);
     const member = collections.find(c => c.id === memberId);
     if (isNaN(pay) || pay <= 0 || !member) return;
 
-    // Check if the payment target is Cash Box (Cash in Hand)
-    // If it's bank (other than admin's physical cash control), flag it as pending verification
     const needsVerification = partialPaymentWallet !== 'cash_in_hand';
 
     setCollections(prev => prev.map(c => {
@@ -214,12 +253,9 @@ export default function CashVaultLedger() {
       return c;
     }));
 
-    // If it's Cash box, credit instantly
     if (!needsVerification) {
       updateBalance('cash_in_hand', pay);
     } else {
-      // Add bank balance, but flag it or hold
-      // For simplicity, we credit the bank instantly but show the RLS audit/verification state
       updateBalance(partialPaymentWallet, pay);
     }
 
@@ -232,45 +268,45 @@ export default function CashVaultLedger() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
 
       {/* Main Split Layout Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 sm:gap-6">
         
         {/* Left Side forms (ATM Relocation & Spending Panel) */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-5 sm:space-y-6">
           
           {/* Fast Entry Spending Module */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-              <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                <Coins size={14} className="text-indigo-600" />
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Coins size={16} className="text-rose-600" />
                 Quick Spend / Personal Draw
               </h3>
-              <span className="text-[9px] text-red-700 font-bold bg-red-50 border border-red-100 px-2 py-0.5 rounded">
-                Deducted from Cash Box
+              <span className="text-[10px] text-rose-700 font-bold bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
+                Cash Box Debit
               </span>
             </div>
 
             <form onSubmit={handlePersonalDraw} className="space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 font-bold">Amount (₹)</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Amount (₹)</label>
                   <input
                     type="number"
                     required
-                    placeholder="Enter amount"
+                    placeholder="e.g. 500"
                     value={spendAmount}
                     onChange={(e) => setSpendAmount(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2.5 py-1.5 text-xs text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 font-bold">Tag Category</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Category</label>
                   <select
                     value={spendTag}
                     onChange={(e) => setSpendTag(e.target.value as PersonalDraw['tag'])}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                   >
                     <option value="Petrol">Petrol</option>
                     <option value="Groceries">Groceries</option>
@@ -280,25 +316,29 @@ export default function CashVaultLedger() {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] text-gray-500 font-bold flex items-center justify-between">
-                  <span>Dictation / Log Description</span>
-                  <button type="button" onClick={() => setSpendDesc("Petrol filled for Dad's bike to collect chit amount from Balaji")} className="text-[9px] text-indigo-600 flex items-center gap-1 hover:text-indigo-800">
-                    <Mic size={10} /> Simulate Dictation
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
+                  <span>Reason / Description</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setSpendDesc("Petrol filled for Dad's bike for collections")} 
+                    className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 hover:text-indigo-800"
+                  >
+                    <Mic size={11} /> Auto-fill
                   </button>
                 </label>
                 <textarea
-                  placeholder="Type or dictate reason..."
+                  placeholder="e.g. Petrol for collection visits..."
                   value={spendDesc}
                   onChange={(e) => setSpendDesc(e.target.value)}
                   rows={2}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2.5 py-1.5 text-xs text-gray-900 focus:outline-none resize-none"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none resize-none font-medium shadow-2xs leading-relaxed"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-red-50 hover:bg-red-600 border border-red-200 text-red-700 hover:text-white font-bold text-xs py-2 rounded-lg transition-all duration-150 shadow-sm"
+                className="w-full bg-rose-50 hover:bg-rose-600 border border-rose-200 text-rose-700 hover:text-white active:scale-98 font-bold text-xs py-3 rounded-xl transition-all duration-150 shadow-2xs"
               >
                 Log Personal Draw
               </button>
@@ -306,47 +346,47 @@ export default function CashVaultLedger() {
           </div>
 
           {/* ATM Relocation Engine */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
-              <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                <Scale size={14} className="text-indigo-600" />
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Scale size={16} className="text-indigo-600" />
                 ATM Bank-to-Cash Relocation
               </h3>
-              <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">
-                Debit Bank → Verify Cash Box
+              <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
+                2-Step Verify
               </span>
             </div>
 
             <form onSubmit={handleATMRelocation} className="space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 font-bold">Source Bank</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Source Bank</label>
                   <select
                     value={relocateSource}
                     onChange={(e) => setRelocateSource(e.target.value as Exclude<WalletType, 'cash_in_hand'>)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                   >
                     <option value="kishor_bank">Kishor Bank</option>
                     <option value="dad_bank">Dad Bank</option>
                     <option value="mom_bank">Mom Bank</option>
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 font-bold">Amount (₹)</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Amount (₹)</label>
                   <input
                     type="number"
                     required
-                    placeholder="Enter amount"
+                    placeholder="e.g. 20000"
                     value={relocateAmount}
                     onChange={(e) => setRelocateAmount(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2.5 py-1.5 text-xs text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-gray-900 hover:bg-black text-white font-bold text-xs py-2 rounded-lg transition-all duration-150 shadow-sm"
+                className="w-full bg-gray-900 hover:bg-black text-white active:scale-98 font-bold text-xs py-3 rounded-xl transition-all duration-150 shadow-2xs"
               >
                 Trigger ATM Withdrawal
               </button>
@@ -354,24 +394,24 @@ export default function CashVaultLedger() {
 
             {/* Pending Inflow verification list */}
             {relocations.length > 0 && (
-              <div className="space-y-2 pt-3 border-t border-gray-100">
+              <div className="space-y-2.5 pt-3.5 border-t border-gray-100">
                 <h4 className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
-                  <AlertCircle size={12} />
-                  Pending Physical Verification
+                  <AlertCircle size={13} />
+                  Pending Physical Cash Verification
                 </h4>
                 
                 <div className="space-y-2">
                   {relocations.map((reloc) => (
-                    <div key={reloc.id} className="flex justify-between items-center bg-gray-50 border border-gray-200 p-2.5 rounded-lg">
+                    <div key={reloc.id} className="flex justify-between items-center bg-amber-50/70 border border-amber-200 p-3 rounded-2xl">
                       <div>
-                        <span className="text-[10px] font-semibold text-gray-500 block">From: {reloc.source.replace('_', ' ')}</span>
-                        <span className="text-xs font-bold text-gray-900 mt-0.5 block">{formatCurrency(reloc.amount)}</span>
+                        <span className="text-[10px] font-bold text-gray-500 uppercase block">From: {reloc.source.replace('_', ' ')}</span>
+                        <span className="text-xs font-extrabold text-gray-900 mt-0.5 block">{formatCurrency(reloc.amount)}</span>
                       </div>
                       <button
                         onClick={() => handleVerifyRelocation(reloc.id, reloc.amount)}
-                        className="bg-green-600 hover:bg-green-700 text-white font-bold text-[9px] px-2.5 py-1.5 rounded flex items-center gap-1 transition-all duration-150"
+                        className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-[10px] px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all duration-150 shadow-2xs"
                       >
-                        <Check size={10} /> Verify Delivery
+                        <Check size={11} /> Confirm Inflow
                       </button>
                     </div>
                   ))}
@@ -381,23 +421,23 @@ export default function CashVaultLedger() {
           </div>
 
           {/* Payout Split Tracker Form */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
-            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5 border-b border-gray-100 pb-2.5">
-              <Scale size={14} className="text-indigo-600" />
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+              <Scale size={16} className="text-indigo-600" />
               Payout Split Distribution
             </h3>
 
             <form onSubmit={handlePayoutSplit} className="space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 font-bold">Chit Group</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Chit Group</label>
                   <select
                     value={splitGroup}
                     onChange={(e) => setSplitGroup(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                   >
                     {availableGroups.length === 0 ? (
-                      <option value="">No Chit Groups Found</option>
+                      <option value="">No Groups Found</option>
                     ) : (
                       availableGroups.map((g) => (
                         <option key={g.id} value={g.name}>
@@ -407,14 +447,14 @@ export default function CashVaultLedger() {
                     )}
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 font-bold">Target Payout Wallet</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Payout Wallet</label>
                   <select
                     value={splitSourceWallet}
                     onChange={(e) => setSplitSourceWallet(e.target.value as WalletType)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                   >
-                    <option value="cash_in_hand">Physical Cash Box</option>
+                    <option value="cash_in_hand">Cash Box</option>
                     <option value="kishor_bank">Kishor Bank</option>
                     <option value="dad_bank">Dad Bank</option>
                     <option value="mom_bank">Mom Bank</option>
@@ -423,33 +463,33 @@ export default function CashVaultLedger() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 font-bold">Total Chit Value</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Total Value (₹)</label>
                   <input
                     type="number"
                     required
                     placeholder="₹1,00,000"
                     value={splitTotal}
                     onChange={(e) => setSplitTotal(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2.5 py-1.5 text-xs text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 font-bold">Paid Now</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Paid Now (₹)</label>
                   <input
                     type="number"
                     required
                     placeholder="₹70,000"
                     value={splitPaid}
                     onChange={(e) => setSplitPaid(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2.5 py-1.5 text-xs text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 font-bold text-xs py-2 rounded-lg transition-all duration-150 shadow-sm"
+                className="w-full bg-gray-100 hover:bg-gray-200 active:scale-98 border border-gray-200 text-gray-800 font-bold text-xs py-3 rounded-xl transition-all duration-150 shadow-2xs"
               >
                 Record Payout Split
               </button>
@@ -459,24 +499,126 @@ export default function CashVaultLedger() {
         </div>
 
         {/* Right Side Ledgers / Partial Payment Matrix (Collections & Liabilities) */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className="lg:col-span-3 space-y-5 sm:space-y-6">
           
           {/* Collection Balance Ledger */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
-            <div>
-              <h3 className="text-sm font-bold text-gray-900">Monthly Collection Balance Ledger</h3>
-              <p className="text-[11px] text-gray-500 mt-0.5">Rolling monthly payments tracked in bits and pieces</p>
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-snug">Monthly Collection Balance Ledger</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Rolling monthly payments tracked in real-time</p>
+              </div>
+              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full">
+                {collections.length} members
+              </span>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Mobile Cards Stream (for small screens < md) */}
+            <div className="space-y-3 md:hidden">
+              {collections.length === 0 ? (
+                <div className="py-8 text-center text-xs text-gray-400">No collection records found.</div>
+              ) : (
+                collections.map((col) => {
+                  const isPaying = activePaymentMemberId === col.id;
+                  const remaining = col.totalDue - col.amountLogged;
+
+                  return (
+                    <div key={col.id} className="p-4 bg-gray-50/70 border border-gray-200 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-sm text-gray-900 block leading-snug">{col.memberName}</span>
+                          <span className="text-xs text-gray-500 font-mono mt-0.5 block">
+                            Due: {formatCurrency(col.totalDue)} · Logged: {formatCurrency(col.amountLogged)}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className={`text-sm font-extrabold block ${remaining === 0 ? 'text-emerald-600' : 'text-gray-900'}`}>
+                            {remaining === 0 ? 'Paid' : formatCurrency(remaining)}
+                          </span>
+                          <span className="text-[10px] font-mono text-gray-400 uppercase mt-0.5 block">{col.targetVault.replace(/_/g, ' ')}</span>
+                        </div>
+                      </div>
+
+                      {!isPaying ? (
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200/60">
+                          {col.status === 'pending_verification' && (
+                            <button
+                              onClick={() => handleVerifyCollection(col.id)}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold px-3.5 py-1.5 rounded-xl"
+                            >
+                              Verify
+                            </button>
+                          )}
+                          {remaining > 0 && (
+                            <button
+                              onClick={() => {
+                                setActivePaymentMemberId(col.id);
+                                setPartialPaymentVal(remaining.toString());
+                              }}
+                              className="bg-gray-900 hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-xl shadow-2xs active:scale-95 transition-all"
+                            >
+                              Record Payment
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <form 
+                          onSubmit={(e) => handleLogPartialPayment(e, col.id)}
+                          className="pt-2.5 border-t border-gray-200 space-y-2.5"
+                        >
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              placeholder="Amount"
+                              required
+                              value={partialPaymentVal}
+                              onChange={(e) => setPartialPaymentVal(e.target.value)}
+                              className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                            />
+                            <select
+                              value={partialPaymentWallet}
+                              onChange={(e) => setPartialPaymentWallet(e.target.value as WalletType)}
+                              className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                            >
+                              <option value="cash_in_hand">Cash Box</option>
+                              <option value="kishor_bank">Kishor Bank</option>
+                              <option value="dad_bank">Dad Bank</option>
+                              <option value="mom_bank">Mom Bank</option>
+                            </select>
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <button 
+                              type="button" 
+                              onClick={() => setActivePaymentMemberId(null)} 
+                              className="text-xs text-gray-500 font-semibold px-3 py-1.5 rounded-xl border border-gray-200"
+                            >
+                              Cancel
+                            </button>
+                            <button 
+                              type="submit" 
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-1.5 rounded-xl shadow-2xs"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop Table View (hidden on small screens < md) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs text-left text-gray-600">
-                <thead className="text-[10px] text-gray-500 uppercase bg-gray-50">
+                <thead className="text-[10px] text-gray-400 uppercase bg-gray-50/80 font-bold tracking-wider">
                   <tr>
-                    <th className="py-2.5 px-3">Member</th>
-                    <th className="py-2.5 px-3">Due / Logged</th>
-                    <th className="py-2.5 px-3">Remaining</th>
-                    <th className="py-2.5 px-3">Target Vault</th>
-                    <th className="py-2.5 px-3 text-right">Action</th>
+                    <th className="py-3.5 px-4">Member</th>
+                    <th className="py-3.5 px-4">Due / Logged</th>
+                    <th className="py-3.5 px-4">Remaining</th>
+                    <th className="py-3.5 px-4">Target Vault</th>
+                    <th className="py-3.5 px-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -485,37 +627,37 @@ export default function CashVaultLedger() {
                     const remaining = col.totalDue - col.amountLogged;
 
                     return (
-                      <tr key={col.id} className="hover:bg-gray-50/50">
-                        <td className="py-3 px-3">
-                          <span className="font-semibold text-gray-800 block">{col.memberName}</span>
-                          <span className={`text-[9px] mt-0.5 inline-block ${
+                      <tr key={col.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <span className="font-bold text-gray-900 block text-xs">{col.memberName}</span>
+                          <span className={`text-[10px] mt-0.5 inline-block font-bold ${
                             col.status === 'completed' 
-                              ? 'text-green-700 bg-green-50 px-1.5 py-0.2 rounded border border-green-200' 
-                              : 'text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200'
+                              ? 'text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200' 
+                              : 'text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200'
                           }`}>
                             {col.status.toUpperCase().replace('_', ' ')}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-gray-500">
+                        <td className="py-3.5 px-4 text-gray-500 font-medium">
                           {formatCurrency(col.totalDue)} / <span className="text-gray-900 font-bold">{formatCurrency(col.amountLogged)}</span>
                         </td>
-                        <td className="py-3 px-3 font-bold text-gray-700">
+                        <td className="py-3.5 px-4 font-bold text-gray-800">
                           {remaining === 0 ? (
-                            <span className="text-green-600">Paid</span>
+                            <span className="text-emerald-600 font-extrabold">Paid</span>
                           ) : (
                             formatCurrency(remaining)
                           )}
                         </td>
-                        <td className="py-3 px-3 font-mono text-[10px] text-gray-500">
-                          {col.targetVault.replace('_', ' ')}
+                        <td className="py-3.5 px-4 font-mono text-[11px] text-gray-500">
+                          {col.targetVault.replace(/_/g, ' ')}
                         </td>
-                        <td className="py-3 px-3 text-right">
+                        <td className="py-3.5 px-4 text-right">
                           {!isPaying ? (
-                            <div className="flex justify-end gap-1.5">
+                            <div className="flex justify-end gap-2">
                               {col.status === 'pending_verification' && (
                                 <button
                                   onClick={() => handleVerifyCollection(col.id)}
-                                  className="bg-green-50 hover:bg-green-600 border border-green-200 hover:border-green-600 text-green-700 hover:text-white text-[9px] font-bold px-2 py-1 rounded transition-all duration-150"
+                                  className="bg-emerald-50 hover:bg-emerald-600 border border-emerald-200 hover:border-emerald-600 text-emerald-700 hover:text-white text-xs font-bold px-3 py-1.5 rounded-xl transition-all duration-150"
                                 >
                                   Verify
                                 </button>
@@ -526,7 +668,7 @@ export default function CashVaultLedger() {
                                     setActivePaymentMemberId(col.id);
                                     setPartialPaymentVal(remaining.toString());
                                   }}
-                                  className="bg-gray-900 hover:bg-black text-white text-[9px] font-bold px-2.5 py-1 rounded transition-colors duration-150"
+                                  className="bg-gray-900 hover:bg-black text-white text-xs font-bold px-3.5 py-1.5 rounded-xl transition-colors duration-150 active:scale-95"
                                 >
                                   Pay
                                 </button>
@@ -536,21 +678,21 @@ export default function CashVaultLedger() {
                             /* mini collection form */
                             <form 
                               onSubmit={(e) => handleLogPartialPayment(e, col.id)}
-                              className="flex flex-col gap-1.5 max-w-[140px] ml-auto text-left"
+                              className="flex flex-col gap-2 max-w-[170px] ml-auto text-left"
                             >
-                              <div className="flex gap-1">
+                              <div className="flex gap-1.5">
                                 <input
                                   type="number"
                                   placeholder="Amount"
                                   required
                                   value={partialPaymentVal}
                                   onChange={(e) => setPartialPaymentVal(e.target.value)}
-                                  className="w-16 bg-gray-50 border border-gray-200 rounded px-1 py-0.5 text-[10px] text-gray-900 focus:outline-none"
+                                  className="w-20 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-gray-900 focus:outline-none"
                                 />
                                 <select
                                   value={partialPaymentWallet}
                                   onChange={(e) => setPartialPaymentWallet(e.target.value as WalletType)}
-                                  className="w-16 bg-gray-50 border border-gray-200 rounded px-0.5 py-0.5 text-[9px] text-gray-900 focus:outline-none"
+                                  className="w-20 bg-gray-50 border border-gray-200 rounded-lg px-1.5 py-1 text-xs font-bold text-gray-900 focus:outline-none"
                                 >
                                   <option value="cash_in_hand">Cash</option>
                                   <option value="kishor_bank">Kishor</option>
@@ -558,9 +700,9 @@ export default function CashVaultLedger() {
                                   <option value="mom_bank">Mom</option>
                                 </select>
                               </div>
-                              <div className="flex justify-end gap-1">
-                                <button type="button" onClick={() => setActivePaymentMemberId(null)} className="text-[9px] text-gray-500 hover:text-gray-700">Cancel</button>
-                                <button type="submit" className="bg-gray-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">Log</button>
+                              <div className="flex justify-end gap-1.5">
+                                <button type="button" onClick={() => setActivePaymentMemberId(null)} className="text-xs text-gray-500 hover:text-gray-700 font-semibold px-2 py-0.5">Cancel</button>
+                                <button type="submit" className="bg-gray-900 text-white text-xs font-bold px-3 py-0.5 rounded-lg">Log</button>
                               </div>
                             </form>
                           )}
@@ -574,20 +716,20 @@ export default function CashVaultLedger() {
           </div>
 
           {/* Outstanding Payout Liabilities ledger */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
             <h3 className="text-sm font-bold text-gray-900">Outstanding Payout Debt Liabilities</h3>
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {liabilities.length === 0 ? (
-                <p className="text-xs text-gray-400 italic">No outstanding debt liabilities.</p>
+                <p className="text-xs text-gray-400 italic py-2">No outstanding debt liabilities.</p>
               ) : (
                 liabilities.map((liab) => (
-                  <div key={liab.id} className="flex justify-between items-center bg-gray-50 border border-gray-200 p-3 rounded-lg">
+                  <div key={liab.id} className="flex justify-between items-center bg-gray-50/80 border border-gray-200 p-4 rounded-2xl">
                     <div>
-                      <span className="text-xs font-semibold text-gray-800 block">{liab.groupName} Outstanding Payout</span>
-                      <span className="text-[10px] text-gray-500 mt-1 block">Total Due: {formatCurrency(liab.totalPayout)} | Paid: {formatCurrency(liab.paidAmount)}</span>
+                      <span className="text-xs font-bold text-gray-800 block">{liab.groupName} Outstanding</span>
+                      <span className="text-xs text-gray-500 mt-1 block">Total: {formatCurrency(liab.totalPayout)} | Paid: {formatCurrency(liab.paidAmount)}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-extrabold text-red-600 block">{formatCurrency(liab.liabilityAmount)}</span>
+                      <span className="text-sm font-extrabold text-rose-600 block">{formatCurrency(liab.liabilityAmount)}</span>
                       <button 
                         onClick={() => {
                           if (balances.cash_in_hand >= liab.liabilityAmount) {
@@ -597,7 +739,7 @@ export default function CashVaultLedger() {
                             alert("Insufficient Cash Box liquidity to clear debt liability.");
                           }
                         }}
-                        className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 mt-1 hover:underline block"
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 mt-1 hover:underline block"
                       >
                         Clear Debt
                       </button>
@@ -609,35 +751,35 @@ export default function CashVaultLedger() {
           </div>
 
           {/* Personal Spends Draws Ledger */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
-            <h3 className="text-sm font-bold text-gray-900">Quick Spend / Personal Draws Ledger</h3>
-            <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+            <h3 className="text-sm font-bold text-gray-900">Personal Draws Ledger</h3>
+            <div className="space-y-3 max-h-[260px] overflow-y-auto pr-1">
               {personalDraws.length === 0 ? (
-                <p className="text-xs text-gray-400 italic">No spends logged today.</p>
+                <p className="text-xs text-gray-400 italic py-2">No personal draws logged today.</p>
               ) : (
                 personalDraws.map((draw) => (
-                  <div key={draw.id} className="bg-gray-50 border border-gray-200 p-3 rounded-lg flex justify-between items-start">
-                    <div className="space-y-1">
+                  <div key={draw.id} className="bg-gray-50/80 border border-gray-200 p-4 rounded-2xl flex justify-between items-start">
+                    <div className="space-y-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="bg-red-50 text-red-700 border border-red-150 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded">
+                        <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full">
                           {draw.tag}
                         </span>
-                        <span className="text-[9px] text-gray-400 font-mono">{draw.timestamp}</span>
+                        <span className="text-[10px] text-gray-400 font-mono">{draw.timestamp}</span>
                       </div>
-                      <p className="text-xs text-gray-700 font-medium">{draw.description}</p>
-                      <span className="text-[9px] text-indigo-600 font-bold block">Taken by: {draw.adminName}</span>
+                      <p className="text-xs text-gray-800 font-semibold leading-relaxed">{draw.description}</p>
+                      <span className="text-[11px] text-indigo-600 font-bold block">Taken by: {draw.adminName}</span>
                     </div>
-                    <div className="text-right">
-                      <span className="text-xs font-extrabold text-red-600 block">-{formatCurrency(draw.amount)}</span>
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-extrabold text-rose-600 block">-{formatCurrency(draw.amount)}</span>
                       <button 
                         onClick={() => {
-                          updateBalance('cash_in_hand', draw.amount); // Revert / Refund cash box
+                          updateBalance('cash_in_hand', draw.amount);
                           setPersonalDraws(prev => prev.filter(d => d.id !== draw.id));
                         }}
-                        className="text-gray-400 hover:text-red-600 mt-1 transition-colors"
+                        className="text-gray-400 hover:text-rose-600 p-1.5 mt-1 transition-colors inline-block"
                         title="Delete spend & Refund cash box"
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
@@ -653,3 +795,4 @@ export default function CashVaultLedger() {
     </div>
   );
 }
+
