@@ -262,7 +262,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
           exit_month,
           transferred_from,
           transfer_effective_month,
-          profiles (
+          profiles:profile_id (
             id,
             full_name,
             phone_number
@@ -278,20 +278,23 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
       if (data) {
         setWorkspaceMembers(
-          data.map((m: any) => ({
-            id: m.id,
-            ticket: m.ticket_number,
-            hasWon: m.has_won_regular,
-            bookSynced: m.physical_book_synced,
-            profileId: m.profile_id,
-            splitPool: m.split_pool || null,
-            customInstallment: m.custom_installment ? Number(m.custom_installment) : null,
-            exitMonth: m.exit_month || null,
-            transferredFrom: m.transferred_from || null,
-            transferEffectiveMonth: m.transfer_effective_month || null,
-            name: m.profiles?.full_name || 'Subscriber',
-            phone: m.profiles?.phone_number || '',
-          }))
+          data.map((m: any) => {
+            const prof = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+            return {
+              id: m.id,
+              ticket: m.ticket_number,
+              hasWon: m.has_won_regular,
+              bookSynced: m.physical_book_synced,
+              profileId: m.profile_id,
+              splitPool: m.split_pool || null,
+              customInstallment: m.custom_installment ? Number(m.custom_installment) : null,
+              exitMonth: m.exit_month || null,
+              transferredFrom: m.transferred_from || null,
+              transferEffectiveMonth: m.transfer_effective_month || null,
+              name: prof?.full_name || 'Subscriber',
+              phone: prof?.phone_number || '',
+            };
+          })
         );
       }
     } catch (err) {
@@ -333,7 +336,8 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     setEditGroupName(g.name || '');
     setEditGroupStatus(g.status || (g.active ? 'active' : 'draft'));
     setEditGroupValue(g.totalValue || 100000);
-    setEditGroupMemberCount(g.duration || 5);
+    const count = g.duration || g.memberCount || 5;
+    setEditGroupMemberCount(count);
     setEditGroupStartDate(g.startDate || new Date().toISOString().split('T')[0]);
     setIsAdvancedExpanded(false);
     setEditMemberSearchQuery('');
@@ -353,7 +357,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
           exit_month,
           transferred_from,
           transfer_effective_month,
-          profiles (
+          profiles:profile_id (
             id,
             full_name,
             phone_number
@@ -362,24 +366,36 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         .eq('group_id', g.id)
         .order('ticket_number', { ascending: true });
 
-      if (data) {
-        setEditGroupMembers(
-          data.map((m: any) => ({
-            id: m.id,
-            ticket: m.ticket_number,
-            hasWon: m.has_won_regular,
-            bookSynced: m.physical_book_synced,
-            profileId: m.profile_id,
-            splitPool: m.split_pool || null,
-            customInstallment: m.custom_installment ? Number(m.custom_installment) : null,
-            exitMonth: m.exit_month || null,
-            transferredFrom: m.transferred_from || null,
-            transferEffectiveMonth: m.transfer_effective_month || null,
-            name: m.profiles?.full_name || 'Subscriber',
-            phone: m.profiles?.phone_number || '',
-          }))
-        );
+      if (error) {
+        console.warn('Note fetching edit group members:', error.message);
       }
+
+      // Map all 1..count slots so no ticket slot is ever undefined
+      const mapped = Array.from({ length: count }, (_, idx) => {
+        const tNum = idx + 1;
+        const row = data?.find((m: any) => m.ticket_number === tNum);
+        const prof = Array.isArray(row?.profiles) ? row.profiles[0] : row?.profiles;
+        const dirProfile = row?.profile_id ? masterDirectory.find(p => p.id === row.profile_id) : null;
+        const resolvedName = prof?.full_name || dirProfile?.name || (row?.profile_id ? 'Subscriber' : '');
+        const resolvedPhone = prof?.phone_number || dirProfile?.phone || '';
+
+        return {
+          id: row?.id || `unassigned-${g.id}-${tNum}`,
+          ticket: tNum,
+          hasWon: !!row?.has_won_regular,
+          bookSynced: row?.physical_book_synced ?? true,
+          profileId: row?.profile_id || undefined,
+          splitPool: row?.split_pool || null,
+          customInstallment: row?.custom_installment ? Number(row.custom_installment) : null,
+          exitMonth: row?.exit_month || null,
+          transferredFrom: row?.transferred_from || null,
+          transferEffectiveMonth: row?.transfer_effective_month || null,
+          name: resolvedName,
+          phone: resolvedPhone,
+        };
+      });
+
+      setEditGroupMembers(mapped);
     } catch (err) {
       console.error('Error fetching edit group members:', err);
     }
@@ -456,22 +472,31 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     }
   };
 
-  const handleReassignTicketMember = async (memberRecordId: string, newProfileId: string, newName: string, newPhone: string) => {
+  const handleReassignTicketMember = async (ticketNum: number, currentRecordId: string | undefined, newProfileId: string, newName: string, newPhone: string) => {
+    if (!editingGroup?.id) return;
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('group_members')
-        .update({ profile_id: newProfileId })
-        .eq('id', memberRecordId);
+        .upsert({
+          group_id: editingGroup.id,
+          ticket_number: ticketNum,
+          profile_id: newProfileId,
+          physical_book_synced: true,
+        }, { onConflict: 'group_id,ticket_number' })
+        .select()
+        .single();
 
       if (error) {
         alert(`Failed to reassign member: ${error.message}`);
         return;
       }
 
+      const assignedId = data?.id || currentRecordId || `member-${ticketNum}`;
+
       setEditGroupMembers(prev =>
         prev.map(m =>
-          m.id === memberRecordId
-            ? { ...m, profileId: newProfileId, name: newName, phone: newPhone }
+          m.ticket === ticketNum
+            ? { ...m, id: assignedId, profileId: newProfileId, name: newName, phone: newPhone }
             : m
         )
       );
@@ -479,8 +504,8 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       if (selectedWorkspaceGroupId === editingGroup?.id) {
         setWorkspaceMembers(prev =>
           prev.map(m =>
-            m.id === memberRecordId
-              ? { ...m, profileId: newProfileId, name: newName, phone: newPhone }
+            m.ticket === ticketNum
+              ? { ...m, id: assignedId, profileId: newProfileId, name: newName, phone: newPhone }
               : m
           )
         );
@@ -492,7 +517,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         {
           timestamp: `Today, ${timeStr}`,
           table: 'group_members',
-          desc: `REASSIGNED TICKET: Set subscriber to "${newName}" (${newPhone})`,
+          desc: `ASSIGNED TICKET #${ticketNum}: Set subscriber to "${newName}" (${newPhone})`,
           executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
         },
         ...prev,
@@ -699,27 +724,29 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
   const handleUnassignTicket = async (ticketRecordId: string, ticketNum: number) => {
     try {
-      const { error } = await supabase
-        .from('group_members')
-        .update({
-          profile_id: null,
-          split_pool: null,
-          custom_installment: null,
-          exit_month: null,
-          transferred_from: null,
-          transfer_effective_month: null,
-        })
-        .eq('id', ticketRecordId);
+      if (!ticketRecordId.startsWith('unassigned-')) {
+        const { error } = await supabase
+          .from('group_members')
+          .update({
+            profile_id: null,
+            split_pool: null,
+            custom_installment: null,
+            exit_month: null,
+            transferred_from: null,
+            transfer_effective_month: null,
+          })
+          .eq('id', ticketRecordId);
 
-      if (error) {
-        alert(`Failed to unassign ticket: ${error.message}`);
-        return;
+        if (error) {
+          alert(`Failed to unassign ticket: ${error.message}`);
+          return;
+        }
       }
 
       setEditGroupMembers(prev =>
         prev.map(m =>
-          m.id === ticketRecordId
-            ? { ...m, profileId: undefined, name: 'Unassigned Slot', phone: '', splitPool: null, customInstallment: null, exitMonth: null }
+          m.ticket === ticketNum
+            ? { ...m, profileId: undefined, name: '', phone: '', splitPool: null, customInstallment: null, exitMonth: null }
             : m
         )
       );
@@ -727,8 +754,8 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       if (selectedWorkspaceGroupId === editingGroup?.id) {
         setWorkspaceMembers(prev =>
           prev.map(m =>
-            m.id === ticketRecordId
-              ? { ...m, profileId: undefined, name: 'Unassigned Slot', phone: '', splitPool: null, customInstallment: null, exitMonth: null }
+            m.ticket === ticketNum
+              ? { ...m, profileId: undefined, name: '', phone: '', splitPool: null, customInstallment: null, exitMonth: null }
               : m
           )
         );
@@ -974,6 +1001,20 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
       // Add to local master directory
       setMasterDirectory(prev => [newSubscriber, ...prev]);
+
+      // If we are currently editing a group, assign to the first empty slot in editGroupMembers
+      if (editingGroup) {
+        const firstEmptySlot = editGroupMembers.find(m => !m.profileId);
+        if (firstEmptySlot) {
+          await handleReassignTicketMember(
+            firstEmptySlot.ticket,
+            firstEmptySlot.id,
+            newSubscriber.id,
+            newSubscriber.name,
+            newSubscriber.phone
+          );
+        }
+      }
 
       // Assign to the first empty spot in enrollments
       const firstEmptyIndex = enrollments.findIndex(e => e.name === '');
@@ -2472,164 +2513,6 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                 </div>
               )}
 
-              {/* CREATE SUBSCRIBER MODAL POPUP */}
-              {showCreateMemberModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
-                  <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
-                    <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                          <UserPlus size={18} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-gray-900">Register New Subscriber</h4>
-                          <p className="text-[11px] text-gray-500">Saves to Supabase directory and assigns to open slot</p>
-                        </div>
-                      </div>
-                      <button 
-                        type="button" 
-                        onClick={() => setShowCreateMemberModal(false)}
-                        className="text-gray-400 hover:text-gray-600 p-1"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleCreateAndAssignMember} className="space-y-4">
-                      {/* Subscriber Name Field */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                          Subscriber Full Name *
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-gray-400">
-                            <User size={14} />
-                          </span>
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. Ramesh Kumar"
-                            value={newMemberName}
-                            onChange={(e) => setNewMemberName(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
-                            autoFocus
-                          />
-                        </div>
-
-                        {/* Similar / Fuzzy Name Suggestion (e.g. Kishor vs Kishore) */}
-                        {similarNameSubscriber && (
-                          <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-blue-900 animate-in fade-in duration-200">
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-1.5 font-bold">
-                                <span>💡</span>
-                                <span>Similar subscriber found in directory</span>
-                              </div>
-                              <p className="text-[11px] text-blue-700">
-                                Did you mean <strong>{similarNameSubscriber.name}</strong> ({similarNameSubscriber.phone})?
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowCreateMemberModal(false);
-                                handleAssignExistingMember(similarNameSubscriber);
-                              }}
-                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg shrink-0 transition-colors shadow-sm self-start sm:self-auto"
-                            >
-                              Assign {similarNameSubscriber.name} →
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Phone Number Field */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                          Phone Number (10 Digits) *
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-gray-400">
-                            <Phone size={14} />
-                          </span>
-                          <input
-                            type="tel"
-                            required
-                            placeholder="e.g. 9876543210"
-                            value={newMemberPhone}
-                            onChange={(e) => setNewMemberPhone(e.target.value)}
-                            className={`w-full bg-gray-50 border rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none transition-colors ${
-                              duplicatePhoneSubscriber
-                                ? 'border-amber-400 focus:border-amber-500 bg-amber-50/30'
-                                : 'border-gray-200 focus:border-indigo-500'
-                            }`}
-                          />
-                        </div>
-                        <p className="text-[10px] text-gray-400">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
-
-                        {/* Duplicate Phone Warning Alert */}
-                        {duplicatePhoneSubscriber && (
-                          <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 space-y-2.5 text-xs animate-in fade-in duration-200">
-                            <div className="flex items-start gap-2">
-                              <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-                              <div>
-                                <span className="font-bold text-amber-900 block">Phone number already registered</span>
-                                <p className="text-[11px] text-amber-800 mt-0.5">
-                                  This phone number is already registered to <strong>{duplicatePhoneSubscriber.name}</strong> ({duplicatePhoneSubscriber.phone}).
-                                </p>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowCreateMemberModal(false);
-                                handleAssignExistingMember(duplicatePhoneSubscriber);
-                              }}
-                              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                            >
-                              <UserPlus size={13} /> Assign {duplicatePhoneSubscriber.name} to Open Slot Instead →
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
-                        <button
-                          type="button"
-                          onClick={() => setShowCreateMemberModal(false)}
-                          className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-lg transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={isCreatingMember || !newMemberName.trim() || !newMemberPhone.trim() || duplicatePhoneSubscriber !== null}
-                          className={`font-bold text-xs px-5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 ${
-                            duplicatePhoneSubscriber !== null
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
-                              : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50'
-                          }`}
-                        >
-                          {isCreatingMember ? (
-                            <>
-                              <RefreshCw size={13} className="animate-spin" /> Saving...
-                            </>
-                          ) : duplicatePhoneSubscriber ? (
-                            <>
-                              <AlertCircle size={14} /> Phone Already In Use
-                            </>
-                          ) : (
-                            <>
-                              <Check size={14} /> Register &amp; Enroll
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
               {/* STEP 3: MONTHLY PLAN REVIEW */}
               {wizardStep === 3 && (
                 <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-6 shadow-sm">
@@ -3224,7 +3107,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                                   #{ticketNum}
                                 </span>
                                 <h5 className="text-sm font-bold text-gray-900">
-                                  {member?.name || 'Unassigned Ticket'}
+                                  {member?.name || (member?.profileId ? 'Subscriber' : 'Unassigned Ticket')}
                                 </h5>
                                 {member?.phone && (
                                   <span className="text-[10px] text-gray-400 font-medium">({member.phone})</span>
@@ -3278,7 +3161,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                                       // Assign next empty ticket with this profileId
                                       const emptySlot = editGroupMembers.find(m => !m.profileId && m.ticket !== ticketNum);
                                       if (emptySlot) {
-                                        handleReassignTicketMember(emptySlot.id, member.profileId, member.name, member.phone);
+                                        handleReassignTicketMember(emptySlot.ticket, emptySlot.id, member.profileId, member.name, member.phone);
                                       } else {
                                         alert('All ticket slots are currently filled.');
                                       }
@@ -3429,12 +3312,13 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                             <select
                               value={member?.profileId || ''}
                               onChange={(e) => {
-                                const targetProfile = masterDirectory.find(p => p.id === e.target.value);
-                                if (targetProfile && member) {
-                                  handleReassignTicketMember(member.id, targetProfile.id!, targetProfile.name, targetProfile.phone);
+                                const selectedProfileId = e.target.value;
+                                const targetProfile = masterDirectory.find(p => p.id === selectedProfileId);
+                                if (targetProfile) {
+                                  handleReassignTicketMember(ticketNum, member?.id, targetProfile.id!, targetProfile.name, targetProfile.phone);
                                 }
                               }}
-                              className="bg-gray-50 border border-gray-200 text-gray-800 text-[11px] font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                              className="bg-gray-50 border border-gray-200 text-gray-800 text-[11px] font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 max-w-[200px]"
                             >
                               <option value="" disabled>Select Subscriber</option>
                               {masterDirectory.map(p => (
@@ -4040,6 +3924,178 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                 Save Override
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global Create / Register Subscriber Modal Popup */}
+      {showCreateMemberModal && (
+        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                  <UserPlus size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Register New Subscriber</h4>
+                  <p className="text-[11px] text-gray-500">Saves to Supabase directory and assigns to open slot</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowCreateMemberModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAndAssignMember} className="space-y-4">
+              {/* Subscriber Name Field */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                  Subscriber Full Name *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-gray-400">
+                    <User size={14} />
+                  </span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ramesh Kumar"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Similar / Fuzzy Name Suggestion (e.g. Kishor vs Kishore) */}
+                {similarNameSubscriber && (
+                  <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-blue-900 animate-in fade-in duration-200">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <span>💡</span>
+                        <span>Similar subscriber found in directory</span>
+                      </div>
+                      <p className="text-[11px] text-blue-700">
+                        Did you mean <strong>{similarNameSubscriber.name}</strong> ({similarNameSubscriber.phone})?
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateMemberModal(false);
+                        if (editingGroup) {
+                          const firstEmpty = editGroupMembers.find(m => !m.profileId);
+                          if (firstEmpty) {
+                            handleReassignTicketMember(firstEmpty.ticket, firstEmpty.id, similarNameSubscriber.id!, similarNameSubscriber.name, similarNameSubscriber.phone);
+                          }
+                        } else {
+                          handleAssignExistingMember(similarNameSubscriber);
+                        }
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg shrink-0 transition-colors shadow-sm self-start sm:self-auto"
+                    >
+                      Assign {similarNameSubscriber.name} →
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Phone Number Field */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                  Phone Number (10 Digits) *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-gray-400">
+                    <Phone size={14} />
+                  </span>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="e.g. 9876543210"
+                    value={newMemberPhone}
+                    onChange={(e) => setNewMemberPhone(e.target.value)}
+                    className={`w-full bg-gray-50 border rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none transition-colors ${
+                      duplicatePhoneSubscriber
+                        ? 'border-amber-400 focus:border-amber-500 bg-amber-50/30'
+                        : 'border-gray-200 focus:border-indigo-500'
+                    }`}
+                  />
+                </div>
+                <p className="text-[10px] text-gray-400">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
+
+                {/* Duplicate Phone Warning Alert */}
+                {duplicatePhoneSubscriber && (
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 space-y-2.5 text-xs animate-in fade-in duration-200">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-amber-900 block">Phone number already registered</span>
+                        <p className="text-[11px] text-amber-800 mt-0.5">
+                          This phone number is already registered to <strong>{duplicatePhoneSubscriber.name}</strong> ({duplicatePhoneSubscriber.phone}).
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateMemberModal(false);
+                        if (editingGroup) {
+                          const firstEmpty = editGroupMembers.find(m => !m.profileId);
+                          if (firstEmpty) {
+                            handleReassignTicketMember(firstEmpty.ticket, firstEmpty.id, duplicatePhoneSubscriber.id!, duplicatePhoneSubscriber.name, duplicatePhoneSubscriber.phone);
+                          }
+                        } else {
+                          handleAssignExistingMember(duplicatePhoneSubscriber);
+                        }
+                      }}
+                      className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <UserPlus size={13} /> Assign {duplicatePhoneSubscriber.name} to Open Slot Instead →
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateMemberModal(false)}
+                  className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingMember || !newMemberName.trim() || !newMemberPhone.trim() || duplicatePhoneSubscriber !== null}
+                  className={`font-bold text-xs px-5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 ${
+                    duplicatePhoneSubscriber !== null
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50'
+                  }`}
+                >
+                  {isCreatingMember ? (
+                    <>
+                      <RefreshCw size={13} className="animate-spin" /> Saving...
+                    </>
+                  ) : duplicatePhoneSubscriber ? (
+                    <>
+                      <AlertCircle size={14} /> Phone Already In Use
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} /> Register &amp; Enroll
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
