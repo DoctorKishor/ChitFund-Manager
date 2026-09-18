@@ -25,7 +25,11 @@ import {
   Rocket,
   CalendarDays,
   RefreshCw,
-  Plus
+  Plus,
+  UserPlus,
+  Phone,
+  User,
+  Trash2
 } from 'lucide-react';
 
 // ── Utility: First Sunday on-or-after the 10th of a given month ──────────────
@@ -69,20 +73,27 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupValue, setNewGroupValue] = useState('100000');
   const [newGroupDuration, setNewGroupDuration] = useState('5');
-  const [enrollments, setEnrollments] = useState<{ name: string; phone: string }[]>([
-    { name: '', phone: '' },
-    { name: '', phone: '' },
-    { name: '', phone: '' },
-    { name: '', phone: '' },
-    { name: '', phone: '' },
+  const [enrollments, setEnrollments] = useState<{ id?: string; name: string; phone: string }[]>([
+    { id: undefined, name: '', phone: '' },
+    { id: undefined, name: '', phone: '' },
+    { id: undefined, name: '', phone: '' },
+    { id: undefined, name: '', phone: '' },
+    { id: undefined, name: '', phone: '' },
   ]);
 
   // Wizard Setup States
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+
+  // New Member Modal States for Wizard Step 2 & Master Directory
+  const [showCreateMemberModal, setShowCreateMemberModal] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberPhone, setNewMemberPhone] = useState('');
+  const [isCreatingMember, setIsCreatingMember] = useState(false);
 
   // Live Supabase Directory
-  const [masterDirectory, setMasterDirectory] = useState<{ name: string; phone: string }[]>([]);
+  const [masterDirectory, setMasterDirectory] = useState<{ id?: string; name: string; phone: string }[]>([]);
 
   // Chits Directory Switcher States (Loaded from Supabase)
   const [showWizard, setShowWizard] = useState(false);
@@ -128,11 +139,13 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('full_name, phone_number');
+        .select('id, full_name, phone_number')
+        .order('created_at', { ascending: false });
 
       if (data && data.length > 0) {
         setMasterDirectory(
           data.map((p: any) => ({
+            id: p.id,
             name: p.full_name,
             phone: p.phone_number,
           }))
@@ -206,7 +219,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       const copy = [...prev];
       if (copy.length < num) {
         while (copy.length < num) {
-          copy.push({ name: '', phone: '' });
+          copy.push({ id: undefined, name: '', phone: '' });
         }
       } else if (copy.length > num) {
         return copy.slice(0, num);
@@ -221,6 +234,110 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       copy[index] = { ...copy[index], [field]: val };
       return copy;
     });
+  };
+
+  const handleClearSlot = (index: number) => {
+    setEnrollments(prev => {
+      const copy = [...prev];
+      copy[index] = { id: undefined, name: '', phone: '' };
+      return copy;
+    });
+  };
+
+  const handleAssignExistingMember = (member: { id?: string; name: string; phone: string }) => {
+    const isAlreadyAdded = enrollments.some(e => e.name.toLowerCase() === member.name.toLowerCase());
+    if (isAlreadyAdded) {
+      alert(`"${member.name}" is already assigned to a ticket in this chit group.`);
+      return;
+    }
+    const firstEmptyIndex = enrollments.findIndex(e => e.name === '');
+    if (firstEmptyIndex !== -1) {
+      setEnrollments(prev => {
+        const copy = [...prev];
+        copy[firstEmptyIndex] = member;
+        return copy;
+      });
+      setMemberSearchQuery('');
+      setIsSearchDropdownOpen(false);
+    } else {
+      alert("All spots are fully enrolled! To enroll more, increase group duration in Step 1.");
+    }
+  };
+
+  const handleCreateAndAssignMember = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanName = newMemberName.trim();
+    const cleanPhone = newMemberPhone.trim();
+
+    if (!cleanName) {
+      alert('Please enter a subscriber full name.');
+      return;
+    }
+    if (!cleanPhone) {
+      alert('Please enter a phone number.');
+      return;
+    }
+
+    try {
+      setIsCreatingMember(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert({
+          full_name: cleanName,
+          phone_number: cleanPhone,
+          role: 'subscriber',
+        })
+        .select()
+        .single();
+
+      if (error) {
+        alert(`Failed to save subscriber to database: ${error.message}`);
+        return;
+      }
+
+      const newSubscriber = {
+        id: data.id,
+        name: data.full_name || cleanName,
+        phone: data.phone_number || cleanPhone,
+      };
+
+      // Add to local master directory
+      setMasterDirectory(prev => [newSubscriber, ...prev]);
+
+      // Assign to the first empty spot in enrollments
+      const firstEmptyIndex = enrollments.findIndex(e => e.name === '');
+      if (firstEmptyIndex !== -1) {
+        setEnrollments(prev => {
+          const copy = [...prev];
+          copy[firstEmptyIndex] = newSubscriber;
+          return copy;
+        });
+      }
+
+      // Add audit log
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'profiles',
+          desc: `NEW SUBSCRIBER REGISTERED: "${cleanName}" (${cleanPhone}) — enrolled in Ticket #${firstEmptyIndex !== -1 ? firstEmptyIndex + 1 : 'N/A'}`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+
+      // Reset modal state
+      setNewMemberName('');
+      setNewMemberPhone('');
+      setMemberSearchQuery('');
+      setIsSearchDropdownOpen(false);
+      setShowCreateMemberModal(false);
+    } catch (err: any) {
+      alert(`Error creating member: ${err.message}`);
+    } finally {
+      setIsCreatingMember(false);
+    }
   };
 
   const handleCreateGroup = async (e: React.FormEvent) => {
@@ -239,7 +356,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     }
 
     try {
-      const { data, error } = await supabase.from('chit_groups').insert({
+      const { data: groupData, error: groupError } = await supabase.from('chit_groups').insert({
         name: newGroupName,
         total_value: Number(newGroupValue),
         member_count: duration,
@@ -248,9 +365,31 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         kai_iruppu_pool: 0,
       }).select().single();
 
-      if (error) {
-        alert(`Failed to create group in database: ${error.message}`);
+      if (groupError) {
+        alert(`Failed to create group in database: ${groupError.message}`);
         return;
+      }
+
+      // Insert enrolled members into group_members
+      if (groupData) {
+        const memberInserts = enrollments
+          .filter(slot => slot.id)
+          .map((slot, idx) => ({
+            group_id: groupData.id,
+            profile_id: slot.id,
+            ticket_number: idx + 1,
+            has_won_regular: false,
+            physical_book_synced: true,
+          }));
+
+        if (memberInserts.length > 0) {
+          const { error: membersError } = await supabase
+            .from('group_members')
+            .insert(memberInserts);
+          if (membersError) {
+            console.warn('group_members insert note:', membersError.message);
+          }
+        }
       }
 
       alert(`Success: Chit Group "${newGroupName}" created in Supabase! \nPool Value: ₹${newGroupValue}\nDuration: ${duration} Months.`);
@@ -264,11 +403,11 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     setNewGroupValue('100000');
     setNewGroupDuration('5');
     setEnrollments([
-      { name: '', phone: '' },
-      { name: '', phone: '' },
-      { name: '', phone: '' },
-      { name: '', phone: '' },
-      { name: '', phone: '' },
+      { id: undefined, name: '', phone: '' },
+      { id: undefined, name: '', phone: '' },
+      { id: undefined, name: '', phone: '' },
+      { id: undefined, name: '', phone: '' },
+      { id: undefined, name: '', phone: '' },
     ]);
     setWizardStep(1);
     setShowWizard(false);
@@ -1182,43 +1321,184 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
               {/* STEP 2: ASSIGN MEMBERS */}
               {wizardStep === 2 && (
                 <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-6 shadow-sm">
-                  <div className="border-b border-gray-150 pb-3 flex justify-between items-center">
+                  <div className="border-b border-gray-150 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <h4 className="text-sm font-bold text-gray-900">Step 2: Assign Group Members</h4>
-                      <p className="text-xs text-gray-500 mt-0.5">Click master directory members below to enroll them in spots</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Search &amp; assign subscribers to each ticket slot or register new members</p>
                     </div>
-                    <span className="bg-indigo-50 text-indigo-600 border border-indigo-150 text-[10px] font-bold px-3 py-1 rounded">
-                      Enrolled: {enrollments.filter(e => e.name !== '').length} / {newGroupDuration} spots
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-3 py-1 rounded border transition-colors ${
+                        enrollments.every(e => e.name !== '')
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-indigo-50 text-indigo-600 border-indigo-150'
+                      }`}>
+                        Enrolled: {enrollments.filter(e => e.name !== '').length} / {newGroupDuration} spots
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Slots Grid */}
+                  {/* Fast Search & Auto-Suggest Combobox */}
+                  <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                        Quick Search &amp; Assign Subscriber
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewMemberName(memberSearchQuery.trim());
+                          setNewMemberPhone('');
+                          setShowCreateMemberModal(true);
+                        }}
+                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 hover:underline"
+                      >
+                        <UserPlus size={12} /> + Register New Member
+                      </button>
+                    </div>
+
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-gray-400">
+                        <Search size={14} />
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Type member name to search or register..."
+                        value={memberSearchQuery}
+                        onFocus={() => setIsSearchDropdownOpen(true)}
+                        onChange={(e) => {
+                          setMemberSearchQuery(e.target.value);
+                          setIsSearchDropdownOpen(true);
+                        }}
+                        className="w-full bg-white border border-gray-200 focus:border-indigo-500 rounded-lg pl-9 pr-20 py-2 text-xs font-semibold text-gray-900 focus:outline-none shadow-sm"
+                      />
+                      {memberSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMemberSearchQuery('');
+                            setIsSearchDropdownOpen(false);
+                          }}
+                          className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+
+                      {/* Dropdown Suggestions */}
+                      {isSearchDropdownOpen && memberSearchQuery.trim().length > 0 && (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-gray-100">
+                          {/* Create Option */}
+                          <div
+                            onClick={() => {
+                              setNewMemberName(memberSearchQuery.trim());
+                              setNewMemberPhone('');
+                              setShowCreateMemberModal(true);
+                              setIsSearchDropdownOpen(false);
+                            }}
+                            className="p-2.5 hover:bg-indigo-50 cursor-pointer flex items-center justify-between text-indigo-600 font-bold text-xs bg-indigo-50/40"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <UserPlus size={14} />
+                              Create &amp; Assign &quot;{memberSearchQuery}&quot;
+                            </span>
+                            <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded font-semibold">+ New</span>
+                          </div>
+
+                          {/* Matching Master Directory Members */}
+                          {masterDirectory
+                            .filter(m => m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) || m.phone.includes(memberSearchQuery))
+                            .map((member, idx) => {
+                              const isAlreadyEnrolled = enrollments.some(e => e.name.toLowerCase() === member.name.toLowerCase());
+                              return (
+                                <div
+                                  key={idx}
+                                  onClick={() => {
+                                    if (!isAlreadyEnrolled) {
+                                      handleAssignExistingMember(member);
+                                    }
+                                  }}
+                                  className={`p-2.5 flex items-center justify-between text-xs transition-colors ${
+                                    isAlreadyEnrolled
+                                      ? 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
+                                      : 'hover:bg-gray-50 cursor-pointer text-gray-800'
+                                  }`}
+                                >
+                                  <div>
+                                    <span className="font-bold block">{member.name}</span>
+                                    <span className="text-[10px] text-gray-400">{member.phone}</span>
+                                  </div>
+                                  <div>
+                                    {isAlreadyEnrolled ? (
+                                      <span className="text-[9px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded">Enrolled</span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded hover:bg-indigo-100">
+                                        Assign to Next Slot →
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                          {masterDirectory.filter(m => m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) || m.phone.includes(memberSearchQuery)).length === 0 && (
+                            <div className="p-3 text-center text-xs text-gray-400">
+                              No existing subscribers matched &quot;{memberSearchQuery}&quot;. Click above to create this member.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Group Enrollment Spots (Slots Grid) */}
                   <div className="space-y-2">
-                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Group Enrollment Spots</h5>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[220px] overflow-y-auto pr-1">
+                    <div className="flex justify-between items-center">
+                      <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        Enrolled Chit Ticket Spots ({enrollments.filter(e => e.name !== '').length} of {newGroupDuration})
+                      </h5>
+                      <span className="text-[10px] text-gray-400">
+                        {enrollments.some(e => e.name === '') ? 'Click directory below or search above to fill' : '✓ All tickets assigned!'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[260px] overflow-y-auto pr-1">
                       {enrollments.map((slot, index) => (
-                        <div key={index} className={`flex gap-2 items-center p-2.5 rounded-lg border transition-all ${
-                          slot.name 
-                            ? 'bg-gray-50 border-gray-200' 
-                            : 'border-dashed border-gray-200 bg-white'
-                        }`}>
-                          <span className="text-[10px] font-bold text-gray-400 shrink-0">#{index + 1}</span>
+                        <div 
+                          key={index} 
+                          className={`flex gap-2.5 items-center p-3 rounded-xl border transition-all ${
+                            slot.name 
+                              ? 'bg-white border-gray-200 shadow-sm' 
+                              : 'border-dashed border-gray-250 bg-gray-50/50'
+                          }`}
+                        >
+                          <span className={`text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                            slot.name
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-150'
+                              : 'bg-gray-200 text-gray-500'
+                          }`}>
+                            #{index + 1}
+                          </span>
+
                           {slot.name ? (
-                            <div className="flex-1 min-w-0 flex items-center justify-between">
+                            <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                               <div className="truncate">
-                                <span className="text-xs font-bold text-gray-800 block truncate">{slot.name}</span>
-                                <span className="text-[9px] text-gray-400 mt-0.5">{slot.phone}</span>
+                                <span className="text-xs font-bold text-gray-900 block truncate">{slot.name}</span>
+                                <span className="text-[10px] text-gray-500 mt-0.5 block truncate flex items-center gap-1">
+                                  <Phone size={10} className="text-gray-400 shrink-0" />
+                                  {slot.phone}
+                                </span>
                               </div>
                               <button
                                 type="button"
-                                onClick={() => handleEnrollmentChange(index, 'name', '')}
-                                className="text-red-650 hover:text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-red-200 shrink-0 bg-white"
+                                onClick={() => handleClearSlot(index)}
+                                title="Unassign member from this slot"
+                                className="text-red-600 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded border border-red-200 shrink-0 bg-red-50/50 hover:bg-red-50 transition-colors flex items-center gap-1"
                               >
-                                Clear
+                                <Trash2 size={11} /> Clear
                               </button>
                             </div>
                           ) : (
-                            <span className="text-xs text-gray-300 font-semibold italic">Empty slot</span>
+                            <span className="text-xs text-gray-400 font-medium italic">Empty ticket slot #{index + 1}</span>
                           )}
                         </div>
                       ))}
@@ -1228,56 +1508,66 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                   {/* Master Member Directory */}
                   <div className="space-y-3 border-t border-gray-150 pt-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <h5 className="text-[10px] font-bold text-indigo-650 uppercase tracking-wider">Master Subscriber Directory</h5>
-                      <div className="relative w-full sm:w-64">
-                        <span className="absolute left-2.5 top-1.5 text-gray-400"><Search size={14} /></span>
-                        <input
-                          type="text"
-                          placeholder="Search subscribers..."
-                          value={memberSearchQuery}
-                          onChange={(e) => setMemberSearchQuery(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-8 py-1 text-xs text-gray-900 focus:outline-none"
-                        />
+                      <div>
+                        <h5 className="text-[10px] font-bold text-indigo-650 uppercase tracking-wider">
+                          Master Subscriber Directory ({masterDirectory.length})
+                        </h5>
+                        <p className="text-[11px] text-gray-500">Click any subscriber to assign to next available slot</p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewMemberName('');
+                            setNewMemberPhone('');
+                            setShowCreateMemberModal(true);
+                          }}
+                          className="bg-gray-900 hover:bg-black text-white font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
+                        >
+                          <UserPlus size={13} /> + Add Member
+                        </button>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[160px] overflow-y-auto pr-1">
-                      {masterDirectory
-                        .filter(m => m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()))
-                        .map((member, i) => {
-                          const isAlreadyAdded = enrollments.some(e => e.name === member.name);
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[170px] overflow-y-auto pr-1">
+                      {masterDirectory.length === 0 ? (
+                        <div className="col-span-full py-6 text-center text-xs text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                          No subscribers found in database. Click <strong>&quot;+ Add Member&quot;</strong> above to create your first subscriber.
+                        </div>
+                      ) : (
+                        masterDirectory.map((member, i) => {
+                          const isAlreadyAdded = enrollments.some(e => e.name.toLowerCase() === member.name.toLowerCase());
 
                           return (
                             <button
                               key={i}
                               type="button"
                               disabled={isAlreadyAdded}
-                              onClick={() => {
-                                const firstEmptyIndex = enrollments.findIndex(e => e.name === '');
-                                if (firstEmptyIndex !== -1) {
-                                  setEnrollments(prev => {
-                                    const copy = [...prev];
-                                    copy[firstEmptyIndex] = member;
-                                    return copy;
-                                  });
-                                } else {
-                                  alert("All spots are fully enrolled! To enroll more, increase group duration in Step 1.");
-                                }
-                              }}
-                              className={`p-3 rounded-lg border text-left transition-all ${
+                              onClick={() => handleAssignExistingMember(member)}
+                              className={`p-3 rounded-xl border text-left transition-all relative ${
                                 isAlreadyAdded 
-                                  ? 'bg-gray-50 border-gray-200 opacity-40 cursor-not-allowed' 
-                                  : 'bg-white hover:bg-gray-50 border-gray-200 hover:border-gray-300'
+                                  ? 'bg-gray-50 border-gray-200 opacity-50 cursor-not-allowed' 
+                                  : 'bg-white hover:bg-indigo-50/40 border-gray-200 hover:border-indigo-300 shadow-sm'
                               }`}
                             >
-                              <span className="text-xs font-bold text-gray-800 block truncate">{member.name}</span>
-                              <span className="text-[9px] text-gray-405 mt-0.5 block truncate">{member.phone}</span>
+                              <div className="flex items-start justify-between gap-1">
+                                <span className="text-xs font-bold text-gray-900 block truncate">{member.name}</span>
+                                {isAlreadyAdded && (
+                                  <span className="text-[8px] font-bold text-emerald-700 bg-emerald-100 px-1 py-0.5 rounded shrink-0">
+                                    Enrolled
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-gray-500 mt-0.5 block truncate">{member.phone}</span>
                             </button>
                           );
-                        })}
+                        })
+                      )}
                     </div>
                   </div>
 
+                  {/* Navigation Step 2 Buttons */}
                   <div className="flex justify-between pt-4 border-t border-gray-150">
                     <button
                       type="button"
@@ -1290,10 +1580,107 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                       type="button"
                       disabled={enrollments.some(e => e.name === '')}
                       onClick={() => setWizardStep(3)}
-                      className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow"
+                      className={`font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow transition-all ${
+                        enrollments.some(e => e.name === '')
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-gray-900 hover:bg-black text-white'
+                      }`}
                     >
                       Next: Monthly Plan <ArrowRight size={14} />
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CREATE SUBSCRIBER MODAL POPUP */}
+              {showCreateMemberModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+                    <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                          <UserPlus size={18} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-gray-900">Register New Subscriber</h4>
+                          <p className="text-[11px] text-gray-500">Saves to Supabase directory and assigns to open slot</p>
+                        </div>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowCreateMemberModal(false)}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleCreateAndAssignMember} className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                          Subscriber Full Name *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-gray-400">
+                            <User size={14} />
+                          </span>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Ramesh Kumar"
+                            value={newMemberName}
+                            onChange={(e) => setNewMemberName(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                          Phone Number (10 Digits) *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-gray-400">
+                            <Phone size={14} />
+                          </span>
+                          <input
+                            type="tel"
+                            required
+                            placeholder="e.g. +91 98765 43210"
+                            value={newMemberPhone}
+                            onChange={(e) => setNewMemberPhone(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-400">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
+                      </div>
+
+                      <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateMemberModal(false)}
+                          className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isCreatingMember || !newMemberName.trim() || !newMemberPhone.trim()}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-5 py-2 rounded-lg transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          {isCreatingMember ? (
+                            <>
+                              <RefreshCw size={13} className="animate-spin" /> Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Check size={14} /> Register &amp; Enroll
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
               )}
