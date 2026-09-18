@@ -1069,8 +1069,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       }
 
       // 2. Increment global treasury balance for this wallet
-      const currentBal = balances[paymentWalletType as keyof typeof balances] || 0;
-      await updateBalance(paymentWalletType as any, currentBal + amt);
+      await updateBalance(paymentWalletType as any, amt);
 
       // 3. Update audit logs
       const now = new Date();
@@ -1153,8 +1152,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       }
 
       // Update Cash in Hand treasury balance
-      const currentCash = balances.cash_in_hand || 0;
-      await updateBalance('cash_in_hand', currentCash + totalToCollect);
+      await updateBalance('cash_in_hand', totalToCollect);
 
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });

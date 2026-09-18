@@ -26,9 +26,11 @@ create table public.chit_groups (
   total_value numeric not null check (total_value >= 0),
   member_count integer not null check (member_count > 0),
   duration_months integer not null check (duration_months > 0),
-  current_month integer not null default 1 check (current_month > 0),
+  current_month integer not null default 0 check (current_month >= 0),
   kai_iruppu_pool numeric not null default 0 check (kai_iruppu_pool >= 0),
   laaba_seetu_rules jsonb not null default '{}'::jsonb,
+  status text not null default 'active' check (status in ('draft', 'active', 'completed')),
+  start_date date default current_date,
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   constraint check_member_count_eq_duration check (member_count = duration_months)
 );
@@ -41,8 +43,12 @@ create table public.group_members (
   ticket_number integer not null check (ticket_number > 0),
   has_won_regular boolean not null default false,
   physical_book_synced boolean not null default true,
-  constraint unique_group_ticket unique (group_id, ticket_number),
-  constraint unique_group_member unique (group_id, profile_id)
+  split_pool jsonb default null,
+  custom_installment numeric default null,
+  exit_month integer default null,
+  transferred_from uuid references public.profiles(id),
+  transfer_effective_month integer default null,
+  constraint unique_group_ticket unique (group_id, ticket_number)
 );
 
 -- global_treasury: Tracks balances of different payment accounts / methods
@@ -76,7 +82,7 @@ create table public.transactions (
 create table public.auction_logs (
   id uuid primary key default gen_random_uuid(),
   group_id uuid not null references public.chit_groups(id) on delete cascade,
-  month integer not null check (month > 0),
+  month integer not null check (month >= 0),
   bid_stream jsonb not null default '[]'::jsonb,
   winning_bidder_id uuid not null references public.profiles(id) on delete restrict,
   winning_discount numeric not null check (winning_discount >= 0),
