@@ -287,7 +287,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       currDue += monthDue * (currentM + 1);
     });
 
-    const remainingToGo = Math.max(0, totalExpectedDue - totalPaidIn);
+    const remainingToGo = Math.max(0, expDue - totalPaidIn);
     const pendingCurrentDues = Math.max(0, currDue - totalPaidIn);
     const settled = pendingCurrentDues === 0;
 
