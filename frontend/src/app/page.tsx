@@ -34,7 +34,9 @@ export default function Home() {
       case 'chits':
         return 'Chit Groups & Enrollment';
       case 'members':
-        return 'Member Matrix & Broadcaster';
+        return 'Members Directory';
+      case 'communication':
+        return 'Communication & WhatsApp Broadcaster';
       case 'auctions':
         return 'Live Bidding Engine';
       case 'reports':

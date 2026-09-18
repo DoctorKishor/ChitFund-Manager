@@ -13,7 +13,8 @@ import {
   ChevronRight,
   LogOut,
   User,
-  Lock
+  Lock,
+  MessageSquare
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -32,6 +33,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
     { id: 'chits', name: 'Chits', icon: Briefcase, adminOnly: false },
     { id: 'members', name: 'Members', icon: Users, adminOnly: false },
+    { id: 'communication', name: 'Communication', icon: MessageSquare, adminOnly: false },
     { id: 'auctions', name: 'Auctions', icon: Gavel, adminOnly: false },
     { id: 'reports', name: 'Reports', icon: BarChart3, adminOnly: false },
     { id: 'cash', name: 'Cash Handling', icon: Vault, adminOnly: true },

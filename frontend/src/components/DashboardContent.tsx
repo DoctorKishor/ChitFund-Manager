@@ -5,6 +5,7 @@ import { supabase } from '../utils/supabase/client';
 import LiveAuctionEngine from './LiveAuctionEngine';
 import CashVaultLedger from './CashVaultLedger';
 import MemberMatrix from './MemberMatrix';
+import CommunicationBroadcastCenter from './CommunicationBroadcastCenter';
 import { 
   DollarSign, 
   Users, 
@@ -2981,6 +2982,25 @@ Thank you for your prompt payment! 🙏`;
               ...prev
             ]);
           }} 
+        />
+      );
+
+    case 'communication':
+      return (
+        <CommunicationBroadcastCenter 
+          onAddAuditLog={(desc) => {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            setAuditLogs(prev => [
+              {
+                timestamp: `Today, ${timeStr}`,
+                table: 'chit_groups',
+                desc,
+                executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
+              },
+              ...prev
+            ]);
+          }}
         />
       );
 
