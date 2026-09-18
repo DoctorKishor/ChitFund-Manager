@@ -80,13 +80,14 @@ export default function LiveAuctionEngine() {
 
   const [loading, setLoading] = useState(true);
 
-  // Fetch all groups list
+  // Fetch only active groups list (excluding Drafts and Completed)
   const fetchGroupsList = async () => {
     try {
       setLoading(true);
       const { data: groupsData, error } = await supabase
         .from('chit_groups')
         .select('*')
+        .eq('status', 'active')
         .order('created_at', { ascending: false });
 
       if (groupsData && groupsData.length > 0) {
@@ -234,9 +235,9 @@ export default function LiveAuctionEngine() {
           <Gavel size={24} />
         </div>
         <div className="space-y-1">
-          <h3 className="text-sm font-bold text-gray-900">No Active Auctions</h3>
-          <p className="text-xs text-gray-500 max-w-sm">
-            There are no active chit groups created yet. Create a group in the <strong>Chits</strong> tab to start a live auction.
+          <h3 className="text-sm font-bold text-gray-900">No Active Chit Groups</h3>
+          <p className="text-xs text-gray-500 max-w-md">
+            Only groups with <strong>Active</strong> status appear in the Live Bidding Room. If your groups are in <strong>Draft</strong> mode (enrollment in progress), open the <strong>Chits</strong> tab, click <em>Edit Details</em>, and set their status to <strong>Active</strong> when ready to auction.
           </p>
         </div>
       </div>

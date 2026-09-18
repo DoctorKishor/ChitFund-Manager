@@ -131,6 +131,7 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
       const { data: groupsData } = await supabase
         .from('chit_groups')
         .select('*')
+        .eq('status', 'active')
         .order('created_at', { ascending: false });
 
       if (groupsData && groupsData.length > 0) {
