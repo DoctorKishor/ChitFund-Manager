@@ -21,6 +21,7 @@ import {
 
 interface Member {
   id: string;
+  profileId?: string;
   fullName: string;
   ticketNumber: number;
   hasWonRegular: boolean;
@@ -36,7 +37,7 @@ interface Bid {
 }
 
 interface ChitGroup {
-  id?: string;
+  id: string;
   name: string;
   totalValue: number;
   memberCount: number;
@@ -57,78 +58,131 @@ function fmtDate(d: Date): string {
 
 export default function LiveAuctionEngine() {
   // 1. Initial State Data (Loaded from Supabase)
+  const [allGroups, setAllGroups] = useState<ChitGroup[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [group, setGroup] = useState<ChitGroup | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch active group from Supabase
-  const fetchAuctionData = async () => {
+  // Fetch all groups list
+  const fetchGroupsList = async () => {
     try {
       setLoading(true);
-      const { data: groupData, error } = await supabase
+      const { data: groupsData, error } = await supabase
         .from('chit_groups')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
-      if (groupData) {
-        setGroup({
-          id: groupData.id,
-          name: groupData.name,
-          totalValue: Number(groupData.total_value),
-          memberCount: groupData.member_count,
-          currentMonth: groupData.current_month || 1,
-          durationMonths: groupData.duration_months,
-          kai_iruppu_pool: Number(groupData.kai_iruppu_pool) || 0,
+      if (groupsData && groupsData.length > 0) {
+        const parsedGroups: ChitGroup[] = groupsData.map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          totalValue: Number(g.total_value),
+          memberCount: g.member_count,
+          currentMonth: g.current_month || 1,
+          durationMonths: g.duration_months,
+          kai_iruppu_pool: Number(g.kai_iruppu_pool) || 0,
+        }));
+        setAllGroups(parsedGroups);
+        
+        // Default to first group if none selected or selected not in list
+        setSelectedGroupId(prev => {
+          if (prev && parsedGroups.some(g => g.id === prev)) return prev;
+          return parsedGroups[0].id;
         });
-
-        // Fetch group members from group_members joined with profiles
-        const { data: memberRows } = await supabase
-          .from('group_members')
-          .select(`
-            id,
-            ticket_number,
-            has_won,
-            profile_id,
-            profiles:profile_id (
-              full_name
-            )
-          `)
-          .eq('group_id', groupData.id)
-          .order('ticket_number', { ascending: true });
-
-        if (memberRows && memberRows.length > 0) {
-          setMembers(memberRows.map(m => ({
-            id: m.id,
-            fullName: (m.profiles as any)?.full_name || `Ticket #${m.ticket_number}`,
-            ticketNumber: m.ticket_number,
-            hasWonRegular: !!m.has_won,
-          })));
-        } else {
-          // Generate placeholder slots if not yet assigned
-          setMembers(Array.from({ length: groupData.member_count }, (_, i) => ({
-            id: `slot-${i + 1}`,
-            fullName: `Ticket Slot #${i + 1}`,
-            ticketNumber: i + 1,
-            hasWonRegular: false,
-          })));
-        }
       } else {
+        setAllGroups([]);
         setGroup(null);
         setMembers([]);
       }
     } catch (err) {
-      console.error('Error fetching auction data:', err);
+      console.error('Error fetching groups list:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  // Fetch specific selected group and its enrolled members
+  const fetchGroupDetails = async (groupId: string) => {
+    try {
+      const selected = allGroups.find(g => g.id === groupId);
+      if (selected) {
+        setGroup(selected);
+      } else {
+        const { data: groupData } = await supabase
+          .from('chit_groups')
+          .select('*')
+          .eq('id', groupId)
+          .maybeSingle();
+
+        if (groupData) {
+          setGroup({
+            id: groupData.id,
+            name: groupData.name,
+            totalValue: Number(groupData.total_value),
+            memberCount: groupData.member_count,
+            currentMonth: groupData.current_month || 1,
+            durationMonths: groupData.duration_months,
+            kai_iruppu_pool: Number(groupData.kai_iruppu_pool) || 0,
+          });
+        }
+      }
+
+      // Fetch group members from group_members joined with profiles
+      const { data: memberRows, error: memberErr } = await supabase
+        .from('group_members')
+        .select(`
+          id,
+          ticket_number,
+          has_won_regular,
+          profile_id,
+          profiles:profile_id (
+            id,
+            full_name
+          )
+        `)
+        .eq('group_id', groupId)
+        .order('ticket_number', { ascending: true });
+
+      if (memberRows && memberRows.length > 0) {
+        setMembers(memberRows.map((m: any) => {
+          const prof = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+          return {
+            id: m.id,
+            profileId: m.profile_id,
+            fullName: prof?.full_name || `Member (Ticket #${m.ticket_number})`,
+            ticketNumber: m.ticket_number,
+            hasWonRegular: !!m.has_won_regular,
+          };
+        }));
+      } else {
+        const memberCount = selected?.memberCount || 10;
+        setMembers(Array.from({ length: memberCount }, (_, i) => ({
+          id: `slot-${i + 1}`,
+          fullName: `Ticket Slot #${i + 1}`,
+          ticketNumber: i + 1,
+          hasWonRegular: false,
+        })));
+      }
+
+      // Reset bids on group switch
+      setBids([]);
+      setActiveLoggingMemberId(null);
+    } catch (err) {
+      console.error('Error fetching group members:', err);
+    }
+  };
+
   useEffect(() => {
-    fetchAuctionData();
+    fetchGroupsList();
   }, []);
+
+  useEffect(() => {
+    if (selectedGroupId) {
+      fetchGroupDetails(selectedGroupId);
+    }
+  }, [selectedGroupId]);
 
   const [activeLoggingMemberId, setActiveLoggingMemberId] = useState<string | null>(null);
   const [bidInputVal, setBidInputVal] = useState<string>('');
@@ -280,8 +334,20 @@ export default function LiveAuctionEngine() {
 
           if (winnerId && !winnerId.startsWith('slot-')) {
             await supabase.from('group_members').update({
-              has_won: true
+              has_won_regular: true
             }).eq('id', winnerId);
+          }
+
+          const winningMember = members.find(m => m.id === winnerId);
+          if (winningMember?.profileId) {
+            await supabase.from('auction_logs').insert({
+              group_id: group.id,
+              month: group.currentMonth,
+              bid_stream: bids,
+              winning_bidder_id: winningMember.profileId,
+              winning_discount: highestBid,
+              is_laaba_seetu: isLaabaSeetuActive,
+            });
           }
         } catch (err) {
           console.error('Error updating chit group in Supabase:', err);
@@ -317,6 +383,28 @@ export default function LiveAuctionEngine() {
       
       {/* Session Lifecycle Dashboard */}
       <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        {allGroups.length > 1 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Active Chit Group:</span>
+              <select
+                value={selectedGroupId}
+                onChange={(e) => setSelectedGroupId(e.target.value)}
+                className="bg-gray-50 hover:bg-gray-100 border border-gray-200 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none cursor-pointer transition-colors shadow-sm"
+              >
+                {allGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} (Month {g.currentMonth} of {g.durationMonths} • {formatCurrency(g.totalValue)})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <span className="text-[11px] text-gray-400 font-medium">
+              Switching groups instantly switches bidding room context
+            </span>
+          </div>
+        )}
+
         <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-4">
           <div>
             <div className="flex items-center space-x-2">
@@ -373,6 +461,7 @@ export default function LiveAuctionEngine() {
             {/* Holiday Month Toggle */}
             <button
               onClick={() => setIsHolidayMonth(v => !v)}
+              title="Manual override to compound this month's winning bid discount forward into next month without dividend distribution"
               className={`font-bold text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 border transition-all duration-200 ${
                 isHolidayMonth
                   ? 'bg-amber-50 border-amber-200 text-amber-700 font-extrabold'
