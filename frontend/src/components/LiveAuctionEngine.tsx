@@ -62,7 +62,22 @@ export default function LiveAuctionEngine() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [group, setGroup] = useState<ChitGroup | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [bids, setBids] = useState<Bid[]>([]);
+  
+  // Group-specific bids map with localStorage persistence
+  const [groupBidsMap, setGroupBidsMap] = useState<Record<string, Bid[]>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('chit_funds_live_bids_v1');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error reading saved bids from localStorage', e);
+      }
+    }
+    return {};
+  });
+
+  const bids = (selectedGroupId && groupBidsMap[selectedGroupId]) || [];
+
   const [loading, setLoading] = useState(true);
 
   // Fetch all groups list
@@ -166,8 +181,6 @@ export default function LiveAuctionEngine() {
         })));
       }
 
-      // Reset bids on group switch
-      setBids([]);
       setActiveLoggingMemberId(null);
     } catch (err) {
       console.error('Error fetching group members:', err);
@@ -273,7 +286,7 @@ export default function LiveAuctionEngine() {
     const bidAmount = Number(bidInputVal);
     const member = members.find(m => m.id === memberId);
     
-    if (isNaN(bidAmount) || bidAmount <= 0 || !member) return;
+    if (isNaN(bidAmount) || bidAmount <= 0 || !member || !selectedGroupId) return;
     
     const now = new Date();
     const timeStr = now.toTimeString().split(' ')[0]; // HH:MM:SS
@@ -287,14 +300,43 @@ export default function LiveAuctionEngine() {
       timestamp: timeStr
     };
 
-    setBids([newBid, ...bids]);
+    setGroupBidsMap(prev => {
+      const currentGroupBids = prev[selectedGroupId] || [];
+      const updated = {
+        ...prev,
+        [selectedGroupId]: [newBid, ...currentGroupBids]
+      };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('chit_funds_live_bids_v1', JSON.stringify(updated));
+        } catch (err) {
+          console.error('Error saving bids to localStorage:', err);
+        }
+      }
+      return updated;
+    });
+
     setActiveLoggingMemberId(null);
     setBidInputVal('');
   };
 
   const handleUndo = () => {
-    if (bids.length === 0) return;
-    setBids(bids.slice(1));
+    if (!selectedGroupId || bids.length === 0) return;
+    setGroupBidsMap(prev => {
+      const currentGroupBids = prev[selectedGroupId] || [];
+      const updated = {
+        ...prev,
+        [selectedGroupId]: currentGroupBids.slice(1)
+      };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('chit_funds_live_bids_v1', JSON.stringify(updated));
+        } catch (err) {
+          console.error('Error saving bids to localStorage:', err);
+        }
+      }
+      return updated;
+    });
   };
 
   const handleCloseAuction = () => {
@@ -357,7 +399,21 @@ export default function LiveAuctionEngine() {
         kai_iruppu_pool: nextPool,
       }) : null);
 
-      setBids([]);
+      // Clear the live bids for this completed group from state & localStorage
+      if (group.id) {
+        setGroupBidsMap(prev => {
+          const updated = { ...prev };
+          delete updated[group.id];
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('chit_funds_live_bids_v1', JSON.stringify(updated));
+            } catch (err) {
+              console.error('Error updating localStorage:', err);
+            }
+          }
+          return updated;
+        });
+      }
 
       setTimeout(() => {
         setShowConfetti(false);
