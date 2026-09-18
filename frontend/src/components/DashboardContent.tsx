@@ -144,7 +144,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
   // Chits Directory Switcher States (Loaded from Supabase)
   const [showWizard, setShowWizard] = useState(false);
-  const [groupFilter, setGroupFilter] = useState<'active' | 'all'>('active');
+  const [groupFilter, setGroupFilter] = useState<'all' | 'active' | 'draft' | 'completed'>('all');
   const [localGroups, setLocalGroups] = useState<any[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
 
@@ -1061,15 +1061,13 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     const duration = Number(newGroupDuration);
     
     if (enrollments.length !== duration) {
-      alert(`Validation Failure: Enrolled spots (${enrollments.length}) must exactly equal group duration in months (${duration}).`);
+      alert(`Validation Failure: Enrolled spots (${enrollments.length}) must match group duration in months (${duration}).`);
       return;
     }
 
-    const isAnyEmpty = enrollments.some(slot => !slot.name.trim() || !slot.phone.trim());
-    if (isAnyEmpty) {
-      alert(`Validation Failure: All ${duration} member slots must be fully enrolled with Name and Phone Number to satisfy strict duration constraints.`);
-      return;
-    }
+    const filledCount = enrollments.filter(slot => slot.name && slot.name.trim() !== '').length;
+    const isFullyEnrolled = filledCount === duration && enrollments.every(slot => slot.id);
+    const groupStatus = isFullyEnrolled ? 'active' : 'draft';
 
     try {
       setIsCreatingGroup(true);
@@ -1080,6 +1078,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         duration_months: duration,
         current_month: 1,
         kai_iruppu_pool: 0,
+        status: groupStatus,
       }).select().single();
 
       if (groupError) {
@@ -1090,11 +1089,12 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       // Insert enrolled members into group_members
       if (groupData) {
         const memberInserts = enrollments
-          .filter(slot => slot.id)
-          .map((slot, idx) => ({
+          .map((slot, idx) => ({ slot, ticketNum: idx + 1 }))
+          .filter(({ slot }) => slot.id)
+          .map(({ slot, ticketNum }) => ({
             group_id: groupData.id,
             profile_id: slot.id,
-            ticket_number: idx + 1,
+            ticket_number: ticketNum,
             has_won_regular: false,
             physical_book_synced: true,
           }));
@@ -1109,7 +1109,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         }
       }
 
-      alert(`Success: Chit Group "${newGroupName}" created in Supabase! \nPool Value: ₹${newGroupValue}\nDuration: ${duration} Months.`);
+      alert(`Success: Chit Group "${newGroupName}" created in Supabase (Status: ${groupStatus.toUpperCase()})!\n${filledCount} of ${duration} spots assigned.${!isFullyEnrolled ? ' You can assign the remaining slots anytime in the Chits tab.' : ''}`);
       await fetchGroups();
 
       // Reset form
@@ -1659,8 +1659,19 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                   </button>
                   <div className="h-5 w-px bg-gray-200 hidden sm:block"></div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+                    <span className={`w-2.5 h-2.5 rounded-full ${
+                      selectedWorkspaceGroup.status === 'draft' ? 'bg-amber-500' : selectedWorkspaceGroup.status === 'completed' ? 'bg-purple-500' : 'bg-green-500 animate-pulse'
+                    }`}></span>
                     <h3 className="text-base font-bold text-gray-900">{selectedWorkspaceGroup.name}</h3>
+                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${
+                      selectedWorkspaceGroup.status === 'draft'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : selectedWorkspaceGroup.status === 'completed'
+                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}>
+                      {selectedWorkspaceGroup.status ? selectedWorkspaceGroup.status.toUpperCase() : 'ACTIVE'}
+                    </span>
                     <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-150 px-2 py-0.5 rounded">
                       Month {selectedWorkspaceGroup.currentMonth} of {selectedWorkspaceGroup.duration}
                     </span>
@@ -1897,17 +1908,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
               </div>
 
               {/* Filter Actions row */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setGroupFilter('active')}
-                  className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all ${
-                    groupFilter === 'active'
-                      ? 'bg-indigo-50 text-indigo-600 border-indigo-150'
-                      : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  Active Only
-                </button>
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setGroupFilter('all')}
                   className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all ${
@@ -1916,21 +1917,56 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                       : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900'
                   }`}
                 >
-                  Show All
+                  Show All ({localGroups.length})
+                </button>
+                <button
+                  onClick={() => setGroupFilter('active')}
+                  className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all ${
+                    groupFilter === 'active'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-1 ring-emerald-200'
+                      : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Active ({localGroups.filter(g => g.status === 'active' || (!g.status && g.active)).length})
+                </button>
+                <button
+                  onClick={() => setGroupFilter('draft')}
+                  className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all ${
+                    groupFilter === 'draft'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200 ring-1 ring-amber-200'
+                      : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Draft ({localGroups.filter(g => g.status === 'draft').length})
+                </button>
+                <button
+                  onClick={() => setGroupFilter('completed')}
+                  className={`text-[10px] font-bold px-3.5 py-1.5 rounded-lg border transition-all ${
+                    groupFilter === 'completed'
+                      ? 'bg-purple-50 text-purple-700 border-purple-200 ring-1 ring-purple-200'
+                      : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Completed ({localGroups.filter(g => g.status === 'completed').length})
                 </button>
               </div>
 
               {/* Groups Card Directory Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {localGroups.filter(g => groupFilter === 'all' || g.active).length === 0 ? (
+                {localGroups.filter(g => {
+                  if (groupFilter === 'all') return true;
+                  if (groupFilter === 'draft') return g.status === 'draft';
+                  if (groupFilter === 'completed') return g.status === 'completed';
+                  return g.status === 'active' || (!g.status && g.active);
+                }).length === 0 ? (
                   <div className="col-span-full py-12 px-6 bg-white border border-gray-200 rounded-xl text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
                     <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
                       <Briefcase size={24} />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-gray-900">No Chit Groups Created Yet</h4>
+                      <h4 className="text-sm font-bold text-gray-900">No Groups in this Category</h4>
                       <p className="text-xs text-gray-500 max-w-sm">
-                        Start by creating your first chit group and enrolling members to track monthly auctions and treasury collections.
+                        There are no chit groups with status <strong>{groupFilter}</strong> currently.
                       </p>
                     </div>
                     <button
@@ -1942,7 +1978,12 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                   </div>
                 ) : (
                 localGroups
-                  .filter(g => groupFilter === 'all' || g.active)
+                  .filter(g => {
+                    if (groupFilter === 'all') return true;
+                    if (groupFilter === 'draft') return g.status === 'draft';
+                    if (groupFilter === 'completed') return g.status === 'completed';
+                    return g.status === 'active' || (!g.status && g.active);
+                  })
                   .map((g) => {
                     const progressPercent = (g.currentMonth / g.duration) * 100;
                     
@@ -1951,10 +1992,24 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                         <div className="space-y-3">
                           {/* Card Top */}
                           <div className="flex justify-between items-start">
-                            <div className="flex items-center space-x-2">
-                              {/* Green Indicator Dot */}
-                              <span className={`w-2 h-2 rounded-full shrink-0 ${g.active ? 'bg-green-500 animate-pulse' : 'bg-gray-350'}`}></span>
-                              <h4 className="text-xs font-bold text-gray-900 truncate max-w-[130px]">{g.name}</h4>
+                            <div className="flex flex-col space-y-1">
+                              <div className="flex items-center space-x-2">
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                  g.status === 'draft' ? 'bg-amber-500' : g.status === 'completed' ? 'bg-purple-500' : 'bg-green-500 animate-pulse'
+                                }`}></span>
+                                <h4 className="text-xs font-bold text-gray-900 truncate max-w-[140px]">{g.name}</h4>
+                              </div>
+                              <div>
+                                <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border inline-block ${
+                                  g.status === 'draft'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : g.status === 'completed'
+                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}>
+                                  {g.status ? g.status.toUpperCase() : 'ACTIVE'}
+                                </span>
+                              </div>
                             </div>
 
                             {/* Quick Action Icons */}
@@ -2559,7 +2614,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                   </div>
 
                   {/* Navigation Step 2 Buttons */}
-                  <div className="flex justify-between pt-4 border-t border-gray-150">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-4 border-t border-gray-150">
                     <button
                       type="button"
                       onClick={() => setWizardStep(1)}
@@ -2567,18 +2622,22 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                     >
                       Back
                     </button>
-                    <button
-                      type="button"
-                      disabled={enrollments.some(e => e.name === '')}
-                      onClick={() => setWizardStep(3)}
-                      className={`font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow transition-all ${
-                        enrollments.some(e => e.name === '')
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-gray-900 hover:bg-black text-white'
-                      }`}
-                    >
-                      Next: Monthly Plan <ArrowRight size={14} />
-                    </button>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] text-gray-500 font-medium">
+                        <strong>{enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration}</strong> assigned
+                        {enrollments.some(e => !e.name || e.name.trim() === '') && (
+                          <span className="text-amber-600 font-bold ml-1.5">(Creates in Draft Mode)</span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setWizardStep(3)}
+                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow transition-all"
+                      >
+                        Next: Monthly Plan <ArrowRight size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2615,11 +2674,22 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                     </div>
 
                     <div className="border-t border-gray-150 pt-3">
-                      <span className="text-[10px] font-bold text-gray-550 uppercase tracking-wider block mb-2">Enrolled Subscribers</span>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-bold text-gray-550 uppercase tracking-wider block">
+                          Enrolled Subscribers ({enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration})
+                        </span>
+                        {enrollments.some(e => !e.name || e.name.trim() === '') && (
+                          <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                            Will Create in Draft Mode
+                          </span>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {enrollments.map((slot, index) => (
-                          <span key={index} className="bg-white border border-gray-200 text-[10px] text-gray-700 px-2.5 py-1 rounded shadow-sm">
-                            Ticket #{index + 1}: {slot.name}
+                          <span key={index} className={`border text-[10px] px-2.5 py-1 rounded shadow-sm ${
+                            slot.name ? 'bg-white border-gray-200 text-gray-700 font-semibold' : 'bg-amber-50/50 border-amber-200 text-amber-700 italic'
+                          }`}>
+                            Ticket #{index + 1}: {slot.name || 'Unassigned (Open Slot)'}
                           </span>
                         ))}
                       </div>
