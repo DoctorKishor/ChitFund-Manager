@@ -17,7 +17,8 @@ import {
   Lock,
   Zap,
   Briefcase,
-  Info
+  Info,
+  Rocket
 } from 'lucide-react';
 
 interface Member {
@@ -77,7 +78,7 @@ export default function LiveAuctionEngine() {
     return {};
   });
 
-  const bids = (selectedGroupId && groupBidsMap[selectedGroupId]) || [];
+  const bids = (group?.currentMonth === 0) ? [] : ((selectedGroupId && groupBidsMap[selectedGroupId]) || []);
 
   const [loading, setLoading] = useState(true);
 
@@ -276,6 +277,10 @@ export default function LiveAuctionEngine() {
 
   // 3. User Actions
   const handleCardClick = (memberId: string, hasWon: boolean) => {
+    if (group?.currentMonth === 0) {
+      alert("No live auction takes place in Month 0 (Launch & Orientation Phase). Please collect launch dues on the Dashboard and confirm launch to begin live bidding in Month 1.");
+      return;
+    }
     if (hasWon) return;
     setActiveLoggingMemberId(memberId);
     const currentMax = bids.length > 0 ? bids[0].amount : 25000;
@@ -284,6 +289,7 @@ export default function LiveAuctionEngine() {
 
   const handleLogBid = (e: React.FormEvent, memberId: string) => {
     e.preventDefault();
+    if (group?.currentMonth === 0) return;
 
     const bidAmount = Number(bidInputVal);
     const member = members.find(m => m.id === memberId);
@@ -551,26 +557,43 @@ export default function LiveAuctionEngine() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-5 border-t border-gray-100 pt-4">
           <div className="p-3 bg-gray-50 rounded-lg border border-gray-150">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">Current Month</span>
-            <span className="text-lg font-bold text-gray-900 mt-1 block">Month {group.currentMonth} of {group.durationMonths}</span>
-          </div>
-
-          <div className="p-3 bg-gray-50 rounded-lg border border-gray-150">
-            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">Chit Value (Pot)</span>
-            <span className="text-lg font-bold text-gray-900 mt-1 block">{formatCurrency(group.totalValue)}</span>
-          </div>
-
-          <div className="p-3 bg-gray-50 rounded-lg border border-gray-150">
-            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">Running Highest Bid</span>
-            <span className="text-lg font-bold text-indigo-600 mt-1 block flex items-center gap-1.5">
-              <TrendingUp size={16} />
-              {formatCurrency(highestBid)}
+            <span className="text-lg font-bold text-gray-900 mt-1 block">
+              {group.currentMonth === 0 ? 'Month 0 (Launch)' : `Month ${group.currentMonth} of ${group.durationMonths}`}
             </span>
           </div>
 
           <div className="p-3 bg-gray-50 rounded-lg border border-gray-150">
-            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">Winner Payout</span>
-            <span className="text-lg font-bold text-green-700 mt-1 block">
-              {formatCurrency(netPayout)}
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">
+              {group.currentMonth === 0 ? 'Launch Pot Value' : 'Chit Value (Pot)'}
+            </span>
+            <span className="text-lg font-bold text-gray-900 mt-1 block">{formatCurrency(group.totalValue)}</span>
+          </div>
+
+          <div className="p-3 bg-gray-50 rounded-lg border border-gray-150">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">
+              {group.currentMonth === 0 ? 'Launch Allocation' : 'Running Highest Bid'}
+            </span>
+            <span className={`text-lg font-bold mt-1 block flex items-center gap-1.5 ${group.currentMonth === 0 ? 'text-amber-700' : 'text-indigo-600'}`}>
+              {group.currentMonth === 0 ? (
+                <>
+                  <Briefcase size={16} />
+                  Organizer Profit
+                </>
+              ) : (
+                <>
+                  <TrendingUp size={16} />
+                  {formatCurrency(highestBid)}
+                </>
+              )}
+            </span>
+          </div>
+
+          <div className="p-3 bg-gray-50 rounded-lg border border-gray-150">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">
+              {group.currentMonth === 0 ? 'Live Bidding Room' : 'Winner Payout'}
+            </span>
+            <span className={`text-lg font-bold mt-1 block ${group.currentMonth === 0 ? 'text-gray-500 text-sm font-semibold' : 'text-green-700'}`}>
+              {group.currentMonth === 0 ? 'Starts in Month 1' : formatCurrency(netPayout)}
             </span>
           </div>
 
@@ -595,10 +618,12 @@ export default function LiveAuctionEngine() {
           <div className="border-b border-gray-100 pb-3">
             <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
               <User size={16} className="text-indigo-600" />
-              Member Selection Matrix
+              {group.currentMonth === 0 ? 'Enrolled Subscribers (Orientation View)' : 'Member Selection Matrix'}
             </h3>
             <p className="text-[11px] text-gray-500 mt-0.5">
-              {isLaabaSeetuActive
+              {group.currentMonth === 0
+                ? 'Review enrolled subscribers. In Month 0, launch installments are collected in the Dashboard without an auction.'
+                : isLaabaSeetuActive
                 ? '🎉 Laaba Seetu Active: Members owe ₹0 this month. Click an eligible member to record their winning bid.'
                 : 'Click an eligible member below to log a shouted bid instantly'}
             </p>
@@ -609,20 +634,23 @@ export default function LiveAuctionEngine() {
             {members.map((member) => {
               const isLogging = activeLoggingMemberId === member.id;
               const hasWon = member.hasWonRegular;
+              const isMonth0 = group.currentMonth === 0;
 
               return (
                 <div
                   key={member.id}
-                  onClick={() => !isLogging && handleCardClick(member.id, hasWon)}
+                  onClick={() => !isMonth0 && !isLogging && handleCardClick(member.id, hasWon)}
                   className={`relative rounded-xl p-4 border transition-all duration-200 overflow-hidden ${
-                    hasWon 
+                    isMonth0
+                      ? 'bg-gray-50/70 border-gray-200 cursor-default'
+                      : hasWon 
                       ? 'bg-gray-50 border-gray-100 opacity-40 cursor-not-allowed'
                       : isLogging
                         ? 'border-indigo-500 bg-indigo-50/50 ring-1 ring-indigo-500/20'
                         : 'bg-white hover:bg-gray-50 border-gray-200 hover:border-gray-300 cursor-pointer shadow-sm'
                   }`}
                 >
-                  {!isLogging ? (
+                  {!isLogging || isMonth0 ? (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3 overflow-hidden">
                         <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
@@ -637,7 +665,11 @@ export default function LiveAuctionEngine() {
                       </div>
 
                       <div className="shrink-0">
-                        {hasWon ? (
+                        {isMonth0 ? (
+                          <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
+                            Enrolled
+                          </span>
+                        ) : hasWon ? (
                           <span className="bg-gray-100 text-gray-400 border border-gray-250 text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
                             Already Won
                           </span>
@@ -691,71 +723,109 @@ export default function LiveAuctionEngine() {
           </div>
         </div>
 
-        {/* 2. Right Pane (Bidding Timeline Feed) */}
+        {/* 2. Right Pane (Bidding Timeline Feed OR Month 0 Orientation Guide) */}
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-5 flex flex-col justify-between relative shadow-sm">
-          
-          <div className="space-y-4">
-            
-            {/* Header with Undo Button */}
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                <Gavel size={16} className="text-indigo-600" />
-                Bidding Timeline
-              </h3>
-              
-              <button
-                onClick={handleUndo}
-                disabled={bids.length === 0}
-                className="flex items-center gap-1 bg-gray-50 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed border border-gray-200 hover:border-gray-250 text-gray-700 text-[10px] font-bold px-2.5 py-1.5 rounded transition-all duration-150"
-              >
-                <Undo2 size={12} />
-                Undo Last Entry
-              </button>
-            </div>
-
-            {/* Scrollable Timeline Stream */}
-            <div className="space-y-3 min-h-[360px] max-h-[420px] overflow-y-auto pr-2">
-              {bids.length === 0 ? (
-                <div className="h-[300px] flex flex-col items-center justify-center text-gray-400 space-y-2 border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
-                  <Gavel size={32} className="text-gray-300 animate-pulse" />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Awaiting Bid Session</p>
-                  <p className="text-[10px] text-gray-400 max-w-[180px] text-center">Click member spots on the left matrix to begin logging bids.</p>
+          {group.currentMonth === 0 ? (
+            <div className="h-full flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+                  <Rocket size={16} className="text-amber-600" />
+                  <h3 className="text-sm font-bold text-gray-900">Month 0 Launch & Orientation Guide</h3>
                 </div>
-              ) : (
-                bids.map((bid, index) => {
-                  const isTopBid = index === 0;
 
-                  return (
-                    <div 
-                      key={bid.id} 
-                      className={`flex justify-between items-center p-3 rounded-lg border transition-all duration-200 ${
-                        isTopBid 
-                          ? 'bg-indigo-50 border-indigo-200 text-indigo-900 shadow-sm' 
-                          : 'bg-gray-50 border-gray-200 text-gray-600'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2.5 overflow-hidden mr-2">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isTopBid ? 'bg-indigo-600 animate-pulse' : 'bg-gray-400'}`}></span>
-                        <div className="flex flex-col overflow-hidden">
-                          <span className={`text-xs font-semibold truncate ${isTopBid ? 'text-indigo-900' : 'text-gray-700'}`}>
-                            {bid.memberName}
+                <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2.5 text-xs text-amber-950">
+                  <p className="font-bold flex items-center gap-1.5 text-amber-900">
+                    <Info size={14} className="text-amber-700" />
+                    How Month 0 Works:
+                  </p>
+                  <ul className="space-y-2 text-[11px] text-amber-900/90 list-disc pl-4">
+                    <li>
+                      <strong>No Prize Pot Auction:</strong> Subscribers do not bid in Month 0.
+                    </li>
+                    <li>
+                      <strong>Full Pot to Organizer:</strong> All {members.length} members pay their launch installment, and the entire {formatCurrency(group.totalValue)} pool is allocated as <strong>Organizer Profit</strong>.
+                    </li>
+                    <li>
+                      <strong>Launch Confirmation:</strong> Once launch collections are recorded in the <strong>Dashboard</strong>, click <em>&ldquo;Confirm Launch & Roll to M1&rdquo;</em>.
+                    </li>
+                    <li>
+                      <strong>First Live Auction:</strong> Live competitive bidding unlocks automatically in <strong>Month 1</strong>!
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-center space-y-1">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Action Required</span>
+                <p className="text-xs font-semibold text-gray-700">
+                  Open the <strong>Dashboard</strong> tab to record Month 0 collections.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              
+              {/* Header with Undo Button */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                  <Gavel size={16} className="text-indigo-600" />
+                  Bidding Timeline
+                </h3>
+                
+                <button
+                  onClick={handleUndo}
+                  disabled={bids.length === 0}
+                  className="flex items-center gap-1 bg-gray-50 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed border border-gray-200 hover:border-gray-250 text-gray-700 text-[10px] font-bold px-2.5 py-1.5 rounded transition-all duration-150"
+                >
+                  <Undo2 size={12} />
+                  Undo Last Entry
+                </button>
+              </div>
+
+              {/* Scrollable Timeline Stream */}
+              <div className="space-y-3 min-h-[360px] max-h-[420px] overflow-y-auto pr-2">
+                {bids.length === 0 ? (
+                  <div className="h-[300px] flex flex-col items-center justify-center text-gray-400 space-y-2 border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+                    <Gavel size={32} className="text-gray-300 animate-pulse" />
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Awaiting Bid Session</p>
+                    <p className="text-[10px] text-gray-400 max-w-[180px] text-center">Click member spots on the left matrix to begin logging bids.</p>
+                  </div>
+                ) : (
+                  bids.map((bid, index) => {
+                    const isTopBid = index === 0;
+
+                    return (
+                      <div 
+                        key={bid.id} 
+                        className={`flex justify-between items-center p-3 rounded-lg border transition-all duration-200 ${
+                          isTopBid 
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-900 shadow-sm' 
+                            : 'bg-gray-50 border-gray-200 text-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2.5 overflow-hidden mr-2">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isTopBid ? 'bg-indigo-600 animate-pulse' : 'bg-gray-400'}`}></span>
+                          <div className="flex flex-col overflow-hidden">
+                            <span className={`text-xs font-semibold truncate ${isTopBid ? 'text-indigo-900' : 'text-gray-700'}`}>
+                              {bid.memberName}
+                            </span>
+                            <span className="text-[9px] text-gray-400 mt-0.5">Ticket #{bid.ticketNumber}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-3 shrink-0">
+                          <span className="text-[9px] font-mono text-gray-400 font-semibold">{bid.timestamp}</span>
+                          <span className={`text-xs font-extrabold ${isTopBid ? 'text-indigo-600' : 'text-gray-650'}`}>
+                            {formatCurrency(bid.amount)}
                           </span>
-                          <span className="text-[9px] text-gray-400 mt-0.5">Ticket #{bid.ticketNumber}</span>
                         </div>
                       </div>
-
-                      <div className="flex items-center space-x-3 shrink-0">
-                        <span className="text-[9px] font-mono text-gray-400 font-semibold">{bid.timestamp}</span>
-                        <span className={`text-xs font-extrabold ${isTopBid ? 'text-indigo-600' : 'text-gray-650'}`}>
-                          {formatCurrency(bid.amount)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
       </div>
