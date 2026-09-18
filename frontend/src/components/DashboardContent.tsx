@@ -794,20 +794,30 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm">
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Average Monthly Dividend</span>
-              <span className="text-lg font-bold text-gray-900 mt-1 block">₹9,444</span>
-              <span className="text-[10px] text-green-600 mt-1 block">▲ +4.2% dividend yield</span>
+              <span className="text-lg font-bold text-gray-900 mt-1 block">
+                {localGroups.length === 0 ? '₹0' : formatCurrency(0)}
+              </span>
+              <span className="text-[10px] text-gray-400 mt-1 block">
+                {localGroups.length === 0 ? 'No active auctions yet' : 'Calculated per active auction'}
+              </span>
             </div>
 
             <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm">
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Collected Funds (Actual)</span>
-              <span className="text-lg font-bold text-gray-900 mt-1 block">₹3,45,000</span>
-              <span className="text-[10px] text-gray-500 mt-1 block">Target baseline: ₹5,00,000</span>
+              <span className="text-lg font-bold text-gray-900 mt-1 block">{formatCurrency(actualCollections)}</span>
+              <span className="text-[10px] text-gray-500 mt-1 block">
+                Target baseline: {formatCurrency(targetCollections)}
+              </span>
             </div>
 
             <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm">
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Total Outstanding Dues</span>
-              <span className="text-lg font-bold text-amber-600 mt-1 block">₹1,55,000</span>
-              <span className="text-[10px] text-gray-500 mt-1 block">5 pending subscribers</span>
+              <span className="text-lg font-bold text-amber-600 mt-1 block">
+                {formatCurrency(Math.max(0, targetCollections - actualCollections))}
+              </span>
+              <span className="text-[10px] text-gray-500 mt-1 block">
+                {fifoMembers.filter(m => getMemberTotalDue(m) > 0).length} pending subscribers
+              </span>
             </div>
           </div>
 
