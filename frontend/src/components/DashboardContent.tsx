@@ -126,6 +126,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupValue, setNewGroupValue] = useState('100000');
   const [newGroupDuration, setNewGroupDuration] = useState('5');
+  const [newGroupStartDate, setNewGroupStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [enrollments, setEnrollments] = useState<{ id?: string; name: string; phone: string }[]>([
     { id: undefined, name: '', phone: '' },
     { id: undefined, name: '', phone: '' },
@@ -216,7 +217,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
             id: g.id,
             name: g.name,
             totalValue: Number(g.total_value),
-            currentMonth: g.current_month || 1,
+            currentMonth: (g.current_month !== undefined && g.current_month !== null) ? Number(g.current_month) : 0,
             duration: g.duration_months,
             memberCount: g.member_count || g.duration_months,
             kaiIruppuPool: Number(g.kai_iruppu_pool || 0),
@@ -902,7 +903,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       if (!activeDashboardGroupId || !localGroups.some(g => g.id === activeDashboardGroupId)) {
         const firstActive = localGroups.find(g => g.status === 'active') || localGroups[0];
         setActiveDashboardGroupId(firstActive.id);
-        setSelectedDashboardMonth(firstActive.currentMonth || 1);
+        setSelectedDashboardMonth(firstActive.currentMonth !== undefined && firstActive.currentMonth !== null ? firstActive.currentMonth : 0);
       }
     }
   }, [localGroups, activeDashboardGroupId]);
@@ -997,15 +998,19 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   };
 
-  // Helper: Month label formatting (e.g. "Aug '26 M1")
+  // Helper: Month label formatting (e.g. "Aug '26 M0 Launch" or "Sep '26 M1")
   const getDashboardMonthLabel = (group: any, monthNum: number) => {
-    if (monthNum === 0) return 'M0 Launch';
     let baseDate = new Date();
     if (group?.startDate) {
       const parsed = new Date(group.startDate);
       if (!isNaN(parsed.getTime())) {
         baseDate = parsed;
       }
+    }
+    if (monthNum === 0) {
+      const monthName = baseDate.toLocaleDateString('en-US', { month: 'short' });
+      const yearShort = baseDate.getFullYear().toString().slice(-2);
+      return `${monthName} '${yearShort} M0 Launch`;
     }
     const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + (monthNum - 1), 1);
     const monthName = d.toLocaleDateString('en-US', { month: 'short' });
@@ -1154,16 +1159,56 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     }
   };
 
-  // Close Month Cycle Handler
+  // Close Month Cycle Handler / Confirm Launch
   const handleCloseMonth = async () => {
     const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId);
     if (!activeGroup) return;
 
-    const currentMonth = activeGroup.currentMonth || 1;
+    const currentMonth = activeGroup.currentMonth !== undefined && activeGroup.currentMonth !== null ? activeGroup.currentMonth : 0;
     const maxMonths = activeGroup.duration || activeGroup.memberCount || 20;
 
     if (selectedDashboardMonth !== currentMonth) {
       alert(`You are currently viewing Month ${selectedDashboardMonth}. The active ongoing month is Month ${currentMonth}.`);
+      return;
+    }
+
+    if (currentMonth === 0) {
+      const confirmLaunch = window.confirm(
+        `CONFIRM LAUNCH (Month 0)?\n\nAll launch collections (₹${activeGroup.totalValue?.toLocaleString('en-IN')}) are allocated to the Organizer as Organizer Profit.\n\nAdvance "${activeGroup.name}" to Month 1 (Live Auctions Phase)?`
+      );
+      if (!confirmLaunch) return;
+
+      try {
+        setIsClosingMonth(true);
+        const { error } = await supabase
+          .from('chit_groups')
+          .update({ current_month: 1 })
+          .eq('id', activeDashboardGroupId);
+
+        if (error) {
+          alert('Error advancing to Month 1: ' + error.message);
+          return;
+        }
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        setAuditLogs(prev => [
+          {
+            timestamp: `Today, ${timeStr}`,
+            table: 'chit_groups',
+            desc: `LAUNCH CONFIRMED: "${activeGroup.name}" — ₹${activeGroup.totalValue?.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group advanced to Month 1.`,
+            executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+          },
+          ...prev,
+        ]);
+
+        await fetchGroups();
+        setSelectedDashboardMonth(1);
+      } catch (err: any) {
+        console.error('Error confirming launch:', err);
+      } finally {
+        setIsClosingMonth(false);
+      }
       return;
     }
 
@@ -1465,9 +1510,10 @@ Thank you for your prompt payment! 🙏`;
         total_value: Number(newGroupValue),
         member_count: duration,
         duration_months: duration,
-        current_month: 1,
+        current_month: 0,
         kai_iruppu_pool: 0,
         status: groupStatus,
+        start_date: newGroupStartDate,
       }).select().single();
 
       if (groupError) {
@@ -1627,8 +1673,8 @@ Thank you for your prompt payment! 🙏`;
         // Auction log for selected month
         const currentMonthAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(selectedDashboardMonth));
 
-        // Month range generator for carousel
-        const monthsRange = Array.from({ length: totalDuration }, (_, i) => i + 1);
+        // Month range generator for carousel (starts at Month 0 Launch Month)
+        const monthsRange = [0, ...Array.from({ length: totalDuration }, (_, i) => i + 1)];
 
         // Recent transactions for this group / month
         const currentMonthTransactions = dashboardTransactions.filter(t => 
@@ -1654,11 +1700,11 @@ Thank you for your prompt payment! 🙏`;
                         key={group.id}
                         onClick={() => {
                           setActiveDashboardGroupId(group.id);
-                          setSelectedDashboardMonth(group.currentMonth || 1);
+                          setSelectedDashboardMonth(group.currentMonth !== undefined && group.currentMonth !== null ? group.currentMonth : 0);
                         }}
                         className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border ${
                           isSelected
-                            ? 'bg-indigo-650 text-white border-indigo-700 shadow-sm shadow-indigo-100 ring-2 ring-indigo-500/20'
+                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm shadow-indigo-100 ring-2 ring-indigo-500/20'
                             : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
                         }`}
                       >
@@ -1669,9 +1715,9 @@ Thank you for your prompt payment! 🙏`;
                             ? isSelected ? 'bg-amber-300' : 'bg-amber-500'
                             : isSelected ? 'bg-blue-300' : 'bg-blue-500'
                         }`} />
-                        <span>{group.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${
-                          isSelected ? 'bg-white/20 text-white' : 'bg-gray-200/70 text-gray-600'
+                        <span className={isSelected ? 'text-white font-bold' : 'text-gray-800 font-bold'}>{group.name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ${
+                          isSelected ? 'bg-indigo-700 text-white' : 'bg-gray-200/70 text-gray-700'
                         }`}>
                           {formatCurrency(group.totalValue)}
                         </span>
@@ -1695,8 +1741,8 @@ Thank you for your prompt payment! 🙏`;
             {activeGroup && (
               <div className="bg-white border border-gray-200 rounded-2xl p-3 shadow-sm flex items-center justify-between gap-2">
                 <button
-                  onClick={() => setSelectedDashboardMonth(prev => Math.max(1, prev - 1))}
-                  disabled={selectedDashboardMonth <= 1}
+                  onClick={() => setSelectedDashboardMonth(prev => Math.max(0, prev - 1))}
+                  disabled={selectedDashboardMonth <= 0}
                   className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0"
                 >
                   <ChevronLeft size={16} />
@@ -1705,7 +1751,7 @@ Thank you for your prompt payment! 🙏`;
                 <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 px-1">
                   {monthsRange.map((mNum) => {
                     const isSelected = (selectedDashboardMonth === mNum);
-                    const isOngoingCurrent = (activeGroup.currentMonth === mNum);
+                    const isOngoingCurrent = ((activeGroup.currentMonth ?? 0) === mNum);
                     const label = getDashboardMonthLabel(activeGroup, mNum);
 
                     return (
@@ -1714,17 +1760,25 @@ Thank you for your prompt payment! 🙏`;
                         onClick={() => setSelectedDashboardMonth(mNum)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border ${
                           isSelected
-                            ? 'bg-gray-900 text-white border-black shadow-sm ring-2 ring-gray-900/10'
+                            ? mNum === 0
+                              ? 'bg-amber-600 text-white border-amber-700 shadow-sm ring-2 ring-amber-500/20'
+                              : 'bg-gray-900 text-white border-black shadow-sm ring-2 ring-gray-900/10'
                             : isOngoingCurrent
-                            ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                            ? mNum === 0
+                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300 ring-1 ring-amber-200'
+                              : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
                             : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200'
                         }`}
                       >
-                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                        {isSelected ? (
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        ) : mNum === 0 ? (
+                          <span className="text-[10px]">👑</span>
+                        ) : null}
                         <span>{label}</span>
                         {isOngoingCurrent && (
                           <span className={`text-[9px] uppercase tracking-wider px-1 py-0.2 rounded font-semibold ${
-                            isSelected ? 'bg-white/20 text-white' : 'bg-indigo-200/60 text-indigo-800'
+                            isSelected ? 'bg-white/20 text-white' : mNum === 0 ? 'bg-amber-200/80 text-amber-900' : 'bg-indigo-200/60 text-indigo-800'
                           }`}>
                             Current
                           </span>
@@ -1750,10 +1804,18 @@ Thank you for your prompt payment! 🙏`;
                 <div className="flex flex-col lg:flex-row justify-between lg:items-start gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md">
-                        {activeGroup.name} · Month {selectedDashboardMonth} of {totalDuration}
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${
+                        selectedDashboardMonth === 0
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                      }`}>
+                        {selectedDashboardMonth === 0 ? (
+                          <>👑 {activeGroup.name} · Month 0 (Launch Month — Organizer Profit Phase)</>
+                        ) : (
+                          <>{activeGroup.name} · Month {selectedDashboardMonth} of {totalDuration}</>
+                        )}
                       </span>
-                      {isLaaba && (
+                      {isLaaba && selectedDashboardMonth > 0 && (
                         <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1">
                           <Sparkles size={11} /> Laaba Seetu Active
                         </span>
@@ -1795,14 +1857,25 @@ Thank you for your prompt payment! 🙏`;
                         <span>{isMarkingAllPaid ? 'Recording...' : 'Mark All Paid'}</span>
                       </button>
 
-                      <button
-                        onClick={handleCloseMonth}
-                        disabled={isClosingMonth || selectedDashboardMonth !== activeGroup.currentMonth}
-                        className="flex items-center gap-1.5 bg-gray-900 hover:bg-black text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none"
-                      >
-                        <ArrowRight size={14} />
-                        <span>{isClosingMonth ? 'Closing...' : 'Close Month'}</span>
-                      </button>
+                      {selectedDashboardMonth === 0 ? (
+                        <button
+                          onClick={handleCloseMonth}
+                          disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
+                          className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                          <Rocket size={14} />
+                          <span>{isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M1'}</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleCloseMonth}
+                          disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
+                          className="flex items-center gap-1.5 bg-gray-900 hover:bg-black text-white font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                          <ArrowRight size={14} />
+                          <span>{isClosingMonth ? 'Closing...' : 'Close Month'}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1828,20 +1901,20 @@ Thank you for your prompt payment! 🙏`;
                       <Trophy size={14} />
                     </div>
                     <div>
-                      {currentMonthAuction ? (
+                      {selectedDashboardMonth === 0 ? (
+                        <div className="text-xs">
+                          <span className="font-bold text-amber-900">Month 0: Launch Month — Organizer Profit Phase</span>
+                          <span className="text-gray-600 ml-1.5">
+                            (Full {formatCurrency(totalChitVal)} pot collected is allocated directly to the Organizer as Organizer Profit · No auction held)
+                          </span>
+                        </div>
+                      ) : currentMonthAuction ? (
                         <div className="text-xs">
                           <span className="font-bold text-gray-900">
                             Won · {currentMonthAuction.winner_name || 'Subscriber'}
                           </span>
                           <span className="text-gray-500 ml-1.5">
                             (Winning Discount: <strong className="text-indigo-600">{formatCurrency(currentMonthAuction.winning_bid || 0)}</strong> · Net Payout: <strong className="text-emerald-600">{formatCurrency(totalChitVal - (currentMonthAuction.winning_bid || 0))}</strong>)
-                          </span>
-                        </div>
-                      ) : selectedDashboardMonth === 0 ? (
-                        <div className="text-xs">
-                          <span className="font-bold text-purple-700">Month 0: Organizer Profit Month</span>
-                          <span className="text-gray-500 ml-1.5">
-                            (Full {formatCurrency(totalChitVal)} pot taken by Organizer · No auction held)
                           </span>
                         </div>
                       ) : (
@@ -3006,6 +3079,18 @@ Thank you for your prompt payment! 🙏`;
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Launch Date / Month 0 Start</label>
+                      <input
+                        type="date"
+                        required
+                        value={newGroupStartDate}
+                        onChange={(e) => setNewGroupStartDate(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none font-semibold"
+                      />
+                      <span className="text-[10px] text-gray-400 block">Sets the start month for Month 0 Launch calculations</span>
                     </div>
                   </div>
 
