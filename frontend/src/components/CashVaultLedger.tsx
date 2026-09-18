@@ -58,25 +58,11 @@ export default function CashVaultLedger() {
   const { profile } = useAuth();
   const activeAdminName = profile?.fullName || simulatedUser.fullName;
 
-  // 1. Core State Hooks
-  const [relocations, setRelocations] = useState<Relocation[]>([
-    { id: 'rel-1', source: 'kishor_bank', amount: 15000, status: 'pending_verification' }
-  ]);
-
-  const [personalDraws, setPersonalDraws] = useState<PersonalDraw[]>([
-    { id: 'pd-1', amount: 500, tag: 'Petrol', description: 'Fuel for weekly cash collection trip', adminName: 'Kishor (Admin)', timestamp: '01:30 PM' }
-  ]);
-
-  const [liabilities, setLiabilities] = useState<DebtLiability[]>([
-    { id: 'liab-1', groupName: 'G-Elite-Weekly-301', totalPayout: 100000, paidAmount: 70000, liabilityAmount: 30000 }
-  ]);
-
-  const [collections, setCollections] = useState<MemberCollection[]>([
-    { id: 'col-1', memberName: 'Priya Subramanian', totalDue: 5000, amountLogged: 3000, targetVault: 'cash_in_hand', status: 'completed' },
-    { id: 'col-2', memberName: 'Balaji Srinivasan', totalDue: 5000, amountLogged: 2000, targetVault: 'kishor_bank', status: 'pending_verification' },
-    { id: 'col-3', memberName: 'Ananya Sen', totalDue: 5000, amountLogged: 5000, targetVault: 'cash_in_hand', status: 'completed' },
-    { id: 'col-4', memberName: 'Suresh Babu', totalDue: 5000, amountLogged: 1000, targetVault: 'dad_bank', status: 'pending_verification' }
-  ]);
+  // 1. Clean Starting State Hooks (Real data starts empty)
+  const [relocations, setRelocations] = useState<Relocation[]>([]);
+  const [personalDraws, setPersonalDraws] = useState<PersonalDraw[]>([]);
+  const [liabilities, setLiabilities] = useState<DebtLiability[]>([]);
+  const [collections, setCollections] = useState<MemberCollection[]>([]);
 
   // Form states
   const [relocateSource, setRelocateSource] = useState<Exclude<WalletType, 'cash_in_hand'>>('kishor_bank');

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import TopStatusRibbon from '@/components/TopStatusRibbon';
-import ProfileSimulationSwitcher from '@/components/ProfileSimulationSwitcher';
+import UserProfileBadge from '@/components/UserProfileBadge';
 import DashboardContent from '@/components/DashboardContent';
 import AuthScreen from '@/components/AuthScreen';
 import { useAuth } from '@/context/AuthContext';
@@ -62,8 +62,8 @@ export default function Home() {
             </h1>
           </div>
 
-          {/* 3. Profile Simulation Switcher overlay */}
-          <ProfileSimulationSwitcher />
+          {/* Real Authenticated User Profile */}
+          <UserProfileBadge />
         </header>
 
         {/* 2. Main Content Board Canvas (Wide, auto-reflowing container) */}

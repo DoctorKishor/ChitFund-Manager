@@ -1,8 +1,7 @@
-'use client';
-
-import React, { useState, useMemo } from 'react';
-import { useSimulation } from '../context/SimulationContext';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useWallet } from '../context/WalletContext';
+import { supabase } from '../utils/supabase/client';
 import LiveAuctionEngine from './LiveAuctionEngine';
 import CashVaultLedger from './CashVaultLedger';
 import MemberMatrix from './MemberMatrix';
@@ -25,12 +24,12 @@ import {
   BarChart3,
   Rocket,
   CalendarDays,
-  RefreshCw
+  RefreshCw,
+  Plus
 } from 'lucide-react';
 
 // ── Utility: First Sunday on-or-after the 10th of a given month ──────────────
 function getFirstSundayOnOrAfter10th(year: number, month: number): Date {
-  // month is 0-indexed (JS Date)
   const d = new Date(year, month, 10);
   while (d.getDay() !== 0) {
     d.setDate(d.getDate() + 1);
@@ -63,7 +62,7 @@ interface DashboardContentProps {
 }
 
 export default function DashboardContent({ activeTab }: DashboardContentProps) {
-  const { simulatedUser } = useSimulation();
+  const { profile } = useAuth();
   const { balances, triggerMockTransaction, updateBalance } = useWallet();
 
   // Group Creation & Enrollment States
@@ -82,32 +81,72 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
 
-  const masterDirectory = [
-    { name: 'Ramesh Kumar (Dad)', phone: '+91 98765 43210' },
-    { name: 'Geetha Kumar (Mom)', phone: '+91 98765 43211' },
-    { name: 'Priya Subramanian', phone: '+91 98765 43213' },
-    { name: 'Balaji Srinivasan', phone: '+91 98765 43214' },
-    { name: 'Kishor (Admin)', phone: '+91 98765 43212' },
-    { name: 'Rajesh Nair', phone: '+91 98765 43215' },
-    { name: 'Ananya Sen', phone: '+91 98765 43216' },
-    { name: 'Amit Patel', phone: '+91 98765 43217' },
-    { name: 'Divya Nair', phone: '+91 98765 43218' },
-    { name: 'Suresh Babu', phone: '+91 98765 43219' },
-    { name: 'Vijay Kumar', phone: '+91 98765 43220' },
-    { name: 'Aarti Sharma', phone: '+91 98765 43221' },
-    { name: 'Deepak Verma', phone: '+91 98765 43222' },
-    { name: 'Neha Gupta', phone: '+91 98765 43223' },
-    { name: 'Sanjay Shah', phone: '+91 98765 43224' },
-  ];
+  // Live Supabase Directory
+  const [masterDirectory, setMasterDirectory] = useState<{ name: string; phone: string }[]>([]);
 
-  // Chits Directory Switcher States
+  // Chits Directory Switcher States (Loaded from Supabase)
   const [showWizard, setShowWizard] = useState(false);
   const [groupFilter, setGroupFilter] = useState<'active' | 'all'>('active');
-  const [localGroups, setLocalGroups] = useState([
-    { id: 'g1', name: 'G-Elite-Weekly-301', totalValue: 100000, currentMonth: 4, duration: 20, active: true },
-    { id: 'g2', name: 'G-Gold-Monthly-102', totalValue: 500000, currentMonth: 6, duration: 12, active: true },
-    { id: 'g3', name: 'G-Silver-Biweekly-204', totalValue: 200000, currentMonth: 10, duration: 10, active: false },
-  ]);
+  const [localGroups, setLocalGroups] = useState<any[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+
+  // Fetch real groups from Supabase
+  const fetchGroups = async () => {
+    try {
+      setLoadingGroups(true);
+      const { data, error } = await supabase
+        .from('chit_groups')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('chit_groups fetch note:', error.message);
+        return;
+      }
+
+      if (data) {
+        setLocalGroups(
+          data.map((g: any) => ({
+            id: g.id,
+            name: g.name,
+            totalValue: Number(g.total_value),
+            currentMonth: g.current_month || 1,
+            duration: g.duration_months,
+            active: true,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching groups from Supabase:', err);
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  // Fetch registered profiles from Supabase
+  const fetchProfiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, phone_number');
+
+      if (data && data.length > 0) {
+        setMasterDirectory(
+          data.map((p: any) => ({
+            name: p.full_name,
+            phone: p.phone_number,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching directory:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchGroups();
+    fetchProfiles();
+  }, []);
 
   // Auction Date Reschedule Override State: { [groupId]: ISO date string }
   const [auctionDateOverrides, setAuctionDateOverrides] = useState<Record<string, string>>({});
@@ -131,46 +170,14 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  // Dashboard Dues & Collection States
-  const [actualCollections, setActualCollections] = useState(345000);
-  const targetCollections = 500000;
+  // Dashboard Dues & Collection States (Real defaults: 0)
+  const [actualCollections, setActualCollections] = useState(0);
+  const targetCollections = useMemo(() => {
+    return localGroups.reduce((acc, g) => acc + (g.totalValue / (g.duration || 1)), 0);
+  }, [localGroups]);
 
-  // FIFO Cumulative Ledger — each member has a chronological ledger array
-  const [fifoMembers, setFifoMembers] = useState<FifoMember[]>([
-    {
-      id: 'y1', name: 'Balaji Srinivasan', ticket: 4, group: 'G-Elite-Weekly-301',
-      ledger: [
-        { month: 2, label: 'Month 2 (Overdue)', original: 5000, paid: 3000 },
-        { month: 3, label: 'Month 3 (Overdue)', original: 5000, paid: 0 },
-        { month: 4, label: 'Month 4 (Current)', original: 5000, paid: 0 },
-      ]
-    },
-    {
-      id: 'y2', name: 'Priya Subramanian', ticket: 3, group: 'G-Elite-Weekly-301',
-      ledger: [
-        { month: 3, label: 'Month 3 (Overdue)', original: 5000, paid: 0 },
-        { month: 4, label: 'Month 4 (Current)', original: 5000, paid: 0 },
-      ]
-    },
-    {
-      id: 'y3', name: 'Geetha Kumar (Mom)', ticket: 2, group: 'G-Elite-Weekly-301',
-      ledger: [
-        { month: 4, label: 'Month 4 (Current)', original: 5000, paid: 0 },
-      ]
-    },
-    {
-      id: 'y4', name: 'Ananya Sen', ticket: 7, group: 'G-Elite-Weekly-301',
-      ledger: [
-        { month: 4, label: 'Month 4 (Current)', original: 5000, paid: 0 },
-      ]
-    },
-    {
-      id: 'y5', name: 'Amit Patel', ticket: 8, group: 'G-Elite-Weekly-301',
-      ledger: [
-        { month: 4, label: 'Month 4 (Current)', original: 5000, paid: 0 },
-      ]
-    },
-  ]);
+  // FIFO Cumulative Ledger — Starts empty until groups & dues are registered
+  const [fifoMembers, setFifoMembers] = useState<FifoMember[]>([]);
 
   // Derive total outstanding per member
   const getMemberTotalDue = (member: FifoMember) =>
@@ -187,12 +194,8 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const selectedFifoMember = fifoMembers.find(m => m.id === selectedMemberId) ?? null;
   const selectedMemberTotalDue = selectedFifoMember ? getMemberTotalDue(selectedFifoMember) : 0;
 
-  // Dynamic Audit Log State
-  const [auditLogs, setAuditLogs] = useState([
-    { timestamp: 'Today, 02:44 AM', table: 'transactions', desc: 'INSERT payout transaction for Group G-301', executor: 'Kishor (Admin)' },
-    { timestamp: 'Today, 01:12 AM', table: 'chit_groups', desc: 'UPDATE Month to [3] for Group G-102', executor: 'Kishor (Admin)' },
-    { timestamp: 'Yesterday, 11:30 PM', table: 'global_treasury', desc: 'UPDATE cash_in_hand balance to ₹45,250', executor: 'Kishor (Admin)' },
-  ]);
+  // Dynamic Audit Log State (Starts empty, records live actions)
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
   const handleDurationChange = (val: string) => {
     setNewGroupDuration(val);
@@ -220,7 +223,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     });
   };
 
-  const handleCreateGroup = (e: React.FormEvent) => {
+  const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     const duration = Number(newGroupDuration);
     
@@ -235,17 +238,26 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       return;
     }
 
-    const newGroup = {
-      id: Math.random().toString(),
-      name: newGroupName,
-      totalValue: Number(newGroupValue),
-      currentMonth: 0, // Month 0 = Launch Month — company profit maps to full pool value
-      duration: duration,
-      active: true
-    };
-    setLocalGroups(prev => [newGroup, ...prev]);
+    try {
+      const { data, error } = await supabase.from('chit_groups').insert({
+        name: newGroupName,
+        total_value: Number(newGroupValue),
+        member_count: duration,
+        duration_months: duration,
+        current_month: 1,
+        kai_iruppu_pool: 0,
+      }).select().single();
 
-    alert(`Success: Chit Group "${newGroupName}" created! \nPool Value: ₹${newGroupValue}\nDuration: ${duration} Months\nMembers Enrolled: ${enrollments.length} slots verified.`);
+      if (error) {
+        alert(`Failed to create group in database: ${error.message}`);
+        return;
+      }
+
+      alert(`Success: Chit Group "${newGroupName}" created in Supabase! \nPool Value: ₹${newGroupValue}\nDuration: ${duration} Months.`);
+      await fetchGroups();
+    } catch (err: any) {
+      alert(`Error creating group: ${err.message}`);
+    }
     
     // Reset form
     setNewGroupName('');
@@ -319,7 +331,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     alert(`FIFO credit of ₹${amountNum.toLocaleString('en-IN')} applied. Oldest overdue balances cleared first.`);
   };
 
-  const isUserAdminOrManager = simulatedUser.role === 'admin' || simulatedUser.role === 'manager';
+  const isUserAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -342,11 +354,11 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                 System Workspace
               </span>
               <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-                Welcome back, {simulatedUser.fullName}!
+                Welcome back, {profile?.fullName || 'User'}!
               </h2>
               <p className="text-sm text-gray-500 max-w-xl">
-                You are currently viewing the workspace as a <span className="font-semibold text-indigo-600 uppercase">{simulatedUser.role}</span>.
-                {!isUserAdminOrManager && " Administrative tabs and actions are restricted."}
+                You are currently viewing the workspace as an <span className="font-semibold text-indigo-600 uppercase">{profile?.role || 'Subscriber'}</span>.
+                {profile?.role === 'subscriber' && " Administrative tabs and actions are restricted."}
               </p>
             </div>
           </div>
@@ -939,7 +951,26 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
               {/* Groups Card Directory Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {localGroups
+                {localGroups.filter(g => groupFilter === 'all' || g.active).length === 0 ? (
+                  <div className="col-span-full py-12 px-6 bg-white border border-gray-200 rounded-xl text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
+                    <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                      <Briefcase size={24} />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-gray-900">No Chit Groups Created Yet</h4>
+                      <p className="text-xs text-gray-500 max-w-sm">
+                        Start by creating your first chit group and enrolling members to track monthly auctions and treasury collections.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowWizard(true)}
+                      className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors shadow"
+                    >
+                      + Create First Group
+                    </button>
+                  </div>
+                ) : (
+                localGroups
                   .filter(g => groupFilter === 'all' || g.active)
                   .map((g) => {
                     const progressPercent = (g.currentMonth / g.duration) * 100;
@@ -1071,7 +1102,8 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                         )}
                       </div>
                     );
-                  })}
+                  })
+                )}
               </div>
             </div>
           ) : (

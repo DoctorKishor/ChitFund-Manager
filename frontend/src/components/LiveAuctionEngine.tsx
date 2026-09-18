@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/utils/supabase/client';
 import { 
   Undo2, 
   Gavel, 
@@ -14,7 +15,8 @@ import {
   ArrowRight,
   X,
   Lock,
-  Zap
+  Zap,
+  Briefcase
 } from 'lucide-react';
 
 interface Member {
@@ -34,6 +36,7 @@ interface Bid {
 }
 
 interface ChitGroup {
+  id?: string;
   name: string;
   totalValue: number;
   memberCount: number;
@@ -53,33 +56,46 @@ function fmtDate(d: Date): string {
 }
 
 export default function LiveAuctionEngine() {
-  // 1. Initial State Data
-  const [group, setGroup] = useState<ChitGroup>({
-    name: 'G-Elite-Weekly-301',
-    totalValue: 100000,
-    memberCount: 10,
-    currentMonth: 4,
-    durationMonths: 20,
-    kai_iruppu_pool: 60000, // Starts accumulated at ₹60,000 for demonstration
-  });
+  // 1. Initial State Data (Loaded from Supabase)
+  const [group, setGroup] = useState<ChitGroup | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [members, setMembers] = useState<Member[]>([
-    { id: 'm1', fullName: 'Ramesh Kumar (Dad)', ticketNumber: 1, hasWonRegular: true },
-    { id: 'm2', fullName: 'Geetha Kumar (Mom)', ticketNumber: 2, hasWonRegular: false },
-    { id: 'm3', fullName: 'Priya Subramanian', ticketNumber: 3, hasWonRegular: false },
-    { id: 'm4', fullName: 'Balaji Srinivasan', ticketNumber: 4, hasWonRegular: false },
-    { id: 'm5', fullName: 'Kishor (Admin)', ticketNumber: 5, hasWonRegular: false },
-    { id: 'm6', fullName: 'Rajesh Nair', ticketNumber: 6, hasWonRegular: true },
-    { id: 'm7', fullName: 'Ananya Sen', ticketNumber: 7, hasWonRegular: false },
-    { id: 'm8', fullName: 'Amit Patel', ticketNumber: 8, hasWonRegular: false },
-    { id: 'm9', fullName: 'Divya Nair', ticketNumber: 9, hasWonRegular: false },
-    { id: 'm10', fullName: 'Suresh Babu', ticketNumber: 10, hasWonRegular: false },
-  ]);
+  // Fetch active group from Supabase
+  const fetchAuctionData = async () => {
+    try {
+      setLoading(true);
+      const { data: groupData, error } = await supabase
+        .from('chit_groups')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-  const [bids, setBids] = useState<Bid[]>([
-    { id: 'b2', memberId: 'm4', memberName: 'Balaji Srinivasan', ticketNumber: 4, amount: 35000, timestamp: '03:01:22' },
-    { id: 'b1', memberId: 'm3', memberName: 'Priya Subramanian', ticketNumber: 3, amount: 30000, timestamp: '02:58:45' },
-  ]);
+      if (groupData) {
+        setGroup({
+          id: groupData.id,
+          name: groupData.name,
+          totalValue: Number(groupData.total_value),
+          memberCount: groupData.member_count,
+          currentMonth: groupData.current_month || 1,
+          durationMonths: groupData.duration_months,
+          kai_iruppu_pool: Number(groupData.kai_iruppu_pool) || 0,
+        });
+      } else {
+        setGroup(null);
+      }
+    } catch (err) {
+      console.error('Error fetching auction data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAuctionData();
+  }, []);
 
   const [activeLoggingMemberId, setActiveLoggingMemberId] = useState<string | null>(null);
   const [bidInputVal, setBidInputVal] = useState<string>('');
@@ -106,8 +122,33 @@ export default function LiveAuctionEngine() {
     }
   }, [activeLoggingMemberId]);
 
+  // Loading and Empty State handling
+  if (loading) {
+    return (
+      <div className="py-12 text-center text-gray-500 text-xs">
+        Loading live auction data...
+      </div>
+    );
+  }
+
+  if (!group) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-12 text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
+        <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+          <Gavel size={24} />
+        </div>
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-gray-900">No Active Auctions</h3>
+          <p className="text-xs text-gray-500 max-w-sm">
+            There are no active chit groups created yet. Create a group in the <strong>Chits</strong> tab to start a live auction.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Laaba Seetu triggers if accumulated pool matches or exceeds total chit value (₹1L)
-  const isLaabaSeetuActive = group.kai_iruppu_pool >= group.totalValue;
+  const isLaabaSeetuActive = (group.kai_iruppu_pool || 0) >= group.totalValue;
 
   // Auction date calculation
   const now = new Date();
@@ -207,28 +248,28 @@ export default function LiveAuctionEngine() {
 
       if (biddingLocked) {
         // Laaba Seetu (non-holiday): reset accumulated pool, advance month
-        setGroup(prev => ({
+        setGroup(prev => prev ? ({
           ...prev,
           currentMonth: Math.min(prev.durationMonths, prev.currentMonth + 1),
           kai_iruppu_pool: 0
-        }));
+        }) : null);
       } else if (isHolidayMonth) {
         // Holiday month: compound high bid into next discount pool, advance month
         setNextDiscountPool(prev => prev + highestBid);
-        setGroup(prev => ({
+        setGroup(prev => prev ? ({
           ...prev,
           currentMonth: Math.min(prev.durationMonths, prev.currentMonth + 1)
-        }));
+        }) : null);
         // No winner flagged — bidding was for compounding purposes
       } else {
         // Regular month: mark winner, advance month
         if (winnerId) {
           setMembers(prev => prev.map(m => m.id === winnerId ? { ...m, hasWonRegular: true } : m));
         }
-        setGroup(prev => ({
+        setGroup(prev => prev ? ({
           ...prev,
           currentMonth: Math.min(prev.durationMonths, prev.currentMonth + 1)
-        }));
+        }) : null);
       }
       setBids([]);
 
@@ -374,16 +415,16 @@ export default function LiveAuctionEngine() {
             <input 
               type="number"
               value={group.kai_iruppu_pool}
-              onChange={(e) => setGroup(prev => ({ ...prev, kai_iruppu_pool: Number(e.target.value) }))}
+              onChange={(e) => setGroup(prev => prev ? ({ ...prev, kai_iruppu_pool: Number(e.target.value) }) : null)}
               className="w-28 bg-white border border-gray-250 rounded px-2.5 py-1 text-xs text-gray-950 focus:outline-none focus:border-indigo-500"
             />
           </div>
           <div className="flex items-center gap-2">
             <button 
-              onClick={() => setGroup(prev => ({ ...prev, kai_iruppu_pool: 60000 }))}
+              onClick={() => setGroup(prev => prev ? ({ ...prev, kai_iruppu_pool: 0 }) : null)}
               className="bg-white hover:bg-gray-105 text-gray-700 font-bold text-[10px] px-3 py-1.5 rounded transition-all border border-gray-200"
             >
-              Reset to ₹60K (Regular Mode)
+              Reset Pool
             </button>
             <button 
               onClick={() => setNextDiscountPool(0)}
@@ -392,11 +433,11 @@ export default function LiveAuctionEngine() {
               Clear Discount Pool
             </button>
             <button 
-              onClick={() => setGroup(prev => ({ ...prev, kai_iruppu_pool: prev.totalValue }))}
+              onClick={() => setGroup(prev => prev ? ({ ...prev, kai_iruppu_pool: prev.totalValue }) : null)}
               className="bg-gray-900 hover:bg-black text-white font-bold text-[10px] px-3.5 py-1.5 rounded flex items-center gap-1 shadow-sm transition-all"
             >
               <Zap size={12} />
-              Trigger Laaba Seetu (Set ₹1,00,000)
+              Trigger Laaba Seetu (Max Pool)
             </button>
           </div>
         </div>

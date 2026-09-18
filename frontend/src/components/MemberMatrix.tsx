@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { supabase } from '@/utils/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 import { 
   Users, 
   Send, 
@@ -11,8 +13,8 @@ import {
   Smartphone, 
   Laptop, 
   ExternalLink,
-  CheckCircle2,
-  XCircle,
+  CheckCircle2, 
+  XCircle, 
   FileText
 } from 'lucide-react';
 
@@ -51,59 +53,57 @@ interface MemberMatrixProps {
 }
 
 export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
-  // 1. Static Group Data for Broadcasting templates
-  const groupsMetadata: Record<string, GroupMetadata> = {
-    'G-Elite-Weekly-301': {
-      id: 'g1',
-      name: 'G-Elite-Weekly-301',
-      currentMonth: 4,
-      poolValue: 100000,
-      auctionDate: 'July 22, 2026',
-      winnerName: 'Balaji Srinivasan',
-      winningDiscount: 35000,
-      netPayout: 65000,
-      dividend: 3333,
-      fixedInstallment: 5000
-    },
-    'G-Gold-Monthly-102': {
-      id: 'g2',
-      name: 'G-Gold-Monthly-102',
-      currentMonth: 6,
-      poolValue: 500000,
-      auctionDate: 'August 02, 2026',
-      winnerName: 'Priya Subramanian',
-      winningDiscount: 140000,
-      netPayout: 360000,
-      dividend: 15555,
-      fixedInstallment: 25000
-    }
-  };
+  const { profile } = useAuth();
+  const [groupsMetadata, setGroupsMetadata] = useState<Record<string, GroupMetadata>>({});
+  const [members, setMembers] = useState<Member[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // 2. State hooks
-  const [members, setMembers] = useState<Member[]>([
-    { id: 'm3', fullName: 'Priya Subramanian', phoneNumber: '+91 98765 43213', groups: [{ name: 'G-Elite-Weekly-301', ticket: 3 }, { name: 'G-Gold-Monthly-102', ticket: 12 }], physicalBookSynced: true },
-    { id: 'm4', fullName: 'Balaji Srinivasan', phoneNumber: '+91 98765 43214', groups: [{ name: 'G-Elite-Weekly-301', ticket: 4 }], physicalBookSynced: false },
-    { id: 'm2', fullName: 'Geetha Kumar (Mom)', phoneNumber: '+91 98765 43212', groups: [{ name: 'G-Elite-Weekly-301', ticket: 2 }], physicalBookSynced: true },
-    { id: 'm1', fullName: 'Ramesh Kumar (Dad)', phoneNumber: '+91 98765 43211', groups: [{ name: 'G-Elite-Weekly-301', ticket: 1 }], physicalBookSynced: true },
-    { id: 'm7', fullName: 'Ananya Sen', phoneNumber: '+91 98765 43215', groups: [{ name: 'G-Elite-Weekly-301', ticket: 7 }], physicalBookSynced: false },
-    { id: 'm10', fullName: 'Suresh Babu', phoneNumber: '+91 98765 43216', groups: [{ name: 'G-Elite-Weekly-301', ticket: 10 }], physicalBookSynced: true }
-  ]);
-
-  const [auditLogs] = useState<AuditLog[]>([
-    { id: 'l-1', timestamp: '03:08:44 AM', subscriberName: 'Priya Subramanian', action: 'Inspected Group Ledger', device: 'mobile', userAgent: 'iPhone 15 Pro / Safari' },
-    { id: 'l-2', timestamp: '02:55:12 AM', subscriberName: 'Balaji Srinivasan', action: 'Logged in via Mobile Link', device: 'mobile', userAgent: 'OnePlus 11 / Chrome' },
-    { id: 'l-3', timestamp: 'Yesterday, 11:15 PM', subscriberName: 'Ananya Sen', action: 'Viewed Auction History', device: 'desktop', userAgent: 'Windows 11 / Edge' },
-    { id: 'l-4', timestamp: 'Yesterday, 10:44 PM', subscriberName: 'Suresh Babu', action: 'Inspected Group Ledger', device: 'mobile', userAgent: 'Pixel 8 / Chrome' },
-    { id: 'l-5', timestamp: 'Yesterday, 06:12 PM', subscriberName: 'Priya Subramanian', action: 'Inspected Personal Receipt', device: 'desktop', userAgent: 'macOS Sonoma / Safari' }
-  ]);
-
-  const [activeGroupKey, setActiveGroupKey] = useState<string>('G-Elite-Weekly-301');
+  const [activeGroupKey, setActiveGroupKey] = useState<string>('');
   const [templateType, setTemplateType] = useState<'pre-auction' | 'post-auction'>('pre-auction');
   const [copied, setCopied] = useState<boolean>(false);
   const [broadcastText, setBroadcastText] = useState<string>('');
   
   // Custom Dynamic Signature Line
-  const [signatureLine, setSignatureLine] = useState<string>("Dr. Kishor Anbazhakan's Organization");
+  const [signatureLine, setSignatureLine] = useState<string>(
+    profile?.fullName ? `${profile.fullName}'s Chit Fund Organization` : "Chit Fund Organization"
+  );
+
+  useEffect(() => {
+    if (profile?.fullName) {
+      setSignatureLine(`${profile.fullName}'s Chit Fund Organization`);
+    }
+  }, [profile]);
+
+  // Fetch real subscribers from Supabase
+  const fetchMembers = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*');
+
+      if (data) {
+        setMembers(
+          data.map((p: any) => ({
+            id: p.id,
+            fullName: p.full_name || 'Member',
+            phoneNumber: p.phone_number || '',
+            groups: [],
+            physicalBookSynced: true,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching member matrix:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMembers();
+  }, []);
 
   // 3. Compile broadcast text dynamically based on selected group, template, and signature
   useEffect(() => {
@@ -296,7 +296,15 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {members.map((member) => (
+                {members.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-gray-400 text-xs">
+                      <Users size={20} className="mx-auto mb-2 text-indigo-400 opacity-60" />
+                      No members registered yet in database.
+                    </td>
+                  </tr>
+                ) : (
+                members.map((member) => (
                   <tr key={member.id} className="hover:bg-gray-50/50">
                     <td className="py-3 px-3">
                       <span className="font-semibold text-gray-900 block">{member.fullName}</span>
@@ -307,11 +315,15 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                     </td>
                     <td className="py-3 px-3">
                       <div className="space-y-1">
-                        {member.groups.map((g, idx) => (
-                          <span key={idx} className="block text-[10px] text-gray-500">
-                            <span className="font-semibold text-gray-700">{g.name}</span> (Ticket #{g.ticket})
-                          </span>
-                        ))}
+                        {member.groups && member.groups.length > 0 ? (
+                          member.groups.map((g, idx) => (
+                            <span key={idx} className="block text-[10px] text-gray-500">
+                              <span className="font-semibold text-gray-700">{g.name}</span> (Ticket #{g.ticket})
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px] text-gray-400 italic">No chits assigned</span>
+                        )}
                       </div>
                     </td>
                     <td className="py-3 px-3 text-right">
@@ -329,7 +341,7 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
@@ -348,7 +360,13 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
           </div>
 
           <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-            {auditLogs.map((log) => (
+            {auditLogs.length === 0 ? (
+              <div className="py-8 text-center text-gray-400 text-xs">
+                <History size={18} className="mx-auto mb-2 text-gray-300" />
+                No audit activities logged yet.
+              </div>
+            ) : (
+              auditLogs.map((log) => (
               <div key={log.id} className="bg-gray-50 border border-gray-150 p-3 rounded-lg space-y-1.5">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-gray-900">{log.subscriberName}</span>
@@ -364,7 +382,7 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                   </div>
                 </div>
               </div>
-            ))}
+            )))}
           </div>
         </div>
 

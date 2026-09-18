@@ -24,10 +24,10 @@ interface WalletContextType {
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 const DEFAULT_BALANCES: WalletBalances = {
-  cash_in_hand: 45250,
-  kishor_bank: 128400,
-  dad_bank: 350000,
-  mom_bank: 215300,
+  cash_in_hand: 0,
+  kishor_bank: 0,
+  dad_bank: 0,
+  mom_bank: 0,
 };
 
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
