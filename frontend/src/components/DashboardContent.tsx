@@ -45,6 +45,38 @@ function formatAuctionDate(d: Date): string {
   return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+// ── Utility: Phone Normalization (extract core 10 digits) ────────────────────
+export function normalizePhone(phone: string): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  return digits.length > 10 ? digits.slice(-10) : digits;
+}
+
+// ── Utility: Levenshtein Distance for typo & fuzzy name matching ─────────────
+export function levenshteinDistance(a: string, b: string): number {
+  const s1 = a.toLowerCase().trim();
+  const s2 = b.toLowerCase().trim();
+  const m = s1.length;
+  const n = s2.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (s1[i - 1] === s2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+  }
+  return dp[m][n];
+}
+
 // ── FIFO Ledger Types ─────────────────────────────────────────────────────────
 interface LedgerEntry {
   month: number;
@@ -264,17 +296,50 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     }
   };
 
+  // Real-time phone duplicate check for modal
+  const duplicatePhoneSubscriber = useMemo(() => {
+    const clean = normalizePhone(newMemberPhone);
+    if (clean.length < 10) return null;
+    return masterDirectory.find(m => normalizePhone(m.phone) === clean) || null;
+  }, [newMemberPhone, masterDirectory]);
+
+  // Real-time name fuzzy similarity check for modal (handles minor typos like Kishor vs Kishore)
+  const similarNameSubscriber = useMemo(() => {
+    const input = newMemberName.trim();
+    if (input.length < 3) return null;
+    
+    // Find closest member whose name is not identical
+    for (const member of masterDirectory) {
+      if (member.name.toLowerCase().trim() === input.toLowerCase().trim()) continue;
+      
+      const dist = levenshteinDistance(input, member.name);
+      // If edit distance is 1 or 2 (or one is substring of another with length >= 4)
+      if (dist <= 2 || (input.length >= 4 && member.name.toLowerCase().includes(input.toLowerCase()))) {
+        return member;
+      }
+    }
+    return null;
+  }, [newMemberName, masterDirectory]);
+
   const handleCreateAndAssignMember = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanName = newMemberName.trim();
     const cleanPhone = newMemberPhone.trim();
+    const normalizedDigits = normalizePhone(cleanPhone);
 
     if (!cleanName) {
       alert('Please enter a subscriber full name.');
       return;
     }
-    if (!cleanPhone) {
-      alert('Please enter a phone number.');
+    if (!cleanPhone || normalizedDigits.length < 10) {
+      alert('Please enter a valid 10-digit phone number.');
+      return;
+    }
+
+    // Check duplicate phone in master directory
+    const existingWithPhone = masterDirectory.find(m => normalizePhone(m.phone) === normalizedDigits);
+    if (existingWithPhone) {
+      alert(`Duplicate Phone Error: Phone number "${cleanPhone}" is already registered to "${existingWithPhone.name}". Please use a unique number or assign ${existingWithPhone.name} directly.`);
       return;
     }
 
@@ -291,7 +356,11 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         .single();
 
       if (error) {
-        alert(`Failed to save subscriber to database: ${error.message}`);
+        if (error.code === '23505' || error.message.includes('unique')) {
+          alert(`Database Error: Phone number "${cleanPhone}" is already registered to another subscriber in Supabase.`);
+        } else {
+          alert(`Failed to save subscriber to database: ${error.message}`);
+        }
         return;
       }
 
@@ -1616,6 +1685,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                     </div>
 
                     <form onSubmit={handleCreateAndAssignMember} className="space-y-4">
+                      {/* Subscriber Name Field */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
                           Subscriber Full Name *
@@ -1634,8 +1704,34 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                             autoFocus
                           />
                         </div>
+
+                        {/* Similar / Fuzzy Name Suggestion (e.g. Kishor vs Kishore) */}
+                        {similarNameSubscriber && (
+                          <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-blue-900 animate-in fade-in duration-200">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-1.5 font-bold">
+                                <span>💡</span>
+                                <span>Similar subscriber found in directory</span>
+                              </div>
+                              <p className="text-[11px] text-blue-700">
+                                Did you mean <strong>{similarNameSubscriber.name}</strong> ({similarNameSubscriber.phone})?
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowCreateMemberModal(false);
+                                handleAssignExistingMember(similarNameSubscriber);
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg shrink-0 transition-colors shadow-sm self-start sm:self-auto"
+                            >
+                              Assign {similarNameSubscriber.name} →
+                            </button>
+                          </div>
+                        )}
                       </div>
 
+                      {/* Phone Number Field */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
                           Phone Number (10 Digits) *
@@ -1647,13 +1743,43 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                           <input
                             type="tel"
                             required
-                            placeholder="e.g. +91 98765 43210"
+                            placeholder="e.g. 9876543210"
                             value={newMemberPhone}
                             onChange={(e) => setNewMemberPhone(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                            className={`w-full bg-gray-50 border rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none transition-colors ${
+                              duplicatePhoneSubscriber
+                                ? 'border-amber-400 focus:border-amber-500 bg-amber-50/30'
+                                : 'border-gray-200 focus:border-indigo-500'
+                            }`}
                           />
                         </div>
                         <p className="text-[10px] text-gray-400">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
+
+                        {/* Duplicate Phone Warning Alert */}
+                        {duplicatePhoneSubscriber && (
+                          <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 space-y-2.5 text-xs animate-in fade-in duration-200">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-bold text-amber-900 block">Phone number already registered</span>
+                                <p className="text-[11px] text-amber-800 mt-0.5">
+                                  This phone number is already registered to <strong>{duplicatePhoneSubscriber.name}</strong> ({duplicatePhoneSubscriber.phone}).
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowCreateMemberModal(false);
+                                handleAssignExistingMember(duplicatePhoneSubscriber);
+                              }}
+                              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                            >
+                              <UserPlus size={13} /> Assign {duplicatePhoneSubscriber.name} to Open Slot Instead →
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
@@ -1666,12 +1792,20 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                         </button>
                         <button
                           type="submit"
-                          disabled={isCreatingMember || !newMemberName.trim() || !newMemberPhone.trim()}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-5 py-2 rounded-lg transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                          disabled={isCreatingMember || !newMemberName.trim() || !newMemberPhone.trim() || duplicatePhoneSubscriber !== null}
+                          className={`font-bold text-xs px-5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 ${
+                            duplicatePhoneSubscriber !== null
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50'
+                          }`}
                         >
                           {isCreatingMember ? (
                             <>
                               <RefreshCw size={13} className="animate-spin" /> Saving...
+                            </>
+                          ) : duplicatePhoneSubscriber ? (
+                            <>
+                              <AlertCircle size={14} /> Phone Already In Use
                             </>
                           ) : (
                             <>
