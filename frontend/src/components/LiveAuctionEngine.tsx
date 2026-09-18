@@ -83,8 +83,41 @@ export default function LiveAuctionEngine() {
           durationMonths: groupData.duration_months,
           kai_iruppu_pool: Number(groupData.kai_iruppu_pool) || 0,
         });
+
+        // Fetch group members from group_members joined with profiles
+        const { data: memberRows } = await supabase
+          .from('group_members')
+          .select(`
+            id,
+            ticket_number,
+            has_won,
+            profile_id,
+            profiles:profile_id (
+              full_name
+            )
+          `)
+          .eq('group_id', groupData.id)
+          .order('ticket_number', { ascending: true });
+
+        if (memberRows && memberRows.length > 0) {
+          setMembers(memberRows.map(m => ({
+            id: m.id,
+            fullName: (m.profiles as any)?.full_name || `Ticket #${m.ticket_number}`,
+            ticketNumber: m.ticket_number,
+            hasWonRegular: !!m.has_won,
+          })));
+        } else {
+          // Generate placeholder slots if not yet assigned
+          setMembers(Array.from({ length: groupData.member_count }, (_, i) => ({
+            id: `slot-${i + 1}`,
+            fullName: `Ticket Slot #${i + 1}`,
+            ticketNumber: i + 1,
+            hasWonRegular: false,
+          })));
+        }
       } else {
         setGroup(null);
+        setMembers([]);
       }
     } catch (err) {
       console.error('Error fetching auction data:', err);
@@ -244,6 +277,12 @@ export default function LiveAuctionEngine() {
             current_month: nextMonth,
             kai_iruppu_pool: nextPool,
           }).eq('id', group.id);
+
+          if (winnerId && !winnerId.startsWith('slot-')) {
+            await supabase.from('group_members').update({
+              has_won: true
+            }).eq('id', winnerId);
+          }
         } catch (err) {
           console.error('Error updating chit group in Supabase:', err);
         }

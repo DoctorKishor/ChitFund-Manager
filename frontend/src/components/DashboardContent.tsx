@@ -164,6 +164,22 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  // Advanced ChitBase Member Action Sub-Modals
+  const [splitModalTicket, setSplitModalTicket] = useState<any | null>(null);
+  const [splitPayers, setSplitPayers] = useState<{ name: string; part: number }[]>([]);
+  
+  const [exitModalTicket, setExitModalTicket] = useState<any | null>(null);
+  const [exitMonthVal, setExitMonthVal] = useState<number>(2);
+
+  const [transferModalTicket, setTransferModalTicket] = useState<any | null>(null);
+  const [transferRecipientId, setTransferRecipientId] = useState<string>('');
+  const [transferMonthVal, setTransferMonthVal] = useState<number>(2);
+
+  const [customAmountModalTicket, setCustomAmountModalTicket] = useState<any | null>(null);
+  const [customAmountVal, setCustomAmountVal] = useState<number>(0);
+
+  const [expandedTimingTicketIds, setExpandedTimingTicketIds] = useState<number[]>([]);
+
   // High-Security Delete Group Modal States
   const [deletingGroup, setDeletingGroup] = useState<any | null>(null);
   const [deletePhraseInput, setDeletePhraseInput] = useState('');
@@ -241,6 +257,11 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
           has_won_regular,
           physical_book_synced,
           profile_id,
+          split_pool,
+          custom_installment,
+          exit_month,
+          transferred_from,
+          transfer_effective_month,
           profiles (
             id,
             full_name,
@@ -263,6 +284,11 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
             hasWon: m.has_won_regular,
             bookSynced: m.physical_book_synced,
             profileId: m.profile_id,
+            splitPool: m.split_pool || null,
+            customInstallment: m.custom_installment ? Number(m.custom_installment) : null,
+            exitMonth: m.exit_month || null,
+            transferredFrom: m.transferred_from || null,
+            transferEffectiveMonth: m.transfer_effective_month || null,
             name: m.profiles?.full_name || 'Subscriber',
             phone: m.profiles?.phone_number || '',
           }))
@@ -322,6 +348,11 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
           has_won_regular,
           physical_book_synced,
           profile_id,
+          split_pool,
+          custom_installment,
+          exit_month,
+          transferred_from,
+          transfer_effective_month,
           profiles (
             id,
             full_name,
@@ -339,6 +370,11 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
             hasWon: m.has_won_regular,
             bookSynced: m.physical_book_synced,
             profileId: m.profile_id,
+            splitPool: m.split_pool || null,
+            customInstallment: m.custom_installment ? Number(m.custom_installment) : null,
+            exitMonth: m.exit_month || null,
+            transferredFrom: m.transferred_from || null,
+            transferEffectiveMonth: m.transfer_effective_month || null,
             name: m.profiles?.full_name || 'Subscriber',
             phone: m.profiles?.phone_number || '',
           }))
@@ -465,6 +501,243 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       alert(`Error reassigning member: ${err.message}`);
     }
   };
+
+  const handleSaveSplit = async (ticketId: string, payers: { name: string; part: number }[]) => {
+    try {
+      const { error } = await supabase
+        .from('group_members')
+        .update({ split_pool: payers.length > 0 ? payers : null })
+        .eq('id', ticketId);
+
+      if (error) {
+        alert(`Failed to save split pool: ${error.message}`);
+        return;
+      }
+
+      setEditGroupMembers(prev =>
+        prev.map(m => m.id === ticketId ? { ...m, splitPool: payers.length > 0 ? payers : null } : m)
+      );
+
+      if (selectedWorkspaceGroupId === editingGroup?.id) {
+        setWorkspaceMembers(prev =>
+          prev.map(m => m.id === ticketId ? { ...m, splitPool: payers.length > 0 ? payers : null } : m)
+        );
+      }
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'group_members',
+          desc: `SPLIT POOL CONFIGURED: ${payers.length} co-payers saved for ticket`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+
+      setSplitModalTicket(null);
+    } catch (err: any) {
+      alert(`Error saving split pool: ${err.message}`);
+    }
+  };
+
+  const handleSaveExit = async (ticketId: string, exitMonth: number | null) => {
+    try {
+      const { error } = await supabase
+        .from('group_members')
+        .update({ exit_month: exitMonth })
+        .eq('id', ticketId);
+
+      if (error) {
+        alert(`Failed to update member exit: ${error.message}`);
+        return;
+      }
+
+      setEditGroupMembers(prev =>
+        prev.map(m => m.id === ticketId ? { ...m, exitMonth } : m)
+      );
+
+      if (selectedWorkspaceGroupId === editingGroup?.id) {
+        setWorkspaceMembers(prev =>
+          prev.map(m => m.id === ticketId ? { ...m, exitMonth } : m)
+        );
+      }
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'group_members',
+          desc: exitMonth ? `MEMBER EXIT SCHEDULED: Stops paying from Month ${exitMonth}` : `MEMBER RE-INSTATED: Cleared exit status`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+
+      setExitModalTicket(null);
+    } catch (err: any) {
+      alert(`Error saving member exit: ${err.message}`);
+    }
+  };
+
+  const handleSaveTransfer = async (ticketId: string, recipientProfileId: string, startMonth: number) => {
+    try {
+      const targetProfile = masterDirectory.find(p => p.id === recipientProfileId);
+      if (!targetProfile) {
+        alert('Please select a recipient subscriber.');
+        return;
+      }
+
+      const currentTicket = editGroupMembers.find(m => m.id === ticketId);
+      const prevProfileId = currentTicket?.profileId;
+
+      const { error } = await supabase
+        .from('group_members')
+        .update({
+          profile_id: recipientProfileId,
+          transferred_from: prevProfileId,
+          transfer_effective_month: startMonth,
+        })
+        .eq('id', ticketId);
+
+      if (error) {
+        alert(`Failed to transfer ticket: ${error.message}`);
+        return;
+      }
+
+      setEditGroupMembers(prev =>
+        prev.map(m =>
+          m.id === ticketId
+            ? {
+                ...m,
+                profileId: recipientProfileId,
+                name: targetProfile.name,
+                phone: targetProfile.phone,
+                transferredFrom: prevProfileId,
+                transferEffectiveMonth: startMonth,
+              }
+            : m
+        )
+      );
+
+      if (selectedWorkspaceGroupId === editingGroup?.id) {
+        setWorkspaceMembers(prev =>
+          prev.map(m =>
+            m.id === ticketId
+              ? {
+                  ...m,
+                  profileId: recipientProfileId,
+                  name: targetProfile.name,
+                  phone: targetProfile.phone,
+                  transferredFrom: prevProfileId,
+                  transferEffectiveMonth: startMonth,
+                }
+              : m
+          )
+        );
+      }
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'group_members',
+          desc: `TICKET TRANSFERRED: Handed over to "${targetProfile.name}" starting from Month ${startMonth}`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+
+      setTransferModalTicket(null);
+    } catch (err: any) {
+      alert(`Error transferring ticket: ${err.message}`);
+    }
+  };
+
+  const handleSaveCustomAmount = async (ticketId: string, amount: number | null) => {
+    try {
+      const { error } = await supabase
+        .from('group_members')
+        .update({ custom_installment: amount })
+        .eq('id', ticketId);
+
+      if (error) {
+        alert(`Failed to save custom amount: ${error.message}`);
+        return;
+      }
+
+      setEditGroupMembers(prev =>
+        prev.map(m => m.id === ticketId ? { ...m, customInstallment: amount } : m)
+      );
+
+      if (selectedWorkspaceGroupId === editingGroup?.id) {
+        setWorkspaceMembers(prev =>
+          prev.map(m => m.id === ticketId ? { ...m, customInstallment: amount } : m)
+        );
+      }
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'group_members',
+          desc: amount ? `CUSTOM DUE SET: ₹${amount.toLocaleString('en-IN')}/mo on ticket` : `CUSTOM DUE CLEARED: Reset to baseline installment`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+
+      setCustomAmountModalTicket(null);
+    } catch (err: any) {
+      alert(`Error saving custom amount: ${err.message}`);
+    }
+  };
+
+  const handleUnassignTicket = async (ticketRecordId: string, ticketNum: number) => {
+    try {
+      const { error } = await supabase
+        .from('group_members')
+        .update({
+          profile_id: null,
+          split_pool: null,
+          custom_installment: null,
+          exit_month: null,
+          transferred_from: null,
+          transfer_effective_month: null,
+        })
+        .eq('id', ticketRecordId);
+
+      if (error) {
+        alert(`Failed to unassign ticket: ${error.message}`);
+        return;
+      }
+
+      setEditGroupMembers(prev =>
+        prev.map(m =>
+          m.id === ticketRecordId
+            ? { ...m, profileId: undefined, name: 'Unassigned Slot', phone: '', splitPool: null, customInstallment: null, exitMonth: null }
+            : m
+        )
+      );
+
+      if (selectedWorkspaceGroupId === editingGroup?.id) {
+        setWorkspaceMembers(prev =>
+          prev.map(m =>
+            m.id === ticketRecordId
+              ? { ...m, profileId: undefined, name: 'Unassigned Slot', phone: '', splitPool: null, customInstallment: null, exitMonth: null }
+              : m
+          )
+        );
+      }
+    } catch (err: any) {
+      alert(`Error unassigning ticket: ${err.message}`);
+    }
+  };
+
 
   const handleExecuteDeleteGroup = async () => {
     if (!deletingGroup) return;
@@ -2875,78 +3148,301 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
                 </form>
               ) : (
-                /* TAB 2: MEMBERS MANAGEMENT */
+                /* TAB 2: MEMBERS MANAGEMENT (ChitBase Architecture) */
                 <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-2 border-b border-gray-150">
+                  {/* Top Members Header */}
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-gray-150">
                     <div>
-                      <h4 className="text-sm font-bold text-gray-900">Enrolled Tickets &amp; Member Roster</h4>
+                      <h4 className="text-sm font-bold text-gray-900">Members</h4>
                       <p className="text-[11px] text-gray-500">
-                        Assign or swap subscribers for all {editGroupMemberCount} tickets in this chit group
+                        {editGroupMembers.filter(m => m.profileId).length} members · {editGroupMembers.filter(m => m.profileId).length}/{editGroupMemberCount} shares filled
                       </p>
                     </div>
-                    <div className="relative">
-                      <Search size={12} className="absolute left-2.5 top-2.5 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Filter tickets or members..."
-                        value={editMemberSearchQuery}
-                        onChange={(e) => setEditMemberSearchQuery(e.target.value)}
-                        className="bg-gray-50 border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none"
-                      />
+
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Search size={12} className="absolute left-2.5 top-2.5 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Filter members..."
+                          value={editMemberSearchQuery}
+                          onChange={(e) => setEditMemberSearchQuery(e.target.value)}
+                          className="bg-gray-50 border border-gray-200 rounded-xl pl-7 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewMemberName('');
+                          setNewMemberPhone('');
+                          setShowCreateMemberModal(true);
+                        }}
+                        className="bg-gray-900 hover:bg-black text-white font-bold text-[11px] px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
+                      >
+                        <UserPlus size={13} /> + Add Member
+                      </button>
                     </div>
                   </div>
 
-                  {/* Tickets Roster List */}
-                  <div className="space-y-2.5">
+                  {/* Informational Timing Banner */}
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-600 space-y-0.5">
+                    <p className="font-semibold text-gray-800">
+                      Months 1–{editingGroup?.currentMonth || 1} are already collected and stay exactly as they are.
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      Share changes and adjustments apply from <strong>month {(editingGroup?.currentMonth || 1) + 1}</strong> onward.
+                    </p>
+                  </div>
+
+                  {/* Member Tickets Roster List */}
+                  <div className="space-y-3">
                     {Array.from({ length: editGroupMemberCount }).map((_, idx) => {
                       const ticketNum = idx + 1;
-                      const assigned = editGroupMembers.find(m => m.ticket === ticketNum);
-                      
+                      const member = editGroupMembers.find(m => m.ticket === ticketNum);
+                      const standardDue = Math.round(editGroupValue / (editGroupMemberCount || 1));
+                      const effectiveDue = member?.customInstallment || standardDue;
+                      const isTimingExpanded = expandedTimingTicketIds.includes(ticketNum);
+
+                      if (editMemberSearchQuery && member?.name && !member.name.toLowerCase().includes(editMemberSearchQuery.toLowerCase())) {
+                        return null;
+                      }
+
                       return (
                         <div
                           key={ticketNum}
-                          className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
-                            assigned ? 'bg-white border-gray-200 shadow-sm' : 'border-dashed border-gray-300 bg-gray-50/50'
+                          className={`p-4 rounded-2xl border transition-all space-y-3 ${
+                            member?.profileId 
+                              ? 'bg-white border-gray-200 shadow-sm hover:border-gray-300' 
+                              : 'border-dashed border-gray-300 bg-gray-50/60'
                           }`}
                         >
-                          <div className="flex items-center gap-2.5">
-                            <span className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150 text-xs font-bold flex items-center justify-center shrink-0">
-                              #{ticketNum}
-                            </span>
-                            <div>
-                              <strong className="text-xs font-bold text-gray-900 block">
-                                {assigned?.name || 'Unassigned Slot'}
-                              </strong>
-                              <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                <Phone size={10} /> {assigned?.phone || 'No phone'}
-                              </span>
+                          {/* Card Header Line */}
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150 text-[11px] font-bold flex items-center justify-center shrink-0">
+                                  #{ticketNum}
+                                </span>
+                                <h5 className="text-sm font-bold text-gray-900">
+                                  {member?.name || 'Unassigned Ticket'}
+                                </h5>
+                                {member?.phone && (
+                                  <span className="text-[10px] text-gray-400 font-medium">({member.phone})</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 font-medium pl-8">
+                                Pays <strong className="text-emerald-700">≈ {formatCurrency(effectiveDue)}/mo</strong> · wins up to <strong className="text-gray-900">{formatCurrency(editGroupValue)}</strong>
+                              </p>
                             </div>
+
+                            {/* Unassign / Remove Button */}
+                            {member?.profileId && (
+                              <button
+                                type="button"
+                                title="Unassign ticket"
+                                onClick={() => handleUnassignTicket(member.id, ticketNum)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-colors"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-2 self-end sm:self-auto">
-                            {/* Reassign Subscriber Dropdown */}
+                          {/* Stepper & Timing Toggle Line */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100">
+                            {/* Shares Stepper */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl p-1 shadow-sm">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (member?.profileId) {
+                                      // Unassign one extra ticket with this profileId
+                                      const extra = editGroupMembers.filter(m => m.profileId === member.profileId && m.ticket !== ticketNum);
+                                      if (extra.length > 0) {
+                                        handleUnassignTicket(extra[extra.length - 1].id, extra[extra.length - 1].ticket);
+                                      }
+                                    }
+                                  }}
+                                  className="w-6 h-6 rounded-lg hover:bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs"
+                                >
+                                  <Minus size={11} />
+                                </button>
+                                <span className="w-8 text-center font-bold text-xs text-gray-900">
+                                  {member?.profileId ? `${editGroupMembers.filter(m => m.profileId === member.profileId).length}x` : '0x'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (member?.profileId) {
+                                      // Assign next empty ticket with this profileId
+                                      const emptySlot = editGroupMembers.find(m => !m.profileId && m.ticket !== ticketNum);
+                                      if (emptySlot) {
+                                        handleReassignTicketMember(emptySlot.id, member.profileId, member.name, member.phone);
+                                      } else {
+                                        alert('All ticket slots are currently filled.');
+                                      }
+                                    }
+                                  }}
+                                  className="w-6 h-6 rounded-lg hover:bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs"
+                                >
+                                  <Plus size={11} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Share timing dropdown toggle */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExpandedTimingTicketIds(prev =>
+                                  isTimingExpanded ? prev.filter(id => id !== ticketNum) : [...prev, ticketNum]
+                                );
+                              }}
+                              className="text-xs font-semibold text-gray-500 hover:text-gray-900 flex items-center gap-1 transition-colors"
+                            >
+                              Share timing {isTimingExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            </button>
+                          </div>
+
+                          <p className="text-[10px] text-gray-400 italic">
+                            Adding starts a new split from month {(editingGroup?.currentMonth || 1) + 1} — months already collected stay unchanged.
+                          </p>
+
+                          {/* 4 Action Buttons Row (ChitBase inspired) */}
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCustomAmountModalTicket(member);
+                                setCustomAmountVal(member?.customInstallment || standardDue);
+                              }}
+                              className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
+                                member?.customInstallment
+                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {member?.customInstallment ? `Custom: ₹${member.customInstallment.toLocaleString('en-IN')}` : 'Set a custom amount'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSplitModalTicket(member);
+                                setSplitPayers(member?.splitPool || [
+                                  { name: member?.name || 'Person 1', part: Math.round(standardDue / 2) },
+                                  { name: 'Person 2', part: Math.round(standardDue / 2) }
+                                ]);
+                              }}
+                              className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
+                                member?.splitPool
+                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {member?.splitPool ? `Pool (${member.splitPool.length} payers)` : 'Split into a pool'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExitModalTicket(member);
+                                setExitMonthVal(member?.exitMonth || (editingGroup?.currentMonth || 1) + 1);
+                              }}
+                              className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
+                                member?.exitMonth
+                                  ? 'bg-red-50 text-red-700 border-red-200'
+                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {member?.exitMonth ? `Exits M${member.exitMonth}` : 'Member leaves the chit...'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTransferModalTicket(member);
+                                setTransferRecipientId('');
+                                setTransferMonthVal((editingGroup?.currentMonth || 1) + 1);
+                              }}
+                              className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
+                                member?.transferredFrom
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {member?.transferredFrom ? 'Transferred' : 'Transfer shares...'}
+                            </button>
+                          </div>
+
+                          {/* Expanded Share Timing Details */}
+                          {isTimingExpanded && (
+                            <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2 text-xs animate-in fade-in duration-150">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Share Timeline Breakdown</span>
+                              <div className="space-y-1 text-[11px]">
+                                <div className="flex justify-between py-1 border-b border-gray-200">
+                                  <span>Month 1 (Launch / Historical)</span>
+                                  <span className="text-gray-500 font-semibold">1x · Locked (collected)</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-200">
+                                  <span>Month 2 onward</span>
+                                  <span className="text-indigo-600 font-semibold">
+                                    {member?.profileId ? `${editGroupMembers.filter(m => m.profileId === member.profileId).length}x active` : 'Unassigned'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Active Split Pool Summary Tag */}
+                          {member?.splitPool && (
+                            <div className="p-2.5 bg-purple-50/70 border border-purple-200 rounded-xl text-xs text-purple-900 space-y-1">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider block">👥 Joint Split Pool Active:</span>
+                              <div className="flex flex-wrap gap-2 text-[11px]">
+                                {member.splitPool.map((p: any, pIdx: number) => (
+                                  <span key={pIdx} className="bg-white border border-purple-200 px-2 py-0.5 rounded-md font-semibold">
+                                    {p.name}: {formatCurrency(p.part)}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Active Exit Warning Tag */}
+                          {member?.exitMonth && (
+                            <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 flex justify-between items-center">
+                              <span>⚠️ Member scheduled to stop paying from <strong>Month {member.exitMonth}</strong>.</span>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveExit(member.id, null)}
+                                className="text-[10px] font-bold text-red-700 underline"
+                              >
+                                Re-instate
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Reassign Subscriber Selector */}
+                          <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2 text-[11px]">
+                            <span className="text-gray-500 font-medium">Reassign Subscriber:</span>
                             <select
-                              value={assigned?.profileId || ''}
+                              value={member?.profileId || ''}
                               onChange={(e) => {
                                 const targetProfile = masterDirectory.find(p => p.id === e.target.value);
-                                if (targetProfile && assigned) {
-                                  handleReassignTicketMember(assigned.id, targetProfile.id!, targetProfile.name, targetProfile.phone);
+                                if (targetProfile && member) {
+                                  handleReassignTicketMember(member.id, targetProfile.id!, targetProfile.name, targetProfile.phone);
                                 }
                               }}
                               className="bg-gray-50 border border-gray-200 text-gray-800 text-[11px] font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
                             >
-                              <option value="" disabled>Reassign Subscriber</option>
+                              <option value="" disabled>Select Subscriber</option>
                               {masterDirectory.map(p => (
                                 <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
                               ))}
                             </select>
-
-                            {assigned?.hasWon && (
-                              <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
-                                Won
-                              </span>
-                            )}
                           </div>
+
                         </div>
                       );
                     })}
@@ -2984,6 +3480,352 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ── 1. SUB-MODAL: SPLIT INTO A POOL (Screenshot 3) ──────── */}
+      {splitModalTicket && (
+        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative">
+            <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">Split {splitModalTicket.name}&apos;s share</h4>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Add each person who pays a part of this one share. Their payments are collected and tracked...
+                </p>
+              </div>
+              <button onClick={() => setSplitModalTicket(null)} className="text-gray-400 hover:text-gray-600 p-1">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+              <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <span>Who Pays</span>
+                <span>Their Part</span>
+              </div>
+
+              {splitPayers.map((payer, pIdx) => (
+                <div key={pIdx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={payer.name}
+                    placeholder={`Person ${pIdx + 1}`}
+                    onChange={(e) => {
+                      const copy = [...splitPayers];
+                      copy[pIdx].name = e.target.value;
+                      setSplitPayers(copy);
+                    }}
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                  />
+                  <div className="relative w-28">
+                    <span className="absolute left-2.5 top-2 text-gray-400 text-xs font-bold">₹</span>
+                    <input
+                      type="number"
+                      value={payer.part || ''}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const copy = [...splitPayers];
+                        copy[pIdx].part = Number(e.target.value) || 0;
+                        setSplitPayers(copy);
+                      }}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-6 pr-2 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                    />
+                  </div>
+                  {splitPayers.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setSplitPayers(splitPayers.filter((_, i) => i !== pIdx))}
+                      className="text-gray-400 hover:text-red-600 p-1"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setSplitPayers([...splitPayers, { name: `Person ${splitPayers.length + 1}`, part: 0 }])}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-1"
+              >
+                + Add person
+              </button>
+            </div>
+
+            {/* Total Payers Summary Bar */}
+            <div className="bg-gray-900 text-white rounded-2xl p-3 flex justify-between items-center text-xs">
+              <span className="font-bold flex items-center gap-1.5">
+                <Users size={14} /> {splitPayers.filter(p => p.name.trim()).length} PAYERS
+              </span>
+              <strong className="text-sm font-extrabold">
+                {formatCurrency(splitPayers.reduce((sum, p) => sum + (p.part || 0), 0))}/mo
+              </strong>
+            </div>
+
+            <p className="text-[10px] text-gray-400 text-center">
+              Target ticket due: {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}/mo.
+            </p>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setSplitModalTicket(null)}
+                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              {splitModalTicket.splitPool && (
+                <button
+                  type="button"
+                  onClick={() => handleSaveSplit(splitModalTicket.id, [])}
+                  className="border border-red-200 text-red-700 hover:bg-red-50 font-bold text-xs px-3 py-2 rounded-xl transition-colors"
+                >
+                  Clear Split
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleSaveSplit(splitModalTicket.id, splitPayers)}
+                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2 rounded-xl transition-colors shadow-sm"
+              >
+                Save split
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 2. SUB-MODAL: MEMBER LEAVES THE CHIT (Screenshot 4) ──────── */}
+      {exitModalTicket && (
+        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative">
+            <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">Member leaves the chit</h4>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  {exitModalTicket.name} · Ticket #{exitModalTicket.ticket}
+                </p>
+              </div>
+              <button onClick={() => setExitModalTicket(null)} className="text-gray-400 hover:text-gray-600 p-1">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-gray-700 block">Member stops paying from:</label>
+              <select
+                value={exitMonthVal}
+                onChange={(e) => setExitMonthVal(Number(e.target.value))}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+              >
+                {Array.from({ length: editGroupMemberCount }).map((_, i) => {
+                  const mNum = i + 1;
+                  return (
+                    <option key={mNum} value={mNum}>
+                      Month {mNum} {mNum <= (editingGroup?.currentMonth || 1) ? '(Current/Past)' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Now vs After Table */}
+            <div className="border border-gray-200 rounded-2xl overflow-hidden text-xs">
+              <div className="grid grid-cols-4 bg-gray-50 p-2.5 font-bold text-[10px] text-gray-400 uppercase tracking-wider">
+                <span>Month</span>
+                <span>Member</span>
+                <span>Now</span>
+                <span className="text-right">After</span>
+              </div>
+              <div className="divide-y divide-gray-100 max-h-[140px] overflow-y-auto">
+                {Array.from({ length: editGroupMemberCount }).slice(exitMonthVal - 1).map((_, idx) => {
+                  const mNum = exitMonthVal + idx;
+                  const stdDue = Math.round(editGroupValue / (editGroupMemberCount || 1));
+                  return (
+                    <div key={mNum} className="grid grid-cols-4 p-2.5 text-xs items-center">
+                      <span className="font-bold text-gray-800">M{mNum}</span>
+                      <span className="truncate text-gray-600">{exitModalTicket.name}</span>
+                      <span className="text-gray-500">{formatCurrency(stdDue)}</span>
+                      <span className="text-right font-bold text-red-600">₹0</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs flex justify-between items-center font-bold">
+              <span className="text-gray-500">These months collect in total:</span>
+              <span className="text-gray-900">
+                {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)) * Math.max(1, editGroupMemberCount - exitMonthVal + 1))} → <strong className="text-red-600">₹0</strong>
+              </span>
+            </div>
+
+            <p className="text-[10px] text-gray-400">
+              They pay up to the month before. Payments and wins stay on record; nothing is deleted.
+            </p>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setExitModalTicket(null)}
+                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveExit(exitModalTicket.id, exitMonthVal)}
+                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2 rounded-xl transition-colors shadow-sm"
+              >
+                End shares
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 3. SUB-MODAL: TRANSFER SHARES ──────── */}
+      {transferModalTicket && (
+        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative">
+            <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">Transfer Ticket #{transferModalTicket.ticket}</h4>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Transfer future payments and bidding rights from {transferModalTicket.name} to another subscriber
+                </p>
+              </div>
+              <button onClick={() => setTransferModalTicket(null)} className="text-gray-400 hover:text-gray-600 p-1">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-gray-700 block">Select New Subscriber *</label>
+                <select
+                  value={transferRecipientId}
+                  onChange={(e) => setTransferRecipientId(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                >
+                  <option value="" disabled>Choose recipient subscriber</option>
+                  {masterDirectory
+                    .filter(p => p.id !== transferModalTicket.profileId)
+                    .map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-gray-700 block">Transfer Effective From:</label>
+                <select
+                  value={transferMonthVal}
+                  onChange={(e) => setTransferMonthVal(Number(e.target.value))}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                >
+                  {Array.from({ length: editGroupMemberCount }).map((_, i) => {
+                    const mNum = i + 1;
+                    return (
+                      <option key={mNum} value={mNum}>
+                        Month {mNum} {mNum <= (editingGroup?.currentMonth || 1) ? '(Upcoming)' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-[11px] text-amber-900 space-y-1">
+              <p className="font-bold">Transfer Summary:</p>
+              <p>• Previous payments remain credited to {transferModalTicket.name}.</p>
+              <p>• Dues and live bidding rights from Month {transferMonthVal} transfer to the new subscriber.</p>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setTransferModalTicket(null)}
+                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!transferRecipientId}
+                onClick={() => handleSaveTransfer(transferModalTicket.id, transferRecipientId, transferMonthVal)}
+                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2 rounded-xl transition-colors shadow-sm disabled:opacity-50"
+              >
+                Confirm Transfer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 4. SUB-MODAL: CUSTOM AMOUNT ──────── */}
+      {customAmountModalTicket && (
+        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative">
+            <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">Custom Monthly Due</h4>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Ticket #{customAmountModalTicket.ticket} · {customAmountModalTicket.name}
+                </p>
+              </div>
+              <button onClick={() => setCustomAmountModalTicket(null)} className="text-gray-400 hover:text-gray-600 p-1">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-gray-700 block">Monthly Amount (₹)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-gray-400 font-bold text-xs">₹</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={500}
+                  value={customAmountVal || ''}
+                  placeholder="e.g. 15000"
+                  onChange={(e) => setCustomAmountVal(Number(e.target.value) || 0)}
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+              <p className="text-[10px] text-gray-500">
+                Standard baseline installment: {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}/mo.
+              </p>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setCustomAmountModalTicket(null)}
+                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              {customAmountModalTicket.customInstallment && (
+                <button
+                  type="button"
+                  onClick={() => handleSaveCustomAmount(customAmountModalTicket.id, null)}
+                  className="border border-red-200 text-red-700 hover:bg-red-50 font-bold text-xs px-3 py-2 rounded-xl transition-colors"
+                >
+                  Clear Custom
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleSaveCustomAmount(customAmountModalTicket.id, customAmountVal > 0 ? customAmountVal : null)}
+                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2 rounded-xl transition-colors shadow-sm"
+              >
+                Save Custom Amount
+              </button>
+            </div>
           </div>
         </div>
       )}
