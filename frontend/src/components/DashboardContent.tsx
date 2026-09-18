@@ -73,7 +73,9 @@ function formatAuctionDate(d: Date): string {
 export function normalizePhone(phone: string): string {
   if (!phone) return '';
   const digits = phone.replace(/\D/g, '');
-  return digits.length > 10 ? digits.slice(-10) : digits;
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+  return digits;
 }
 
 // ── Utility: Levenshtein Distance for typo & fuzzy name matching ─────────────
@@ -1797,8 +1799,16 @@ Thank you for your prompt payment! 🙏`;
       alert('Please enter a subscriber full name.');
       return;
     }
-    if (!cleanPhone || normalizedDigits.length < 10) {
-      alert('Please enter a valid 10-digit phone number.');
+    if (!cleanPhone || normalizedDigits.length === 0) {
+      alert('Phone Number Required:\n\nPlease enter a valid 10-digit mobile number.');
+      return;
+    }
+    if (normalizedDigits.length < 10) {
+      alert(`Invalid Phone Number Warning:\n\nThe phone number entered is too short (${normalizedDigits.length}/10 digits).\nExpected exactly 10 digits (e.g. 9842235740). You entered: "${cleanPhone}". Please check and re-enter.`);
+      return;
+    }
+    if (normalizedDigits.length > 10) {
+      alert(`Invalid Phone Number Warning:\n\nThe phone number entered has too many digits (${normalizedDigits.length}/10 digits).\nExpected exactly 10 digits (e.g. 9842235740). You entered: "${cleanPhone}". Please check and re-enter.`);
       return;
     }
 
@@ -1815,7 +1825,7 @@ Thank you for your prompt payment! 🙏`;
         .from('profiles')
         .insert({
           full_name: cleanName,
-          phone_number: cleanPhone,
+          phone_number: normalizedDigits,
           role: 'subscriber',
         })
         .select()
@@ -5633,9 +5643,24 @@ Thank you for your prompt payment! 🙏`;
 
               {/* Phone Number Field */}
               <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                  Phone Number (10 Digits) *
-                </label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                    Phone Number (10 Digits) *
+                  </label>
+                  {newMemberPhone.trim() && (
+                    <span className={`text-[10px] font-bold ${
+                      normalizePhone(newMemberPhone).length === 10
+                        ? 'text-emerald-600'
+                        : normalizePhone(newMemberPhone).length < 10
+                          ? 'text-amber-600'
+                          : 'text-rose-600'
+                    }`}>
+                      {normalizePhone(newMemberPhone).length === 10
+                        ? '✓ Valid 10 digits'
+                        : `${normalizePhone(newMemberPhone).length}/10 digits`}
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-gray-400">
                     <Phone size={14} />
@@ -5643,16 +5668,25 @@ Thank you for your prompt payment! 🙏`;
                   <input
                     type="tel"
                     required
-                    placeholder="e.g. 9876543210"
+                    placeholder="e.g. 9842235740"
                     value={newMemberPhone}
                     onChange={(e) => setNewMemberPhone(e.target.value)}
-                    className={`w-full bg-gray-50 border rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none transition-colors ${
+                    className={`w-full bg-gray-50 border rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none transition-colors font-mono ${
                       duplicatePhoneSubscriber
                         ? 'border-amber-400 focus:border-amber-500 bg-amber-50/30'
-                        : 'border-gray-200 focus:border-indigo-500'
+                        : !newMemberPhone.trim()
+                          ? 'border-gray-200 focus:border-indigo-500'
+                          : normalizePhone(newMemberPhone).length === 10
+                            ? 'border-emerald-400 focus:border-emerald-500 bg-emerald-50/20'
+                            : 'border-amber-400 focus:border-amber-500 bg-amber-50/20'
                     }`}
                   />
                 </div>
+                {newMemberPhone.trim() && normalizePhone(newMemberPhone).length !== 10 && (
+                  <p className="text-[10px] text-amber-600 font-medium">
+                    ⚠️ Phone number must be exactly 10 digits ({normalizePhone(newMemberPhone).length > 10 ? `${normalizePhone(newMemberPhone).length - 10} digits too many` : `${10 - normalizePhone(newMemberPhone).length} digits remaining`})
+                  </p>
+                )}
                 <p className="text-[10px] text-gray-400">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
 
                 {/* Duplicate Phone Warning Alert */}

@@ -19,14 +19,39 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const normalizePhoneDigits = (raw: string): string => {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+    if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+    return digits;
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
+
+    if (isSignUp) {
+      const coreDigits = normalizePhoneDigits(phoneNumber);
+      if (!phoneNumber.trim() || coreDigits.length === 0) {
+        setErrorMsg('Please enter a valid 10-digit mobile number.');
+        return;
+      }
+      if (coreDigits.length < 10) {
+        setErrorMsg(`Phone number is too short (${coreDigits.length}/10 digits). Please enter exactly 10 digits.`);
+        return;
+      }
+      if (coreDigits.length > 10) {
+        setErrorMsg(`Phone number has too many digits (${coreDigits.length}/10 digits). Please enter exactly 10 digits.`);
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
       if (isSignUp) {
+        const coreDigits = normalizePhoneDigits(phoneNumber);
         // Sign Up Flow
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -34,7 +59,7 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
           options: {
             data: {
               full_name: fullName,
-              phone_number: phoneNumber,
+              phone_number: coreDigits,
               role: 'subscriber',
             },
           },
@@ -47,7 +72,7 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
           const { error: profileError } = await supabase.from('profiles').upsert({
             id: data.user.id,
             full_name: fullName,
-            phone_number: phoneNumber,
+            phone_number: coreDigits,
             role: 'subscriber',
           });
 
@@ -128,7 +153,22 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">Phone Number (10 Digits)</label>
+                  {phoneNumber.trim() && (
+                    <span className={`text-[10px] font-bold ${
+                      normalizePhoneDigits(phoneNumber).length === 10
+                        ? 'text-emerald-400'
+                        : normalizePhoneDigits(phoneNumber).length < 10
+                          ? 'text-amber-400'
+                          : 'text-rose-400'
+                    }`}>
+                      {normalizePhoneDigits(phoneNumber).length === 10
+                        ? '✓ Valid 10 digits'
+                        : `${normalizePhoneDigits(phoneNumber).length}/10 digits`}
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <Phone size={16} className="absolute left-3 top-3 text-slate-500" />
                   <input
@@ -136,10 +176,21 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
                     required
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    placeholder="e.g. 9842235740"
+                    className={`w-full bg-slate-950 border rounded-lg pl-9 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none font-mono ${
+                      !phoneNumber.trim()
+                        ? 'border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                        : normalizePhoneDigits(phoneNumber).length === 10
+                          ? 'border-emerald-500/50 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
+                          : 'border-amber-500/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500'
+                    }`}
                   />
                 </div>
+                {phoneNumber.trim() && normalizePhoneDigits(phoneNumber).length !== 10 && (
+                  <p className="text-[10px] text-amber-400 font-medium mt-1">
+                    ⚠️ Must be exactly 10 digits ({normalizePhoneDigits(phoneNumber).length > 10 ? `${normalizePhoneDigits(phoneNumber).length - 10} digits too many` : `${10 - normalizePhoneDigits(phoneNumber).length} digits remaining`})
+                  </p>
+                )}
               </div>
             </>
           )}

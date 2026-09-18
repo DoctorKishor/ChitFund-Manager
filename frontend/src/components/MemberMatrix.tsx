@@ -154,11 +154,35 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
     setIsAddModalOpen(true);
   };
 
+  // Normalize phone number to core 10 digits
+  const normalizePhoneDigits = (raw: string): string => {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+    if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+    return digits;
+  };
+
   // Save Member (Add or Edit)
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFullName.trim()) {
-      alert('Please enter member name.');
+      alert('Please enter a member full name.');
+      return;
+    }
+
+    const coreDigits = normalizePhoneDigits(newPhoneNumber);
+    if (!newPhoneNumber.trim() || coreDigits.length === 0) {
+      alert('Phone Number Required:\n\nPlease enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    if (coreDigits.length < 10) {
+      alert(`Invalid Phone Number Warning:\n\nThe phone number entered is too short (${coreDigits.length}/10 digits).\nExpected exactly 10 digits (e.g. 9842235740). You entered: "${newPhoneNumber}". Please check and re-enter.`);
+      return;
+    }
+
+    if (coreDigits.length > 10) {
+      alert(`Invalid Phone Number Warning:\n\nThe phone number entered has too many digits (${coreDigits.length}/10 digits).\nExpected exactly 10 digits (e.g. 9842235740). You entered: "${newPhoneNumber}". Please check and re-enter.`);
       return;
     }
 
@@ -171,14 +195,14 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
           .from('profiles')
           .update({
             full_name: newFullName.trim(),
-            phone_number: newPhoneNumber.trim(),
+            phone_number: coreDigits,
           })
           .eq('id', editingMember.id);
 
         if (error) throw error;
 
         if (onAddAuditLog) {
-          onAddAuditLog(`PROFILE UPDATED: ${newFullName.trim()} (${newPhoneNumber.trim()})`);
+          onAddAuditLog(`PROFILE UPDATED: ${newFullName.trim()} (${coreDigits})`);
         }
       } else {
         // Insert new profile
@@ -186,14 +210,14 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
           .from('profiles')
           .insert({
             full_name: newFullName.trim(),
-            phone_number: newPhoneNumber.trim(),
+            phone_number: coreDigits,
             role: 'subscriber',
           });
 
         if (error) throw error;
 
         if (onAddAuditLog) {
-          onAddAuditLog(`NEW MEMBER ENROLLED: ${newFullName.trim()} (${newPhoneNumber.trim()})`);
+          onAddAuditLog(`NEW MEMBER ENROLLED: ${newFullName.trim()} (${coreDigits})`);
         }
       }
 
@@ -454,14 +478,43 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Phone Number</label>
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                  Phone Number (10 Digits) *
+                </label>
+                {newPhoneNumber.trim() && (
+                  <span className={`text-[10px] font-bold ${
+                    normalizePhoneDigits(newPhoneNumber).length === 10
+                      ? 'text-emerald-600'
+                      : normalizePhoneDigits(newPhoneNumber).length < 10
+                        ? 'text-amber-600'
+                        : 'text-rose-600'
+                  }`}>
+                    {normalizePhoneDigits(newPhoneNumber).length === 10 
+                      ? '✓ Valid 10 digits' 
+                      : `${normalizePhoneDigits(newPhoneNumber).length}/10 digits`}
+                  </span>
+                )}
+              </div>
               <input
                 type="tel"
+                required
                 placeholder="e.g. 9842235740"
                 value={newPhoneNumber}
                 onChange={(e) => setNewPhoneNumber(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none font-mono"
+                className={`w-full bg-gray-50 border rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none font-mono ${
+                  !newPhoneNumber.trim()
+                    ? 'border-gray-200 focus:border-indigo-500'
+                    : normalizePhoneDigits(newPhoneNumber).length === 10
+                      ? 'border-emerald-400 focus:border-emerald-500 bg-emerald-50/20'
+                      : 'border-amber-400 focus:border-amber-500 bg-amber-50/20'
+                }`}
               />
+              {newPhoneNumber.trim() && normalizePhoneDigits(newPhoneNumber).length !== 10 && (
+                <p className="text-[10px] text-amber-600 font-medium">
+                  ⚠️ Phone number must be exactly 10 digits ({normalizePhoneDigits(newPhoneNumber).length > 10 ? `${normalizePhoneDigits(newPhoneNumber).length - 10} digits too many` : `${10 - normalizePhoneDigits(newPhoneNumber).length} digits remaining`})
+                </p>
+              )}
             </div>
 
             <div className="flex gap-2 justify-end pt-2">
