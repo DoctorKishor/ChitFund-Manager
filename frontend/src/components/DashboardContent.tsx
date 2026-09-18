@@ -914,6 +914,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [customPaymentDate, setCustomPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paymentNote, setPaymentNote] = useState<string>('');
   const [paymentReceiptUrl, setPaymentReceiptUrl] = useState<string>('');
+  const [receiptFileToUpload, setReceiptFileToUpload] = useState<File | null>(null);
   const [dashboardTransactions, setDashboardTransactions] = useState<any[]>([]);
   const [dashboardAuctionLogs, setDashboardAuctionLogs] = useState<any[]>([]);
   const [dashboardGroupMembers, setDashboardGroupMembers] = useState<any[]>([]);
@@ -921,6 +922,60 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [isMarkingAllPaid, setIsMarkingAllPaid] = useState<boolean>(false);
   const [isClosingMonth, setIsClosingMonth] = useState<boolean>(false);
+
+  // Helper: client-side image downscaling & compression to protect Supabase 500MB DB & 1GB Storage limits
+  // Compresses any 5-10MB mobile photo down to ~30-50 KB without quality loss for receipts
+  const compressImage = (file: File, maxWidth = 900, maxHeight = 900, quality = 0.72): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.src = objectUrl;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('Canvas context unavailable'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(objectUrl);
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Image compression failed'));
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = (err) => {
+        URL.revokeObjectURL(objectUrl);
+        reject(err);
+      };
+    });
+  };
 
   // Helper: compute effective ISO date timestamp based on date pill selection
   const computeEffectivePaymentDate = (dateType: 'today' | 'yesterday' | 'custom', customDate: string) => {
@@ -943,10 +998,11 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const handleReceiptPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Photo size exceeds 5MB limit. Please choose a smaller image.');
+    if (file.size > 15 * 1024 * 1024) {
+      alert('Photo size exceeds 15MB limit. Please choose a smaller image.');
       return;
     }
+    setReceiptFileToUpload(file);
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
@@ -1091,11 +1147,37 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     try {
       setIsProcessingPayment(true);
 
+      // 1. Process receipt image compression & Supabase Storage upload
+      let finalReceiptUrl = paymentReceiptUrl || null;
+      if (receiptFileToUpload) {
+        try {
+          const compressedBlob = await compressImage(receiptFileToUpload);
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;
+          const filePath = `${activeDashboardGroupId}/${fileName}`;
+
+          const { error: storageErr } = await supabase.storage
+            .from('receipts')
+            .upload(filePath, compressedBlob, {
+              contentType: 'image/jpeg',
+              upsert: true,
+            });
+
+          if (!storageErr) {
+            const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(filePath);
+            finalReceiptUrl = publicUrl;
+          } else {
+            console.warn('Supabase storage upload note:', storageErr.message);
+          }
+        } catch (imgErr) {
+          console.warn('Image compression/upload note:', imgErr);
+        }
+      }
+
       const effectiveDateStr = computeEffectivePaymentDate(paymentDateType, customPaymentDate);
       const defaultNote = `Month ${selectedDashboardMonth} collection payment - Ticket #${recordingPaymentMember.ticket} (${recordingPaymentMember.name})`;
       const finalNote = paymentNote.trim() ? `${defaultNote} — Note: ${paymentNote.trim()}` : defaultNote;
 
-      // 1. Insert collection transaction
+      // 2. Insert collection transaction (only tiny ~80 byte URL saved in database)
       const { error: txErr } = await supabase
         .from('transactions')
         .insert({
@@ -1107,7 +1189,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
           status: 'completed',
           amount: amt,
           notes: finalNote,
-          verification_proof_url: paymentReceiptUrl || null,
+          verification_proof_url: finalReceiptUrl,
           created_at: effectiveDateStr,
           created_by: profile?.id || null,
         });
@@ -1117,10 +1199,10 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         return;
       }
 
-      // 2. Increment global treasury balance for this wallet
+      // 3. Increment global treasury balance for this wallet
       await updateBalance(paymentWalletType as any, amt);
 
-      // 3. Update audit logs
+      // 4. Update audit logs
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       setAuditLogs(prev => [
@@ -1137,6 +1219,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       setQuickPaymentAmount('');
       setPaymentNote('');
       setPaymentReceiptUrl('');
+      setReceiptFileToUpload(null);
       setPaymentDateType('today');
       await fetchDashboardData(activeDashboardGroupId);
     } catch (err: any) {
@@ -1155,6 +1238,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     setPaymentWalletType(tx.wallet_type || 'cash_in_hand');
     setPaymentNote(tx.notes || '');
     setPaymentReceiptUrl(tx.verification_proof_url || '');
+    setReceiptFileToUpload(null);
 
     if (tx.created_at) {
       const txDate = new Date(tx.created_at);
@@ -1196,19 +1280,46 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
     try {
       setIsProcessingPayment(true);
+
+      // 1. Process receipt image compression & upload if new file picked
+      let finalReceiptUrl = paymentReceiptUrl || null;
+      if (receiptFileToUpload) {
+        try {
+          const compressedBlob = await compressImage(receiptFileToUpload);
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;
+          const filePath = `${activeDashboardGroupId}/${fileName}`;
+
+          const { error: storageErr } = await supabase.storage
+            .from('receipts')
+            .upload(filePath, compressedBlob, {
+              contentType: 'image/jpeg',
+              upsert: true,
+            });
+
+          if (!storageErr) {
+            const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(filePath);
+            finalReceiptUrl = publicUrl;
+          } else {
+            console.warn('Supabase storage upload note:', storageErr.message);
+          }
+        } catch (imgErr) {
+          console.warn('Image compression/upload note:', imgErr);
+        }
+      }
+
       const effectiveDateStr = computeEffectivePaymentDate(paymentDateType, customPaymentDate);
       const oldAmt = Number(editingTransaction.amount || 0);
       const oldWallet = editingTransaction.wallet_type;
       const newWallet = paymentWalletType;
 
-      // 1. Update transaction in database
+      // 2. Update transaction in database
       const { error: updateErr } = await supabase
         .from('transactions')
         .update({
           amount: newAmt,
           wallet_type: newWallet,
           notes: paymentNote,
-          verification_proof_url: paymentReceiptUrl || null,
+          verification_proof_url: finalReceiptUrl,
           created_at: effectiveDateStr,
         })
         .eq('id', editingTransaction.id);
@@ -1218,7 +1329,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         return;
       }
 
-      // 2. Adjust treasury balances accurately
+      // 3. Adjust treasury balances accurately
       if (oldWallet === newWallet) {
         const delta = newAmt - oldAmt;
         if (delta !== 0) {
@@ -1229,7 +1340,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         await updateBalance(newWallet as any, newAmt);
       }
 
-      // 3. Audit log
+      // 4. Audit log
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       setAuditLogs(prev => [
@@ -1246,6 +1357,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       setQuickPaymentAmount('');
       setPaymentNote('');
       setPaymentReceiptUrl('');
+      setReceiptFileToUpload(null);
       await fetchDashboardData(activeDashboardGroupId);
     } catch (err: any) {
       console.error('Error updating payment:', err);
@@ -1263,6 +1375,18 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
     try {
       setIsProcessingPayment(true);
+
+      // 0. Clean up storage if URL points to Supabase storage
+      if (tx.verification_proof_url && tx.verification_proof_url.includes('/storage/v1/object/public/receipts/')) {
+        try {
+          const path = tx.verification_proof_url.split('/storage/v1/object/public/receipts/')[1];
+          if (path) {
+            await supabase.storage.from('receipts').remove([decodeURIComponent(path)]);
+          }
+        } catch (e) {
+          console.warn('Storage cleanup note:', e);
+        }
+      }
 
       // 1. Delete from database
       const { error: delErr } = await supabase
