@@ -75,17 +75,17 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
     }
   }, [profile]);
 
-  // Fetch real subscribers from Supabase
-  const fetchMembers = async () => {
+  // Fetch real subscribers and groups from Supabase
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: profilesData } = await supabase
         .from('profiles')
         .select('*');
 
-      if (data) {
+      if (profilesData) {
         setMembers(
-          data.map((p: any) => ({
+          profilesData.map((p: any) => ({
             id: p.id,
             fullName: p.full_name || 'Member',
             phoneNumber: p.phone_number || '',
@@ -93,6 +93,32 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
             physicalBookSynced: true,
           }))
         );
+      }
+
+      const { data: groupsData } = await supabase
+        .from('chit_groups')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (groupsData && groupsData.length > 0) {
+        const metaMap: Record<string, GroupMetadata> = {};
+        groupsData.forEach((g: any) => {
+          const installment = Math.floor(Number(g.total_value) / (g.duration_months || 1));
+          metaMap[g.id] = {
+            id: g.id,
+            name: g.name,
+            currentMonth: g.current_month || 1,
+            poolValue: Number(g.total_value),
+            auctionDate: 'First Sunday after 10th',
+            winnerName: 'Active Auction',
+            winningDiscount: 0,
+            netPayout: Number(g.total_value),
+            dividend: 0,
+            fixedInstallment: installment,
+          };
+        });
+        setGroupsMetadata(metaMap);
+        setActiveGroupKey(groupsData[0].id);
       }
     } catch (err) {
       console.error('Error fetching member matrix:', err);
@@ -102,7 +128,7 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
   };
 
   useEffect(() => {
-    fetchMembers();
+    fetchData();
   }, []);
 
   // 3. Compile broadcast text dynamically based on selected group, template, and signature
@@ -211,8 +237,15 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                 onChange={(e) => setActiveGroupKey(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2.5 py-1.5 text-xs text-gray-900 focus:outline-none"
               >
-                <option value="G-Elite-Weekly-301">G-Elite-Weekly-301</option>
-                <option value="G-Gold-Monthly-102">G-Gold-Monthly-102</option>
+                {Object.keys(groupsMetadata).length === 0 ? (
+                  <option value="">No Groups Found</option>
+                ) : (
+                  Object.values(groupsMetadata).map((grp) => (
+                    <option key={grp.id} value={grp.id}>
+                      {grp.name}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 

@@ -18,7 +18,6 @@ interface WalletContextType {
   lastChangedWallet: WalletType | null;
   loading: boolean;
   updateBalance: (wallet: WalletType, amount: number) => Promise<void>;
-  triggerMockTransaction: (type: 'collection' | 'payout' | 'transfer') => Promise<void>;
   resetTreasuryToZero: () => Promise<void>;
 }
 
@@ -143,17 +142,6 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const triggerMockTransaction = async (type: 'collection' | 'payout' | 'transfer') => {
-    if (type === 'collection') {
-      await updateBalance('cash_in_hand', 5000);
-    } else if (type === 'payout') {
-      await updateBalance('dad_bank', -25000);
-    } else if (type === 'transfer') {
-      await updateBalance('cash_in_hand', -10000);
-      await updateBalance('kishor_bank', 10000);
-    }
-  };
-
   return (
     <WalletContext.Provider
       value={{
@@ -161,7 +149,6 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         lastChangedWallet,
         loading,
         updateBalance,
-        triggerMockTransaction,
         resetTreasuryToZero,
       }}
     >

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { SimulationProvider } from "@/context/SimulationContext";
 import { WalletProvider } from "@/context/WalletContext";
 import { AuthProvider } from "@/context/AuthContext";
 import ServiceWorkerCleanup from "@/components/ServiceWorkerCleanup";
@@ -17,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chit Funds Manager - Admin Workspace",
-  description: "Multi-admin chit fund dashboard with real-time balance sync and role simulation",
+  title: "Chit Funds Manager - Workspace",
+  description: "Chit fund workspace with real-time balance sync",
 };
 
 export default function RootLayout({
@@ -34,11 +33,9 @@ export default function RootLayout({
       <body className="min-h-full bg-slate-950 text-slate-100 flex flex-col">
         <ServiceWorkerCleanup />
         <AuthProvider>
-          <SimulationProvider>
-            <WalletProvider>
-              {children}
-            </WalletProvider>
-          </SimulationProvider>
+          <WalletProvider>
+            {children}
+          </WalletProvider>
         </AuthProvider>
       </body>
     </html>

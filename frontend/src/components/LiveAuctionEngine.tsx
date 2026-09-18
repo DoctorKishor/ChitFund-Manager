@@ -407,40 +407,6 @@ export default function LiveAuctionEngine() {
             </span>
           </div>
         </div>
-
-        {/* Dynamic Simulation Pool Adjuster Widget */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50 border border-gray-150 rounded-lg p-3 mt-4">
-          <div className="flex items-center space-x-2 text-xs">
-            <span className="font-semibold text-gray-500">Simulate Accumulated Pool (₹):</span>
-            <input 
-              type="number"
-              value={group.kai_iruppu_pool}
-              onChange={(e) => setGroup(prev => prev ? ({ ...prev, kai_iruppu_pool: Number(e.target.value) }) : null)}
-              className="w-28 bg-white border border-gray-250 rounded px-2.5 py-1 text-xs text-gray-950 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setGroup(prev => prev ? ({ ...prev, kai_iruppu_pool: 0 }) : null)}
-              className="bg-white hover:bg-gray-105 text-gray-700 font-bold text-[10px] px-3 py-1.5 rounded transition-all border border-gray-200"
-            >
-              Reset Pool
-            </button>
-            <button 
-              onClick={() => setNextDiscountPool(0)}
-              className="bg-white hover:bg-gray-105 text-gray-700 font-bold text-[10px] px-3 py-1.5 rounded transition-all border border-gray-200"
-            >
-              Clear Discount Pool
-            </button>
-            <button 
-              onClick={() => setGroup(prev => prev ? ({ ...prev, kai_iruppu_pool: prev.totalValue }) : null)}
-              className="bg-gray-900 hover:bg-black text-white font-bold text-[10px] px-3.5 py-1.5 rounded flex items-center gap-1 shadow-sm transition-all"
-            >
-              <Zap size={12} />
-              Trigger Laaba Seetu (Max Pool)
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Split Work Space Pane */}

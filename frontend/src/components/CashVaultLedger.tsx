@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet, WalletType } from '../context/WalletContext';
-import { useSimulation } from '../context/SimulationContext';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../utils/supabase/client';
 import { 
   Wallet, 
   Landmark, 
@@ -54,15 +54,27 @@ interface MemberCollection {
 
 export default function CashVaultLedger() {
   const { balances, updateBalance } = useWallet();
-  const { simulatedUser } = useSimulation();
   const { profile } = useAuth();
-  const activeAdminName = profile?.fullName || simulatedUser.fullName;
+  const activeAdminName = profile?.fullName || 'Admin';
 
   // 1. Clean Starting State Hooks (Real data starts empty)
   const [relocations, setRelocations] = useState<Relocation[]>([]);
   const [personalDraws, setPersonalDraws] = useState<PersonalDraw[]>([]);
   const [liabilities, setLiabilities] = useState<DebtLiability[]>([]);
   const [collections, setCollections] = useState<MemberCollection[]>([]);
+  const [availableGroups, setAvailableGroups] = useState<{ id: string; name: string }[]>([]);
+
+  // Fetch groups from Supabase
+  useEffect(() => {
+    const fetchGroups = async () => {
+      const { data } = await supabase.from('chit_groups').select('id, name');
+      if (data && data.length > 0) {
+        setAvailableGroups(data);
+        setSplitGroup(data[0].name);
+      }
+    };
+    fetchGroups();
+  }, []);
 
   // Form states
   const [relocateSource, setRelocateSource] = useState<Exclude<WalletType, 'cash_in_hand'>>('kishor_bank');
@@ -72,7 +84,7 @@ export default function CashVaultLedger() {
   const [spendTag, setSpendTag] = useState<PersonalDraw['tag']>('Petrol');
   const [spendDesc, setSpendDesc] = useState<string>('');
   
-  const [splitGroup, setSplitGroup] = useState<string>('G-Weekly-202');
+  const [splitGroup, setSplitGroup] = useState<string>('');
   const [splitTotal, setSplitTotal] = useState<string>('');
   const [splitPaid, setSplitPaid] = useState<string>('');
   const [splitSourceWallet, setSplitSourceWallet] = useState<WalletType>('dad_bank');
@@ -384,9 +396,15 @@ export default function CashVaultLedger() {
                     onChange={(e) => setSplitGroup(e.target.value)}
                     className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-gray-900 focus:outline-none"
                   >
-                    <option value="G-Weekly-202">G-Weekly-202</option>
-                    <option value="G-Elite-Weekly-301">G-Elite-Weekly-301</option>
-                    <option value="G-Gold-Monthly-102">G-Gold-Monthly-102</option>
+                    {availableGroups.length === 0 ? (
+                      <option value="">No Chit Groups Found</option>
+                    ) : (
+                      availableGroups.map((g) => (
+                        <option key={g.id} value={g.name}>
+                          {g.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
                 <div className="space-y-1">

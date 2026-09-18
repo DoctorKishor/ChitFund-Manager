@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useSimulation } from '../context/SimulationContext';
 import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, 
@@ -24,10 +23,9 @@ interface SidebarProps {
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { simulatedUser } = useSimulation();
   const { profile, signOut } = useAuth();
 
-  const activeUserRole = profile?.role || simulatedUser.role;
+  const activeUserRole = profile?.role || 'subscriber';
   const isUserAdminOrManager = activeUserRole === 'admin' || activeUserRole === 'manager';
 
   const navItems = [
@@ -132,7 +130,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             {!isCollapsed && (
               <div className="flex flex-col overflow-hidden">
                 <span className="text-sm font-semibold text-gray-900 truncate">
-                  {profile?.fullName || simulatedUser.fullName}
+                  {profile?.fullName || 'User'}
                 </span>
                 <span className="text-xs text-gray-500 truncate capitalize">
                   {activeUserRole} (Supabase)

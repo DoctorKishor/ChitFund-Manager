@@ -63,7 +63,7 @@ interface DashboardContentProps {
 
 export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const { profile } = useAuth();
-  const { balances, triggerMockTransaction, updateBalance } = useWallet();
+  const { balances, updateBalance } = useWallet();
 
   // Group Creation & Enrollment States
   const [newGroupName, setNewGroupName] = useState('');
@@ -679,60 +679,31 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
             </div>
           )}
 
-          {/* Interactive Live Sync Simulation Dashboard Controller */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Simulation Controls Card */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 lg:col-span-1 shadow-sm">
-              <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <Coins size={16} className="text-indigo-650" />
-                Live Sync Sandbox
-              </h4>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Click the buttons below to log simulated database transactions. These updates will instantly recalculate global balances and trigger the <strong>Top Status Ribbon</strong> pills to flash, showing our database synchronization is active.
-              </p>
-              <div className="space-y-2 pt-2">
-                <button
-                  onClick={() => triggerMockTransaction('collection')}
-                  className="w-full flex items-center justify-between text-left text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 text-gray-800 px-3.5 py-3 rounded-lg font-semibold transition-all duration-200"
-                >
-                  <span>1. Member Cash Collection</span>
-                  <span className="text-green-700 font-bold bg-green-50 px-2 py-0.5 rounded border border-green-200">+₹5,000 Cash</span>
-                </button>
-                <button
-                  onClick={() => triggerMockTransaction('payout')}
-                  className="w-full flex items-center justify-between text-left text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 text-gray-800 px-3.5 py-3 rounded-lg font-semibold transition-all duration-200"
-                >
-                  <span>2. Disburse Auction Payout</span>
-                  <span className="text-red-700 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-200">-₹25,000 Dad Bank</span>
-                </button>
-                <button
-                  onClick={() => triggerMockTransaction('transfer')}
-                  className="w-full flex items-center justify-between text-left text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 text-gray-800 px-3.5 py-3 rounded-lg font-semibold transition-all duration-200"
-                >
-                  <span>3. Cash Box to Bank Transfer</span>
-                  <span className="text-indigo-750 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-150">±₹10,000 Sync</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Audit or Activity Stream */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 lg:col-span-2 shadow-sm">
-              <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <ShieldAlert size={16} className="text-indigo-650" />
-                Live System Audit Log
-              </h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left text-gray-600">
-                  <thead className="text-[10px] text-gray-500 uppercase bg-gray-50 rounded-lg">
+          {/* Live System Activity and Audit Log */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <ShieldAlert size={16} className="text-indigo-650" />
+              Live System Audit Log
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left text-gray-600">
+                <thead className="text-[10px] text-gray-500 uppercase bg-gray-50 rounded-lg">
+                  <tr>
+                    <th className="py-2.5 px-3">Timestamp</th>
+                    <th className="py-2.5 px-3">Table</th>
+                    <th className="py-2.5 px-3">Action Description</th>
+                    <th className="py-2.5 px-3 text-right">Executor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {auditLogs.length === 0 ? (
                     <tr>
-                      <th className="py-2.5 px-3">Timestamp</th>
-                      <th className="py-2.5 px-3">Table</th>
-                      <th className="py-2.5 px-3">Action Description</th>
-                      <th className="py-2.5 px-3 text-right">Executor</th>
+                      <td colSpan={4} className="py-6 text-center text-gray-400 text-xs">
+                        No transactions logged yet. Real database transactions will appear here live.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {auditLogs.map((log, index) => (
+                  ) : (
+                    auditLogs.map((log, index) => (
                       <tr key={index} className="hover:bg-gray-50/50">
                         <td className="py-3 px-3 font-medium text-gray-400">{log.timestamp}</td>
                         <td className="py-3 px-3">
@@ -743,10 +714,10 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                         <td className="py-3 px-3 text-gray-700">{log.desc}</td>
                         <td className="py-3 px-3 text-right font-medium text-indigo-600">{log.executor}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -769,7 +740,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                 timestamp: `Today, ${timeStr}`,
                 table: 'profiles',
                 desc,
-                executor: 'Kishor (Admin)'
+                executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
               },
               ...prev
             ]);
@@ -786,91 +757,37 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
             <div className="border-b border-gray-100 pb-3">
               <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                 <BarChart3 size={16} className="text-indigo-650" />
-                Reports & AI-Assisted Analytics
+                Reports & Real-Time Portfolio Analytics
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Query analytics or read auto-compiled reports. Powered by natural language matching.
+                Real-time metrics compiled directly from your active Supabase chit groups and treasury ledger.
               </p>
             </div>
 
-            {/* Natural Language Query Box */}
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                setIsAiLoading(true);
-                setAiResponse(null);
-                setTimeout(() => {
-                  setIsAiLoading(false);
-                  const q = aiQuery.toLowerCase();
-                  if (q.includes('gold') || q.includes('monthly')) {
-                    setAiResponse("AI Insight: G-Gold-Monthly-102 currently holds a 100% subscriber collections compliance rate for Month 6. Individual dividends are pro-rated to yield ₹15,555 per subscriber, presenting optimal active yield.");
-                  } else if (q.includes('weekly') || q.includes('elite')) {
-                    setAiResponse("AI Insight: G-Elite-Weekly-301 has accumulated ₹60,000 of its ₹1,00,000 pool. Based on installment schedules, it will trigger the Laaba Seetu lockout in Month 8, securing ₹1,00,000 total company profit.");
-                  } else {
-                    setAiResponse("AI Insight: Consolidated chit groups show ₹8,00,000 total value managed. Active compliance is at 94.6% with ₹3,45,000 collected. Average monthly dividend distribution yields ₹9,444 per active subscriber spot.");
-                  }
-                }, 1000);
-              }}
-              className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-150"
-            >
-              <div className="space-y-1">
-                <label className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block">Ask anything about your Chit funds data...</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={aiQuery}
-                    onChange={(e) => setAiQuery(e.target.value)}
-                    placeholder="e.g. How much did Priya pay in Gold-102? or Predict Laaba Seetu triggers..."
-                    className="w-full bg-white border border-gray-250 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-gray-950 focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors shrink-0 animate-fade-in"
-                  >
-                    Analyze
-                  </button>
-                </div>
+            {/* Quick Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Total Active Groups</span>
+                <span className="text-xl font-bold text-gray-900 mt-1 block">{localGroups.filter(g => g.active).length}</span>
+                <span className="text-[10px] text-indigo-600 mt-1 block">Live from Supabase</span>
               </div>
 
-              {/* Presets */}
-              <div className="flex flex-wrap gap-2 text-[10px]">
-                <span className="text-gray-400 font-semibold self-center">Try queries:</span>
-                <button
-                  type="button"
-                  onClick={() => setAiQuery("Analyze Gold group compliance")}
-                  className="bg-white hover:bg-gray-105 border border-gray-200 text-gray-700 px-2 py-0.5 rounded transition-colors"
-                >
-                  "Analyze Gold group compliance"
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAiQuery("Predict Weekly Elite Laaba Seetu trigger month")}
-                  className="bg-white hover:bg-gray-105 border border-gray-200 text-gray-700 px-2 py-0.5 rounded transition-colors"
-                >
-                  "Predict Weekly Elite Laaba Seetu trigger"
-                </button>
+              <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Total Value Managed</span>
+                <span className="text-xl font-bold text-gray-900 mt-1 block">
+                  {formatCurrency(localGroups.reduce((acc, g) => acc + (g.totalValue || 0), 0))}
+                </span>
+                <span className="text-[10px] text-gray-500 mt-1 block">Across all active groups</span>
               </div>
-            </form>
 
-            {/* AI Analytical Response display */}
-            {isAiLoading && (
-              <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center text-xs text-gray-550 space-x-2">
-                <span className="h-3 w-3 border-2 border-indigo-500/30 border-t-indigo-600 rounded-full animate-spin"></span>
-                <span>AI Agent analyzing treasury ledger data tables...</span>
+              <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Treasury Cash Liquid</span>
+                <span className="text-xl font-bold text-green-600 mt-1 block">
+                  {formatCurrency(balances.cash_in_hand)}
+                </span>
+                <span className="text-[10px] text-gray-500 mt-1 block">Physical Cash Box</span>
               </div>
-            )}
-
-            {!isAiLoading && aiResponse && (
-              <div className="p-4 bg-indigo-50 border border-indigo-150 rounded-xl space-y-2 animate-in slide-in-from-top-2 duration-200">
-                <div className="flex justify-between items-center text-[10px] font-bold text-indigo-600 uppercase">
-                  <span>AI Analytical Summary</span>
-                  <span>Instant sync</span>
-                </div>
-                <p className="text-xs text-indigo-900 leading-relaxed font-semibold">
-                  {aiResponse}
-                </p>
-              </div>
-            )}
+            </div>
           </div>
 
           {/* Quick analytic statistics columns */}
