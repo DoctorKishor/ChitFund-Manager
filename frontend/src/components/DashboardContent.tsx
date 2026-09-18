@@ -1054,11 +1054,13 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         .insert({
           group_id: activeDashboardGroupId,
           profile_id: recordingPaymentMember.profileId || null,
+          group_member_id: recordingPaymentMember.id || null,
           wallet_type: paymentWalletType,
           type: 'collection',
           status: 'completed',
           amount: amt,
           notes: noteText,
+          created_by: profile?.id || null,
         });
 
       if (txErr) {
@@ -1135,11 +1137,13 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       const txsToInsert = pendingMembers.map(p => ({
         group_id: activeDashboardGroupId,
         profile_id: p.member.profileId || null,
+        group_member_id: p.member.id || null,
         wallet_type: 'cash_in_hand',
         type: 'collection',
         status: 'completed',
         amount: p.unpaidAmount,
         notes: `Month ${selectedDashboardMonth} collection payment - Ticket #${p.member.ticket} (${p.member.name}) [Bulk Mark All Paid]`,
+        created_by: profile?.id || null,
       }));
 
       const { error: insertErr } = await supabase.from('transactions').insert(txsToInsert);

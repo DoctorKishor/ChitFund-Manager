@@ -58,15 +58,17 @@ create table public.global_treasury (
 create table public.transactions (
   id uuid primary key default gen_random_uuid(),
   group_id uuid references public.chit_groups(id) on delete set null,
-  profile_id uuid not null references public.profiles(id) on delete restrict,
+  profile_id uuid references public.profiles(id) on delete set null,
+  group_member_id uuid references public.group_members(id) on delete set null,
   wallet_type text not null check (wallet_type in ('cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank')),
   type text not null check (type in ('collection', 'payout', 'personal_draw', 'atm_withdrawal', 'transfer')),
   status text not null check (status in ('completed', 'pending_verification')),
   amount numeric not null check (amount > 0),
+  notes text default null,
   denomination_log jsonb default null,
   voice_note_text text default null,
   verification_proof_url text default null,
-  created_by uuid not null references public.profiles(id) on delete restrict,
+  created_by uuid references public.profiles(id) on delete set null default auth.uid(),
   created_at timestamp with time zone not null default timezone('utc'::text, now())
 );
 
