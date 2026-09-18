@@ -913,7 +913,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                           {g.currentMonth === 0 ? (
                             <div className="flex items-center gap-2 py-1">
                               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
-                              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Launch Month — Company Profit Phase</span>
+                              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Launch Month — Organizer Profit Phase</span>
                             </div>
                           ) : (
                             <div className="space-y-1">
@@ -942,7 +942,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                             </div>
                             {g.currentMonth === 0 && (
                               <div className="flex justify-between">
-                                <span>Launch Profit:</span>
+                                <span>Organizer Profit:</span>
                                 <strong className="text-amber-600">{formatCurrency(g.totalValue)}</strong>
                               </div>
                             )}
@@ -981,12 +981,12 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                                   {
                                     timestamp: `Today, ${timeStr}`,
                                     table: 'chit_groups',
-                                    desc: `LAUNCH CONFIRMED for "${g.name}" — ₹${g.totalValue.toLocaleString('en-IN')} locked as company profit. Group advanced to Month 1.`,
-                                    executor: 'Kishor (Admin)'
+                                    desc: `LAUNCH CONFIRMED for "${g.name}" — ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit. Group advanced to Month 1.`,
+                                    executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
                                   },
                                   ...prev
                                 ]);
-                                alert(`✅ Launch confirmed! ₹${g.totalValue.toLocaleString('en-IN')} locked as company profit for Month 0. Group now advances to Month 1.`);
+                                alert(`✅ Launch confirmed! ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
                               }}
                               className="w-full bg-amber-600 hover:bg-amber-755 text-white font-bold text-[10px] py-2 rounded flex items-center justify-center gap-1.5 transition-all shadow-sm"
                             >

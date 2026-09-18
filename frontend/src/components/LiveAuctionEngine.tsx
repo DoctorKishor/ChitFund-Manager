@@ -147,7 +147,7 @@ export default function LiveAuctionEngine() {
     );
   }
 
-  // Laaba Seetu triggers if accumulated pool matches or exceeds total chit value (₹1L)
+  // Laaba Seetu triggers if accumulated pool matches or exceeds total chit value (e.g. ₹2L)
   const isLaabaSeetuActive = (group.kai_iruppu_pool || 0) >= group.totalValue;
 
   // Auction date calculation
@@ -157,32 +157,19 @@ export default function LiveAuctionEngine() {
     ? fmtDate(new Date(auctionDateOverride)) + ' (Override)'
     : fmtDate(canonicalDate);
 
-  // In a holiday month, bidding is OPEN regardless of Laaba Seetu (pool overflow)
-  // The highest bid is compounded forward into nextDiscountPool instead of paying dividends
-  const biddingLocked = isLaabaSeetuActive && !isHolidayMonth;
-
-  const highestBid = biddingLocked
-    ? 0
-    : (bids.length > 0 ? Math.max(...bids.map(b => b.amount)) : 0);
+  const highestBid = bids.length > 0 ? Math.max(...bids.map(b => b.amount)) : 0;
   
-  const winningBidObj = biddingLocked ? null : bids.find(b => b.amount === highestBid);
-  const winnerName = biddingLocked
-    ? 'Company Profit (Laaba Seetu)'
-    : (winningBidObj ? winningBidObj.memberName : 'No bids yet');
+  const winningBidObj = bids.find(b => b.amount === highestBid);
+  const winnerName = winningBidObj ? winningBidObj.memberName : 'No bids yet';
   const winnerTicket = winningBidObj ? winningBidObj.ticketNumber : null;
   const winnerId = winningBidObj ? winningBidObj.memberId : null;
 
-  // Payout logic depends on holiday vs regular vs Laaba Seetu month
-  // Holiday month: no discount — winner receives full pool; high bid compounds to nextDiscountPool
-  // Regular month: winner receives pool minus high bid; high bid split as dividends
-  // Laaba Seetu (non-holiday): locked, entire pool to company profit
-  const netPayout = biddingLocked
-    ? 0
-    : isHolidayMonth
-      ? group.totalValue // full pool out — no discount applied this month
-      : (group.totalValue - highestBid);
+  // Payout calculation:
+  // Winner receives Total Chit Value minus winning discount bid
+  const netPayout = bids.length > 0 ? (group.totalValue - highestBid) : group.totalValue;
 
-  const totalDividend = (biddingLocked || isHolidayMonth) ? 0 : highestBid;
+  // Dividend distribution
+  const totalDividend = isHolidayMonth ? 0 : highestBid;
   const dividendPerMember = totalDividend / (group.memberCount - 1);
 
   const formatCurrency = (val: number) => {
@@ -195,7 +182,7 @@ export default function LiveAuctionEngine() {
 
   // 3. User Actions
   const handleCardClick = (memberId: string, hasWon: boolean) => {
-    if (hasWon || biddingLocked) return;
+    if (hasWon) return;
     setActiveLoggingMemberId(memberId);
     const currentMax = bids.length > 0 ? bids[0].amount : 25000;
     setBidInputVal((currentMax + 1000).toString());
@@ -203,7 +190,6 @@ export default function LiveAuctionEngine() {
 
   const handleLogBid = (e: React.FormEvent, memberId: string) => {
     e.preventDefault();
-    if (biddingLocked) return;
 
     const bidAmount = Number(bidInputVal);
     const member = members.find(m => m.id === memberId);
@@ -228,49 +214,56 @@ export default function LiveAuctionEngine() {
   };
 
   const handleUndo = () => {
-    if (bids.length === 0 || biddingLocked) return;
+    if (bids.length === 0) return;
     setBids(bids.slice(1));
   };
 
   const handleCloseAuction = () => {
-    if (!biddingLocked && bids.length === 0) {
+    if (bids.length === 0) {
       alert("Cannot close auction without any bids recorded.");
       return;
     }
     setShowCloseModal(true);
   };
 
-  const handleConfirmClose = () => {
+  const handleConfirmClose = async () => {
     setIsRecording(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsRecording(false);
       setShowConfetti(true);
 
-      if (biddingLocked) {
-        // Laaba Seetu (non-holiday): reset accumulated pool, advance month
-        setGroup(prev => prev ? ({
-          ...prev,
-          currentMonth: Math.min(prev.durationMonths, prev.currentMonth + 1),
-          kai_iruppu_pool: 0
-        }) : null);
-      } else if (isHolidayMonth) {
-        // Holiday month: compound high bid into next discount pool, advance month
-        setNextDiscountPool(prev => prev + highestBid);
-        setGroup(prev => prev ? ({
-          ...prev,
-          currentMonth: Math.min(prev.durationMonths, prev.currentMonth + 1)
-        }) : null);
-        // No winner flagged — bidding was for compounding purposes
-      } else {
-        // Regular month: mark winner, advance month
-        if (winnerId) {
-          setMembers(prev => prev.map(m => m.id === winnerId ? { ...m, hasWonRegular: true } : m));
+      const nextMonth = Math.min(group.durationMonths, group.currentMonth + 1);
+      const nextPool = isLaabaSeetuActive 
+        ? Math.max(0, group.kai_iruppu_pool - group.totalValue) 
+        : group.kai_iruppu_pool + (isHolidayMonth ? highestBid : 0);
+
+      // Update in Supabase
+      if (group.id) {
+        try {
+          await supabase.from('chit_groups').update({
+            current_month: nextMonth,
+            kai_iruppu_pool: nextPool,
+          }).eq('id', group.id);
+        } catch (err) {
+          console.error('Error updating chit group in Supabase:', err);
         }
-        setGroup(prev => prev ? ({
-          ...prev,
-          currentMonth: Math.min(prev.durationMonths, prev.currentMonth + 1)
-        }) : null);
       }
+
+      // Mark winner in local state
+      if (winnerId) {
+        setMembers(prev => prev.map(m => m.id === winnerId ? { ...m, hasWonRegular: true } : m));
+      }
+
+      setGroup(prev => prev ? ({
+        ...prev,
+        currentMonth: nextMonth,
+        kai_iruppu_pool: nextPool,
+      }) : null);
+
+      if (isHolidayMonth) {
+        setNextDiscountPool(prev => prev + highestBid);
+      }
+
       setBids([]);
 
       setTimeout(() => {
@@ -289,18 +282,18 @@ export default function LiveAuctionEngine() {
           <div>
             <div className="flex items-center space-x-2">
               <span className={`h-2 w-2 rounded-full ${
-                biddingLocked ? 'bg-indigo-500 animate-ping'
+                isLaabaSeetuActive ? 'bg-emerald-500 animate-ping'
                 : isHolidayMonth ? 'bg-amber-500 animate-pulse'
                 : 'bg-red-500 animate-pulse'
               }`}></span>
               <span className={`text-[10px] font-bold uppercase tracking-widest border px-2 py-0.5 rounded ${
-                biddingLocked
-                  ? 'text-indigo-600 bg-indigo-50 border-indigo-200'
+                isLaabaSeetuActive
+                  ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                   : isHolidayMonth
                     ? 'text-amber-700 bg-amber-50 border-amber-200'
                     : 'text-red-700 bg-red-50 border-red-200'
               }`}>
-                {biddingLocked ? 'Laaba Seetu Session' : isHolidayMonth ? 'Holiday Month — Bid Compounds Forward' : 'Live Bidding Room'}
+                {isLaabaSeetuActive ? '🎉 Laaba Seetu Month (₹0 Member Dues)' : isHolidayMonth ? 'Holiday Month — Bid Compounds Forward' : 'Live Bidding Room'}
               </span>
             </div>
             <h2 className="text-xl font-bold text-gray-900 tracking-tight mt-1">
@@ -352,10 +345,10 @@ export default function LiveAuctionEngine() {
             </button>
             <button
               onClick={handleCloseAuction}
-              disabled={!biddingLocked && bids.length === 0}
+              disabled={bids.length === 0}
               className="font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all duration-200 bg-gray-900 hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed text-white"
             >
-              {biddingLocked ? 'Process Laaba Seetu Closeout' : isHolidayMonth ? 'Compound Bid & Close Month' : 'Close Auction & Record Winner'}
+              {isLaabaSeetuActive ? 'Close Laaba Seetu & Record Winner' : isHolidayMonth ? 'Compound Bid & Close Month' : 'Close Auction & Record Winner'}
               <ArrowRight size={14} />
             </button>
           </div>
@@ -376,14 +369,14 @@ export default function LiveAuctionEngine() {
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">Running Highest Bid</span>
             <span className="text-lg font-bold text-indigo-600 mt-1 block flex items-center gap-1.5">
               <TrendingUp size={16} />
-              {biddingLocked ? '₹0 (Laaba Seetu)' : formatCurrency(highestBid)}
+              {formatCurrency(highestBid)}
             </span>
           </div>
 
           <div className="p-3 bg-gray-50 rounded-lg border border-gray-150">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">Winner Payout</span>
             <span className="text-lg font-bold text-green-700 mt-1 block">
-              {biddingLocked ? '₹0 (Laaba Seetu)' : formatCurrency(netPayout)}
+              {formatCurrency(netPayout)}
             </span>
           </div>
 
@@ -414,29 +407,14 @@ export default function LiveAuctionEngine() {
         
         {/* 1. Left Pane (Member Selection Matrix) */}
         <div className="lg:col-span-3 bg-white border border-gray-200 rounded-xl p-5 space-y-4 relative shadow-sm">
-          
-          {/* Overlay Banner: only show if bidding is locked (Laaba Seetu + not holiday month) */}
-          {biddingLocked && (
-            <div className="absolute inset-0 bg-white/90 rounded-xl z-20 flex flex-col items-center justify-center p-6 text-center space-y-3 backdrop-blur-[1px]">
-              <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center animate-bounce">
-                <Lock size={20} />
-              </div>
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Bidding Mechanics Disabled</h3>
-              <p className="text-xs text-gray-500 max-w-[280px]">
-                The accumulated pool of <strong className="text-amber-600">{formatCurrency(group.kai_iruppu_pool)}</strong> matches or exceeds the total monthly chit value of <strong className="text-indigo-600">{formatCurrency(group.totalValue)}</strong>, locking this session as <strong>Laaba Seetu</strong>.
-                <br /><span className="text-indigo-600 text-[10px] mt-1 block">Toggle "Holiday Month" above to keep bidding open and compound the bid forward instead.</span>
-              </p>
-            </div>
-          )}
-
           <div className="border-b border-gray-100 pb-3">
             <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
               <User size={16} className="text-indigo-600" />
               Member Selection Matrix
             </h3>
             <p className="text-[11px] text-gray-500 mt-0.5">
-              {biddingLocked
-                ? 'Bidding locked — Laaba Seetu. Toggle Holiday Month to re-enable.'
+              {isLaabaSeetuActive
+                ? '🎉 Laaba Seetu Active: Members owe ₹0 this month. Click an eligible member to record their winning bid.'
                 : isHolidayMonth
                   ? 'Holiday Month: bids compound into next discount pool. No dividends paid.'
                   : 'Click an eligible member below to log a shouted bid instantly'}
@@ -458,9 +436,7 @@ export default function LiveAuctionEngine() {
                       ? 'bg-gray-50 border-gray-100 opacity-40 cursor-not-allowed'
                       : isLogging
                         ? 'border-indigo-500 bg-indigo-50/50 ring-1 ring-indigo-500/20'
-                        : biddingLocked
-                          ? 'bg-gray-50 border-gray-100 opacity-40 cursor-not-allowed'
-                          : 'bg-white hover:bg-gray-50 border-gray-200 hover:border-gray-300 cursor-pointer shadow-sm'
+                        : 'bg-white hover:bg-gray-50 border-gray-200 hover:border-gray-300 cursor-pointer shadow-sm'
                   }`}
                 >
                   {!isLogging ? (
@@ -546,7 +522,7 @@ export default function LiveAuctionEngine() {
               
               <button
                 onClick={handleUndo}
-                disabled={bids.length === 0 || biddingLocked}
+                disabled={bids.length === 0}
                 className="flex items-center gap-1 bg-gray-50 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed border border-gray-200 hover:border-gray-250 text-gray-700 text-[10px] font-bold px-2.5 py-1.5 rounded transition-all duration-150"
               >
                 <Undo2 size={12} />
@@ -623,7 +599,7 @@ export default function LiveAuctionEngine() {
                   <div className="flex items-center space-x-2.5">
                     <Calendar className="text-indigo-600" size={20} />
                     <h3 className="text-base font-bold text-gray-900">
-                      {biddingLocked ? 'Laaba Seetu Closeout' : isHolidayMonth ? 'Holiday Month — Compound & Close' : 'Record Auction Winner'} - Month {group.currentMonth}
+                      {isLaabaSeetuActive ? '🎉 Laaba Seetu Prize Payout' : isHolidayMonth ? 'Holiday Month — Compound & Close' : 'Record Auction Winner'} - Month {group.currentMonth}
                     </h3>
                   </div>
                   <button 
@@ -638,36 +614,36 @@ export default function LiveAuctionEngine() {
                 <div className="space-y-4">
                   <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-500">Recipient/Allocation</span>
+                      <span className="text-gray-500">Recipient/Winner</span>
                       <span className="font-bold text-gray-900 flex items-center gap-1.5">
                         <CheckCircle2 size={14} className="text-indigo-600" />
-                        {biddingLocked ? 'Company Profit (Laaba Seetu)' : isHolidayMonth ? 'Full Pool to Winner (No Dividend)' : winnerName}
+                        {isHolidayMonth ? 'Full Pool to Winner (No Dividend)' : winnerName}
                       </span>
                     </div>
                     
                     <div className="flex justify-between items-center text-xs border-t border-gray-100 pt-2.5">
                       <span className="text-gray-500">Winning Discount Bid</span>
                       <span className="font-bold text-indigo-600">
-                        {biddingLocked ? 'N/A (Bidding Locked)' : formatCurrency(highestBid)}
+                        {formatCurrency(highestBid)}
                       </span>
                     </div>
 
                     <div className="flex justify-between items-center text-xs border-t border-gray-100 pt-2.5">
-                      <span className="text-gray-500">Net Cash Payout to Member</span>
+                      <span className="text-gray-500">Net Cash Payout to Winner</span>
                       <span className="font-bold text-green-600">{formatCurrency(netPayout)}</span>
                     </div>
 
                     <div className="flex justify-between items-center text-xs border-t border-gray-100 pt-2.5">
-                      <span className="text-gray-500">Dividend per Subscriber</span>
-                      <span className="font-bold text-gray-700">
-                        {isHolidayMonth ? 'N/A (Holiday — Bid Compounds)' : formatCurrency(dividendPerMember)}
+                      <span className="text-gray-500">Subscriber Installment Due</span>
+                      <span className={`font-bold ${isLaabaSeetuActive ? 'text-emerald-600' : 'text-gray-700'}`}>
+                        {isLaabaSeetuActive ? '₹0 (Laaba Seetu Free Month)' : `${formatCurrency(group.totalValue / group.durationMonths)}/member`}
                       </span>
                     </div>
 
                     <div className="flex justify-between items-center text-xs border-t border-gray-100 pt-2.5">
-                      <span className="text-gray-500">Locked Company Profit</span>
-                      <span className="font-bold text-amber-600">
-                        {biddingLocked ? formatCurrency(group.kai_iruppu_pool) : '₹0 (Regular Month)'}
+                      <span className="text-gray-500">Discount Pool Deduction</span>
+                      <span className="font-bold text-indigo-600">
+                        {isLaabaSeetuActive ? `-${formatCurrency(group.totalValue)} (Funds this month's pot)` : '₹0 (Regular Month)'}
                       </span>
                     </div>
 
@@ -682,11 +658,11 @@ export default function LiveAuctionEngine() {
                   <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3.5 flex items-start space-x-2.5">
                     <AlertCircle className="text-indigo-600 shrink-0 mt-0.5" size={16} />
                     <p className="text-[10px] text-indigo-900 leading-relaxed">
-                      {biddingLocked
-                        ? `Laaba Seetu month. Entire accumulated pool of ${formatCurrency(group.kai_iruppu_pool)} locked as company profit. Pool resets to ₹0 and group advances to Month ${group.currentMonth + 1}.`
+                      {isLaabaSeetuActive
+                        ? `Laaba Seetu month! Subscribers pay ₹0 installment this cycle. Winner receives ${formatCurrency(netPayout)} funded from the accumulated discount pool. Pool is deducted and group advances to Month ${group.currentMonth + 1}.`
                         : isHolidayMonth
-                          ? `Holiday Month: bidding was live. The high bid of ${formatCurrency(highestBid)} will NOT be paid as dividends — it compounds into the Next Discount Pool (current: ${formatCurrency(nextDiscountPool + highestBid)}). The winner receives the full pool of ${formatCurrency(netPayout)}.`
-                          : `Recording sets winner to 'Already Won', distributes dividend of ${formatCurrency(dividendPerMember)} to other members, and advances group to Month ${group.currentMonth + 1}.`
+                          ? `Holiday Month: high bid of ${formatCurrency(highestBid)} compounds into the Next Discount Pool (current: ${formatCurrency(nextDiscountPool + highestBid)}). Winner receives ${formatCurrency(netPayout)}.`
+                          : `Recording sets winner to 'Already Won', distributes dividend to members, and advances group to Month ${group.currentMonth + 1}.`
                       }
                     </p>
                   </div>
@@ -713,7 +689,7 @@ export default function LiveAuctionEngine() {
                         Recording...
                       </>
                     ) : (
-                      biddingLocked ? 'Lock Profit & Close Month' : isHolidayMonth ? 'Compound Bid & Advance Month' : 'Confirm & Record Winner'
+                      isLaabaSeetuActive ? 'Confirm Laaba Seetu Winner' : isHolidayMonth ? 'Compound Bid & Advance Month' : 'Confirm & Record Winner'
                     )}
                   </button>
                 </div>
