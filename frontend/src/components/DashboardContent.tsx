@@ -734,9 +734,10 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   };
 
   // Render content based on active tab and simulated role
-  switch (activeTab) {
-    case 'dashboard':
-      return (
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return (
         <div className="space-y-6">
           {/* Dashboard Header Banner */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 relative overflow-hidden shadow-sm">
@@ -1024,52 +1025,6 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
               </div>
             )}
           </div>
-
-          {/* Reschedule Date Override Popover */}
-          {rescheduleGroupId && (
-            <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-              <div className="bg-white border border-gray-200 rounded-xl p-5 w-full max-w-xs space-y-4 shadow-2xl">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                  <h4 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                    <CalendarDays size={14} className="text-indigo-600" />
-                    Reschedule Auction Date
-                  </h4>
-                  <button onClick={() => setRescheduleGroupId(null)} className="text-gray-400 hover:text-gray-600">
-                    <X size={14} />
-                  </button>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Select New Date</label>
-                  <input
-                    type="date"
-                    value={rescheduleInputVal}
-                    onChange={(e) => setRescheduleInputVal(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded px-2.5 py-1.5 text-xs text-gray-900 focus:outline-none"
-                  />
-                  <p className="text-[10px] text-gray-500 mt-1">Canonical (auto): {formatAuctionDate(getFirstSundayOnOrAfter10th(new Date().getFullYear(), new Date().getMonth()))}</p>
-                </div>
-                <div className="flex gap-2 justify-end">
-                  {auctionDateOverrides[rescheduleGroupId] && (
-                    <button
-                      onClick={() => { setAuctionDateOverrides(prev => { const n = {...prev}; delete n[rescheduleGroupId!]; return n; }); setRescheduleGroupId(null); }}
-                      className="text-[10px] font-bold text-red-650 border border-red-200 px-3 py-1.5 rounded hover:bg-red-50 transition-colors"
-                    >
-                      Clear Override
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      if (rescheduleInputVal) setAuctionDateOverrides(prev => ({ ...prev, [rescheduleGroupId!]: rescheduleInputVal }));
-                      setRescheduleGroupId(null);
-                    }}
-                    className="bg-gray-900 hover:bg-black text-white font-bold text-[10px] px-4 py-1.5 rounded transition-colors"
-                  >
-                    Save Override
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Live System Activity and Audit Log */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
@@ -2569,7 +2524,72 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
         </div>
       );
 
-    default:
-      return null;
-  }
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      {renderTabContent()}
+
+      {/* Global Reschedule Date Override Popover (accessible on Dashboard, Chits directory, and Workspace) */}
+      {rescheduleGroupId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-xs space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+              <h4 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                <CalendarDays size={14} className="text-indigo-600" />
+                Reschedule Auction Date
+              </h4>
+              <button onClick={() => setRescheduleGroupId(null)} className="text-gray-400 hover:text-gray-600 p-1">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Select New Date</label>
+              <input
+                type="date"
+                value={rescheduleInputVal}
+                onChange={(e) => setRescheduleInputVal(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                autoFocus
+              />
+              <p className="text-[10px] text-gray-500 mt-1">
+                Canonical (auto): {formatAuctionDate(getFirstSundayOnOrAfter10th(new Date().getFullYear(), new Date().getMonth()))}
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+              {auctionDateOverrides[rescheduleGroupId] && (
+                <button
+                  type="button"
+                  onClick={() => { 
+                    setAuctionDateOverrides(prev => { 
+                      const n = {...prev}; 
+                      delete n[rescheduleGroupId!]; 
+                      return n; 
+                    }); 
+                    setRescheduleGroupId(null); 
+                  }}
+                  className="text-[10px] font-bold text-red-650 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  Clear Override
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (rescheduleInputVal) setAuctionDateOverrides(prev => ({ ...prev, [rescheduleGroupId!]: rescheduleInputVal }));
+                  setRescheduleGroupId(null);
+                }}
+                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors shadow-sm"
+              >
+                Save Override
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
