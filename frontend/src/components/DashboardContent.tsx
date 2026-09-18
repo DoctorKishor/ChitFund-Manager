@@ -130,6 +130,8 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const [dropdownHighlightedIndex, setDropdownHighlightedIndex] = useState(0);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
 
   // New Member Modal States for Wizard Step 2 & Master Directory
   const [showCreateMemberModal, setShowCreateMemberModal] = useState(false);
@@ -1054,6 +1056,8 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCreatingGroup) return;
+
     const duration = Number(newGroupDuration);
     
     if (enrollments.length !== duration) {
@@ -1068,8 +1072,9 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     }
 
     try {
+      setIsCreatingGroup(true);
       const { data: groupData, error: groupError } = await supabase.from('chit_groups').insert({
-        name: newGroupName,
+        name: newGroupName.trim(),
         total_value: Number(newGroupValue),
         member_count: duration,
         duration_months: duration,
@@ -1106,23 +1111,25 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
       alert(`Success: Chit Group "${newGroupName}" created in Supabase! \nPool Value: ₹${newGroupValue}\nDuration: ${duration} Months.`);
       await fetchGroups();
+
+      // Reset form
+      setNewGroupName('');
+      setNewGroupValue('100000');
+      setNewGroupDuration('5');
+      setEnrollments([
+        { id: undefined, name: '', phone: '' },
+        { id: undefined, name: '', phone: '' },
+        { id: undefined, name: '', phone: '' },
+        { id: undefined, name: '', phone: '' },
+        { id: undefined, name: '', phone: '' },
+      ]);
+      setWizardStep(1);
+      setShowWizard(false);
     } catch (err: any) {
       alert(`Error creating group: ${err.message}`);
+    } finally {
+      setIsCreatingGroup(false);
     }
-    
-    // Reset form
-    setNewGroupName('');
-    setNewGroupValue('100000');
-    setNewGroupDuration('5');
-    setEnrollments([
-      { id: undefined, name: '', phone: '' },
-      { id: undefined, name: '', phone: '' },
-      { id: undefined, name: '', phone: '' },
-      { id: undefined, name: '', phone: '' },
-      { id: undefined, name: '', phone: '' },
-    ]);
-    setWizardStep(1);
-    setShowWizard(false);
   };
 
   const handleRecordPaymentSubmit = (e: React.FormEvent) => {
@@ -2277,98 +2284,161 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                       </button>
                     </div>
 
-                    <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-gray-400">
-                        <Search size={14} />
-                      </span>
-                      <input
-                        type="text"
-                        placeholder="Type member name to search or register..."
-                        value={memberSearchQuery}
-                        onFocus={() => setIsSearchDropdownOpen(true)}
-                        onChange={(e) => {
-                          setMemberSearchQuery(e.target.value);
-                          setIsSearchDropdownOpen(true);
-                        }}
-                        className="w-full bg-white border border-gray-200 focus:border-indigo-500 rounded-lg pl-9 pr-20 py-2 text-xs font-semibold text-gray-900 focus:outline-none shadow-sm"
-                      />
-                      {memberSearchQuery && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMemberSearchQuery('');
-                            setIsSearchDropdownOpen(false);
-                          }}
-                          className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
+                    {(() => {
+                      const filteredMembers = masterDirectory.filter(
+                        m => m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) || m.phone.includes(memberSearchQuery)
+                      );
+                      const totalItems = 1 + filteredMembers.length;
 
-                      {/* Dropdown Suggestions */}
-                      {isSearchDropdownOpen && memberSearchQuery.trim().length > 0 && (
-                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-gray-100">
-                          {/* Create Option */}
-                          <div
-                            onClick={() => {
-                              setNewMemberName(memberSearchQuery.trim());
-                              setNewMemberPhone('');
-                              setShowCreateMemberModal(true);
-                              setIsSearchDropdownOpen(false);
+                      return (
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-gray-400">
+                            <Search size={14} />
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="Type member name to search or register... (↑/↓ to navigate, Enter to select)"
+                            value={memberSearchQuery}
+                            onFocus={() => {
+                              setIsSearchDropdownOpen(true);
+                              setDropdownHighlightedIndex(0);
                             }}
-                            className="p-2.5 hover:bg-indigo-50 cursor-pointer flex items-center justify-between text-indigo-600 font-bold text-xs bg-indigo-50/40"
-                          >
-                            <span className="flex items-center gap-1.5">
-                              <UserPlus size={14} />
-                              Create &amp; Assign &quot;{memberSearchQuery}&quot;
-                            </span>
-                            <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded font-semibold">+ New</span>
-                          </div>
+                            onChange={(e) => {
+                              setMemberSearchQuery(e.target.value);
+                              setIsSearchDropdownOpen(true);
+                              setDropdownHighlightedIndex(0);
+                            }}
+                            onKeyDown={(e) => {
+                              if (!isSearchDropdownOpen || memberSearchQuery.trim().length === 0) {
+                                if (e.key === 'ArrowDown') {
+                                  setIsSearchDropdownOpen(true);
+                                }
+                                return;
+                              }
 
-                          {/* Matching Master Directory Members */}
-                          {masterDirectory
-                            .filter(m => m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) || m.phone.includes(memberSearchQuery))
-                            .map((member, idx) => {
-                              const isAlreadyEnrolled = enrollments.some(e => e.name.toLowerCase() === member.name.toLowerCase());
-                              return (
-                                <div
-                                  key={idx}
-                                  onClick={() => {
+                              if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                setDropdownHighlightedIndex(prev => (prev + 1) % totalItems);
+                              } else if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setDropdownHighlightedIndex(prev => (prev - 1 + totalItems) % totalItems);
+                              } else if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (dropdownHighlightedIndex === 0) {
+                                  setNewMemberName(memberSearchQuery.trim());
+                                  setNewMemberPhone('');
+                                  setShowCreateMemberModal(true);
+                                  setIsSearchDropdownOpen(false);
+                                } else {
+                                  const targetMember = filteredMembers[dropdownHighlightedIndex - 1];
+                                  if (targetMember) {
+                                    const isAlreadyEnrolled = enrollments.some(
+                                      en => en.name.toLowerCase() === targetMember.name.toLowerCase()
+                                    );
                                     if (!isAlreadyEnrolled) {
-                                      handleAssignExistingMember(member);
+                                      handleAssignExistingMember(targetMember);
                                     }
-                                  }}
-                                  className={`p-2.5 flex items-center justify-between text-xs transition-colors ${
-                                    isAlreadyEnrolled
-                                      ? 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
-                                      : 'hover:bg-gray-50 cursor-pointer text-gray-800'
-                                  }`}
-                                >
-                                  <div>
-                                    <span className="font-bold block">{member.name}</span>
-                                    <span className="text-[10px] text-gray-400">{member.phone}</span>
-                                  </div>
-                                  <div>
-                                    {isAlreadyEnrolled ? (
-                                      <span className="text-[9px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded">Enrolled</span>
-                                    ) : (
-                                      <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded hover:bg-indigo-100">
-                                        Assign to Next Slot →
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
+                                  }
+                                }
+                              } else if (e.key === 'Escape') {
+                                setIsSearchDropdownOpen(false);
+                              }
+                            }}
+                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 rounded-lg pl-9 pr-20 py-2 text-xs font-semibold text-gray-900 focus:outline-none shadow-sm"
+                          />
+                          {memberSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMemberSearchQuery('');
+                                setIsSearchDropdownOpen(false);
+                              }}
+                              className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
 
-                          {masterDirectory.filter(m => m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) || m.phone.includes(memberSearchQuery)).length === 0 && (
-                            <div className="p-3 text-center text-xs text-gray-400">
-                              No existing subscribers matched &quot;{memberSearchQuery}&quot;. Click above to create this member.
+                          {/* Dropdown Suggestions */}
+                          {isSearchDropdownOpen && memberSearchQuery.trim().length > 0 && (
+                            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-gray-100">
+                              {/* Create Option (Index 0) */}
+                              <div
+                                onClick={() => {
+                                  setNewMemberName(memberSearchQuery.trim());
+                                  setNewMemberPhone('');
+                                  setShowCreateMemberModal(true);
+                                  setIsSearchDropdownOpen(false);
+                                }}
+                                className={`p-2.5 cursor-pointer flex items-center justify-between text-xs transition-colors ${
+                                  dropdownHighlightedIndex === 0
+                                    ? 'bg-indigo-100/90 text-indigo-950 font-bold ring-1 ring-inset ring-indigo-400'
+                                    : 'hover:bg-indigo-50 text-indigo-600 font-semibold bg-indigo-50/40'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <UserPlus size={14} />
+                                  Create &amp; Assign &quot;{memberSearchQuery}&quot;
+                                </span>
+                                <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                                  {dropdownHighlightedIndex === 0 && <span>↵</span>} + New
+                                </span>
+                              </div>
+
+                              {/* Matching Master Directory Members (Index 1..N) */}
+                              {filteredMembers.map((member, idx) => {
+                                const isAlreadyEnrolled = enrollments.some(
+                                  e => e.name.toLowerCase() === member.name.toLowerCase()
+                                );
+                                const isHighlighted = dropdownHighlightedIndex === idx + 1;
+
+                                return (
+                                  <div
+                                    key={idx}
+                                    onClick={() => {
+                                      if (!isAlreadyEnrolled) {
+                                        handleAssignExistingMember(member);
+                                      }
+                                    }}
+                                    className={`p-2.5 flex items-center justify-between text-xs transition-colors ${
+                                      isAlreadyEnrolled
+                                        ? 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
+                                        : isHighlighted
+                                          ? 'bg-indigo-50 text-indigo-950 font-bold ring-1 ring-inset ring-indigo-300'
+                                          : 'hover:bg-gray-50 cursor-pointer text-gray-800'
+                                    }`}
+                                  >
+                                    <div>
+                                      <span className="font-bold block">{member.name}</span>
+                                      <span className="text-[10px] text-gray-400">{member.phone}</span>
+                                    </div>
+                                    <div>
+                                      {isAlreadyEnrolled ? (
+                                        <span className="text-[9px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded">Enrolled</span>
+                                      ) : isHighlighted ? (
+                                        <span className="text-[10px] font-bold text-white bg-indigo-600 px-2.5 py-0.5 rounded shadow-sm">
+                                          ↵ Enter to Assign
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded hover:bg-indigo-100">
+                                          Assign to Next Slot →
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {filteredMembers.length === 0 && (
+                                <div className="p-3 text-center text-xs text-gray-400">
+                                  No existing subscribers matched &quot;{memberSearchQuery}&quot;. Press <strong>Enter</strong> to register this member.
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Group Enrollment Spots (Slots Grid) */}
@@ -2566,10 +2636,21 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                     </button>
                     <button
                       type="button"
+                      disabled={isCreatingGroup}
                       onClick={handleCreateGroup}
-                      className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-6 py-2.5 rounded-lg transition-colors duration-155 flex items-center justify-center gap-1.5 shadow"
+                      className={`font-bold text-xs px-6 py-2.5 rounded-lg transition-colors duration-155 flex items-center justify-center gap-1.5 shadow ${
+                        isCreatingGroup
+                          ? 'bg-gray-400 text-white cursor-not-allowed'
+                          : 'bg-gray-900 hover:bg-black text-white'
+                      }`}
                     >
-                      Create Group &amp; Enroll Slots
+                      {isCreatingGroup ? (
+                        <>
+                          <RefreshCw size={13} className="animate-spin" /> Creating Group in Supabase...
+                        </>
+                      ) : (
+                        'Create Group & Enroll Slots'
+                      )}
                     </button>
                   </div>
                 </div>
