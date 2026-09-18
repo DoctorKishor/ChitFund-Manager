@@ -108,3 +108,57 @@ The system maintains 4 distinct operational vaults synchronized in real-time wit
    - Use **"Laaba Seetu"** strictly for the member-profit free installment mechanism.
 3. **Database Integrity**: Always enforce PostgreSQL constraints, foreign keys, and Row-Level Security (RLS) policies.
 4. **Build Verification**: Always run `npm run build` to verify zero TypeScript errors before committing changes.
+
+---
+
+## 7. Master System Audit & Fine-Tuning / Debugging Directive
+
+Whenever an AI agent is requested to audit, debug, fine-tune, or add features to this application, it MUST execute the following verification checklist:
+
+### A. Supabase PostgreSQL & Schema Synchronization Audit
+1. **Schema & Column Parity**:
+   - Inspect `information_schema.columns` across all core tables (`chit_groups`, `group_members`, `profiles`, `transactions`, `auction_logs`, `global_treasury`, `security_audit_logs`).
+   - Ensure every column referenced, queried, inserted, or updated in the frontend (e.g. `notes`, `group_member_id`, `start_date`, `split_pool`, `custom_installment`, `exit_month`, `transferred_from`) exists in the live PostgreSQL database.
+2. **Check Constraints & Enums**:
+   - Verify `chit_groups.current_month >= 0` (MUST allow `0` for Launch / Orientation Month).
+   - Verify `auction_logs.month >= 0`.
+   - Verify enum check constraints:
+     - `global_treasury.wallet_type IN ('cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank')`
+     - `transactions.type IN ('collection', 'payout', 'personal_draw', 'atm_withdrawal', 'transfer')`
+     - `chit_groups.status IN ('draft', 'active', 'completed')`
+3. **Foreign Keys & Nullability**:
+   - Ensure `transactions.profile_id` and `transactions.created_by` permit `NULL` or have fallback defaults (`auth.uid()`) to prevent crashes during offline / manual subscriber operations.
+4. **Row-Level Security (RLS) & Triggers**:
+   - Ensure `is_admin_or_manager()` security definer functions permit required `SELECT`, `INSERT`, and `UPDATE` operations.
+   - Verify `process_audit_log()` triggers fire smoothly on data mutations without throwing constraint violations.
+
+### B. Chit Funds Business Rules & Math Integrity
+1. **Month 0 vs Month 1 Separation**:
+   - **Month 0**: Launch & Orientation month (`startDate + 0`). No live auction is held. All collections are allocated as **Organizer Profit**.
+   - **Month 1**: 1st Live Auction month (`startDate + 1`). Eligible members place discount bids.
+   - **Months 2..N**: Subsequent consecutive monthly auctions (`startDate + 2..N`).
+2. **Live Auction Bidding & Payouts**:
+   - Winner Net Payout = $\text{Total Chit Value} - \text{Winning Discount Bid}$.
+   - The winning discount accumulates into `kai_iruppu_pool`.
+3. **Laaba Seetu (லாப சீட்டு) Mechanics**:
+   - Triggers when `kai_iruppu_pool >= Total Chit Value`.
+   - In a Laaba Seetu month: Member due = **₹0**. Auction is still held.
+   - Winning discount from the Laaba Seetu month immediately starts the new discount pool:
+     $$\text{New Pool} = (\text{Old Pool} - \text{Total Chit Value}) + \text{This Month's Winning Discount}$$
+
+### C. Multi-Wallet Treasury & State Flow Audit
+1. **Delta vs Absolute Balance Updates**:
+   - In `useWallet().updateBalance(wallet, amount)`, verify `amount` is ALWAYS treated as a **delta** (e.g. `+amt` or `-amt`), NEVER as `currentBal + amt` (which would cause double-counting).
+2. **4 Operational Vaults**:
+   - Ensure synchronization across `cash_in_hand`, `kishor_bank`, `dad_bank`, and `mom_bank`.
+   - Ensure ATM relocations use the two-step verification workflow (bank debit $\rightarrow$ pending verification $\rightarrow$ physical cash box credit).
+3. **Zero Mock Data Policy**:
+   - Verify that NO fake demo toggles, hardcoded member arrays, or mock simulation buttons exist in the UI. All cards must read/write to Supabase.
+
+### D. Verification & Execution Protocol
+1. Inspect the live Supabase database using MCP tools or SQL scripts.
+2. If any schema disparity is found, execute the necessary DDL migration in Supabase and update `supabase_schema.sql`.
+3. If any frontend state or math disparity is found, fix the component code.
+4. Run `npm run build` in `frontend/` to ensure **0 TypeScript / compilation errors**.
+5. Commit and push all synchronized changes to GitHub `main`.
+
