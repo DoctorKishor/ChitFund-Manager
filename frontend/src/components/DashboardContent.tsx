@@ -50,7 +50,8 @@ import {
   CheckCheck,
   Landmark,
   Info,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 
 // ── Utility: First Sunday on-or-after the 10th of a given month ──────────────
@@ -169,6 +170,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [editGroupStatus, setEditGroupStatus] = useState<'draft' | 'active' | 'completed'>('active');
   const [editGroupValue, setEditGroupValue] = useState<number>(100000);
   const [editGroupMemberCount, setEditGroupMemberCount] = useState<number>(5);
+  const [editGroupCurrentMonth, setEditGroupCurrentMonth] = useState<number>(0);
   const [editGroupStartDate, setEditGroupStartDate] = useState<string>('');
   const [editGroupMembers, setEditGroupMembers] = useState<any[]>([]);
   const [editMemberSearchQuery, setEditMemberSearchQuery] = useState('');
@@ -349,6 +351,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     setEditGroupValue(g.totalValue || 100000);
     const count = g.duration || g.memberCount || 5;
     setEditGroupMemberCount(count);
+    setEditGroupCurrentMonth((g.currentMonth !== undefined && g.currentMonth !== null) ? g.currentMonth : 0);
     setEditGroupStartDate(g.startDate || new Date().toISOString().split('T')[0]);
     setIsAdvancedExpanded(false);
     setEditMemberSearchQuery('');
@@ -429,6 +432,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
           total_value: valNum,
           member_count: countNum,
           duration_months: countNum,
+          current_month: editGroupCurrentMonth,
           status: editGroupStatus,
           start_date: editGroupStartDate || null,
         })
@@ -449,6 +453,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                 totalValue: valNum,
                 duration: countNum,
                 memberCount: countNum,
+                currentMonth: editGroupCurrentMonth,
                 status: editGroupStatus,
                 startDate: editGroupStartDate,
                 active: editGroupStatus !== 'completed',
@@ -1290,6 +1295,57 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     }
   };
 
+  // Revert / Rollback Active Month Cycle Handler
+  const handleRevertMonth = async () => {
+    const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId);
+    if (!activeGroup) return;
+
+    const currentMonth = activeGroup.currentMonth !== undefined && activeGroup.currentMonth !== null ? activeGroup.currentMonth : 0;
+    if (currentMonth <= 0) {
+      alert('This chit group is currently at Month 0 (Launch Month) and cannot be rolled back further.');
+      return;
+    }
+
+    const prevMonth = currentMonth - 1;
+    const confirmRevert = window.confirm(
+      `REVERT ACTIVE MONTH CYCLE?\n\nAre you sure you want to revert "${activeGroup.name}" from Month ${currentMonth} back to Month ${prevMonth}${prevMonth === 0 ? ' (Launch & Orientation Phase)' : ''}?\n\n(All past recorded collections and subscriber ledger entries remain completely preserved.)`
+    );
+    if (!confirmRevert) return;
+
+    try {
+      setIsClosingMonth(true);
+      const { error } = await supabase
+        .from('chit_groups')
+        .update({ current_month: prevMonth, status: 'active' })
+        .eq('id', activeDashboardGroupId);
+
+      if (error) {
+        alert('Error reverting month: ' + error.message);
+        return;
+      }
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'chit_groups',
+          desc: `REVERTED CYCLE: "${activeGroup.name}" rolled back from Month ${currentMonth} to Month ${prevMonth} by Admin`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+
+      await fetchGroups();
+      setSelectedDashboardMonth(prevMonth);
+    } catch (err: any) {
+      console.error('Error reverting month:', err);
+      alert('Failed to revert month.');
+    } finally {
+      setIsClosingMonth(false);
+    }
+  };
+
   // WhatsApp Receipt Link Generator
   const generateWhatsAppReceiptUrl = (member: any, paidAmount: number, totalDue: number, tx?: any) => {
     const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId);
@@ -1872,6 +1928,19 @@ Thank you for your prompt payment! 🙏`;
                         <CheckCheck size={14} />
                         <span>{isMarkingAllPaid ? 'Recording...' : 'Mark All Paid'}</span>
                       </button>
+
+                      {/* In-App Revert Active Month Button */}
+                      {(activeGroup.currentMonth ?? 0) > 0 && (
+                        <button
+                          onClick={handleRevertMonth}
+                          disabled={isClosingMonth}
+                          className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-sm border border-gray-200"
+                          title={`Roll back active cycle to Month ${(activeGroup.currentMonth ?? 1) - 1}`}
+                        >
+                          <RotateCcw size={13} className="text-gray-500" />
+                          <span>Revert to M{(activeGroup.currentMonth ?? 1) - 1}</span>
+                        </button>
+                      )}
 
                       {selectedDashboardMonth === 0 ? (
                         <button
@@ -3694,6 +3763,26 @@ Thank you for your prompt payment! 🙏`;
                         {editGroupStatus === 'draft' && 'Draft mode: Enrollment open, no auction bids or treasury postings yet.'}
                         {editGroupStatus === 'active' && 'Active: In-progress chit fund for monthly collections and live auctions.'}
                         {editGroupStatus === 'completed' && 'Completed: All monthly cycles and winner payouts concluded.'}
+                      </p>
+                    </div>
+
+                    {/* Active Month Selector */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 block">Current Active Month *</label>
+                      <select
+                        value={editGroupCurrentMonth}
+                        onChange={(e) => setEditGroupCurrentMonth(parseInt(e.target.value) || 0)}
+                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none"
+                      >
+                        <option value={0}>Month 0 (Launch Month — Organizer Profit Phase)</option>
+                        {Array.from({ length: editGroupMemberCount }).map((_, idx) => (
+                          <option key={idx + 1} value={idx + 1}>
+                            Month {idx + 1} {idx === 0 ? '(1st Live Auction)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-gray-500">
+                        Directly controls the ongoing monthly cycle. You can advance or revert this anytime.
                       </p>
                     </div>
                   </div>
