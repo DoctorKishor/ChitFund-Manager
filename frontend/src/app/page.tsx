@@ -68,8 +68,8 @@ export default function Home() {
 
         {/* 2. Main Content Board Canvas (Wide, auto-reflowing container) */}
         <main className="flex-1 p-6 space-y-6 overflow-y-auto w-full max-w-[1600px] mx-auto">
-          {/* Top Status Ribbon (Multi-wallet summary asset pills) */}
-          <TopStatusRibbon />
+          {/* Top Status Ribbon (Multi-wallet summary asset pills) — shown exclusively in Cash Handling tab */}
+          {activeTab === 'cash' && <TopStatusRibbon />}
 
           {/* Dynamic Content Panel Board */}
           <div className="w-full">
