@@ -51,7 +51,8 @@ import {
   Landmark,
   Info,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  Paperclip
 } from 'lucide-react';
 
 // ── Utility: First Sunday on-or-after the 10th of a given month ──────────────
@@ -906,8 +907,13 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [selectedDashboardMonth, setSelectedDashboardMonth] = useState<number>(1);
   const [hidePaidMembers, setHidePaidMembers] = useState<boolean>(false);
   const [recordingPaymentMember, setRecordingPaymentMember] = useState<any | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<any | null>(null);
   const [paymentWalletType, setPaymentWalletType] = useState<string>('cash_in_hand');
   const [quickPaymentAmount, setQuickPaymentAmount] = useState<string>('');
+  const [paymentDateType, setPaymentDateType] = useState<'today' | 'yesterday' | 'custom'>('today');
+  const [customPaymentDate, setCustomPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [paymentNote, setPaymentNote] = useState<string>('');
+  const [paymentReceiptUrl, setPaymentReceiptUrl] = useState<string>('');
   const [dashboardTransactions, setDashboardTransactions] = useState<any[]>([]);
   const [dashboardAuctionLogs, setDashboardAuctionLogs] = useState<any[]>([]);
   const [dashboardGroupMembers, setDashboardGroupMembers] = useState<any[]>([]);
@@ -915,6 +921,40 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [isMarkingAllPaid, setIsMarkingAllPaid] = useState<boolean>(false);
   const [isClosingMonth, setIsClosingMonth] = useState<boolean>(false);
+
+  // Helper: compute effective ISO date timestamp based on date pill selection
+  const computeEffectivePaymentDate = (dateType: 'today' | 'yesterday' | 'custom', customDate: string) => {
+    const now = new Date();
+    if (dateType === 'today') {
+      return now.toISOString();
+    } else if (dateType === 'yesterday') {
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      return yesterday.toISOString();
+    } else {
+      if (!customDate) return now.toISOString();
+      const [year, month, day] = customDate.split('-').map(Number);
+      const custom = new Date(year, (month || 1) - 1, day || 1, now.getHours(), now.getMinutes(), now.getSeconds());
+      return custom.toISOString();
+    }
+  };
+
+  // Helper: handle local image upload for receipt attachment
+  const handleReceiptPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Photo size exceeds 5MB limit. Please choose a smaller image.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setPaymentReceiptUrl(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Auto-select first active group when groups load
   useEffect(() => {
@@ -1051,7 +1091,9 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     try {
       setIsProcessingPayment(true);
 
-      const noteText = `Month ${selectedDashboardMonth} collection payment - Ticket #${recordingPaymentMember.ticket} (${recordingPaymentMember.name})`;
+      const effectiveDateStr = computeEffectivePaymentDate(paymentDateType, customPaymentDate);
+      const defaultNote = `Month ${selectedDashboardMonth} collection payment - Ticket #${recordingPaymentMember.ticket} (${recordingPaymentMember.name})`;
+      const finalNote = paymentNote.trim() ? `${defaultNote} — Note: ${paymentNote.trim()}` : defaultNote;
 
       // 1. Insert collection transaction
       const { error: txErr } = await supabase
@@ -1064,7 +1106,9 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
           type: 'collection',
           status: 'completed',
           amount: amt,
-          notes: noteText,
+          notes: finalNote,
+          verification_proof_url: paymentReceiptUrl || null,
+          created_at: effectiveDateStr,
           created_by: profile?.id || null,
         });
 
@@ -1091,10 +1135,170 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
 
       setRecordingPaymentMember(null);
       setQuickPaymentAmount('');
+      setPaymentNote('');
+      setPaymentReceiptUrl('');
+      setPaymentDateType('today');
       await fetchDashboardData(activeDashboardGroupId);
     } catch (err: any) {
       console.error('Error processing quick payment:', err);
       alert('An error occurred while processing payment.');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Open Edit Payment Modal Handler
+  const handleOpenEditPayment = (tx: any) => {
+    setEditingTransaction(tx);
+    setRecordingPaymentMember(null);
+    setQuickPaymentAmount(String(tx.amount || ''));
+    setPaymentWalletType(tx.wallet_type || 'cash_in_hand');
+    setPaymentNote(tx.notes || '');
+    setPaymentReceiptUrl(tx.verification_proof_url || '');
+
+    if (tx.created_at) {
+      const txDate = new Date(tx.created_at);
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+
+      const isSameDay = (d1: Date, d2: Date) =>
+        d1.getFullYear() === d2.getFullYear() &&
+        d1.getMonth() === d2.getMonth() &&
+        d1.getDate() === d2.getDate();
+
+      if (isSameDay(txDate, today)) {
+        setPaymentDateType('today');
+        setCustomPaymentDate(today.toISOString().split('T')[0]);
+      } else if (isSameDay(txDate, yesterday)) {
+        setPaymentDateType('yesterday');
+        setCustomPaymentDate(yesterday.toISOString().split('T')[0]);
+      } else {
+        setPaymentDateType('custom');
+        setCustomPaymentDate(txDate.toISOString().split('T')[0]);
+      }
+    } else {
+      setPaymentDateType('today');
+      setCustomPaymentDate(new Date().toISOString().split('T')[0]);
+    }
+  };
+
+  // Save Payment Edit Handler
+  const handleSavePaymentEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTransaction || !activeDashboardGroupId) return;
+
+    const newAmt = parseFloat(quickPaymentAmount);
+    if (isNaN(newAmt) || newAmt <= 0) {
+      alert('Please enter a valid payment amount.');
+      return;
+    }
+
+    try {
+      setIsProcessingPayment(true);
+      const effectiveDateStr = computeEffectivePaymentDate(paymentDateType, customPaymentDate);
+      const oldAmt = Number(editingTransaction.amount || 0);
+      const oldWallet = editingTransaction.wallet_type;
+      const newWallet = paymentWalletType;
+
+      // 1. Update transaction in database
+      const { error: updateErr } = await supabase
+        .from('transactions')
+        .update({
+          amount: newAmt,
+          wallet_type: newWallet,
+          notes: paymentNote,
+          verification_proof_url: paymentReceiptUrl || null,
+          created_at: effectiveDateStr,
+        })
+        .eq('id', editingTransaction.id);
+
+      if (updateErr) {
+        alert('Failed to update payment: ' + updateErr.message);
+        return;
+      }
+
+      // 2. Adjust treasury balances accurately
+      if (oldWallet === newWallet) {
+        const delta = newAmt - oldAmt;
+        if (delta !== 0) {
+          await updateBalance(newWallet as any, delta);
+        }
+      } else {
+        await updateBalance(oldWallet as any, -oldAmt);
+        await updateBalance(newWallet as any, newAmt);
+      }
+
+      // 3. Audit log
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'transactions',
+          desc: `PAYMENT EDITED: Updated receipt #${editingTransaction.id.slice(0, 8)} to ₹${newAmt.toLocaleString('en-IN')} (${newWallet.replace(/_/g, ' ')})`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+
+      setEditingTransaction(null);
+      setQuickPaymentAmount('');
+      setPaymentNote('');
+      setPaymentReceiptUrl('');
+      await fetchDashboardData(activeDashboardGroupId);
+    } catch (err: any) {
+      console.error('Error updating payment:', err);
+      alert('An error occurred while updating payment.');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Delete/Void Payment Handler
+  const handleDeletePayment = async (tx: any) => {
+    const amt = Number(tx.amount || 0);
+    const confirmMsg = `Are you sure you want to void/delete this payment receipt of ₹${amt.toLocaleString('en-IN')}?\n\nThis will deduct ₹${amt.toLocaleString('en-IN')} from ${tx.wallet_type?.replace(/_/g, ' ')} balance.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setIsProcessingPayment(true);
+
+      // 1. Delete from database
+      const { error: delErr } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', tx.id);
+
+      if (delErr) {
+        alert('Failed to delete payment: ' + delErr.message);
+        return;
+      }
+
+      // 2. Revert wallet balance
+      await updateBalance(tx.wallet_type as any, -amt);
+
+      // 3. Audit log
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'transactions',
+          desc: `PAYMENT DELETED: Voided ₹${amt.toLocaleString('en-IN')} from ${tx.wallet_type?.replace(/_/g, ' ')}`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+
+      if (editingTransaction?.id === tx.id) {
+        setEditingTransaction(null);
+      }
+
+      await fetchDashboardData(activeDashboardGroupId);
+    } catch (err: any) {
+      console.error('Error deleting payment:', err);
+      alert('An error occurred while deleting payment.');
     } finally {
       setIsProcessingPayment(false);
     }
@@ -2113,8 +2317,13 @@ Thank you for your prompt payment! 🙏`;
                           <button
                             onClick={() => {
                               setRecordingPaymentMember(member);
+                              setEditingTransaction(null);
                               setQuickPaymentAmount(member.remaining.toString());
                               setPaymentWalletType('cash_in_hand');
+                              setPaymentDateType('today');
+                              setCustomPaymentDate(new Date().toISOString().split('T')[0]);
+                              setPaymentNote('');
+                              setPaymentReceiptUrl('');
                             }}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm shrink-0 flex items-center gap-1.5"
                           >
@@ -2140,21 +2349,41 @@ Thank you for your prompt payment! 🙏`;
 
                     {!hidePaidMembers && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                        {paidList.map((member) => (
-                          <div
-                            key={member.id}
-                            className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-2.5 flex items-center justify-between text-xs"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-                              <span className="font-semibold text-gray-900 truncate">{member.name}</span>
-                              <span className="text-[10px] text-gray-500 font-mono">#{member.ticket}</span>
+                        {paidList.map((member) => {
+                          const memTx = dashboardTransactions.find(t => 
+                            t.type === 'collection' && 
+                            (t.profile_id === member.profileId || t.group_member_id === member.id) &&
+                            (t.notes?.includes(`Month ${selectedDashboardMonth}`) || !t.notes)
+                          );
+
+                          return (
+                            <div
+                              key={member.id}
+                              className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-2.5 flex items-center justify-between text-xs hover:border-emerald-300 transition-colors"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                                <span className="font-semibold text-gray-900 truncate">{member.name}</span>
+                                <span className="text-[10px] text-gray-500 font-mono">#{member.ticket}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-bold text-emerald-700">
+                                  {formatCurrency(member.paid)} paid
+                                </span>
+                                {memTx && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditPayment(memTx)}
+                                    title="Edit payment receipt"
+                                    className="p-1 text-emerald-700 hover:text-indigo-700 hover:bg-emerald-100 rounded-md transition-colors"
+                                  >
+                                    <Edit3 size={12} />
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <span className="font-bold text-emerald-700 shrink-0">
-                              {formatCurrency(member.paid)} paid
-                            </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -2172,7 +2401,7 @@ Thank you for your prompt payment! 🙏`;
                       <span>Payments Breakdown Ledger</span>
                     </h3>
                     <p className="text-[11px] text-gray-500 mt-0.5">
-                      Live transaction receipts for Month {selectedDashboardMonth} with 1-click WhatsApp sharing
+                      Live transaction receipts for Month {selectedDashboardMonth} with edit/delete & 1-click WhatsApp sharing
                     </p>
                   </div>
                   <span className="text-xs font-bold text-gray-500">
@@ -2187,7 +2416,7 @@ Thank you for your prompt payment! 🙏`;
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {currentMonthTransactions.map((tx) => {
-                      const matchedMember = dashboardGroupMembers.find(m => m.profileId === tx.profile_id);
+                      const matchedMember = dashboardGroupMembers.find(m => m.profileId === tx.profile_id || m.id === tx.group_member_id);
                       const memberName = matchedMember?.name || 'Subscriber';
                       const ticketNum = matchedMember?.ticket || '?';
                       const dateStr = tx.created_at 
@@ -2206,28 +2435,59 @@ Thank you for your prompt payment! 🙏`;
                                 <span className="text-[10px] font-mono bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded">
                                   {tx.wallet_type?.replace(/_/g, ' ').toUpperCase() || 'CASH'}
                                 </span>
+                                {tx.verification_proof_url && (
+                                  <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded flex items-center gap-0.5">
+                                    <Paperclip size={9} /> Receipt
+                                  </span>
+                                )}
                               </div>
-                              <span className="text-[10px] text-gray-400">{dateStr}</span>
+                              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                                <span>{dateStr}</span>
+                                {tx.notes && <span className="text-gray-500 italic max-w-xs truncate">· {tx.notes}</span>}
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3 justify-between sm:justify-end">
-                            <span className="text-xs font-bold text-emerald-600">
+                          <div className="flex items-center gap-2 justify-between sm:justify-end">
+                            <span className="text-xs font-bold text-emerald-600 mr-1">
                               +{formatCurrency(Number(tx.amount || 0))}
                             </span>
 
-                            {/* WhatsApp Share Button */}
-                            {matchedMember && (
-                              <a
-                                href={generateWhatsAppReceiptUrl(matchedMember, Number(tx.amount || 0), baseInstallment, tx)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors"
+                            <div className="flex items-center gap-1.5">
+                              {/* WhatsApp Share Button */}
+                              {matchedMember && (
+                                <a
+                                  href={generateWhatsAppReceiptUrl(matchedMember, Number(tx.amount || 0), baseInstallment, tx)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Share receipt on WhatsApp"
+                                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition-colors"
+                                >
+                                  <Share2 size={12} />
+                                  <span className="hidden sm:inline">Share</span>
+                                </a>
+                              )}
+
+                              {/* Edit Payment Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditPayment(tx)}
+                                title="Edit payment"
+                                className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-lg transition-colors"
                               >
-                                <Share2 size={12} />
-                                <span>Share</span>
-                              </a>
-                            )}
+                                <Edit3 size={13} />
+                              </button>
+
+                              {/* Delete/Void Payment Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePayment(tx)}
+                                title="Delete payment receipt"
+                                className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-200 hover:border-rose-200 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -2237,87 +2497,129 @@ Thank you for your prompt payment! 🙏`;
               </div>
             )}
 
-            {/* Quick Record Payment Modal */}
-            {recordingPaymentMember && (
+            {/* Unified Quick Record & Edit Payment Modal */}
+            {(recordingPaymentMember || editingTransaction) && (
               <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
                 <form
-                  onSubmit={handleRecordQuickPayment}
-                  className="bg-white rounded-2xl border border-gray-200 p-6 w-full max-w-md space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150"
+                  onSubmit={editingTransaction ? handleSavePaymentEdit : handleRecordQuickPayment}
+                  className="bg-white rounded-2xl border border-gray-200 p-6 w-full max-w-md space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
                 >
+                  {/* Modal Header */}
                   <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                        <Coins size={16} />
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        editingTransaction 
+                          ? 'bg-indigo-100 text-indigo-800' 
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {editingTransaction ? <Edit3 size={16} /> : <Coins size={16} />}
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-gray-900">Record Installment Payment</h4>
-                        <p className="text-[10px] text-gray-500">Month {selectedDashboardMonth} · {activeGroup?.name}</p>
+                        <h4 className="text-sm font-bold text-gray-900">
+                          {editingTransaction ? 'Edit payment' : 'Record Installment Payment'}
+                        </h4>
+                        <p className="text-[10px] text-gray-500">
+                          {editingTransaction 
+                            ? `Receipt #${editingTransaction.id.slice(0, 8)} · Month ${selectedDashboardMonth}`
+                            : `Month ${selectedDashboardMonth} · ${activeGroup?.name}`}
+                        </p>
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setRecordingPaymentMember(null)}
-                      className="text-gray-400 hover:text-gray-700"
+                      onClick={() => {
+                        setRecordingPaymentMember(null);
+                        setEditingTransaction(null);
+                      }}
+                      className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 transition-colors"
                     >
                       <X size={16} />
                     </button>
                   </div>
 
                   {/* Subscriber Details Card */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex justify-between items-center text-xs">
-                    <div>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Subscriber</span>
-                      <span className="font-bold text-gray-900">{recordingPaymentMember.name}</span>
-                      <span className="text-gray-500 ml-1.5 font-mono">#{recordingPaymentMember.ticket}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Remaining Due</span>
-                      <span className="font-bold text-amber-600">{formatCurrency(recordingPaymentMember.remaining)}</span>
-                    </div>
-                  </div>
+                  {(() => {
+                    const matchedMember = editingTransaction 
+                      ? dashboardGroupMembers.find(m => m.profileId === editingTransaction.profile_id || m.id === editingTransaction.group_member_id)
+                      : recordingPaymentMember;
+                    const subscriberName = matchedMember?.name || (editingTransaction ? 'Subscriber' : recordingPaymentMember?.name || 'Subscriber');
+                    const ticketNum = matchedMember?.ticket || (recordingPaymentMember ? recordingPaymentMember.ticket : '?');
+
+                    return (
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex justify-between items-center text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                            {subscriberName.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="truncate">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Subscriber</span>
+                            <span className="font-bold text-gray-900 truncate block">{subscriberName}</span>
+                            <span className="text-gray-500 text-[10px] font-mono">#{ticketNum}</span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {recordingPaymentMember ? (
+                            <>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Remaining Due</span>
+                              <span className="font-bold text-amber-600">{formatCurrency(recordingPaymentMember.remaining)}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Logged Amount</span>
+                              <span className="font-bold text-indigo-600">{formatCurrency(Number(editingTransaction.amount || 0))}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Payment Amount Input */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Payment Amount (₹)</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-gray-400 font-bold">₹</span>
+                      <span className="absolute left-3.5 top-2.5 text-base text-gray-400 font-bold">₹</span>
                       <input
                         type="number"
                         required
                         placeholder="Amount"
                         value={quickPaymentAmount}
                         onChange={(e) => setQuickPaymentAmount(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-7 py-2 text-sm font-semibold text-gray-900 focus:outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-2 text-base font-bold text-gray-900 focus:outline-none"
                       />
                     </div>
                   </div>
 
                   {/* Quick Preset Chips */}
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setQuickPaymentAmount(recordingPaymentMember.remaining.toString())}
-                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-1.5 rounded-lg transition-colors border border-gray-200"
-                    >
-                      Full ({formatCurrency(recordingPaymentMember.remaining)})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuickPaymentAmount(Math.floor(recordingPaymentMember.remaining / 2).toString())}
-                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-1.5 rounded-lg transition-colors border border-gray-200"
-                    >
-                      Half ({formatCurrency(Math.floor(recordingPaymentMember.remaining / 2))})
-                    </button>
+                    {recordingPaymentMember && recordingPaymentMember.remaining > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setQuickPaymentAmount(recordingPaymentMember.remaining.toString())}
+                          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-1.5 rounded-lg transition-colors border border-gray-200"
+                        >
+                          Full ({formatCurrency(recordingPaymentMember.remaining)})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQuickPaymentAmount(Math.floor(recordingPaymentMember.remaining / 2).toString())}
+                          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-1.5 rounded-lg transition-colors border border-gray-200"
+                        >
+                          Half ({formatCurrency(Math.floor(recordingPaymentMember.remaining / 2))})
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() => setQuickPaymentAmount('')}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors border border-gray-200"
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-4 py-1.5 rounded-lg transition-colors border border-gray-200"
                     >
                       Clear
                     </button>
                   </div>
 
-                  {/* 4-Wallet Selector */}
+                  {/* 4-Wallet Selector (Receiving Account / Vault) */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Receiving Account / Vault</label>
                     <div className="grid grid-cols-2 gap-2">
@@ -2348,23 +2650,141 @@ Thank you for your prompt payment! 🙏`;
                     </div>
                   </div>
 
-                  {/* Buttons */}
-                  <div className="flex gap-2 justify-end pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setRecordingPaymentMember(null)}
-                      className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-all"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isProcessingPayment}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <Check size={14} />
-                      <span>{isProcessingPayment ? 'Recording...' : 'Confirm Payment'}</span>
-                    </button>
+                  {/* Date Selector (Today / Yesterday / Custom) */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Date</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'today', label: 'Today' },
+                        { id: 'yesterday', label: 'Yesterday' },
+                        { id: 'custom', label: '📅 Custom' },
+                      ].map((d) => {
+                        const isSelected = paymentDateType === d.id;
+                        return (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => setPaymentDateType(d.id as any)}
+                            className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
+                              isSelected
+                                ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
+                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {paymentDateType === 'custom' && (
+                      <div className="mt-1.5 animate-in fade-in duration-150">
+                        <input
+                          type="date"
+                          value={customPaymentDate}
+                          onChange={(e) => setCustomPaymentDate(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Note (optional) */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Note (optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Paid via GPay / Handed cash to Dad"
+                      value={paymentNote}
+                      onChange={(e) => setPaymentNote(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-medium text-gray-900 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Receipt Photo Attachment */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Receipt Attachment</label>
+                    {paymentReceiptUrl ? (
+                      <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                        <div className="flex items-center gap-2.5">
+                          <img
+                            src={paymentReceiptUrl}
+                            alt="Receipt preview"
+                            className="w-10 h-10 object-cover rounded-lg border border-emerald-300"
+                          />
+                          <div className="text-left">
+                            <span className="text-xs font-bold text-emerald-900 block">Receipt Attached</span>
+                            <span className="text-[10px] text-emerald-700">Photo ready</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentReceiptUrl('')}
+                          className="text-rose-600 hover:text-rose-800 text-xs font-bold px-2 py-1 rounded-lg hover:bg-rose-50"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <input
+                          type="file"
+                          id="dashboard-receipt-upload"
+                          accept="image/*"
+                          onChange={handleReceiptPhotoUpload}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="dashboard-receipt-upload"
+                          className="flex items-center justify-center gap-2 border border-dashed border-gray-300 hover:border-gray-400 bg-gray-50/70 hover:bg-gray-100 rounded-xl py-2.5 px-3 text-xs text-gray-600 font-semibold cursor-pointer transition-colors"
+                        >
+                          <Paperclip size={14} className="text-gray-500" />
+                          <span>Attach receipt photo</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-between pt-2">
+                    {editingTransaction ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePayment(editingTransaction)}
+                        disabled={isProcessingPayment}
+                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 size={13} />
+                        <span>Delete</span>
+                      </button>
+                    ) : <div />}
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRecordingPaymentMember(null);
+                          setEditingTransaction(null);
+                        }}
+                        className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isProcessingPayment}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <Check size={14} />
+                        <span>
+                          {isProcessingPayment 
+                            ? 'Saving...' 
+                            : editingTransaction 
+                              ? 'Save changes' 
+                              : 'Confirm Payment'}
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>
