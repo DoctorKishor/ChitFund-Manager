@@ -75,26 +75,59 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
     }
   }, [profile]);
 
-  // Fetch real subscribers and groups from Supabase
+  // Fetch real subscribers, enrolled groups, and audit logs from Supabase
   const fetchData = async () => {
     try {
       setLoading(true);
+
+      // 1. Fetch all registered profiles
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('*');
+        .select('*')
+        .order('full_name', { ascending: true });
+
+      // 2. Fetch all group member enrollments joined with chit_groups
+      const { data: memberGroupsData } = await supabase
+        .from('group_members')
+        .select(`
+          id,
+          profile_id,
+          group_id,
+          ticket_number,
+          physical_book_synced,
+          chit_groups (
+            id,
+            name
+          )
+        `);
 
       if (profilesData) {
         setMembers(
-          profilesData.map((p: any) => ({
-            id: p.id,
-            fullName: p.full_name || 'Member',
-            phoneNumber: p.phone_number || '',
-            groups: [],
-            physicalBookSynced: true,
-          }))
+          profilesData.map((p: any) => {
+            const memberGroupRecords = (memberGroupsData || []).filter((gm: any) => gm.profile_id === p.id);
+            const assignedGroups = memberGroupRecords.map((gm: any) => {
+              const groupObj = Array.isArray(gm.chit_groups) ? gm.chit_groups[0] : gm.chit_groups;
+              return {
+                name: groupObj?.name || 'Chit Group',
+                ticket: gm.ticket_number,
+              };
+            });
+            const isSynced = memberGroupRecords.length > 0
+              ? memberGroupRecords.every((gm: any) => gm.physical_book_synced)
+              : true;
+
+            return {
+              id: p.id,
+              fullName: p.full_name || 'Member',
+              phoneNumber: p.phone_number || '',
+              groups: assignedGroups,
+              physicalBookSynced: isSynced,
+            };
+          })
         );
       }
 
+      // 3. Fetch active chit groups for broadcast center
       const { data: groupsData } = await supabase
         .from('chit_groups')
         .select('*')
@@ -118,7 +151,27 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
           };
         });
         setGroupsMetadata(metaMap);
-        setActiveGroupKey(groupsData[0].id);
+        setActiveGroupKey(prev => prev && metaMap[prev] ? prev : groupsData[0].id);
+      }
+
+      // 4. Fetch recent audit logs from database
+      const { data: logsData } = await supabase
+        .from('security_audit_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(10);
+
+      if (logsData && logsData.length > 0) {
+        setAuditLogs(
+          logsData.map((l: any) => ({
+            id: l.id,
+            timestamp: new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            subscriberName: l.target_table ? `Table: ${l.target_table}` : 'System Admin',
+            action: l.action_description,
+            device: 'desktop',
+            userAgent: 'Audit Trail',
+          }))
+        );
       }
     } catch (err) {
       console.error('Error fetching member matrix:', err);
@@ -140,12 +193,12 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
     const formattedInstallment = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(meta.fixedInstallment);
 
     if (templateType === 'pre-auction') {
-      text = `Dear Members,\n\nGroup [${meta.name}] Auction #[Month ${meta.currentMonth}] is active on [${meta.auctionDate}].\nInstallment Dues (Ticket #${meta.id === 'g1' ? 3 : 12}): [${formattedInstallment}].\nPlease clear all outstanding amounts immediately.\n\nRegards,\n${signatureLine}`;
+      text = `Dear Members,\n\nGroup [${meta.name}] Auction #[Month ${meta.currentMonth}] is active on [${meta.auctionDate}].\nInstallment Dues per ticket: [${formattedInstallment}].\nPlease clear all outstanding amounts immediately.\n\nRegards,\n${signatureLine}`;
     } else {
-      text = `Dear Members,\n\nGroup [${meta.name}] Auction #[Month ${meta.currentMonth}] completed.\nWinner: [${meta.winnerName}] (Ticket #${meta.id === 'g1' ? 4 : 12}) with a discount of [${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(meta.winningDiscount)}].\nNet Payout: [${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(meta.netPayout)}].\nDivided Dividend distributed per member: [${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(meta.dividend)}].\n\nRegards,\n${signatureLine}`;
+      text = `Dear Members,\n\nGroup [${meta.name}] Auction #[Month ${meta.currentMonth}] completed.\nWinner: [${meta.winnerName}] with a winning discount of [${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(meta.winningDiscount)}].\nNet Payout: [${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(meta.netPayout)}].\n\nRegards,\n${signatureLine}`;
     }
     setBroadcastText(text);
-  }, [activeGroupKey, templateType, signatureLine]);
+  }, [activeGroupKey, templateType, signatureLine, groupsMetadata]);
 
   const handleCopyText = () => {
     navigator.clipboard.writeText(broadcastText);
@@ -153,12 +206,21 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleToggleSync = (memberId: string) => {
+  const handleToggleSync = async (memberId: string) => {
     const member = members.find(m => m.id === memberId);
     if (!member) return;
 
     const nextState = !member.physicalBookSynced;
     setMembers(prev => prev.map(m => m.id === memberId ? { ...m, physicalBookSynced: nextState } : m));
+
+    try {
+      await supabase
+        .from('group_members')
+        .update({ physical_book_synced: nextState })
+        .eq('profile_id', memberId);
+    } catch (err) {
+      console.error('Error updating pocket book sync in DB:', err);
+    }
 
     // Send update back to the main system dashboard audit feed
     if (onAddAuditLog) {
