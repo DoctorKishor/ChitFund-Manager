@@ -234,8 +234,8 @@ export default function LiveAuctionEngine() {
 
       const nextMonth = Math.min(group.durationMonths, group.currentMonth + 1);
       const nextPool = isLaabaSeetuActive 
-        ? Math.max(0, group.kai_iruppu_pool - group.totalValue) 
-        : group.kai_iruppu_pool + (isHolidayMonth ? highestBid : 0);
+        ? Math.max(0, group.kai_iruppu_pool - group.totalValue) + highestBid 
+        : group.kai_iruppu_pool + highestBid;
 
       // Update in Supabase
       if (group.id) {
@@ -647,6 +647,13 @@ export default function LiveAuctionEngine() {
                       </span>
                     </div>
 
+                    <div className="flex justify-between items-center text-xs border-t border-gray-100 pt-2.5">
+                      <span className="text-gray-500">New Pool Carry-Forward</span>
+                      <span className="font-bold text-amber-600">
+                        {formatCurrency((isLaabaSeetuActive ? Math.max(0, group.kai_iruppu_pool - group.totalValue) : group.kai_iruppu_pool) + highestBid)}
+                      </span>
+                    </div>
+
                     {isHolidayMonth && highestBid > 0 && (
                       <div className="flex justify-between items-center text-xs border-t border-gray-100 pt-2.5">
                         <span className="text-gray-500">Compounds into Next Pool</span>
@@ -659,10 +666,10 @@ export default function LiveAuctionEngine() {
                     <AlertCircle className="text-indigo-600 shrink-0 mt-0.5" size={16} />
                     <p className="text-[10px] text-indigo-900 leading-relaxed">
                       {isLaabaSeetuActive
-                        ? `Laaba Seetu month! Subscribers pay ₹0 installment this cycle. Winner receives ${formatCurrency(netPayout)} funded from the accumulated discount pool. Pool is deducted and group advances to Month ${group.currentMonth + 1}.`
+                        ? `Laaba Seetu month! Subscribers pay ₹0 installment this cycle. Winner receives ${formatCurrency(netPayout)} funded from the accumulated discount pool. This month's winning discount of ${formatCurrency(highestBid)} is credited to start the new discount pool (${formatCurrency(Math.max(0, group.kai_iruppu_pool - group.totalValue) + highestBid)}). Group advances to Month ${group.currentMonth + 1}.`
                         : isHolidayMonth
-                          ? `Holiday Month: high bid of ${formatCurrency(highestBid)} compounds into the Next Discount Pool (current: ${formatCurrency(nextDiscountPool + highestBid)}). Winner receives ${formatCurrency(netPayout)}.`
-                          : `Recording sets winner to 'Already Won', distributes dividend to members, and advances group to Month ${group.currentMonth + 1}.`
+                          ? `Holiday Month: high bid of ${formatCurrency(highestBid)} compounds into the Next Discount Pool. Winner receives ${formatCurrency(netPayout)}.`
+                          : `Recording sets winner to 'Already Won', adds discount of ${formatCurrency(highestBid)} to accumulated pool (${formatCurrency(group.kai_iruppu_pool + highestBid)}), and advances group to Month ${group.currentMonth + 1}.`
                       }
                     </p>
                   </div>

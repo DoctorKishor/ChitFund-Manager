@@ -44,13 +44,17 @@ This repository contains a full-stack **Chit Funds Management System** designed 
 - **How Laaba Seetu Operates**:
   1. **₹0 Installment Due for Members**:
      - All 20 subscribers **DO NOT PAY** their monthly installment (Installment due = ₹0).
-     - The monthly prize pot of ₹2,00,000 is completely funded by the accumulated discount pool.
+     - The monthly prize pot of ₹2,00,000 is completely funded by the previously accumulated discount pool.
   2. **Regular Auction Continues**:
      - An auction is **still conducted** among eligible non-winning members as usual.
      - The winning bidder receives their calculated net payout (`₹2,00,000 - winning bid`).
-  3. **Pool Reset**:
-     - The ₹2,00,000 accumulated pool is deducted/reset to ₹0 (or surplus remainder carried forward).
-     - Future regular auction discounts accumulate again for potential subsequent Laaba Seetu cycles.
+     - *Example*: If Member C bids ₹20,000 in the Laaba Seetu month, Member C receives ₹1,80,000 net payout and is marked as *Already Won*.
+  3. **Discount Pool Rollover & Continuous Accumulation**:
+     - The previously accumulated ₹2,00,000 pool is deducted to fund the prize pot.
+     - **The winning bid discount from this Laaba Seetu month (e.g., ₹20,000) is immediately credited to the new Discount Pool (`kai_iruppu_pool`)**.
+     - Running pool for next month becomes:
+       $$\text{New Pool} = (\text{Old Pool} - \text{Total Chit Value}) + \text{This Month's Winning Discount} = (₹2,00,000 - ₹2,00,000) + ₹20,000 = ₹20,000$$
+     - Subsequent regular months' auction discounts accumulate onto this ₹20,000 towards future Laaba Seetu cycles.
 
 ---
 
