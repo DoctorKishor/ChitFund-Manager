@@ -838,15 +838,29 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [rescheduleGroupId, setRescheduleGroupId] = useState<string | null>(null);
   const [rescheduleInputVal, setRescheduleInputVal] = useState<string>('');
 
-  // Compute canonical auction date for a group (uses today's month/year as calendar anchor)
-  const getGroupAuctionDate = (groupId: string): { display: string; isOverride: boolean } => {
+  // Compute canonical auction date for a group (uses today's month/year as calendar anchor or group.startDate)
+  const getGroupAuctionDate = (groupId: string, monthNum: number = 1): { display: string; isOverride: boolean; isOrientation?: boolean } => {
+    if (monthNum === 0) {
+      return { display: 'Orientation Collection Session (No Auction)', isOverride: false, isOrientation: true };
+    }
     if (auctionDateOverrides[groupId]) {
       const parts = auctionDateOverrides[groupId].split('-');
       const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
       return { display: formatAuctionDate(d) + ' (Override)', isOverride: true };
     }
-    const now = new Date();
-    const canonical = getFirstSundayOnOrAfter10th(now.getFullYear(), now.getMonth());
+    const group = localGroups.find(g => g.id === groupId);
+    let baseDate = new Date();
+    if (group?.startDate) {
+      const parsed = new Date(group.startDate);
+      if (!isNaN(parsed.getTime())) {
+        baseDate = parsed;
+      }
+    }
+    // M0 is baseDate + 0 (Launch/Orientation Month)
+    // M1 is baseDate + 1 (1st Auction Month)
+    // M2 is baseDate + 2, etc.
+    const targetMonthDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + monthNum, 1);
+    const canonical = getFirstSundayOnOrAfter10th(targetMonthDate.getFullYear(), targetMonthDate.getMonth());
     return { display: formatAuctionDate(canonical), isOverride: false };
   };
 
@@ -998,7 +1012,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   };
 
-  // Helper: Month label formatting (e.g. "Aug '26 M0 Launch" or "Sep '26 M1")
+  // Helper: Month label formatting (e.g. "Aug '26 M0 Launch & Orientation" or "Sep '26 M1 (1st Auction)")
   const getDashboardMonthLabel = (group: any, monthNum: number) => {
     let baseDate = new Date();
     if (group?.startDate) {
@@ -1012,10 +1026,10 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
       const yearShort = baseDate.getFullYear().toString().slice(-2);
       return `${monthName} '${yearShort} M0 Launch`;
     }
-    const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + (monthNum - 1), 1);
+    const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + monthNum, 1);
     const monthName = d.toLocaleDateString('en-US', { month: 'short' });
     const yearShort = d.getFullYear().toString().slice(-2);
-    return `${monthName} '${yearShort} M${monthNum}`;
+    return `${monthName} '${yearShort} M${monthNum}${monthNum === 1 ? ' (1st Auction)' : ''}`;
   };
 
   // 1-Tap Record Quick Payment Handler
@@ -1928,11 +1942,11 @@ Thank you for your prompt payment! 🙏`;
                   {/* Auction Date / Link */}
                   <div className="flex items-center gap-2">
                     {(() => {
-                      const { display } = getGroupAuctionDate(activeGroup.id);
+                      const { display, isOrientation } = getGroupAuctionDate(activeGroup.id, selectedDashboardMonth);
                       return (
                         <span className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
-                          <CalendarDays size={12} className="text-indigo-600" />
-                          <span>Auction: <strong className="text-gray-800">{display}</strong></span>
+                          <CalendarDays size={12} className={isOrientation ? "text-amber-600" : "text-indigo-600"} />
+                          <span>{isOrientation ? 'Session:' : 'Auction:'} <strong className="text-gray-800">{display}</strong></span>
                         </span>
                       );
                     })()}

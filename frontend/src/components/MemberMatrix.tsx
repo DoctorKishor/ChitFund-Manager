@@ -141,7 +141,7 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
           metaMap[g.id] = {
             id: g.id,
             name: g.name,
-            currentMonth: g.current_month || 1,
+            currentMonth: (g.current_month !== undefined && g.current_month !== null) ? Number(g.current_month) : 0,
             poolValue: Number(g.total_value),
             auctionDate: 'First Sunday after 10th',
             winnerName: 'Active Auction',

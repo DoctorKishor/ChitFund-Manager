@@ -16,7 +16,8 @@ import {
   X,
   Lock,
   Zap,
-  Briefcase
+  Briefcase,
+  Info
 } from 'lucide-react';
 
 interface Member {
@@ -96,7 +97,7 @@ export default function LiveAuctionEngine() {
           name: g.name,
           totalValue: Number(g.total_value),
           memberCount: g.member_count,
-          currentMonth: g.current_month || 1,
+          currentMonth: (g.current_month !== undefined && g.current_month !== null) ? Number(g.current_month) : 0,
           durationMonths: g.duration_months,
           kai_iruppu_pool: Number(g.kai_iruppu_pool) || 0,
         }));
@@ -138,7 +139,7 @@ export default function LiveAuctionEngine() {
             name: groupData.name,
             totalValue: Number(groupData.total_value),
             memberCount: groupData.member_count,
-            currentMonth: groupData.current_month || 1,
+            currentMonth: (groupData.current_month !== undefined && groupData.current_month !== null) ? Number(groupData.current_month) : 0,
             durationMonths: groupData.duration_months,
             kai_iruppu_pool: Number(groupData.kai_iruppu_pool) || 0,
           });
@@ -454,14 +455,24 @@ export default function LiveAuctionEngine() {
           <div>
             <div className="flex items-center space-x-2">
               <span className={`h-2 w-2 rounded-full ${
-                isLaabaSeetuActive ? 'bg-emerald-500 animate-ping' : 'bg-red-500 animate-pulse'
+                group.currentMonth === 0 
+                  ? 'bg-amber-500 animate-pulse'
+                  : isLaabaSeetuActive 
+                  ? 'bg-emerald-500 animate-ping' 
+                  : 'bg-red-500 animate-pulse'
               }`}></span>
               <span className={`text-[10px] font-bold uppercase tracking-widest border px-2 py-0.5 rounded ${
-                isLaabaSeetuActive
+                group.currentMonth === 0
+                  ? 'text-amber-700 bg-amber-50 border-amber-200'
+                  : isLaabaSeetuActive
                   ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                   : 'text-red-700 bg-red-50 border-red-200'
               }`}>
-                {isLaabaSeetuActive ? '🎉 Laaba Seetu Month (₹0 Member Dues)' : 'Live Bidding Room'}
+                {group.currentMonth === 0
+                  ? '🚀 Month 0 (Orientation & Launch Phase)'
+                  : isLaabaSeetuActive 
+                  ? '🎉 Laaba Seetu Month (₹0 Member Dues)' 
+                  : 'Live Bidding Room'}
               </span>
             </div>
             <h2 className="text-xl font-bold text-gray-900 tracking-tight mt-1">
@@ -470,13 +481,20 @@ export default function LiveAuctionEngine() {
             {/* Auction Date */}
             <div className="flex items-center gap-2 mt-1">
               <Calendar size={12} className="text-gray-400" />
-              <span className="text-[11px] text-gray-500">Auction: <span className={`font-semibold ${auctionDateOverride ? 'text-amber-600' : 'text-gray-700'}`}>{auctionDateDisplay}</span></span>
-              <button
-                onClick={() => setShowDatePicker(v => !v)}
-                className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded hover:bg-indigo-100 transition-colors"
-              >
-                Reschedule
-              </button>
+              <span className="text-[11px] text-gray-500">
+                {group.currentMonth === 0 ? 'Session:' : 'Auction:'}{' '}
+                <span className={`font-semibold ${auctionDateOverride ? 'text-amber-600' : 'text-gray-700'}`}>
+                  {group.currentMonth === 0 ? 'Orientation & Launch (No Auction)' : auctionDateDisplay}
+                </span>
+              </span>
+              {group.currentMonth > 0 && (
+                <button
+                  onClick={() => setShowDatePicker(v => !v)}
+                  className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded hover:bg-indigo-100 transition-colors"
+                >
+                  Reschedule
+                </button>
+              )}
               {auctionDateOverride && (
                 <button
                   onClick={() => { setAuctionDateOverride(null); setShowDatePicker(false); }}
@@ -501,14 +519,33 @@ export default function LiveAuctionEngine() {
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handleCloseAuction}
-              disabled={bids.length === 0}
+              disabled={group.currentMonth === 0 || bids.length === 0}
               className="font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all duration-200 bg-gray-900 hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed text-white"
             >
-              {isLaabaSeetuActive ? '🎉 Close Laaba Seetu & Record Winner' : 'Close Auction & Record Winner'}
+              {group.currentMonth === 0
+                ? 'No Auction in Month 0'
+                : isLaabaSeetuActive 
+                ? '🎉 Close Laaba Seetu & Record Winner' 
+                : 'Close Auction & Record Winner'}
               <ArrowRight size={14} />
             </button>
           </div>
         </div>
+
+        {group.currentMonth === 0 && (
+          <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+            <Info className="text-amber-600 mt-0.5 shrink-0" size={18} />
+            <div className="text-xs text-amber-900 space-y-1">
+              <p className="font-bold">Orientation & Launch Collection Month (Month 0)</p>
+              <p className="text-amber-800">
+                Month 0 is reserved for launch collections and orientation. No live auction takes place in Month 0; the entire launch collection pool is allocated as <strong>Organizer Profit</strong>.
+              </p>
+              <p className="text-amber-700 text-[11px]">
+                Collect Month 0 payments in the <strong>Dashboard</strong>, and confirm launch collections to advance this chit group to <strong>Month 1</strong> where the first live auction will begin.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* 5 Core Financial Status Metric Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-5 border-t border-gray-100 pt-4">
