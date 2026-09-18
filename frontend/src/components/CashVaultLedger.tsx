@@ -221,68 +221,6 @@ export default function CashVaultLedger() {
 
   return (
     <div className="space-y-6">
-      
-      {/* 1. Unified Multi-Wallet Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Cash Box */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100">
-              <Wallet size={20} />
-            </div>
-            <div>
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block">Physical Cash Box</span>
-              <span className="text-base font-bold text-gray-900 mt-0.5 block">{formatCurrency(balances.cash_in_hand)}</span>
-              {relocations.length > 0 && (
-                <span className="text-[9px] text-amber-600 mt-1 block flex items-center gap-1">
-                  <AlertCircle size={10} />
-                  +{formatCurrency(relocations.reduce((sum, r) => sum + r.amount, 0))} pending ATM inflow
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Kishor Bank */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-lg bg-gray-50 text-gray-600 border border-gray-150">
-              <Landmark size={20} />
-            </div>
-            <div>
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block">Kishor Bank</span>
-              <span className="text-base font-bold text-gray-900 mt-0.5 block">{formatCurrency(balances.kishor_bank)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Dad Bank */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-lg bg-gray-50 text-gray-600 border border-gray-150">
-              <Landmark size={20} />
-            </div>
-            <div>
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block">Dad Bank</span>
-              <span className="text-base font-bold text-gray-900 mt-0.5 block">{formatCurrency(balances.dad_bank)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Mom Bank */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-lg bg-gray-50 text-gray-600 border border-gray-150">
-              <Landmark size={20} />
-            </div>
-            <div>
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block">Mom Bank</span>
-              <span className="text-base font-bold text-gray-900 mt-0.5 block">{formatCurrency(balances.mom_bank)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Main Split Layout Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">

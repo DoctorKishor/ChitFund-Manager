@@ -400,11 +400,11 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
               <div className="w-full bg-gray-50 rounded-full h-3 overflow-hidden border border-gray-200">
                 <div 
                   className="bg-indigo-650 h-full rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min(100, (actualCollections / targetCollections) * 100)}%` }}
+                  style={{ width: `${targetCollections > 0 ? Math.min(100, (actualCollections / targetCollections) * 100) : 0}%` }}
                 ></div>
               </div>
               <div className="flex justify-between text-[10px] text-gray-500 font-semibold">
-                <span>{((actualCollections / targetCollections) * 100).toFixed(1)}% Completed</span>
+                <span>{targetCollections > 0 ? ((actualCollections / targetCollections) * 100).toFixed(1) : '0.0'}% Completed</span>
                 <span>Remaining: {formatCurrency(Math.max(0, targetCollections - actualCollections))}</span>
               </div>
             </div>

@@ -19,6 +19,7 @@ interface WalletContextType {
   loading: boolean;
   updateBalance: (wallet: WalletType, amount: number) => Promise<void>;
   triggerMockTransaction: (type: 'collection' | 'payout' | 'transfer') => Promise<void>;
+  resetTreasuryToZero: () => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -49,14 +50,15 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (!data || data.length === 0) {
-        // Seed initial wallets if empty
+        // Seed initial wallets with 0 if empty
         const initialRows = [
-          { wallet_type: 'cash_in_hand', current_balance: DEFAULT_BALANCES.cash_in_hand },
-          { wallet_type: 'kishor_bank', current_balance: DEFAULT_BALANCES.kishor_bank },
-          { wallet_type: 'dad_bank', current_balance: DEFAULT_BALANCES.dad_bank },
-          { wallet_type: 'mom_bank', current_balance: DEFAULT_BALANCES.mom_bank },
+          { wallet_type: 'cash_in_hand', current_balance: 0 },
+          { wallet_type: 'kishor_bank', current_balance: 0 },
+          { wallet_type: 'dad_bank', current_balance: 0 },
+          { wallet_type: 'mom_bank', current_balance: 0 },
         ];
         await supabase.from('global_treasury').upsert(initialRows, { onConflict: 'wallet_type' });
+        setBalances(DEFAULT_BALANCES);
       } else {
         const loaded: WalletBalances = { ...DEFAULT_BALANCES };
         data.forEach((row: any) => {
@@ -71,6 +73,18 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper to reset all balances in Supabase to 0
+  const resetTreasuryToZero = async () => {
+    const zeroRows = [
+      { wallet_type: 'cash_in_hand', current_balance: 0 },
+      { wallet_type: 'kishor_bank', current_balance: 0 },
+      { wallet_type: 'dad_bank', current_balance: 0 },
+      { wallet_type: 'mom_bank', current_balance: 0 },
+    ];
+    await supabase.from('global_treasury').upsert(zeroRows, { onConflict: 'wallet_type' });
+    setBalances(DEFAULT_BALANCES);
   };
 
   useEffect(() => {
@@ -148,6 +162,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         loading,
         updateBalance,
         triggerMockTransaction,
+        resetTreasuryToZero,
       }}
     >
       {children}
