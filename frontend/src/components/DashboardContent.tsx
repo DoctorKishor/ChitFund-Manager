@@ -26,6 +26,7 @@ import {
   CalendarDays,
   RefreshCw,
   Plus,
+  Minus,
   UserPlus,
   Phone,
   User,
@@ -36,7 +37,12 @@ import {
   Lock,
   Unlock,
   Sliders,
-  ShieldCheck
+  ShieldCheck,
+  Trophy,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  Sparkles
 } from 'lucide-react';
 
 // ── Utility: First Sunday on-or-after the 10th of a given month ──────────────
@@ -145,9 +151,17 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
   const [loadingWorkspaceMembers, setLoadingWorkspaceMembers] = useState(false);
 
-  // Edit Group Modal States
+  // Edit Group Advanced Modal States (ChitBase Architecture)
   const [editingGroup, setEditingGroup] = useState<any | null>(null);
+  const [editActiveTab, setEditActiveTab] = useState<'details' | 'members'>('details');
   const [editGroupName, setEditGroupName] = useState('');
+  const [editGroupStatus, setEditGroupStatus] = useState<'draft' | 'active' | 'completed'>('active');
+  const [editGroupValue, setEditGroupValue] = useState<number>(100000);
+  const [editGroupMemberCount, setEditGroupMemberCount] = useState<number>(5);
+  const [editGroupStartDate, setEditGroupStartDate] = useState<string>('');
+  const [editGroupMembers, setEditGroupMembers] = useState<any[]>([]);
+  const [editMemberSearchQuery, setEditMemberSearchQuery] = useState('');
+  const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // High-Security Delete Group Modal States
@@ -178,8 +192,11 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
             totalValue: Number(g.total_value),
             currentMonth: g.current_month || 1,
             duration: g.duration_months,
+            memberCount: g.member_count || g.duration_months,
             kaiIruppuPool: Number(g.kai_iruppu_pool || 0),
-            active: true,
+            status: g.status || 'active',
+            startDate: g.start_date || '',
+            active: g.status !== 'completed',
           }))
         );
       }
@@ -284,40 +301,168 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     }
   };
 
-  const handleSaveEditGroup = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const openEditGroupModal = async (g: any) => {
+    setEditingGroup(g);
+    setEditActiveTab('details');
+    setEditGroupName(g.name || '');
+    setEditGroupStatus(g.status || (g.active ? 'active' : 'draft'));
+    setEditGroupValue(g.totalValue || 100000);
+    setEditGroupMemberCount(g.duration || 5);
+    setEditGroupStartDate(g.startDate || new Date().toISOString().split('T')[0]);
+    setIsAdvancedExpanded(false);
+    setEditMemberSearchQuery('');
+
+    // Fetch enrolled tickets for this group
+    try {
+      const { data, error } = await supabase
+        .from('group_members')
+        .select(`
+          id,
+          ticket_number,
+          has_won_regular,
+          physical_book_synced,
+          profile_id,
+          profiles (
+            id,
+            full_name,
+            phone_number
+          )
+        `)
+        .eq('group_id', g.id)
+        .order('ticket_number', { ascending: true });
+
+      if (data) {
+        setEditGroupMembers(
+          data.map((m: any) => ({
+            id: m.id,
+            ticket: m.ticket_number,
+            hasWon: m.has_won_regular,
+            bookSynced: m.physical_book_synced,
+            profileId: m.profile_id,
+            name: m.profiles?.full_name || 'Subscriber',
+            phone: m.profiles?.phone_number || '',
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Error fetching edit group members:', err);
+    }
+  };
+
+  const handleSaveEditGroup = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!editingGroup || !editGroupName.trim()) return;
+
     try {
       setIsSavingEdit(true);
-      const { error } = await supabase
+      const valNum = Number(editGroupValue);
+      const countNum = Number(editGroupMemberCount);
+
+      // 1. Update chit_groups in Supabase
+      const { error: groupError } = await supabase
         .from('chit_groups')
-        .update({ name: editGroupName.trim() })
+        .update({
+          name: editGroupName.trim(),
+          total_value: valNum,
+          member_count: countNum,
+          duration_months: countNum,
+          status: editGroupStatus,
+          start_date: editGroupStartDate || null,
+        })
         .eq('id', editingGroup.id);
 
-      if (error) {
-        alert(`Failed to update group: ${error.message}`);
+      if (groupError) {
+        alert(`Failed to update group: ${groupError.message}`);
         return;
       }
 
-      setLocalGroups(prev => prev.map(g => g.id === editingGroup.id ? { ...g, name: editGroupName.trim() } : g));
-      
+      // 2. Update local state
+      setLocalGroups(prev =>
+        prev.map(g =>
+          g.id === editingGroup.id
+            ? {
+                ...g,
+                name: editGroupName.trim(),
+                totalValue: valNum,
+                duration: countNum,
+                memberCount: countNum,
+                status: editGroupStatus,
+                startDate: editGroupStartDate,
+                active: editGroupStatus !== 'completed',
+              }
+            : g
+        )
+      );
+
+      // 3. Security audit log
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       setAuditLogs(prev => [
         {
           timestamp: `Today, ${timeStr}`,
           table: 'chit_groups',
-          desc: `RENAMED CHIT GROUP: "${editingGroup.name}" -> "${editGroupName.trim()}"`,
+          desc: `UPDATED CHIT GROUP: "${editGroupName.trim()}" (Status: ${editGroupStatus.toUpperCase()}, Pool: ₹${valNum.toLocaleString('en-IN')}, Duration: ${countNum}M)`,
           executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
         },
         ...prev,
       ]);
+
+      // 4. Refresh workspace members if on this group's workspace
+      if (selectedWorkspaceGroupId === editingGroup.id) {
+        fetchWorkspaceMembers(editingGroup.id);
+      }
 
       setEditingGroup(null);
     } catch (err: any) {
       alert(`Error editing group: ${err.message}`);
     } finally {
       setIsSavingEdit(false);
+    }
+  };
+
+  const handleReassignTicketMember = async (memberRecordId: string, newProfileId: string, newName: string, newPhone: string) => {
+    try {
+      const { error } = await supabase
+        .from('group_members')
+        .update({ profile_id: newProfileId })
+        .eq('id', memberRecordId);
+
+      if (error) {
+        alert(`Failed to reassign member: ${error.message}`);
+        return;
+      }
+
+      setEditGroupMembers(prev =>
+        prev.map(m =>
+          m.id === memberRecordId
+            ? { ...m, profileId: newProfileId, name: newName, phone: newPhone }
+            : m
+        )
+      );
+
+      if (selectedWorkspaceGroupId === editingGroup?.id) {
+        setWorkspaceMembers(prev =>
+          prev.map(m =>
+            m.id === memberRecordId
+              ? { ...m, profileId: newProfileId, name: newName, phone: newPhone }
+              : m
+          )
+        );
+      }
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'group_members',
+          desc: `REASSIGNED TICKET: Set subscriber to "${newName}" (${newPhone})`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+    } catch (err: any) {
+      alert(`Error reassigning member: ${err.message}`);
     }
   };
 
@@ -1204,10 +1349,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setEditingGroup(selectedWorkspaceGroup);
-                      setEditGroupName(selectedWorkspaceGroup.name);
-                    }}
+                    onClick={() => openEditGroupModal(selectedWorkspaceGroup)}
                     className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
                   >
                     <Edit3 size={13} className="text-gray-500" /> Edit Details
@@ -1498,11 +1640,8 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
-                                title="Edit group name"
-                                onClick={() => {
-                                  setEditingGroup(g);
-                                  setEditGroupName(g.name);
-                                }}
+                                title="Edit chit details"
+                                onClick={() => openEditGroupModal(g)}
                                 className="p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                               >
                                 <Edit3 size={13} />
@@ -2283,244 +2422,6 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
             </div>
           )}
 
-          {/* EDIT GROUP DETAILS MODAL */}
-          {editingGroup && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
-              <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                      <Edit3 size={18} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-gray-900">Edit Chit Group Details</h4>
-                      <p className="text-[11px] text-gray-500">Update group parameters in Supabase</p>
-                    </div>
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={() => setEditingGroup(null)}
-                    className="text-gray-400 hover:text-gray-600 p-1"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-
-                <form onSubmit={handleSaveEditGroup} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                      Group Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={editGroupName}
-                      onChange={(e) => setEditGroupName(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
-                      autoFocus
-                    />
-                  </div>
-
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1 text-xs text-gray-500">
-                    <div className="flex justify-between">
-                      <span>Total Pool:</span>
-                      <strong className="text-gray-800">{formatCurrency(editingGroup.totalValue)}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Duration:</span>
-                      <strong className="text-gray-800">{editingGroup.duration} Months</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Current Month:</span>
-                      <strong className="text-indigo-600">Month {editingGroup.currentMonth}</strong>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
-                    <button
-                      type="button"
-                      onClick={() => setEditingGroup(null)}
-                      className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSavingEdit || !editGroupName.trim()}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-5 py-2 rounded-lg transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {isSavingEdit ? (
-                        <>
-                          <RefreshCw size={13} className="animate-spin" /> Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Check size={14} /> Save Changes
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* HIGH-SECURITY MULTI-STEP DANGER DELETE CONFIRMATION MODAL */}
-          {deletingGroup && (() => {
-            const requiredPhrase = `DELETE ${deletingGroup.name}`;
-            const isPhraseMatched = 
-              deletePhraseInput.trim().toUpperCase() === requiredPhrase.toUpperCase() ||
-              deletePhraseInput.trim().toUpperCase() === 'DELETE' ||
-              deletePhraseInput.trim().toLowerCase() === deletingGroup.name.toLowerCase();
-            const isSliderReady = isPhraseMatched && deleteSliderVal >= 98;
-
-            return (
-              <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
-                <div className="bg-white border-2 border-red-200 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative">
-                  
-                  {/* Danger Header */}
-                  <div className="flex justify-between items-start border-b border-red-100 pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-red-100 text-red-700 rounded-xl">
-                        <AlertTriangle size={22} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-red-900">
-                          Permanent Deletion Warning
-                        </h4>
-                        <p className="text-xs text-red-700 font-semibold mt-0.5">
-                          &quot;{deletingGroup.name}&quot; ({formatCurrency(deletingGroup.totalValue)})
-                        </p>
-                      </div>
-                    </div>
-                    <button 
-                      type="button" 
-                      onClick={() => setDeletingGroup(null)}
-                      className="text-gray-400 hover:text-gray-600 p-1"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-
-                  {/* Warning Description Box */}
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 space-y-2 text-xs text-red-900">
-                    <p className="font-bold flex items-center gap-1.5">
-                      <AlertCircle size={14} className="text-red-600 shrink-0" />
-                      This action is permanent and completely irreversible!
-                    </p>
-                    <ul className="list-disc list-inside space-y-1 text-[11px] text-red-800 pl-1">
-                      <li>All {deletingGroup.duration} enrolled subscriber tickets will be unlinked.</li>
-                      <li>All historical auction bidding logs and discount pool records will be purged.</li>
-                      <li>The group configuration will be permanently removed from Supabase.</li>
-                    </ul>
-                  </div>
-
-                  {/* Safety Verification Step 1: Type Required Phrase */}
-                  <div className="space-y-1.5 pt-1">
-                    <label className="text-[11px] text-gray-700 font-bold block">
-                      Step 1: Type <span className="font-mono bg-red-100 text-red-800 px-1.5 py-0.5 rounded select-all font-bold">DELETE {deletingGroup.name}</span> (or <span className="font-mono bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">DELETE</span>) below:
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder={`Type DELETE ${deletingGroup.name}`}
-                        value={deletePhraseInput}
-                        onChange={(e) => setDeletePhraseInput(e.target.value)}
-                        className={`w-full bg-gray-50 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-gray-900 focus:outline-none transition-colors ${
-                          isPhraseMatched
-                            ? 'border-emerald-500 bg-emerald-50/40 text-emerald-900'
-                            : 'border-gray-300 focus:border-red-400'
-                        }`}
-                        autoFocus
-                      />
-                      {isPhraseMatched && (
-                        <span className="absolute right-3 top-2 text-emerald-600 text-xs font-bold flex items-center gap-1">
-                          <Check size={14} /> Verified
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Safety Verification Step 2: Slide to Confirm Slider */}
-                  <div className="space-y-2 pt-2 border-t border-gray-100">
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="font-bold text-gray-700 flex items-center gap-1">
-                        {isPhraseMatched ? (
-                          <Unlock size={13} className="text-emerald-600" />
-                        ) : (
-                          <Lock size={13} className="text-gray-400" />
-                        )}
-                        Step 2: Slide all the way to confirm deletion
-                      </span>
-                      <span className={`font-bold ${isSliderReady ? 'text-red-600' : 'text-gray-400'}`}>
-                        {deleteSliderVal}%
-                      </span>
-                    </div>
-
-                    <div className="relative flex items-center">
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={deleteSliderVal}
-                        disabled={!isPhraseMatched || isDeletingGroup}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setDeleteSliderVal(val);
-                          if (val >= 100 && isPhraseMatched) {
-                            handleExecuteDeleteGroup();
-                          }
-                        }}
-                        className={`w-full h-8 rounded-xl appearance-none cursor-pointer transition-all ${
-                          !isPhraseMatched
-                            ? 'bg-gray-100 opacity-50 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-red-100 via-red-300 to-red-600 accent-red-600'
-                        }`}
-                      />
-                    </div>
-                    <p className="text-[10px] text-gray-400 text-center">
-                      {!isPhraseMatched
-                        ? '🔒 Complete Step 1 above to unlock the confirmation slider'
-                        : '👉 Drag the slider to 100% to trigger permanent deletion'}
-                    </p>
-                  </div>
-
-                  {/* Action Controls Footer */}
-                  <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
-                    <button
-                      type="button"
-                      onClick={() => setDeletingGroup(null)}
-                      className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-lg transition-colors"
-                    >
-                      Cancel &amp; Keep Group
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!isSliderReady || isDeletingGroup}
-                      onClick={handleExecuteDeleteGroup}
-                      className={`font-bold text-xs px-5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 ${
-                        isSliderReady && !isDeletingGroup
-                          ? 'bg-red-600 hover:bg-red-700 text-white'
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
-                      }`}
-                    >
-                      {isDeletingGroup ? (
-                        <>
-                          <RefreshCw size={13} className="animate-spin" /> Purging from Supabase...
-                        </>
-                      ) : (
-                        <>
-                          <Trash2 size={13} /> Delete Group Permanently
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                </div>
-              </div>
-            );
-          })()}
-
         </div>
       );
 
@@ -2532,6 +2433,716 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   return (
     <>
       {renderTabContent()}
+
+      {/* ── UPGRADED CHITBASE-INSPIRED CHIT GROUP SETTINGS MODAL ──────── */}
+      {editingGroup && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden my-auto">
+            
+            {/* 1. Modal Top Bar */}
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between bg-white z-10">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingGroup(null)}
+                  className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  <ArrowLeft size={13} /> Back
+                </button>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Edit Chit Group</h3>
+                  <p className="text-[11px] text-gray-500 font-medium">
+                    {formatCurrency(editGroupValue)} · {editGroupMemberCount} Members · <span className="capitalize font-semibold text-indigo-600">{editGroupStatus}</span>
+                  </p>
+                </div>
+              </div>
+
+              <button 
+                type="button" 
+                onClick={() => setEditingGroup(null)}
+                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* 2. Top Tab Switcher */}
+            <div className="flex border-b border-gray-150 bg-gray-50/70 px-5 pt-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setEditActiveTab('details')}
+                className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 ${
+                  editActiveTab === 'details'
+                    ? 'bg-white text-indigo-600 border-indigo-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800 border-transparent'
+                }`}
+              >
+                <Briefcase size={14} /> Chit Details
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditActiveTab('members')}
+                className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 ${
+                  editActiveTab === 'members'
+                    ? 'bg-white text-indigo-600 border-indigo-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800 border-transparent'
+                }`}
+              >
+                <Users size={14} /> Members
+                <span className="bg-indigo-50 text-indigo-700 text-[10px] px-1.5 py-0.2 rounded-full font-extrabold border border-indigo-100">
+                  {editGroupMembers.length}
+                </span>
+              </button>
+            </div>
+
+            {/* 3. Scrollable Content Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6">
+
+              {editActiveTab === 'details' ? (
+                <form id="edit-chit-form" onSubmit={handleSaveEditGroup} className="space-y-6">
+                  
+                  {/* Section A: Name & Status */}
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">Chit details</span>
+                      <h4 className="text-xs font-bold text-gray-500 uppercase mt-0.5">Name &amp; status</h4>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 block">Chit Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={editGroupName}
+                        onChange={(e) => setEditGroupName(e.target.value)}
+                        placeholder="e.g. Sample Test Group"
+                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    {/* Status 3-Pills */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 block">Status</label>
+                      <div className="grid grid-cols-3 gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditGroupStatus('draft')}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                            editGroupStatus === 'draft'
+                              ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-sm'
+                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          <Edit3 size={14} className={editGroupStatus === 'draft' ? 'text-amber-600' : 'text-gray-400'} />
+                          Draft
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditGroupStatus('active')}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                            editGroupStatus === 'active'
+                              ? 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-sm ring-1 ring-emerald-400'
+                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          <CheckCircle2 size={14} className={editGroupStatus === 'active' ? 'text-emerald-600' : 'text-gray-400'} />
+                          Active
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditGroupStatus('completed')}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                            editGroupStatus === 'completed'
+                              ? 'bg-purple-50 border-purple-300 text-purple-900 shadow-sm'
+                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          <Trophy size={14} className={editGroupStatus === 'completed' ? 'text-purple-600' : 'text-gray-400'} />
+                          Completed
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-500 italic mt-1">
+                        {editGroupStatus === 'draft' && 'Draft mode: Enrollment open, no auction bids or treasury postings yet.'}
+                        {editGroupStatus === 'active' && 'Active: In-progress chit fund for monthly collections and live auctions.'}
+                        {editGroupStatus === 'completed' && 'Completed: All monthly cycles and winner payouts concluded.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <hr className="border-gray-150" />
+
+                  {/* Section B: Size & Timing */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-xs font-bold text-gray-900">Size &amp; timing</h4>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase">Key fields</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Member Shares Stepper */}
+                      <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-gray-800">Member shares *</span>
+                          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (editGroupMemberCount > 1) {
+                                  setEditGroupMemberCount(prev => prev - 1);
+                                }
+                              }}
+                              className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-sm"
+                            >
+                              <Minus size={13} />
+                            </button>
+                            <input
+                              type="number"
+                              min={1}
+                              max={100}
+                              value={editGroupMemberCount}
+                              onChange={(e) => {
+                                const val = Math.max(1, parseInt(e.target.value) || 1);
+                                setEditGroupMemberCount(val);
+                              }}
+                              className="w-10 text-center font-bold text-xs text-gray-900 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setEditGroupMemberCount(prev => prev + 1)}
+                              className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-sm"
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+                        </div>
+                        <span className="text-[11px] text-gray-500 block">
+                          {editGroupMembers.length} of {editGroupMemberCount} assigned
+                        </span>
+                      </div>
+
+                      {/* Duration Stepper (Synced 1:1) */}
+                      <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-gray-800">Duration (Months) *</span>
+                          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (editGroupMemberCount > 1) {
+                                  setEditGroupMemberCount(prev => prev - 1);
+                                }
+                              }}
+                              className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-sm"
+                            >
+                              <Minus size={13} />
+                            </button>
+                            <span className="w-10 text-center font-bold text-xs text-gray-900">
+                              {editGroupMemberCount}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditGroupMemberCount(prev => prev + 1)}
+                              className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-sm"
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+                        </div>
+                        <span className="text-[11px] text-gray-500 block">
+                          {editGroupMemberCount} planned, {editGroupMemberCount} months
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Validation Badges */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-emerald-900">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider block">
+                            SHARES LIVE {editGroupMembers.length} / {editGroupMemberCount}
+                          </span>
+                          <p className="text-[11px] text-emerald-800 mt-0.5">
+                            {editGroupMembers.length === editGroupMemberCount 
+                              ? 'Share count matches the members assigned.' 
+                              : `${editGroupMemberCount - editGroupMembers.length} tickets need member assignment.`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-emerald-900">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider block">
+                            MONTHS LIVE {editGroupMemberCount} / {editGroupMemberCount}
+                          </span>
+                          <p className="text-[11px] text-emerald-800 mt-0.5">
+                            Duration and monthly plan are ready.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Start Month Picker */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 block">Start Month *</label>
+                      <input
+                        type="date"
+                        value={editGroupStartDate}
+                        onChange={(e) => setEditGroupStartDate(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-gray-500">
+                        Changing the start month shifts dashboard months only before this chit has payments, lifts, or closed months.
+                      </p>
+                    </div>
+                  </div>
+
+                  <hr className="border-gray-150" />
+
+                  {/* Section C: Set up the money */}
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900">Set up the money</h4>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Summary of monthly contributions, Organizer profit, and Laaba Seetu</p>
+                    </div>
+
+                    {/* Total Chit Value Input */}
+                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-2">
+                      <label className="text-[11px] font-bold text-gray-700 block">
+                        Total chit value — the prize pot (₹) *
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-2.5 text-gray-400 font-bold text-sm">₹</span>
+                        <input
+                          type="number"
+                          min={1000}
+                          step={1000}
+                          required
+                          value={editGroupValue}
+                          onChange={(e) => setEditGroupValue(Math.max(1000, parseInt(e.target.value) || 0))}
+                          className="w-full bg-white border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-2 text-sm font-bold text-gray-900 focus:outline-none"
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-500 font-medium">
+                        Roughly {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))} per member each month.
+                      </p>
+                    </div>
+
+                    {/* 3-Stage Formula Flow */}
+                    <div className="p-3 bg-white border border-gray-200 rounded-2xl flex items-center justify-around text-center shadow-sm">
+                      <div>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase block">MEMBERS</span>
+                        <strong className="text-xs font-extrabold text-gray-800">{editGroupMemberCount}</strong>
+                      </div>
+                      <ArrowRight size={14} className="text-gray-300" />
+                      <div>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase block">EACH PAYS / MO</span>
+                        <strong className="text-xs font-extrabold text-indigo-600">
+                          {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}
+                        </strong>
+                      </div>
+                      <ArrowRight size={14} className="text-gray-300" />
+                      <div>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase block">WINNER TAKES</span>
+                        <strong className="text-xs font-extrabold text-amber-600">
+                          {formatCurrency(editGroupValue)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* Step 1 Card: How much does each member pay */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-2xl space-y-3 shadow-sm">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-indigo-900 text-white text-[10px] font-bold flex items-center justify-center">1</span>
+                          <h5 className="text-xs font-bold text-gray-900">How much does each member pay every month?</h5>
+                        </div>
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Check size={11} /> All set
+                        </span>
+                      </div>
+
+                      <div className="p-3 bg-emerald-50/50 border border-emerald-150 rounded-xl text-xs text-emerald-900 font-medium">
+                        Everyone pays <strong>{formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}</strong> every month — that&apos;s a <strong>{formatCurrency(editGroupValue)}</strong> pot collected each month.
+                      </div>
+                    </div>
+
+                    {/* Step 2 Card: Month 0 Organizer Profit */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-2xl space-y-2 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">2</span>
+                        <h5 className="text-xs font-bold text-gray-900">Month 0 Launch Month (Organizer Profit)</h5>
+                      </div>
+                      <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-xl text-xs text-amber-900">
+                        <p className="font-semibold">Launch Month Allocation:</p>
+                        <p className="text-[11px] text-amber-800 mt-0.5">
+                          All {editGroupMemberCount} members pay their first installment (<strong>{formatCurrency(editGroupValue)}</strong> total), which is taken directly by the Organizer as <strong>Organizer Profit</strong>. No auction occurs in Month 0.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Step 3 Card: Laaba Seetu Bonus Month */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-2xl space-y-2 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex items-center justify-center">3</span>
+                        <h5 className="text-xs font-bold text-gray-900">Laaba Seetu (லாப சீட்டு — Profit Month)</h5>
+                      </div>
+                      <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl text-xs text-emerald-950 space-y-1">
+                        <p className="font-semibold">Threshold: When Kai Iruppu Pool &ge; {formatCurrency(editGroupValue)}</p>
+                        <p className="text-[11px] text-emerald-800">
+                          Subscribers pay <strong>₹0 installment due</strong>. The prize pot is funded entirely by accumulated auction discounts, and auction bidding continues normally!
+                        </p>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  <hr className="border-gray-150" />
+
+                  {/* Section D: REVIEW — Does this look right? */}
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">REVIEW — does this look right?</span>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between py-1 border-b border-gray-200">
+                        <span className="text-gray-500">Members</span>
+                        <strong className="text-gray-900">{editGroupMemberCount}</strong>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-gray-200">
+                        <span className="text-gray-500">Each member pays / month</span>
+                        <strong className="text-gray-900">{formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}</strong>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-gray-200">
+                        <span className="text-gray-500">Collected each month</span>
+                        <strong className="text-gray-900">{formatCurrency(editGroupValue)}</strong>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-gray-200">
+                        <span className="text-gray-500">Prize pot — winner takes</span>
+                        <strong className="text-amber-600">{formatCurrency(editGroupValue)}</strong>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-gray-200">
+                        <span className="text-gray-500">Monthly draws</span>
+                        <strong className="text-gray-900">{editGroupMemberCount} · from {editGroupStartDate || 'Active cycle'}</strong>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-gray-200">
+                        <span className="text-gray-500">Organizer Profit</span>
+                        <strong className="text-amber-600">{formatCurrency(editGroupValue)} (Month 0)</strong>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex items-center gap-1.5 text-emerald-700 text-xs font-bold">
+                      <CheckCircle2 size={14} /> The money adds up — collection matches the pot.
+                    </div>
+                  </div>
+
+                  {/* Section E: Advanced & Danger Zone */}
+                  <div className="border border-gray-200 rounded-2xl overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setIsAdvancedExpanded(prev => !prev)}
+                      className="w-full p-3.5 bg-gray-50 hover:bg-gray-100/80 flex justify-between items-center text-xs font-bold text-gray-700 transition-colors"
+                    >
+                      <span>ADVANCED</span>
+                      <span className="text-indigo-600 text-[11px] font-bold">
+                        {isAdvancedExpanded ? 'Hide' : 'Show'}
+                      </span>
+                    </button>
+
+                    {isAdvancedExpanded && (
+                      <div className="p-4 bg-red-50/50 border-t border-red-100 space-y-3">
+                        <span className="text-[10px] font-extrabold text-red-700 uppercase tracking-wider block">DANGER ZONE</span>
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                          <p className="text-xs text-red-800">
+                            Permanently delete this chit group and all its enrolled tickets &amp; auction data.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const target = editingGroup;
+                              setEditingGroup(null);
+                              setDeletingGroup(target);
+                              setDeletePhraseInput('');
+                              setDeleteSliderVal(0);
+                            }}
+                            className="border border-red-300 bg-white hover:bg-red-50 text-red-700 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm shrink-0 self-start sm:self-auto"
+                          >
+                            <Trash2 size={13} className="text-red-600" /> Delete Group
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                </form>
+              ) : (
+                /* TAB 2: MEMBERS MANAGEMENT */
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-2 border-b border-gray-150">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900">Enrolled Tickets &amp; Member Roster</h4>
+                      <p className="text-[11px] text-gray-500">
+                        Assign or swap subscribers for all {editGroupMemberCount} tickets in this chit group
+                      </p>
+                    </div>
+                    <div className="relative">
+                      <Search size={12} className="absolute left-2.5 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Filter tickets or members..."
+                        value={editMemberSearchQuery}
+                        onChange={(e) => setEditMemberSearchQuery(e.target.value)}
+                        className="bg-gray-50 border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tickets Roster List */}
+                  <div className="space-y-2.5">
+                    {Array.from({ length: editGroupMemberCount }).map((_, idx) => {
+                      const ticketNum = idx + 1;
+                      const assigned = editGroupMembers.find(m => m.ticket === ticketNum);
+                      
+                      return (
+                        <div
+                          key={ticketNum}
+                          className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                            assigned ? 'bg-white border-gray-200 shadow-sm' : 'border-dashed border-gray-300 bg-gray-50/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150 text-xs font-bold flex items-center justify-center shrink-0">
+                              #{ticketNum}
+                            </span>
+                            <div>
+                              <strong className="text-xs font-bold text-gray-900 block">
+                                {assigned?.name || 'Unassigned Slot'}
+                              </strong>
+                              <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                <Phone size={10} /> {assigned?.phone || 'No phone'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 self-end sm:self-auto">
+                            {/* Reassign Subscriber Dropdown */}
+                            <select
+                              value={assigned?.profileId || ''}
+                              onChange={(e) => {
+                                const targetProfile = masterDirectory.find(p => p.id === e.target.value);
+                                if (targetProfile && assigned) {
+                                  handleReassignTicketMember(assigned.id, targetProfile.id!, targetProfile.name, targetProfile.phone);
+                                }
+                              }}
+                              className="bg-gray-50 border border-gray-200 text-gray-800 text-[11px] font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                            >
+                              <option value="" disabled>Reassign Subscriber</option>
+                              {masterDirectory.map(p => (
+                                <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
+                              ))}
+                            </select>
+
+                            {assigned?.hasWon && (
+                              <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
+                                Won
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* 4. Modal Sticky Action Footer */}
+            <div className="p-4 sm:p-5 border-t border-gray-150 bg-gray-50 flex justify-between items-center z-10">
+              <button
+                type="button"
+                onClick={() => setEditingGroup(null)}
+                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSaveEditGroup()}
+                disabled={isSavingEdit || !editGroupName.trim()}
+                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isSavingEdit ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" /> Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} /> Update Group
+                  </>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* HIGH-SECURITY MULTI-STEP DANGER DELETE CONFIRMATION MODAL */}
+      {deletingGroup && (() => {
+        const requiredPhrase = `DELETE ${deletingGroup.name}`;
+        const isPhraseMatched = 
+          deletePhraseInput.trim().toUpperCase() === requiredPhrase.toUpperCase() ||
+          deletePhraseInput.trim().toUpperCase() === 'DELETE' ||
+          deletePhraseInput.trim().toLowerCase() === deletingGroup.name.toLowerCase();
+        const isSliderReady = isPhraseMatched && deleteSliderVal >= 98;
+
+        return (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="bg-white border-2 border-red-200 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative">
+              
+              {/* Danger Header */}
+              <div className="flex justify-between items-start border-b border-red-100 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-red-100 text-red-700 rounded-xl">
+                    <AlertTriangle size={22} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-red-900">
+                      Permanent Deletion Warning
+                    </h4>
+                    <p className="text-xs text-red-700 font-semibold mt-0.5">
+                      &quot;{deletingGroup.name}&quot; ({formatCurrency(deletingGroup.totalValue)})
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setDeletingGroup(null)}
+                  className="text-gray-400 hover:text-gray-600 p-1"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Warning Description Box */}
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 space-y-2 text-xs text-red-900">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertCircle size={14} className="text-red-600 shrink-0" />
+                  This action is permanent and completely irreversible!
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-[11px] text-red-800 pl-1">
+                  <li>All {deletingGroup.duration} enrolled subscriber tickets will be unlinked.</li>
+                  <li>All historical auction bidding logs and discount pool records will be purged.</li>
+                  <li>The group configuration will be permanently removed from Supabase.</li>
+                </ul>
+              </div>
+
+              {/* Safety Verification Step 1: Type Required Phrase */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11px] text-gray-700 font-bold block">
+                  Step 1: Type <span className="font-mono bg-red-100 text-red-800 px-1.5 py-0.5 rounded select-all font-bold">DELETE {deletingGroup.name}</span> (or <span className="font-mono bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">DELETE</span>) below:
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={`Type DELETE ${deletingGroup.name}`}
+                    value={deletePhraseInput}
+                    onChange={(e) => setDeletePhraseInput(e.target.value)}
+                    className={`w-full bg-gray-50 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-gray-900 focus:outline-none transition-colors ${
+                      isPhraseMatched
+                        ? 'border-emerald-500 bg-emerald-50/40 text-emerald-900'
+                        : 'border-gray-300 focus:border-red-400'
+                    }`}
+                    autoFocus
+                  />
+                  {isPhraseMatched && (
+                    <span className="absolute right-3 top-2 text-emerald-600 text-xs font-bold flex items-center gap-1">
+                      <Check size={14} /> Verified
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Safety Verification Step 2: Slide to Confirm Slider */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="font-bold text-gray-700 flex items-center gap-1">
+                    {isPhraseMatched ? (
+                      <Unlock size={13} className="text-emerald-600" />
+                    ) : (
+                      <Lock size={13} className="text-gray-400" />
+                    )}
+                    Step 2: Slide all the way to confirm deletion
+                  </span>
+                  <span className={`font-bold ${isSliderReady ? 'text-red-600' : 'text-gray-400'}`}>
+                    {deleteSliderVal}%
+                  </span>
+                </div>
+
+                <div className="relative flex items-center">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={deleteSliderVal}
+                    disabled={!isPhraseMatched || isDeletingGroup}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setDeleteSliderVal(val);
+                      if (val >= 100 && isPhraseMatched) {
+                        handleExecuteDeleteGroup();
+                      }
+                    }}
+                    className={`w-full h-8 rounded-xl appearance-none cursor-pointer transition-all ${
+                      !isPhraseMatched
+                        ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-red-100 via-red-300 to-red-600 accent-red-600'
+                    }`}
+                  />
+                </div>
+                <p className="text-[10px] text-gray-400 text-center">
+                  {!isPhraseMatched
+                    ? '🔒 Complete Step 1 above to unlock the confirmation slider'
+                    : '👉 Drag the slider to 100% to trigger permanent deletion'}
+                </p>
+              </div>
+
+              {/* Action Controls Footer */}
+              <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setDeletingGroup(null)}
+                  className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-lg transition-colors"
+                >
+                  Cancel &amp; Keep Group
+                </button>
+                <button
+                  type="button"
+                  disabled={!isSliderReady || isDeletingGroup}
+                  onClick={handleExecuteDeleteGroup}
+                  className={`font-bold text-xs px-5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 ${
+                    isSliderReady && !isDeletingGroup
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  {isDeletingGroup ? (
+                    <>
+                      <RefreshCw size={13} className="animate-spin" /> Purging from Supabase...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={13} /> Delete Group Permanently
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Global Reschedule Date Override Popover (accessible on Dashboard, Chits directory, and Workspace) */}
       {rescheduleGroupId && (
