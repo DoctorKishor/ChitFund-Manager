@@ -210,7 +210,6 @@ export default function CashVaultLedger() {
           month,
           winning_bidder_id,
           winning_discount,
-          net_payout,
           is_laaba_seetu,
           created_at,
           profiles:winning_bidder_id (
