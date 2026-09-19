@@ -166,6 +166,12 @@ export default function CashVaultLedger() {
   const [settleAmount, setSettleAmount] = useState<string>('');
   const [isProcessingSettle, setIsProcessingSettle] = useState<boolean>(false);
 
+  // Floating Capital Recovery State (Choose payout vault freely)
+  const [recoveringFloat, setRecoveringFloat] = useState<FloatingDeposit | null>(null);
+  const [recoverSourceWallet, setRecoverSourceWallet] = useState<WalletType>('cash_in_hand');
+  const [recoverAmount, setRecoverAmount] = useState<string>('');
+  const [isProcessingRecover, setIsProcessingRecover] = useState<boolean>(false);
+
   // Personal Draws Filter & Search
   const [personalDrawStatusFilter, setPersonalDrawStatusFilter] = useState<'all' | 'outstanding' | 'settled'>('all');
   const [personalDrawPersonFilter, setPersonalDrawPersonFilter] = useState<string>('all');
@@ -579,47 +585,80 @@ export default function CashVaultLedger() {
     }
   };
 
-  // Action: Recover Float (Take Back Injected Cash)
-  const handleRecoverFloat = async (float: FloatingDeposit) => {
-    if (balances[float.walletType] < float.amount) {
-      alert(`Insufficient balance in ${WALLET_META[float.walletType].name} to recover float of ${formatCurrency(float.amount)}. Available: ${formatCurrency(balances[float.walletType])}`);
+  // Action: Open Float Recovery Modal (Choose payout account freely)
+  const handleOpenRecoverModal = (float: FloatingDeposit) => {
+    setRecoveringFloat(float);
+    setRecoverAmount(String(float.amount));
+    // Default to original wallet if it has sufficient funds; otherwise choose the wallet with the largest balance
+    if (balances[float.walletType] >= float.amount) {
+      setRecoverSourceWallet(float.walletType);
+    } else if (balances.cash_in_hand >= float.amount) {
+      setRecoverSourceWallet('cash_in_hand');
+    } else {
+      const sorted = (['cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank'] as WalletType[])
+        .sort((a, b) => (balances[b] || 0) - (balances[a] || 0));
+      setRecoverSourceWallet(sorted[0]);
+    }
+  };
+
+  // Action: Confirm Float Recovery from Selected Vault
+  const handleConfirmRecoverFloat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recoveringFloat) return;
+
+    const amount = Number(recoverAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid recovery amount.");
       return;
     }
 
-    if (!confirm(`Recover ${formatCurrency(float.amount)} float back to ${float.depositedBy}?\n\nThis will withdraw ${formatCurrency(float.amount)} from ${WALLET_META[float.walletType].name} and mark this floating deposit as fully Recovered (Settled).`)) {
+    if (amount > recoveringFloat.amount) {
+      alert(`Recovery amount cannot exceed the floating deposit amount of ${formatCurrency(recoveringFloat.amount)}.`);
       return;
     }
 
+    if (balances[recoverSourceWallet] < amount) {
+      alert(`Insufficient balance in ${WALLET_META[recoverSourceWallet].name} to pay out ${formatCurrency(amount)}. Available: ${formatCurrency(balances[recoverSourceWallet])}`);
+      return;
+    }
+
+    setIsProcessingRecover(true);
     try {
-      // 1. Deduct from vault (Dad takes back his money)
-      await updateBalance(float.walletType, -float.amount);
+      // 1. Deduct from selected payout account
+      await updateBalance(recoverSourceWallet, -amount);
 
       // 2. Insert withdrawal transaction
       await supabase.from('transactions').insert([
         {
-          wallet_type: float.walletType,
+          wallet_type: recoverSourceWallet,
           type: 'transfer',
           status: 'completed',
-          amount: float.amount,
-          notes: `Float Recovery of ${formatCurrency(float.amount)} by ${float.depositedBy} from ${WALLET_META[float.walletType].name}`,
+          amount: amount,
+          notes: `Float Recovery of ${formatCurrency(amount)} by ${recoveringFloat.depositedBy} paid from ${WALLET_META[recoverSourceWallet].name} (Original Inflow: ${WALLET_META[recoveringFloat.walletType].name})`,
           created_by: profile?.id || null,
         }
       ]);
 
-      // 3. Update original floating deposit note to recovered
+      // 3. Update original floating deposit note
       const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const updatedNotes = `[Floating Deposit - ${float.tag}] ${float.notes} | Deposited By: ${float.depositedBy} | Status: Recovered (Withdrawn ${formatCurrency(float.amount)} on ${dateStr})`;
+      const isFull = amount >= recoveringFloat.amount;
+      const updatedNotes = isFull
+        ? `[Floating Deposit - ${recoveringFloat.tag}] ${recoveringFloat.notes} | Deposited By: ${recoveringFloat.depositedBy} | Status: Recovered (Withdrawn ${formatCurrency(amount)} from ${WALLET_META[recoverSourceWallet].name} on ${dateStr})`
+        : `[Floating Deposit - ${recoveringFloat.tag}] ${recoveringFloat.notes} | Deposited By: ${recoveringFloat.depositedBy} | Status: Partially Recovered (Withdrawn ${formatCurrency(amount)} from ${WALLET_META[recoverSourceWallet].name} on ${dateStr}, Remaining Float: ${formatCurrency(recoveringFloat.amount - amount)})`;
 
       await supabase
         .from('transactions')
         .update({ notes: updatedNotes })
-        .eq('id', float.id);
+        .eq('id', recoveringFloat.id);
 
-      alert(`✓ Successfully recovered ${formatCurrency(float.amount)} float back for ${float.depositedBy}!`);
+      setRecoveringFloat(null);
       await fetchData();
+      alert(`✓ Successfully recovered ${formatCurrency(amount)} back for ${recoveringFloat.depositedBy} from ${WALLET_META[recoverSourceWallet].name}!`);
     } catch (err: any) {
       console.error('Error recovering float:', err);
       alert('Error recovering float: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsProcessingRecover(false);
     }
   };
 
@@ -1739,7 +1778,7 @@ export default function CashVaultLedger() {
 
                     <button
                       type="button"
-                      onClick={() => handleRecoverFloat(float)}
+                      onClick={() => handleOpenRecoverModal(float)}
                       className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
                     >
                       <RotateCcw size={13} />
@@ -2547,6 +2586,168 @@ export default function CashVaultLedger() {
                         : Number(settleAmount) > settlingDraw.amount
                         ? `Cannot Exceed ${formatCurrency(settlingDraw.amount)}`
                         : `✓ Put ${formatCurrency(Number(settleAmount) || settlingDraw.amount)} Back`
+                      }
+                    </button>
+                  </div>
+                </form>
+
+              </div>
+            </div>
+          )}
+
+          {/* ── INTERACTIVE MODAL: RECOVER ORGANIZER FLOAT (CHOOSE ANY SOURCE ACCOUNT) ── */}
+          {recoveringFloat && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+              <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+                
+                {/* Modal Header */}
+                <div className="flex items-start justify-between border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
+                      <RotateCcw size={20} className="text-emerald-600" />
+                      Recover Organizer Float
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Refund {recoveringFloat.depositedBy} from any vault account with sufficient funds
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRecoveringFloat(null)}
+                    className="text-gray-400 hover:text-gray-700 p-1.5 rounded-xl hover:bg-gray-100 cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleConfirmRecoverFloat} className="space-y-4">
+                  
+                  {/* Injected Float Summary Card */}
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Deposited Float</span>
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                        {recoveringFloat.depositedBy}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-lg font-black font-mono text-emerald-600">
+                        +{formatCurrency(recoveringFloat.amount)}
+                      </span>
+                      <span className="text-[11px] text-gray-500 font-medium">
+                        Original Inflow: {WALLET_META[recoveringFloat.walletType]?.name}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 italic">
+                      &quot;{recoveringFloat.notes}&quot;
+                    </p>
+                  </div>
+
+                  {/* Vault Source Selection (Freely choose any account) */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-700 font-bold uppercase tracking-wider block">
+                      Pay Out / Withdraw Cash From Account:
+                    </label>
+                    <div className="space-y-2">
+                      {[
+                        { type: 'cash_in_hand' as WalletType, label: '💵 Physical Cash Box', bal: balances.cash_in_hand },
+                        { type: 'kishor_bank' as WalletType, label: '🏦 Kishor Bank', bal: balances.kishor_bank },
+                        { type: 'dad_bank' as WalletType, label: '🏦 Dad Bank', bal: balances.dad_bank },
+                        { type: 'mom_bank' as WalletType, label: '🏦 Mom Bank', bal: balances.mom_bank },
+                      ].map((acc) => {
+                        const isSelected = recoverSourceWallet === acc.type;
+                        const hasEnough = (acc.bal || 0) >= (Number(recoverAmount) || recoveringFloat.amount);
+                        return (
+                          <button
+                            key={acc.type}
+                            type="button"
+                            onClick={() => setRecoverSourceWallet(acc.type)}
+                            className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
+                                : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="space-y-0.5">
+                              <span className="text-xs font-bold text-gray-900 block">{acc.label}</span>
+                              <span className={`text-[11px] font-mono font-bold block ${acc.bal > 0 ? 'text-gray-600' : 'text-gray-400'}`}>
+                                Available: {formatCurrency(acc.bal || 0)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {!hasEnough && (
+                                <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                                  Low Bal
+                                </span>
+                              )}
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                                isSelected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-gray-300 bg-white'
+                              }`}>
+                                {isSelected && <Check size={10} />}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Amount to Recover */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-gray-700 font-bold uppercase tracking-wider">
+                        Amount to Recover (₹)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setRecoverAmount(String(recoveringFloat.amount))}
+                        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer"
+                      >
+                        Full Float: {formatCurrency(recoveringFloat.amount)}
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={recoveringFloat.amount}
+                      value={recoverAmount}
+                      onChange={(e) => setRecoverAmount(e.target.value)}
+                      className={`w-full bg-white border rounded-xl px-3.5 py-2.5 text-sm font-black text-gray-900 focus:outline-none font-mono shadow-2xs ${
+                        balances[recoverSourceWallet] < Number(recoverAmount) || Number(recoverAmount) > recoveringFloat.amount
+                          ? 'border-rose-400 focus:border-rose-500 bg-rose-50/30'
+                          : 'border-emerald-300 focus:border-emerald-500'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Validation alerts */}
+                  {balances[recoverSourceWallet] < Number(recoverAmount) && (
+                    <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-[11px] text-rose-800 font-medium leading-relaxed">
+                      ⚠️ <strong>Insufficient balance in {WALLET_META[recoverSourceWallet].name}:</strong> Only {formatCurrency(balances[recoverSourceWallet])} available. Please select another account (e.g. Physical Cash Box) above.
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setRecoveringFloat(null)}
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isProcessingRecover || Number(recoverAmount) <= 0 || Number(recoverAmount) > recoveringFloat.amount || balances[recoverSourceWallet] < Number(recoverAmount)}
+                      className="flex-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                    >
+                      <RotateCcw size={13} />
+                      {isProcessingRecover 
+                        ? 'Processing Recovery...' 
+                        : balances[recoverSourceWallet] < Number(recoverAmount)
+                        ? 'Insufficient Balance'
+                        : `Withdraw ${formatCurrency(Number(recoverAmount) || recoveringFloat.amount)} from ${WALLET_META[recoverSourceWallet].name}`
                       }
                     </button>
                   </div>
