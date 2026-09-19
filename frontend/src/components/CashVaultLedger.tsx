@@ -1,44 +1,27 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useWallet, WalletType } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase/client';
 import { 
   Wallet, 
   Landmark, 
-  Send, 
-  ShieldAlert, 
-  DollarSign, 
-  Check, 
-  AlertCircle, 
-  Mic, 
   Coins, 
-  Scale, 
   Plus, 
   Trash2,
-  ArrowDownLeft,
-  ArrowUpRight,
-  Sparkles,
   Banknote,
-  CheckCircle2,
-  X,
-  History,
-  Activity,
-  Calculator,
-  CreditCard,
-  Layers,
-  Search,
-  Filter,
-  Download,
-  Share2,
-  FileText,
-  Printer,
-  ChevronRight,
-  TrendingUp,
-  RefreshCw,
-  SlidersHorizontal,
-  ArrowRightLeft,
+  Check,
+  AlertCircle, 
+  Mic, 
+  History, 
+  Activity, 
+  Calculator, 
+  CreditCard, 
+  Search, 
+  ChevronRight, 
+  RefreshCw, 
+  ArrowRightLeft, 
   PieChart
 } from 'lucide-react';
 
@@ -46,7 +29,6 @@ export type CashHandlingSubtab =
   | 'overview' 
   | 'wallets' 
   | 'transfers' 
-  | 'payouts' 
   | 'spends' 
   | 'denominations' 
   | 'ledger';
@@ -62,7 +44,6 @@ const CASH_SUBTABS: SubtabConfig[] = [
   { id: 'overview', label: 'Overview', icon: PieChart, description: 'High-level treasury summary, vault allocations & quick actions' },
   { id: 'wallets', label: 'Wallets (GPay)', icon: CreditCard, description: 'Dedicated GPay-style statement cards for each account' },
   { id: 'transfers', label: 'Move Money', icon: ArrowRightLeft, description: 'Inter-vault transfers, ATM cash withdrawals & deposits' },
-  { id: 'payouts', label: 'Payouts', icon: Scale, description: 'Auction prize pot disbursals, split accounts & liabilities' },
   { id: 'spends', label: 'Personal Draws', icon: Coins, description: 'Personal expense logger, petrol/maintenance & category budgets' },
   { id: 'denominations', label: 'Denominations', icon: Calculator, description: 'Physical cash box note counter & reconciliation disparity check' },
   { id: 'ledger', label: 'Audit Ledger', icon: History, description: 'Complete transaction timeline & printable treasury statement' },
@@ -83,23 +64,6 @@ interface PersonalDraw {
   description: string;
   adminName: string;
   timestamp: string;
-}
-
-interface DebtLiability {
-  id: string;
-  groupId: string;
-  groupName: string;
-  month: number;
-  winnerName: string;
-  phone?: string;
-  ticketNumber?: number;
-  totalPayout: number;
-  paidAmount: number;
-  liabilityAmount: number;
-  winningDiscount?: number;
-  winningBidderId?: string;
-  status: 'Pending' | 'Partial' | 'Complete';
-  auctionId?: string;
 }
 
 interface TreasuryTx {
@@ -125,9 +89,6 @@ export default function CashVaultLedger() {
 
   // Supabase Data State
   const [loading, setLoading] = useState<boolean>(true);
-  const [chitGroups, setChitGroups] = useState<any[]>([]);
-  const [auctionLogs, setAuctionLogs] = useState<any[]>([]);
-  const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<TreasuryTx[]>([]);
 
   // Operational State
@@ -151,24 +112,6 @@ export default function CashVaultLedger() {
   const [spendDesc, setSpendDesc] = useState<string>('');
   const [spendWallet, setSpendWallet] = useState<WalletType>('cash_in_hand');
 
-  // Form State: Payout Split
-  const [payoutGroupId, setPayoutGroupId] = useState<string>('');
-  const [payoutSelectedAuctionId, setPayoutSelectedAuctionId] = useState<string>('');
-  const [payoutWinnerId, setPayoutWinnerId] = useState<string>('');
-  const [payoutWinnerName, setPayoutWinnerName] = useState<string>('');
-  const [payoutMonth, setPayoutMonth] = useState<number>(1);
-  const [payoutTotalPot, setPayoutTotalPot] = useState<string>('');
-  const [payoutAlreadyPaid, setPayoutAlreadyPaid] = useState<number>(0);
-  const [payoutRemainingLiability, setPayoutRemainingLiability] = useState<number>(0);
-  const [payoutBank1Wallet, setPayoutBank1Wallet] = useState<WalletType>('dad_bank');
-  const [payoutBank1Amount, setPayoutBank1Amount] = useState<string>('');
-  const [payoutBank2Wallet, setPayoutBank2Wallet] = useState<WalletType>('kishor_bank');
-  const [payoutBank2Amount, setPayoutBank2Amount] = useState<string>('');
-  const [payoutCashAmount, setPayoutCashAmount] = useState<string>('');
-  const [payoutMomAmount, setPayoutMomAmount] = useState<string>('');
-  const [payoutRefNotes, setPayoutRefNotes] = useState<string>('');
-  const [isProcessingPayout, setIsProcessingPayout] = useState<boolean>(false);
-
   // Denomination Counter State
   const [denominations, setDenominations] = useState<{ [key: number]: number }>({
     500: 0,
@@ -190,62 +133,7 @@ export default function CashVaultLedger() {
     try {
       setLoading(true);
 
-      // 1. Fetch groups
-      const { data: groups } = await supabase
-        .from('chit_groups')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (groups && groups.length > 0) {
-        setChitGroups(groups);
-        setPayoutGroupId(prev => prev || groups[0].id);
-      }
-
-      // 2. Fetch auction logs
-      const { data: auctions } = await supabase
-        .from('auction_logs')
-        .select(`
-          id,
-          group_id,
-          month,
-          winning_bidder_id,
-          winning_discount,
-          is_laaba_seetu,
-          created_at,
-          profiles:winning_bidder_id (
-            id,
-            full_name,
-            phone_number
-          )
-        `)
-        .order('month', { ascending: false });
-
-      if (auctions) {
-        setAuctionLogs(auctions);
-      }
-
-      // 3. Fetch group members
-      const { data: members } = await supabase
-        .from('group_members')
-        .select(`
-          id,
-          group_id,
-          ticket_number,
-          profile_id,
-          has_won_regular,
-          custom_installment,
-          profiles:profile_id (
-            id,
-            full_name,
-            phone_number
-          )
-        `);
-
-      if (members) {
-        setGroupMembers(members);
-      }
-
-      // 4. Fetch treasury transactions
+      // Fetch treasury transactions
       const { data: txs } = await supabase
         .from('transactions')
         .select('*')
@@ -311,8 +199,8 @@ export default function CashVaultLedger() {
     dad_bank: {
       name: 'Anbazhakan Bank',
       owner: 'Anbazhakan (Dad)',
-      accountNumber: '•••• 3108 · Auction Disbursements',
-      typeLabel: 'Disbursement Vault · Primary Banking',
+      accountNumber: '•••• 3108 · Primary Banking',
+      typeLabel: 'Disbursement Vault · Primary Channel',
       bgGradient: 'from-purple-950 via-slate-900 to-slate-950',
       borderClass: 'border-purple-500/30',
       textAccent: 'text-purple-400',
@@ -323,7 +211,7 @@ export default function CashVaultLedger() {
       name: 'Parimalam Bank',
       owner: 'Parimalam (Mom)',
       accountNumber: '•••• 5521 · Reserve Channel',
-      typeLabel: 'Reserve Vault · Secondary Banking',
+      typeLabel: 'Reserve Vault · Secondary Channel',
       bgGradient: 'from-amber-950 via-stone-900 to-slate-950',
       borderClass: 'border-amber-500/30',
       textAccent: 'text-amber-400',
@@ -553,374 +441,8 @@ export default function CashVaultLedger() {
     alert(`Refunded ${formatCurrency(amount)} back to ${WALLET_META[spendWallet].name}.`);
   };
 
-  // ── Derived Live Outstanding Payout Debt Liabilities (from Supabase) ──
-  const liveLiabilities = useMemo(() => {
-    const list: DebtLiability[] = [];
-
-    // 1. Compute from auction_logs
-    auctionLogs.forEach((a) => {
-      const group = chitGroups.find((g) => g.id === a.group_id);
-      const totalVal = Number(group?.total_value) || 200000;
-      const discount = Number(a.winning_discount || 0);
-      const netPayout = Number(a.net_payout) || (totalVal - discount);
-
-      const member = groupMembers.find(
-        (m) => m.group_id === a.group_id && (m.profile_id === a.winning_bidder_id || m.id === a.winning_bidder_id)
-      );
-      const prof = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
-      const winnerName = member?.profiles?.full_name || prof?.full_name || (a as any).winner_name || 'Subscriber';
-      const winnerPhone = member?.profiles?.phone_number || prof?.phone_number || '';
-      const ticketNum = member?.ticket_number;
-
-      // Find all payout transactions recorded for this group & month / winner
-      const monthPattern = new RegExp(`\\bMonth\\s+${a.month}\\b|\\bM${a.month}\\b`, 'i');
-      const matchingTxs = recentTransactions.filter((t) =>
-        t.type === 'payout' &&
-        t.group_id === a.group_id &&
-        (
-          (t.notes && monthPattern.test(t.notes)) ||
-          t.profile_id === a.winning_bidder_id ||
-          (member && (t.group_member_id === member.id || t.profile_id === member.profile_id))
-        )
-      );
-
-      const amountPaid = matchingTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-      const remainingLiability = Math.max(0, netPayout - amountPaid);
-      const status: 'Pending' | 'Partial' | 'Complete' =
-        amountPaid >= netPayout && netPayout > 0 ? 'Complete' : amountPaid > 0 ? 'Partial' : 'Pending';
-
-      list.push({
-        id: a.id,
-        auctionId: a.id,
-        groupId: a.group_id,
-        groupName: group?.name || 'Group',
-        month: Number(a.month),
-        winnerName,
-        phone: winnerPhone,
-        ticketNumber: ticketNum,
-        totalPayout: netPayout,
-        paidAmount: amountPaid,
-        liabilityAmount: remainingLiability,
-        winningDiscount: discount,
-        winningBidderId: a.winning_bidder_id,
-        status,
-      });
-    });
-
-    // 2. Check won members in group_members without an auction_logs row
-    groupMembers.filter((m) => m.has_won_regular).forEach((wm) => {
-      const alreadyIncluded = list.some(
-        (l) => l.groupId === wm.group_id && (l.winningBidderId === wm.profile_id || l.ticketNumber === wm.ticket_number)
-      );
-      if (!alreadyIncluded) {
-        const group = chitGroups.find((g) => g.id === wm.group_id);
-        const totalVal = Number(group?.total_value) || 200000;
-        const netPayout = totalVal - 5000;
-        const matchingTxs = recentTransactions.filter(
-          (t) =>
-            t.type === 'payout' &&
-            t.group_id === wm.group_id &&
-            (t.profile_id === wm.profile_id || t.group_member_id === wm.id)
-        );
-        const amountPaid = matchingTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-        const remainingLiability = Math.max(0, netPayout - amountPaid);
-        const status: 'Pending' | 'Partial' | 'Complete' =
-          amountPaid >= netPayout && netPayout > 0 ? 'Complete' : amountPaid > 0 ? 'Partial' : 'Pending';
-
-        list.push({
-          id: wm.id,
-          groupId: wm.group_id,
-          groupName: group?.name || 'Group',
-          month: 1,
-          winnerName: wm.profiles?.full_name || `Member (Ticket #${wm.ticket_number})`,
-          phone: wm.profiles?.phone_number || '',
-          ticketNumber: wm.ticket_number,
-          totalPayout: netPayout,
-          paidAmount: amountPaid,
-          liabilityAmount: remainingLiability,
-          winningDiscount: 5000,
-          winningBidderId: wm.profile_id,
-          status,
-        });
-      }
-    });
-
-    return list;
-  }, [auctionLogs, chitGroups, groupMembers, recentTransactions]);
-
-  // Only unsettled / pending debt liabilities
-  const pendingLiabilities = useMemo(() => {
-    return liveLiabilities.filter((l) => l.liabilityAmount > 0);
-  }, [liveLiabilities]);
-
-  const totalOutstandingLiability = useMemo(() => {
-    return pendingLiabilities.reduce((sum, l) => sum + l.liabilityAmount, 0);
-  }, [pendingLiabilities]);
-
-  // Auctions for currently selected group in Payout form
-  const selectedGroupAuctions = useMemo(() => {
-    if (!payoutGroupId) return [];
-    return liveLiabilities.filter((l) => l.groupId === payoutGroupId);
-  }, [liveLiabilities, payoutGroupId]);
-
-  // Synchronize payout form when group or auctions change
-  useEffect(() => {
-    if (selectedGroupAuctions.length > 0) {
-      const activeAuction = selectedGroupAuctions.find((a) => a.id === payoutSelectedAuctionId) || selectedGroupAuctions[0];
-      setPayoutSelectedAuctionId(activeAuction.id);
-      setPayoutMonth(activeAuction.month);
-      setPayoutWinnerId(activeAuction.winningBidderId || '');
-      setPayoutWinnerName(activeAuction.winnerName);
-      setPayoutTotalPot(String(activeAuction.totalPayout));
-      setPayoutAlreadyPaid(activeAuction.paidAmount);
-      setPayoutRemainingLiability(activeAuction.liabilityAmount);
-    } else {
-      const grp = chitGroups.find((g) => g.id === payoutGroupId);
-      const val = Number(grp?.total_value) || 200000;
-      setPayoutSelectedAuctionId('');
-      setPayoutMonth(grp?.current_month || 1);
-      setPayoutWinnerId('');
-      setPayoutWinnerName('');
-      setPayoutTotalPot(String(val));
-      setPayoutAlreadyPaid(0);
-      setPayoutRemainingLiability(val);
-    }
-  }, [payoutGroupId, selectedGroupAuctions, payoutSelectedAuctionId]);
-
-  // Select auction in form
-  const handleSelectAuction = (auctionId: string) => {
-    const target = selectedGroupAuctions.find((a) => a.id === auctionId);
-    if (target) {
-      setPayoutSelectedAuctionId(target.id);
-      setPayoutMonth(target.month);
-      setPayoutWinnerId(target.winningBidderId || '');
-      setPayoutWinnerName(target.winnerName);
-      setPayoutTotalPot(String(target.totalPayout));
-      setPayoutAlreadyPaid(target.paidAmount);
-      setPayoutRemainingLiability(target.liabilityAmount);
-    }
-  };
-
-  // Pre-fill form from liability list
-  const handlePreFillDisbursement = (liab: DebtLiability) => {
-    setPayoutGroupId(liab.groupId);
-    setPayoutSelectedAuctionId(liab.id);
-    setPayoutMonth(liab.month);
-    setPayoutWinnerId(liab.winningBidderId || '');
-    setPayoutWinnerName(liab.winnerName);
-    setPayoutTotalPot(String(liab.totalPayout));
-    setPayoutAlreadyPaid(liab.paidAmount);
-    setPayoutRemainingLiability(liab.liabilityAmount);
-
-    // Smart vault split suggestion based on available balances:
-    const rem = liab.liabilityAmount;
-    if (balances.dad_bank >= rem) {
-      setPayoutBank1Amount(String(rem));
-      setPayoutBank2Amount('');
-      setPayoutCashAmount('');
-      setPayoutMomAmount('');
-    } else if (balances.kishor_bank >= rem) {
-      setPayoutBank1Amount('');
-      setPayoutBank2Amount(String(rem));
-      setPayoutCashAmount('');
-      setPayoutMomAmount('');
-    } else if (balances.cash_in_hand >= rem) {
-      setPayoutBank1Amount('');
-      setPayoutBank2Amount('');
-      setPayoutCashAmount(String(rem));
-      setPayoutMomAmount('');
-    } else {
-      const dadUse = Math.min(balances.dad_bank, rem);
-      const remAfterDad = rem - dadUse;
-      const kishorUse = Math.min(balances.kishor_bank, remAfterDad);
-      const cashUse = Math.min(balances.cash_in_hand, rem - dadUse - kishorUse);
-
-      setPayoutBank1Amount(dadUse > 0 ? String(dadUse) : '');
-      setPayoutBank2Amount(kishorUse > 0 ? String(kishorUse) : '');
-      setPayoutCashAmount(cashUse > 0 ? String(cashUse) : '');
-      setPayoutMomAmount('');
-    }
-  };
-
-  // Action: Disburse Prize Payout
-  const handleDisbursePrizePayout = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const b1Amt = Number(payoutBank1Amount) || 0;
-    const b2Amt = Number(payoutBank2Amount) || 0;
-    const cashAmt = Number(payoutCashAmount) || 0;
-    const momAmt = Number(payoutMomAmount) || 0;
-    const totalDisbursing = b1Amt + b2Amt + cashAmt + momAmt;
-
-    if (totalDisbursing <= 0) {
-      alert('Please enter a valid disbursement amount from at least one vault.');
-      return;
-    }
-
-    // Liquidity Checks
-    if (b1Amt > 0 && balances[payoutBank1Wallet] < b1Amt) {
-      alert(`Insufficient funds in ${WALLET_META[payoutBank1Wallet].name}. Available: ${formatCurrency(balances[payoutBank1Wallet])}`);
-      return;
-    }
-    if (b2Amt > 0 && balances[payoutBank2Wallet] < b2Amt) {
-      alert(`Insufficient funds in ${WALLET_META[payoutBank2Wallet].name}. Available: ${formatCurrency(balances[payoutBank2Wallet])}`);
-      return;
-    }
-    if (cashAmt > 0 && balances.cash_in_hand < cashAmt) {
-      alert(`Insufficient funds in Physical Cash Box. Available: ${formatCurrency(balances.cash_in_hand)}`);
-      return;
-    }
-    if (momAmt > 0 && balances.mom_bank < momAmt) {
-      alert(`Insufficient funds in Mom Bank. Available: ${formatCurrency(balances.mom_bank)}`);
-      return;
-    }
-
-    const group = chitGroups.find((g) => g.id === payoutGroupId);
-    const targetAuction = auctionLogs.find((a) => a.group_id === payoutGroupId && Number(a.month) === Number(payoutMonth));
-    const targetMember = groupMembers.find(
-      (m) => m.group_id === payoutGroupId && (m.profile_id === payoutWinnerId || m.id === payoutWinnerId)
-    );
-    const winnerProfileId = targetAuction?.winning_bidder_id || targetMember?.profile_id || payoutWinnerId || null;
-    const winnerName = payoutWinnerName || targetMember?.profiles?.full_name || targetAuction?.profiles?.full_name || 'Prize Winner';
-
-    setIsProcessingPayout(true);
-    try {
-      // Execute wallet debits
-      if (b1Amt > 0) await updateBalance(payoutBank1Wallet, -b1Amt);
-      if (b2Amt > 0) await updateBalance(payoutBank2Wallet, -b2Amt);
-      if (cashAmt > 0) await updateBalance('cash_in_hand', -cashAmt);
-      if (momAmt > 0) await updateBalance('mom_bank', -momAmt);
-
-      // Insert payout transactions
-      const txInserts: any[] = [];
-      const baseNote = `Auction Prize Pot Payout · ${group?.name || 'Group'} (M${payoutMonth}) to ${winnerName}${payoutRefNotes ? ` · Ref: ${payoutRefNotes}` : ''}`;
-
-      if (b1Amt > 0) {
-        txInserts.push({
-          group_id: payoutGroupId,
-          profile_id: winnerProfileId,
-          group_member_id: targetMember?.id || null,
-          wallet_type: payoutBank1Wallet,
-          type: 'payout',
-          status: 'completed',
-          amount: b1Amt,
-          notes: `${baseNote} (via ${WALLET_META[payoutBank1Wallet].name})`,
-          created_by: profile?.id || null,
-        });
-      }
-      if (b2Amt > 0) {
-        txInserts.push({
-          group_id: payoutGroupId,
-          profile_id: winnerProfileId,
-          group_member_id: targetMember?.id || null,
-          wallet_type: payoutBank2Wallet,
-          type: 'payout',
-          status: 'completed',
-          amount: b2Amt,
-          notes: `${baseNote} (via ${WALLET_META[payoutBank2Wallet].name})`,
-          created_by: profile?.id || null,
-        });
-      }
-      if (cashAmt > 0) {
-        txInserts.push({
-          group_id: payoutGroupId,
-          profile_id: winnerProfileId,
-          group_member_id: targetMember?.id || null,
-          wallet_type: 'cash_in_hand',
-          type: 'payout',
-          status: 'completed',
-          amount: cashAmt,
-          notes: `${baseNote} (via Physical Cash Box)`,
-          created_by: profile?.id || null,
-        });
-      }
-      if (momAmt > 0) {
-        txInserts.push({
-          group_id: payoutGroupId,
-          profile_id: winnerProfileId,
-          group_member_id: targetMember?.id || null,
-          wallet_type: 'mom_bank',
-          type: 'payout',
-          status: 'completed',
-          amount: momAmt,
-          notes: `${baseNote} (via Mom Bank)`,
-          created_by: profile?.id || null,
-        });
-      }
-
-      if (txInserts.length > 0) {
-        await supabase.from('transactions').insert(txInserts);
-      }
-
-      // Record audit log
-      await supabase.from('security_audit_logs').insert({
-        action_description: `PRIZE POT DISBURSEMENT: Disbursed ${formatCurrency(totalDisbursing)} for "${group?.name || 'Group'}" (Month ${payoutMonth}) to ${winnerName} across treasury vaults.`,
-        target_table: 'transactions',
-      });
-
-      setPayoutBank1Amount('');
-      setPayoutBank2Amount('');
-      setPayoutCashAmount('');
-      setPayoutMomAmount('');
-      setPayoutRefNotes('');
-      await fetchData();
-
-      alert(`✅ Successfully disbursed ${formatCurrency(totalDisbursing)} to ${winnerName}!`);
-    } catch (err) {
-      console.error('Error disbursing payout:', err);
-      alert('Failed to disburse prize payout. Please try again.');
-    } finally {
-      setIsProcessingPayout(false);
-    }
-  };
-
-  // Action: Quick Clear Liability from a specific vault
-  const handleQuickClearLiability = async (liab: DebtLiability, wallet: WalletType) => {
-    if (balances[wallet] < liab.liabilityAmount) {
-      alert(`Insufficient funds in ${WALLET_META[wallet].name}. Available: ${formatCurrency(balances[wallet])}, Required: ${formatCurrency(liab.liabilityAmount)}`);
-      return;
-    }
-
-    const confirm = window.confirm(
-      `Disburse remaining liability ${formatCurrency(liab.liabilityAmount)} to ${liab.winnerName} from ${WALLET_META[wallet].name}?`
-    );
-    if (!confirm) return;
-
-    try {
-      // 1. Debit wallet
-      await updateBalance(wallet, -liab.liabilityAmount);
-
-      // 2. Insert transaction
-      const baseNote = `Auction Prize Pot Payout · ${liab.groupName} (M${liab.month}) to ${liab.winnerName} (via ${WALLET_META[wallet].name})`;
-      await supabase.from('transactions').insert([
-        {
-          group_id: liab.groupId,
-          profile_id: liab.winningBidderId || null,
-          wallet_type: wallet,
-          type: 'payout',
-          status: 'completed',
-          amount: liab.liabilityAmount,
-          notes: baseNote,
-          created_by: profile?.id || null,
-        },
-      ]);
-
-      // 3. Insert audit log
-      await supabase.from('security_audit_logs').insert({
-        action_description: `PRIZE POT LIABILITY SETTLED: Fully cleared ${formatCurrency(liab.liabilityAmount)} for "${liab.groupName}" (Month ${liab.month}) to ${liab.winnerName} from ${WALLET_META[wallet].name}.`,
-        target_table: 'transactions',
-      });
-
-      await fetchData();
-      alert(`✅ Successfully cleared ${formatCurrency(liab.liabilityAmount)} liability for ${liab.winnerName}!`);
-    } catch (err) {
-      console.error('Error clearing liability:', err);
-      alert('Failed to clear debt liability. Please try again.');
-    }
-  };
-
   // Action: Save Denomination Count
   const handleSaveDenominations = async () => {
-    const timestampStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
     const note = `Denomination reconciliation by ${activeAdminName}: Counted ${formatCurrency(calculatedPhysicalCash)} vs System ${formatCurrency(balances.cash_in_hand || 0)} (Disparity: ${formatCurrency(cashDisparity)})`;
 
     setLastReconciliationNote(note);
@@ -1005,27 +527,27 @@ export default function CashVaultLedger() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
               <button
                 onClick={() => setActiveSubtab('transfers')}
-                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
+                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
               >
                 <ArrowRightLeft size={14} className="text-emerald-400" /> Move Money
               </button>
               <button
-                onClick={() => setActiveSubtab('payouts')}
-                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
-              >
-                <Scale size={14} className="text-purple-400" /> Disburse Pot
-              </button>
-              <button
                 onClick={() => setActiveSubtab('spends')}
-                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
+                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
               >
                 <Coins size={14} className="text-rose-400" /> Log Spend
               </button>
               <button
                 onClick={() => setActiveSubtab('denominations')}
-                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
+                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
               >
                 <Calculator size={14} className="text-amber-400" /> Count Cash
+              </button>
+              <button
+                onClick={() => setActiveSubtab('ledger')}
+                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+              >
+                <History size={14} className="text-blue-400" /> View Ledger
               </button>
             </div>
           </div>
@@ -1083,7 +605,7 @@ export default function CashVaultLedger() {
               </h3>
               <button
                 onClick={() => setActiveSubtab('ledger')}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
               >
                 View Complete Ledger →
               </button>
@@ -1091,7 +613,7 @@ export default function CashVaultLedger() {
 
             <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
               {recentTransactions.slice(0, 8).map((tx) => {
-                const isCredit = tx.type === 'collection';
+                const isCredit = tx.type === 'collection' || (tx.type === 'transfer' && tx.notes?.includes('into Cash Box'));
                 const dateLabel = tx.created_at 
                   ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                   : 'Recent';
@@ -1199,7 +721,7 @@ export default function CashVaultLedger() {
                       setTransferDest(selectedWalletDetail);
                       setActiveSubtab('transfers');
                     }}
-                    className="py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
+                    className="py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
                   >
                     <Plus size={15} className="text-emerald-400" /> Add / Inflow
                   </button>
@@ -1208,7 +730,7 @@ export default function CashVaultLedger() {
                       setTransferSource(selectedWalletDetail);
                       setActiveSubtab('transfers');
                     }}
-                    className="py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
+                    className="py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
                   >
                     <ArrowRightLeft size={15} className="text-blue-400" /> Transfer
                   </button>
@@ -1217,7 +739,7 @@ export default function CashVaultLedger() {
                       setSpendWallet(selectedWalletDetail);
                       setActiveSubtab('spends');
                     }}
-                    className="py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
+                    className="py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
                   >
                     <Coins size={15} className="text-rose-400" /> Spend / Draw
                   </button>
@@ -1226,7 +748,7 @@ export default function CashVaultLedger() {
             );
           })()}
 
-          {/* 3 Monthly Flow Metric Cards */}
+          {/* 3 Flow Metric Cards */}
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-white border border-emerald-200/90 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-1">
               <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">TOTAL INFLOW</span>
@@ -1345,10 +867,10 @@ export default function CashVaultLedger() {
                     onChange={(e) => setTransferDest(e.target.value as WalletType)}
                     className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                   >
-                    <option value="cash_in_hand">Cash Box</option>
-                    <option value="kishor_bank">Kishor Bank</option>
-                    <option value="dad_bank">Dad Bank</option>
-                    <option value="mom_bank">Mom Bank</option>
+                    <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
+                    <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
+                    <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
+                    <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
                   </select>
                 </div>
               </div>
@@ -1390,7 +912,7 @@ export default function CashVaultLedger() {
           <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                <Scale size={16} className="text-indigo-600" />
+                <Banknote size={16} className="text-indigo-600" />
                 ATM Bank-to-Cash Relocation
               </h3>
               <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
@@ -1466,414 +988,7 @@ export default function CashVaultLedger() {
         </div>
       )}
 
-      {/* ── SUBTAB 4: PRIZE POT DISBURSEMENTS ── */}
-      {activeSubtab === 'payouts' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-          
-          {/* Winner Prize Pot Payout Form */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                  <Scale size={16} className="text-purple-600" />
-                  Winner Prize Pot Disbursement Desk
-                </h3>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  Multi-vault prize pot distribution synchronized with live auctions
-                </p>
-              </div>
-              <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-0.5 rounded-full">
-                Split Accounts
-              </span>
-            </div>
-
-            <form onSubmit={handleDisbursePrizePayout} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Chit Group</label>
-                  <select
-                    value={payoutGroupId}
-                    onChange={(e) => {
-                      setPayoutGroupId(e.target.value);
-                      setPayoutSelectedAuctionId('');
-                    }}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-purple-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                  >
-                    {chitGroups.map((g) => (
-                      <option key={g.id} value={g.id}>{g.name} ({formatCurrency(g.total_value)})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Auction &amp; Winner</label>
-                  <select
-                    value={payoutSelectedAuctionId}
-                    onChange={(e) => handleSelectAuction(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-purple-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                  >
-                    {selectedGroupAuctions.length === 0 ? (
-                      <option value="">No recorded auctions for this group</option>
-                    ) : (
-                      selectedGroupAuctions.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          M{a.month}: {a.winnerName} {a.ticketNumber ? `(#${a.ticketNumber})` : ''} · {a.status === 'Complete' ? '✅ Settled' : `Pending ${formatCurrency(a.liabilityAmount)}`}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              {/* Selected Winner Status Overview Banner */}
-              <div className="bg-purple-50/60 border border-purple-200/80 rounded-2xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-purple-900">
-                      {payoutWinnerName || 'Select an Auction Winner'}
-                    </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md">
-                      Month {payoutMonth}
-                    </span>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    payoutRemainingLiability <= 0
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : payoutAlreadyPaid > 0
-                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                      : 'bg-rose-50 text-rose-700 border-rose-200'
-                  }`}>
-                    {payoutRemainingLiability <= 0 ? 'Fully Disbursed' : payoutAlreadyPaid > 0 ? 'Partial Payout' : 'Pending Payout'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-purple-100/80 text-center">
-                  <div className="bg-white/80 rounded-xl p-2 border border-purple-100/60">
-                    <span className="text-[9px] font-bold text-gray-500 uppercase block">Net Prize Pot</span>
-                    <span className="text-xs font-black font-mono text-gray-900 block mt-0.5">
-                      {formatCurrency(Number(payoutTotalPot) || 0)}
-                    </span>
-                  </div>
-                  <div className="bg-white/80 rounded-xl p-2 border border-purple-100/60">
-                    <span className="text-[9px] font-bold text-gray-500 uppercase block">Paid So Far</span>
-                    <span className="text-xs font-black font-mono text-emerald-700 block mt-0.5">
-                      {formatCurrency(payoutAlreadyPaid)}
-                    </span>
-                  </div>
-                  <div className="bg-white/80 rounded-xl p-2 border border-purple-100/60">
-                    <span className="text-[9px] font-bold text-rose-600 uppercase block">Remaining Due</span>
-                    <span className="text-xs font-black font-mono text-rose-600 block mt-0.5">
-                      {formatCurrency(payoutRemainingLiability)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Multi-Wallet Split Allocation */}
-              <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-900">Disbursement Split Across 4 Vaults</span>
-                  {payoutRemainingLiability > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const rem = payoutRemainingLiability;
-                        if (balances.dad_bank >= rem) {
-                          setPayoutBank1Amount(String(rem));
-                          setPayoutBank2Amount('');
-                          setPayoutCashAmount('');
-                          setPayoutMomAmount('');
-                        } else if (balances.cash_in_hand >= rem) {
-                          setPayoutBank1Amount('');
-                          setPayoutBank2Amount('');
-                          setPayoutCashAmount(String(rem));
-                          setPayoutMomAmount('');
-                        } else {
-                          const dadUse = Math.min(balances.dad_bank, rem);
-                          const remAfterDad = rem - dadUse;
-                          const kishorUse = Math.min(balances.kishor_bank, remAfterDad);
-                          const cashUse = Math.min(balances.cash_in_hand, rem - dadUse - kishorUse);
-
-                          setPayoutBank1Amount(dadUse > 0 ? String(dadUse) : '');
-                          setPayoutBank2Amount(kishorUse > 0 ? String(kishorUse) : '');
-                          setPayoutCashAmount(cashUse > 0 ? String(cashUse) : '');
-                          setPayoutMomAmount('');
-                        }
-                      }}
-                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
-                    >
-                      ⚡ Auto-Fill Balance
-                    </button>
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {/* Dad Bank */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-[10px]">
-                      <span className="text-gray-500 font-bold uppercase">Dad Bank</span>
-                      <span className="text-gray-400 font-mono">Avail: {formatCurrency(balances.dad_bank)}</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={payoutBank1Amount}
-                        onChange={(e) => setPayoutBank1Amount(e.target.value)}
-                        className="w-full bg-white border border-gray-200 focus:border-purple-500 rounded-xl px-3 py-2 text-xs font-bold font-mono"
-                      />
-                      {payoutRemainingLiability > 0 && balances.dad_bank > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setPayoutBank1Amount(String(Math.min(balances.dad_bank, payoutRemainingLiability)))}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-purple-600 hover:text-purple-800 px-1.5 py-0.5 bg-purple-50 rounded"
-                        >
-                          Max
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Kishor Bank */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-[10px]">
-                      <span className="text-gray-500 font-bold uppercase">Kishor Bank</span>
-                      <span className="text-gray-400 font-mono">Avail: {formatCurrency(balances.kishor_bank)}</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={payoutBank2Amount}
-                        onChange={(e) => setPayoutBank2Amount(e.target.value)}
-                        className="w-full bg-white border border-gray-200 focus:border-purple-500 rounded-xl px-3 py-2 text-xs font-bold font-mono"
-                      />
-                      {payoutRemainingLiability > 0 && balances.kishor_bank > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setPayoutBank2Amount(String(Math.min(balances.kishor_bank, payoutRemainingLiability)))}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-purple-600 hover:text-purple-800 px-1.5 py-0.5 bg-purple-50 rounded"
-                        >
-                          Max
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Cash Box */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-[10px]">
-                      <span className="text-gray-500 font-bold uppercase">Physical Cash Box</span>
-                      <span className="text-gray-400 font-mono">Avail: {formatCurrency(balances.cash_in_hand)}</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={payoutCashAmount}
-                        onChange={(e) => setPayoutCashAmount(e.target.value)}
-                        className="w-full bg-white border border-gray-200 focus:border-purple-500 rounded-xl px-3 py-2 text-xs font-bold font-mono"
-                      />
-                      {payoutRemainingLiability > 0 && balances.cash_in_hand > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setPayoutCashAmount(String(Math.min(balances.cash_in_hand, payoutRemainingLiability)))}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-purple-600 hover:text-purple-800 px-1.5 py-0.5 bg-purple-50 rounded"
-                        >
-                          Max
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Mom Bank */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-[10px]">
-                      <span className="text-gray-500 font-bold uppercase">Mom Bank</span>
-                      <span className="text-gray-400 font-mono">Avail: {formatCurrency(balances.mom_bank)}</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={payoutMomAmount}
-                        onChange={(e) => setPayoutMomAmount(e.target.value)}
-                        className="w-full bg-white border border-gray-200 focus:border-purple-500 rounded-xl px-3 py-2 text-xs font-bold font-mono"
-                      />
-                      {payoutRemainingLiability > 0 && balances.mom_bank > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setPayoutMomAmount(String(Math.min(balances.mom_bank, payoutRemainingLiability)))}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-purple-600 hover:text-purple-800 px-1.5 py-0.5 bg-purple-50 rounded"
-                        >
-                          Max
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Total Disbursing Meter */}
-                {(() => {
-                  const b1 = Number(payoutBank1Amount) || 0;
-                  const b2 = Number(payoutBank2Amount) || 0;
-                  const c = Number(payoutCashAmount) || 0;
-                  const m = Number(payoutMomAmount) || 0;
-                  const sum = b1 + b2 + c + m;
-
-                  return (
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-200 text-xs font-bold">
-                      <span className="text-gray-600">Total To Disburse Now:</span>
-                      <span className={`font-mono text-sm ${sum > 0 ? 'text-purple-700' : 'text-gray-400'}`}>
-                        {formatCurrency(sum)}
-                      </span>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Cheque / UTR / Reference #</label>
-                <input
-                  type="text"
-                  placeholder="e.g. IMPS Ref #849204812 / Cheque #492819"
-                  value={payoutRefNotes}
-                  onChange={(e) => setPayoutRefNotes(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-xs font-medium text-gray-900 focus:outline-none shadow-2xs"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isProcessingPayout}
-                className="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
-              >
-                {isProcessingPayout ? 'Disbursing...' : 'Disburse Winner Prize Pot'}
-              </button>
-            </form>
-          </div>
-
-          {/* Outstanding Payout Debt Liabilities */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs flex flex-col justify-between">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900">Outstanding Payout Debt Liabilities</h3>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
-                    Live prize pot balances owed to auction winners
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full block">
-                    {pendingLiabilities.length} pending
-                  </span>
-                </div>
-              </div>
-
-              {/* Total Debt Banner if > 0 */}
-              {totalOutstandingLiability > 0 && (
-                <div className="p-3.5 bg-rose-50/70 border border-rose-200 rounded-2xl flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block">Total Unsettled Prize Debt</span>
-                    <span className="text-xs text-gray-600">Across {pendingLiabilities.length} recorded auctions</span>
-                  </div>
-                  <span className="text-xl font-black font-mono text-rose-600">
-                    {formatCurrency(totalOutstandingLiability)}
-                  </span>
-                </div>
-              )}
-
-              {/* Liabilities Feed */}
-              <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
-                {pendingLiabilities.length === 0 ? (
-                  <div className="py-16 text-center space-y-2">
-                    <CheckCircle2 size={32} className="text-emerald-500 mx-auto" />
-                    <p className="text-xs font-bold text-gray-800">All Prize Pots Completely Settled</p>
-                    <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
-                      All winners across all active chit groups have received 100% of their awarded prize pots.
-                    </p>
-                  </div>
-                ) : (
-                  pendingLiabilities.map((liab) => (
-                    <div
-                      key={liab.id}
-                      className="bg-gray-50/90 border border-gray-200 p-4 rounded-2xl space-y-3 hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-0.5 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-gray-900">
-                              {liab.groupName} · Month {liab.month}
-                            </span>
-                            <span className={`text-[10px] font-bold px-2 py-0.2 rounded-md border ${
-                              liab.status === 'Partial' 
-                                ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                                : 'bg-rose-50 text-rose-700 border-rose-200'
-                            }`}>
-                              {liab.status}
-                            </span>
-                          </div>
-                          <span className="text-xs font-semibold text-gray-700 block truncate">
-                            {liab.winnerName} {liab.ticketNumber ? `(Ticket #${liab.ticketNumber})` : ''}
-                          </span>
-                          <span className="text-[10px] text-gray-400 font-mono block">
-                            Net Pot: {formatCurrency(liab.totalPayout)} | Paid: {formatCurrency(liab.paidAmount)}
-                          </span>
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase block">Pending Due</span>
-                          <span className="text-base font-black text-rose-600 block font-mono">
-                            {formatCurrency(liab.liabilityAmount)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex items-center gap-2 pt-1 border-t border-gray-200/80">
-                        <button
-                          onClick={() => handlePreFillDisbursement(liab)}
-                          className="flex-1 py-2 px-3 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition-all text-center cursor-pointer active:scale-95"
-                        >
-                          ⚡ Pre-fill Split Desk
-                        </button>
-                        
-                        {/* Quick Direct Clearance Options */}
-                        {balances.dad_bank >= liab.liabilityAmount && (
-                          <button
-                            onClick={() => handleQuickClearLiability(liab, 'dad_bank')}
-                            className="py-2 px-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-[11px] font-bold transition-all cursor-pointer active:scale-95"
-                            title="Clear fully from Dad Bank"
-                          >
-                            Pay via Dad Bank
-                          </button>
-                        )}
-                        {balances.cash_in_hand >= liab.liabilityAmount && (
-                          <button
-                            onClick={() => handleQuickClearLiability(liab, 'cash_in_hand')}
-                            className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition-all cursor-pointer active:scale-95"
-                            title="Clear fully from Cash Box"
-                          >
-                            Pay via Cash Box
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Quick Helper Note */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] text-slate-500 font-medium">
-              💡 <strong>System Rule:</strong> Whenever an auction ends, the net pot (`Total Value - Winning Discount`) automatically enters as an active liability until 100% disbursed across treasury vaults.
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* ── SUBTAB 5: PERSONAL DRAWS & EXPENSES ── */}
+      {/* ── SUBTAB 4: PERSONAL DRAWS & EXPENSES ── */}
       {activeSubtab === 'spends' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
           
@@ -1926,7 +1041,7 @@ export default function CashVaultLedger() {
                   className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                 >
                   <option value="Petrol">Petrol</option>
-                  <option value="Bike Maintenance">Bike Maintenance</option>
+                  <option value="Maintenance">Bike / Vehicle Maintenance</option>
                   <option value="Tea & Refreshments">Tea &amp; Refreshments</option>
                   <option value="Collection Visits">Collection Visits</option>
                   <option value="Groceries">Groceries</option>
@@ -1941,7 +1056,7 @@ export default function CashVaultLedger() {
                   <button 
                     type="button" 
                     onClick={() => setSpendDesc("Petrol filled for Dad's bike for collection visit")} 
-                    className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 hover:text-indigo-800"
+                    className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 hover:text-indigo-800 cursor-pointer"
                   >
                     <Mic size={11} /> Auto-fill
                   </button>
@@ -2010,7 +1125,7 @@ export default function CashVaultLedger() {
         </div>
       )}
 
-      {/* ── SUBTAB 6: DENOMINATION COUNTER & RECONCILIATION ── */}
+      {/* ── SUBTAB 5: DENOMINATION COUNTER & RECONCILIATION ── */}
       {activeSubtab === 'denominations' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
           
@@ -2024,7 +1139,7 @@ export default function CashVaultLedger() {
               <button
                 type="button"
                 onClick={() => setDenominations({ 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0 })}
-                className="text-xs text-gray-500 hover:text-gray-800 font-semibold flex items-center gap-1"
+                className="text-xs text-gray-500 hover:text-gray-800 font-semibold flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw size={12} /> Reset
               </button>
@@ -2096,163 +1211,160 @@ export default function CashVaultLedger() {
                 </div>
               </div>
 
-              {/* Disparity Badge */}
-              <div className={`p-4 rounded-2xl border text-xs font-bold flex items-center justify-between ${
-                cashDisparity === 0 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-                  : cashDisparity > 0 
-                  ? 'bg-amber-50 border-amber-200 text-amber-800' 
+              {/* Disparity Status Callout */}
+              <div className={`p-4 rounded-2xl border ${
+                cashDisparity === 0
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : cashDisparity > 0
+                  ? 'bg-blue-50 border-blue-200 text-blue-800'
                   : 'bg-rose-50 border-rose-200 text-rose-800'
               }`}>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={16} />
-                  <span>
-                    {cashDisparity === 0 
-                      ? 'Perfect Match (₹0 Disparity)' 
-                      : cashDisparity > 0 
-                      ? `Excess Physical Cash (+${formatCurrency(cashDisparity)})` 
-                      : `Cash Shortage (-${formatCurrency(Math.abs(cashDisparity))})`}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold">
+                      {cashDisparity === 0 
+                        ? '✅ Perfect Match — Zero Disparity' 
+                        : cashDisparity > 0 
+                        ? 'ℹ️ Physical Surplus Detected' 
+                        : '⚠️ Physical Shortage Detected'}
+                    </span>
+                  </div>
+                  <span className="text-sm font-black font-mono">
+                    {cashDisparity > 0 ? '+' : ''}{formatCurrency(cashDisparity)}
                   </span>
                 </div>
-                <span className="font-mono">{formatCurrency(cashDisparity)}</span>
+                <p className="text-[11px] opacity-80 mt-1">
+                  {cashDisparity === 0
+                    ? 'Physical banknotes in locker match the system balance exactly.'
+                    : cashDisparity > 0
+                    ? 'You counted more physical currency than recorded in the app.'
+                    : 'Counted cash is lower than system balance. Check for unrecorded spends or payouts.'}
+                </p>
               </div>
 
               {lastReconciliationNote && (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 font-medium">
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-600">
+                  <span className="font-bold text-gray-800 block mb-0.5">Last Record:</span>
                   {lastReconciliationNote}
                 </div>
               )}
             </div>
 
             <button
+              type="button"
               onClick={handleSaveDenominations}
-              className="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all cursor-pointer"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all cursor-pointer mt-4"
             >
-              Save Count &amp; Sync Reconciliation
+              Record Reconciliation Snapshot
             </button>
           </div>
 
         </div>
       )}
 
-      {/* ── SUBTAB 7: MASTER AUDIT LEDGER ── */}
+      {/* ── SUBTAB 6: MASTER AUDIT LEDGER ── */}
       {activeSubtab === 'ledger' && (
-        <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+        <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-5 shadow-2xs">
           
-          {/* Header & Filter Controls */}
+          {/* Header & Filter Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
             <div>
-              <h3 className="text-base font-bold text-gray-900">Master Treasury Audit Ledger</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Search and filter every transaction across all 4 treasury vaults</p>
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <History size={18} className="text-indigo-600" />
+                Treasury Audit &amp; Movements Timeline
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Complete verifiable history of collections, transfers, spends, and ATM cash movements
+              </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">
-                {filteredMasterLedger.length} records
-              </span>
+            {/* Filter Controls */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search ledger..."
+                  value={ledgerSearch}
+                  onChange={(e) => setLedgerSearch(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none w-36 sm:w-48"
+                />
+              </div>
+
+              <select
+                value={ledgerWalletFilter}
+                onChange={(e) => setLedgerWalletFilter(e.target.value)}
+                className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-700 focus:outline-none"
+              >
+                <option value="all">All Accounts</option>
+                <option value="cash_in_hand">Cash Box</option>
+                <option value="kishor_bank">Kishor Bank</option>
+                <option value="dad_bank">Dad Bank</option>
+                <option value="mom_bank">Mom Bank</option>
+              </select>
+
+              <select
+                value={ledgerTypeFilter}
+                onChange={(e) => setLedgerTypeFilter(e.target.value)}
+                className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-700 focus:outline-none"
+              >
+                <option value="all">All Types</option>
+                <option value="collection">Collections (+)</option>
+                <option value="payout">Prize Payouts (-)</option>
+                <option value="transfer">Transfers</option>
+                <option value="personal_draw">Personal Draws (-)</option>
+                <option value="atm_withdrawal">ATM Withdrawals</option>
+              </select>
             </div>
           </div>
 
-          {/* Filters Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="relative">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search notes, amounts, tags..."
-                value={ledgerSearch}
-                onChange={(e) => setLedgerSearch(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-9 pr-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none"
-              />
-            </div>
+          {/* Master Timeline Stream */}
+          <div className="space-y-2.5 max-h-[550px] overflow-y-auto pr-1">
+            {filteredMasterLedger.length === 0 ? (
+              <div className="py-16 text-center text-xs text-gray-400">
+                No matching transactions found in the treasury ledger.
+              </div>
+            ) : (
+              filteredMasterLedger.map((tx) => {
+                const isCredit = tx.type === 'collection' || (tx.type === 'transfer' && tx.notes?.includes('into Cash Box'));
+                const dateLabel = tx.created_at 
+                  ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                  : 'Recent';
 
-            <select
-              value={ledgerWalletFilter}
-              onChange={(e) => setLedgerWalletFilter(e.target.value)}
-              className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none"
-            >
-              <option value="all">All Accounts / Vaults</option>
-              <option value="cash_in_hand">Physical Cash Box</option>
-              <option value="kishor_bank">Kishor Bank</option>
-              <option value="dad_bank">Dad Bank</option>
-              <option value="mom_bank">Mom Bank</option>
-            </select>
+                return (
+                  <div key={tx.id} className="p-4 bg-gray-50/70 border border-gray-100 rounded-2xl flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${
+                          isCredit 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                            : tx.type === 'payout' 
+                            ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                            : tx.type === 'transfer'
+                            ? 'bg-blue-50 text-blue-700 border-blue-200'
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        }`}>
+                          {tx.type.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
+                      </div>
+                      <p className="text-xs font-semibold text-gray-800 leading-snug">
+                        {tx.notes || tx.description || 'Treasury Movement'}
+                      </p>
+                      <span className="text-[10px] text-gray-500 font-medium block">
+                        Account: <strong className="text-gray-700">{WALLET_META[tx.wallet_type]?.name || tx.wallet_type}</strong>
+                      </span>
+                    </div>
 
-            <select
-              value={ledgerTypeFilter}
-              onChange={(e) => setLedgerTypeFilter(e.target.value)}
-              className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none"
-            >
-              <option value="all">All Transaction Types</option>
-              <option value="collection">Collections (Inflow)</option>
-              <option value="payout">Payouts (Outflow)</option>
-              <option value="transfer">Inter-Vault Transfers</option>
-              <option value="personal_draw">Personal Draws</option>
-              <option value="atm_withdrawal">ATM Withdrawals</option>
-            </select>
-          </div>
-
-          {/* Ledger Table */}
-          <div className="overflow-x-auto pt-2">
-            <table className="w-full text-xs text-left text-gray-600">
-              <thead className="text-[10px] text-gray-400 uppercase bg-gray-50/80 font-bold tracking-wider">
-                <tr>
-                  <th className="py-3 px-4">Date &amp; Time</th>
-                  <th className="py-3 px-4">Vault Account</th>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4">Notes &amp; Description</th>
-                  <th className="py-3 px-4 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredMasterLedger.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-xs text-gray-400">
-                      No matching treasury transactions found.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredMasterLedger.map((tx) => {
-                    const isCredit = tx.type === 'collection';
-                    const dateStr = tx.created_at 
-                      ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                      : 'Recent';
-
-                    return (
-                      <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4 font-mono text-[11px] text-gray-500 whitespace-nowrap">
-                          {dateStr}
-                        </td>
-                        <td className="py-3.5 px-4 font-bold text-gray-900 whitespace-nowrap">
-                          {WALLET_META[tx.wallet_type]?.name || tx.wallet_type}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
-                            isCredit 
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                              : tx.type === 'payout' 
-                              ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                              : tx.type === 'transfer'
-                              ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : 'bg-rose-50 text-rose-700 border-rose-200'
-                          }`}>
-                            {tx.type.replace(/_/g, ' ')}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-gray-800 max-w-xs truncate">
-                          {tx.notes || tx.description || 'Treasury Transaction'}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-black font-mono whitespace-nowrap">
-                          <span className={isCredit ? 'text-emerald-600' : 'text-rose-600'}>
-                            {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                    <div className="text-right shrink-0">
+                      <span className={`text-sm sm:text-base font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
         </div>
