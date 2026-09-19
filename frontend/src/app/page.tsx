@@ -45,7 +45,7 @@ export default function Home() {
       case 'reports':
         return 'Reports Center';
       case 'cash':
-        return 'Cash Vault & Treasury Ledger';
+        return 'Treasury & Vault Ledger';
       default:
         return 'Chit Funds Workspace';
     }

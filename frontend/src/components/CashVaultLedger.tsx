@@ -22,7 +22,20 @@ import {
   ChevronRight, 
   RefreshCw, 
   ArrowRightLeft, 
-  PieChart
+  PieChart,
+  User,
+  UserCheck,
+  CheckCircle2,
+  Sparkles,
+  Clock,
+  ArrowDownLeft,
+  ArrowUpRight,
+  HelpCircle,
+  X,
+  Layers,
+  ShieldCheck,
+  HandCoins,
+  RotateCcw
 } from 'lucide-react';
 
 export type CashHandlingSubtab = 
@@ -59,11 +72,34 @@ interface Relocation {
 
 interface PersonalDraw {
   id: string;
+  txId?: string;
   amount: number;
-  tag: 'Personal Expense' | 'Petrol' | 'Maintenance' | 'Groceries' | 'Collection Visits' | 'Tea & Refreshments' | 'Emergency Cash';
+  tag: 'Personal Expense' | 'Money Lending / Rotation' | 'Petrol' | 'Maintenance' | 'Groceries' | 'Collection Visits' | 'Tea & Refreshments' | 'Emergency Cash';
   description: string;
   adminName: string;
+  takenBy: string;
+  walletType: WalletType;
   timestamp: string;
+  created_at: string;
+  status: 'outstanding' | 'settled';
+  settlementDetails?: {
+    settledAt: string;
+    settlementMode: 'vault_repay' | 'member_offset';
+    destWallet?: WalletType;
+    notes?: string;
+  };
+}
+
+interface FloatingDeposit {
+  id: string;
+  amount: number;
+  depositedBy: string;
+  walletType: WalletType;
+  tag: string;
+  notes: string;
+  timestamp: string;
+  created_at: string;
+  status: 'active' | 'recovered';
 }
 
 interface TreasuryTx {
@@ -95,6 +131,15 @@ export default function CashVaultLedger() {
   const [relocations, setRelocations] = useState<Relocation[]>([]);
   const [personalDraws, setPersonalDraws] = useState<PersonalDraw[]>([]);
 
+  // Form State: External Cash Deposit / Float Inflow
+  const [depositDest, setDepositDest] = useState<WalletType>('cash_in_hand');
+  const [depositAmount, setDepositAmount] = useState<string>('');
+  const [depositBy, setDepositBy] = useState<string>('Dad (Anbazhakan)');
+  const [depositCustomBy, setDepositCustomBy] = useState<string>('');
+  const [depositTag, setDepositTag] = useState<string>('Temporary Auction Float');
+  const [depositNotes, setDepositNotes] = useState<string>('');
+  const [isProcessingDeposit, setIsProcessingDeposit] = useState<boolean>(false);
+
   // Form State: Inter-Vault Transfer
   const [transferSource, setTransferSource] = useState<WalletType>('kishor_bank');
   const [transferDest, setTransferDest] = useState<WalletType>('cash_in_hand');
@@ -108,9 +153,23 @@ export default function CashVaultLedger() {
 
   // Form State: Personal Draw
   const [spendAmount, setSpendAmount] = useState<string>('');
-  const [spendTag, setSpendTag] = useState<PersonalDraw['tag']>('Petrol');
+  const [spendTag, setSpendTag] = useState<PersonalDraw['tag']>('Personal Expense');
   const [spendDesc, setSpendDesc] = useState<string>('');
   const [spendWallet, setSpendWallet] = useState<WalletType>('cash_in_hand');
+  const [spendTakenBy, setSpendTakenBy] = useState<string>('Dad (Anbazhakan)');
+  const [spendCustomTakenBy, setSpendCustomTakenBy] = useState<string>('');
+  const [isSubmittingSpend, setIsSubmittingSpend] = useState<boolean>(false);
+
+  // Simple Settlement State (Put Cash Back)
+  const [settlingDraw, setSettlingDraw] = useState<PersonalDraw | null>(null);
+  const [settleDestWallet, setSettleDestWallet] = useState<WalletType>('cash_in_hand');
+  const [settleAmount, setSettleAmount] = useState<string>('');
+  const [isProcessingSettle, setIsProcessingSettle] = useState<boolean>(false);
+
+  // Personal Draws Filter & Search
+  const [personalDrawStatusFilter, setPersonalDrawStatusFilter] = useState<'all' | 'outstanding' | 'settled'>('all');
+  const [personalDrawPersonFilter, setPersonalDrawPersonFilter] = useState<string>('all');
+  const [personalDrawSearch, setPersonalDrawSearch] = useState<string>('');
 
   // Denomination Counter State
   const [denominations, setDenominations] = useState<{ [key: number]: number }>({
@@ -286,6 +345,284 @@ export default function CashVaultLedger() {
     });
   }, [recentTransactions, ledgerWalletFilter, ledgerTypeFilter, ledgerSearch]);
 
+  // Computed Personal Draws from Supabase transactions ledger
+  const computedPersonalDraws = useMemo<PersonalDraw[]>(() => {
+    return recentTransactions
+      .filter((t) => t.type === 'personal_draw')
+      .map((tx) => {
+        const notes = tx.notes || '';
+        
+        // Extract Tag
+        let tag: PersonalDraw['tag'] = 'Personal Expense';
+        const tagMatch = notes.match(/^\[(.*?)\]/);
+        if (tagMatch) {
+          const rawTag = tagMatch[1];
+          if (['Personal Expense', 'Money Lending / Rotation', 'Petrol', 'Maintenance', 'Groceries', 'Collection Visits', 'Tea & Refreshments', 'Emergency Cash'].includes(rawTag)) {
+            tag = rawTag as PersonalDraw['tag'];
+          }
+        }
+
+        // Extract Taken By
+        let takenBy = 'Dad (Anbazhakan)';
+        const takenByMatch = notes.match(/Taken By:\s*([^|]+)/i);
+        if (takenByMatch) {
+          takenBy = takenByMatch[1].trim();
+        }
+
+        // Extract Status & Settlement metadata
+        let status: 'outstanding' | 'settled' = 'outstanding';
+        let settlementDetails: PersonalDraw['settlementDetails'] = undefined;
+        
+        if (notes.toLowerCase().includes('status: settled') || notes.toLowerCase().includes('status: repaid')) {
+          status = 'settled';
+          const settledMatch = notes.match(/Status:\s*Settled\s*\(([^)]+)\)/i);
+          const detailStr = settledMatch ? settledMatch[1] : 'Settled';
+          const isVaultRepay = detailStr.toLowerCase().includes('repaid') || detailStr.toLowerCase().includes('cash box') || detailStr.toLowerCase().includes('bank');
+          settlementDetails = {
+            settledAt: new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+            settlementMode: isVaultRepay ? 'vault_repay' : 'member_offset',
+            notes: detailStr
+          };
+        }
+
+        // Clean Description
+        const desc = notes
+          .replace(/^\[.*?\]\s*/, '')
+          .replace(/\|\s*Taken By:[^|]+/i, '')
+          .replace(/\|\s*Status:[^|]+/i, '')
+          .trim() || `${tag} draw`;
+
+        return {
+          id: tx.id,
+          txId: tx.id,
+          amount: Number(tx.amount || 0),
+          tag,
+          description: desc,
+          adminName: 'Admin',
+          takenBy,
+          walletType: tx.wallet_type,
+          timestamp: new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          created_at: tx.created_at,
+          status,
+          settlementDetails
+        };
+      });
+  }, [recentTransactions]);
+
+  // Outstanding Debt Summary per person
+  const personalDrawStats = useMemo(() => {
+    const outstanding = computedPersonalDraws.filter(d => d.status === 'outstanding');
+    const totalOutstanding = outstanding.reduce((sum, d) => sum + d.amount, 0);
+
+    const dadOutstanding = outstanding
+      .filter(d => d.takenBy.toLowerCase().includes('dad') || d.takenBy.toLowerCase().includes('anbazhakan'))
+      .reduce((sum, d) => sum + d.amount, 0);
+
+    const momOutstanding = outstanding
+      .filter(d => d.takenBy.toLowerCase().includes('mom') || d.takenBy.toLowerCase().includes('parimalam'))
+      .reduce((sum, d) => sum + d.amount, 0);
+
+    const kishorOutstanding = outstanding
+      .filter(d => d.takenBy.toLowerCase().includes('kishor'))
+      .reduce((sum, d) => sum + d.amount, 0);
+
+    const othersOutstanding = outstanding
+      .filter(d => !d.takenBy.toLowerCase().includes('dad') && !d.takenBy.toLowerCase().includes('anbazhakan') && !d.takenBy.toLowerCase().includes('mom') && !d.takenBy.toLowerCase().includes('parimalam') && !d.takenBy.toLowerCase().includes('kishor'))
+      .reduce((sum, d) => sum + d.amount, 0);
+
+    const totalSettled = computedPersonalDraws.filter(d => d.status === 'settled').reduce((sum, d) => sum + d.amount, 0);
+
+    return {
+      totalOutstanding,
+      dadOutstanding,
+      momOutstanding,
+      kishorOutstanding,
+      othersOutstanding,
+      totalSettled,
+      outstandingCount: outstanding.length,
+      settledCount: computedPersonalDraws.length - outstanding.length,
+    };
+  }, [computedPersonalDraws]);
+
+  // Filtered personal draws for UI
+  const filteredPersonalDraws = useMemo(() => {
+    return computedPersonalDraws.filter((draw) => {
+      if (personalDrawStatusFilter !== 'all' && draw.status !== personalDrawStatusFilter) return false;
+      if (personalDrawPersonFilter === 'dad' && !(draw.takenBy.toLowerCase().includes('dad') || draw.takenBy.toLowerCase().includes('anbazhakan'))) return false;
+      if (personalDrawPersonFilter === 'mom' && !(draw.takenBy.toLowerCase().includes('mom') || draw.takenBy.toLowerCase().includes('parimalam'))) return false;
+      if (personalDrawPersonFilter === 'kishor' && !draw.takenBy.toLowerCase().includes('kishor')) return false;
+      if (personalDrawPersonFilter === 'other' && (draw.takenBy.toLowerCase().includes('dad') || draw.takenBy.toLowerCase().includes('anbazhakan') || draw.takenBy.toLowerCase().includes('mom') || draw.takenBy.toLowerCase().includes('parimalam') || draw.takenBy.toLowerCase().includes('kishor'))) return false;
+
+      const q = personalDrawSearch.toLowerCase().trim();
+      if (q) {
+        return (
+          draw.description.toLowerCase().includes(q) ||
+          draw.takenBy.toLowerCase().includes(q) ||
+          draw.tag.toLowerCase().includes(q) ||
+          String(draw.amount).includes(q)
+        );
+      }
+      return true;
+    });
+  }, [computedPersonalDraws, personalDrawStatusFilter, personalDrawPersonFilter, personalDrawSearch]);
+
+  // Computed Floating Deposits from Supabase transactions ledger
+  const computedFloatingDeposits = useMemo<FloatingDeposit[]>(() => {
+    return recentTransactions
+      .filter((t) => t.notes && t.notes.includes('[Floating Deposit'))
+      .map((tx) => {
+        const notes = tx.notes || '';
+        
+        let depositedBy = 'Dad (Anbazhakan)';
+        const byMatch = notes.match(/Deposited By:\s*([^|]+)/i);
+        if (byMatch) {
+          depositedBy = byMatch[1].trim();
+        }
+
+        const isRecovered = notes.toLowerCase().includes('status: recovered') || notes.toLowerCase().includes('status: settled');
+        const status: 'active' | 'recovered' = isRecovered ? 'recovered' : 'active';
+
+        let tag = 'Temporary Float';
+        const tagMatch = notes.match(/\[Floating Deposit\s*-\s*([^\]]+)\]/i);
+        if (tagMatch) {
+          tag = tagMatch[1].trim();
+        }
+
+        const desc = notes
+          .replace(/\[Floating Deposit.*?\]\s*/i, '')
+          .replace(/\|\s*Deposited By:[^|]+/i, '')
+          .replace(/\|\s*Status:[^|]+/i, '')
+          .trim() || 'Floating Deposit';
+
+        return {
+          id: tx.id,
+          amount: Number(tx.amount || 0),
+          depositedBy,
+          walletType: tx.wallet_type,
+          tag,
+          notes: desc,
+          timestamp: new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          created_at: tx.created_at,
+          status,
+        };
+      });
+  }, [recentTransactions]);
+
+  // Floating Capital Stats (Active Floating Deposits per person)
+  const floatStats = useMemo(() => {
+    const active = computedFloatingDeposits.filter(f => f.status === 'active');
+    const totalActiveFloat = active.reduce((sum, f) => sum + f.amount, 0);
+
+    const dadFloat = active
+      .filter(f => f.depositedBy.toLowerCase().includes('dad') || f.depositedBy.toLowerCase().includes('anbazhakan'))
+      .reduce((sum, f) => sum + f.amount, 0);
+
+    const momFloat = active
+      .filter(f => f.depositedBy.toLowerCase().includes('mom') || f.depositedBy.toLowerCase().includes('parimalam'))
+      .reduce((sum, f) => sum + f.amount, 0);
+
+    const kishorFloat = active
+      .filter(f => f.depositedBy.toLowerCase().includes('kishor'))
+      .reduce((sum, f) => sum + f.amount, 0);
+
+    return {
+      totalActiveFloat,
+      dadFloat,
+      momFloat,
+      kishorFloat,
+      activeCount: active.length,
+    };
+  }, [computedFloatingDeposits]);
+
+  // Action: External Deposit / Float Injection
+  const handleExecuteDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = Number(depositAmount);
+
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid deposit amount.");
+      return;
+    }
+
+    const effectiveDepositor = depositBy === 'Other' 
+      ? (depositCustomBy.trim() || 'Other') 
+      : depositBy;
+
+    setIsProcessingDeposit(true);
+    try {
+      await updateBalance(depositDest, amount);
+
+      const desc = depositNotes.trim() || `${depositTag} deposited by ${effectiveDepositor}`;
+      const fullNote = `[Floating Deposit - ${depositTag}] ${desc} | Deposited By: ${effectiveDepositor} | Status: Active Float`;
+
+      await supabase.from('transactions').insert([
+        {
+          wallet_type: depositDest,
+          type: 'transfer',
+          status: 'completed',
+          amount: amount,
+          notes: fullNote,
+          created_by: profile?.id || null,
+        }
+      ]);
+
+      setDepositAmount('');
+      setDepositNotes('');
+      if (depositBy === 'Other') setDepositCustomBy('');
+      await fetchData();
+      alert(`✓ Successfully deposited ${formatCurrency(amount)} into ${WALLET_META[depositDest].name} by ${effectiveDepositor}! (Floating capital active: ${formatCurrency(amount)})`);
+    } catch (err: any) {
+      console.error('Error depositing funds:', err);
+      alert('Error depositing funds: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsProcessingDeposit(false);
+    }
+  };
+
+  // Action: Recover Float (Take Back Injected Cash)
+  const handleRecoverFloat = async (float: FloatingDeposit) => {
+    if (balances[float.walletType] < float.amount) {
+      alert(`Insufficient balance in ${WALLET_META[float.walletType].name} to recover float of ${formatCurrency(float.amount)}. Available: ${formatCurrency(balances[float.walletType])}`);
+      return;
+    }
+
+    if (!confirm(`Recover ${formatCurrency(float.amount)} float back to ${float.depositedBy}?\n\nThis will withdraw ${formatCurrency(float.amount)} from ${WALLET_META[float.walletType].name} and mark this floating deposit as fully Recovered (Settled).`)) {
+      return;
+    }
+
+    try {
+      // 1. Deduct from vault (Dad takes back his money)
+      await updateBalance(float.walletType, -float.amount);
+
+      // 2. Insert withdrawal transaction
+      await supabase.from('transactions').insert([
+        {
+          wallet_type: float.walletType,
+          type: 'transfer',
+          status: 'completed',
+          amount: float.amount,
+          notes: `Float Recovery of ${formatCurrency(float.amount)} by ${float.depositedBy} from ${WALLET_META[float.walletType].name}`,
+          created_by: profile?.id || null,
+        }
+      ]);
+
+      // 3. Update original floating deposit note to recovered
+      const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const updatedNotes = `[Floating Deposit - ${float.tag}] ${float.notes} | Deposited By: ${float.depositedBy} | Status: Recovered (Withdrawn ${formatCurrency(float.amount)} on ${dateStr})`;
+
+      await supabase
+        .from('transactions')
+        .update({ notes: updatedNotes })
+        .eq('id', float.id);
+
+      alert(`✓ Successfully recovered ${formatCurrency(float.amount)} float back for ${float.depositedBy}!`);
+      await fetchData();
+    } catch (err: any) {
+      console.error('Error recovering float:', err);
+      alert('Error recovering float: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   // Action: Inter-Vault Transfer
   const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -404,41 +741,154 @@ export default function CashVaultLedger() {
       return;
     }
 
-    await updateBalance(spendWallet, -amount);
+    const effectiveTakenBy = spendTakenBy === 'Other' 
+      ? (spendCustomTakenBy.trim() || 'Other') 
+      : spendTakenBy;
 
-    const desc = spendDesc.trim() || `${spendTag} spend recorded by ${activeAdminName}`;
-    const newDraw: PersonalDraw = {
-      id: Math.random().toString(),
-      amount,
-      tag: spendTag,
-      description: desc,
-      adminName: activeAdminName,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
+    setIsSubmittingSpend(true);
+    try {
+      await updateBalance(spendWallet, -amount);
 
-    setPersonalDraws([newDraw, ...personalDraws]);
+      const desc = spendDesc.trim() || `${spendTag} taken by ${effectiveTakenBy}`;
+      const fullNote = `[${spendTag}] ${desc} | Taken By: ${effectiveTakenBy} | Status: Outstanding`;
 
-    await supabase.from('transactions').insert([
-      {
-        wallet_type: spendWallet,
-        type: 'personal_draw',
-        status: 'completed',
-        amount: amount,
-        notes: `[${spendTag}] ${desc}`,
-        created_by: profile?.id || null,
-      }
-    ]);
+      await supabase.from('transactions').insert([
+        {
+          wallet_type: spendWallet,
+          type: 'personal_draw',
+          status: 'completed',
+          amount: amount,
+          notes: fullNote,
+          created_by: profile?.id || null,
+        }
+      ]);
 
-    setSpendAmount('');
-    setSpendDesc('');
-    await fetchData();
+      setSpendAmount('');
+      setSpendDesc('');
+      if (spendTakenBy === 'Other') setSpendCustomTakenBy('');
+      await fetchData();
+      alert(`✓ Successfully recorded ₹${amount.toLocaleString('en-IN')} personal draw for ${effectiveTakenBy}.`);
+    } catch (err: any) {
+      console.error('Error recording personal draw:', err);
+      alert('Error recording personal draw: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsSubmittingSpend(false);
+    }
   };
 
-  // Action: Delete Spend & Refund
-  const handleDeletePersonalDraw = async (drawId: string, amount: number) => {
-    await updateBalance(spendWallet, amount);
-    setPersonalDraws(prev => prev.filter(d => d.id !== drawId));
-    alert(`Refunded ${formatCurrency(amount)} back to ${WALLET_META[spendWallet].name}.`);
+  // Action: Open Settlement Modal
+  const handleOpenSettleModal = (draw: PersonalDraw) => {
+    setSettlingDraw(draw);
+    setSettleDestWallet(draw.walletType);
+    setSettleAmount(draw.amount.toString());
+  };
+
+  // Action: Confirm Settlement & Put Cash Back
+  const handleConfirmSettlement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!settlingDraw) return;
+
+    const repayAmt = Number(settleAmount);
+    if (isNaN(repayAmt) || repayAmt <= 0) {
+      alert("Please enter a valid amount to put back.");
+      return;
+    }
+
+    if (repayAmt > settlingDraw.amount) {
+      alert(`The amount to put back (${formatCurrency(repayAmt)}) cannot exceed the draw amount of ${formatCurrency(settlingDraw.amount)}. If you wish to deposit additional cash into the treasury, please use the Move Money / Deposit tab.`);
+      return;
+    }
+
+    setIsProcessingSettle(true);
+    try {
+      // Put cash / money back into the selected vault
+      await updateBalance(settleDestWallet, repayAmt);
+
+      // Record a transaction for the vault deposit
+      await supabase.from('transactions').insert([
+        {
+          wallet_type: settleDestWallet,
+          type: 'transfer',
+          status: 'completed',
+          amount: repayAmt,
+          notes: `Personal Draw Repaid by ${settlingDraw.takenBy} into ${WALLET_META[settleDestWallet].name}`,
+          created_by: profile?.id || null,
+        }
+      ]);
+
+      const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+      if (repayAmt < settlingDraw.amount) {
+        // Partial settlement: reduce draw amount and keep outstanding
+        const remainingAmt = settlingDraw.amount - repayAmt;
+        const updatedNotes = `[${settlingDraw.tag}] ${settlingDraw.description} | Taken By: ${settlingDraw.takenBy} | Status: Outstanding (Partial repayment of ${formatCurrency(repayAmt)} made on ${dateStr}; Remaining: ${formatCurrency(remainingAmt)})`;
+
+        await supabase
+          .from('transactions')
+          .update({ 
+            amount: remainingAmt,
+            notes: updatedNotes 
+          })
+          .eq('id', settlingDraw.id);
+
+        alert(`✓ Put ${formatCurrency(repayAmt)} back into ${WALLET_META[settleDestWallet].name}! Remaining balance owed: ${formatCurrency(remainingAmt)}.`);
+      } else {
+        // Full settlement: mark as settled
+        const updatedNotes = `[${settlingDraw.tag}] ${settlingDraw.description} | Taken By: ${settlingDraw.takenBy} | Status: Settled (Put back ${formatCurrency(repayAmt)} into ${WALLET_META[settleDestWallet].name} on ${dateStr})`;
+        
+        await supabase
+          .from('transactions')
+          .update({ notes: updatedNotes })
+          .eq('id', settlingDraw.id);
+
+        alert(`✓ Successfully put ${formatCurrency(repayAmt)} back into ${WALLET_META[settleDestWallet].name}! Draw is fully settled.`);
+      }
+
+      setSettlingDraw(null);
+      await fetchData();
+    } catch (err: any) {
+      console.error('Error settling personal draw:', err);
+      alert('Error settling personal draw: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsProcessingSettle(false);
+    }
+  };
+
+  // Action: Delete Spend Record
+  const handleDeletePersonalDraw = async (draw: PersonalDraw) => {
+    const isSettled = draw.status === 'settled';
+
+    if (isSettled) {
+      // Draw was ALREADY settled (funds were already put back into the vault).
+      // Deleting this record must NOT refund or alter vault balance!
+      if (!confirm(`Are you sure you want to delete this settled draw record (${formatCurrency(draw.amount)} by ${draw.takenBy}) from history?\n\n(Note: Vault balance will NOT change because the funds were already put back when settled).`)) {
+        return;
+      }
+
+      try {
+        await supabase.from('transactions').delete().eq('id', draw.id);
+        await fetchData();
+        alert(`✓ Removed settled draw record from history.`);
+      } catch (err: any) {
+        console.error('Error deleting personal draw record:', err);
+        alert('Error deleting personal draw record: ' + (err.message || 'Unknown error'));
+      }
+    } else {
+      // Draw is OUTSTANDING. Canceling/deleting it refunds the money back to the vault.
+      if (!confirm(`Are you sure you want to cancel this active draw and refund ${formatCurrency(draw.amount)} back to ${WALLET_META[draw.walletType].name}?`)) {
+        return;
+      }
+
+      try {
+        await updateBalance(draw.walletType, draw.amount);
+        await supabase.from('transactions').delete().eq('id', draw.id);
+        await fetchData();
+        alert(`✓ Refunded ${formatCurrency(draw.amount)} back to ${WALLET_META[draw.walletType].name} and removed draw record.`);
+      } catch (err: any) {
+        console.error('Error deleting personal draw:', err);
+        alert('Error deleting personal draw: ' + (err.message || 'Unknown error'));
+      }
+    }
   };
 
   // Action: Save Denomination Count
@@ -828,299 +1278,1283 @@ export default function CashVaultLedger() {
         </div>
       )}
 
-      {/* ── SUBTAB 3: MOVE MONEY & TRANSFERS ── */}
+      {/* ── SUBTAB 3: MOVE MONEY, TRANSFERS & DEPOSITS ── */}
       {activeSubtab === 'transfers' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+        <div className="space-y-6">
           
-          {/* Inter-Vault Transfer Box */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                <ArrowRightLeft size={16} className="text-blue-600" />
-                Inter-Vault Cash / Bank Transfer
-              </h3>
-              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full">
-                Instant Transfer
-              </span>
+          {/* Top Banner: External Cash Deposit / Organizer Float Injection */}
+          <div className="bg-gradient-to-br from-emerald-900 via-slate-900 to-indigo-950 border border-emerald-500/30 rounded-3xl p-5 sm:p-7 text-white shadow-xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <HandCoins size={20} />
+                  </span>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
+                      External Cash Deposit &amp; Organizer Float
+                    </h3>
+                    <p className="text-xs text-slate-300 font-medium">
+                      Inject outside personal capital (e.g. Dad/Mom bridging auction pot deficit) into the Cash Box or Bank
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-3 py-1 rounded-full flex items-center gap-1.5">
+                  <Sparkles size={12} /> Auto-Tracked as Floating Capital
+                </span>
+              </div>
             </div>
 
-            <form onSubmit={handleExecuteTransfer} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleExecuteDeposit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                {/* Deposited By */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Source Account</label>
+                  <label className="text-[10px] text-slate-300 font-bold uppercase tracking-wider block">
+                    Who Is Depositing? (Deposited By)
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { id: 'Dad (Anbazhakan)', label: '👨 Dad' },
+                      { id: 'Mom (Parimalam)', label: '👩 Mom' },
+                      { id: 'Dr. Kishor', label: '🧑‍⚕️ Dr. Kishor' },
+                      { id: 'Other', label: '✍️ Other' },
+                    ].map((person) => {
+                      const isSelected = depositBy === person.id;
+                      return (
+                        <button
+                          key={person.id}
+                          type="button"
+                          onClick={() => {
+                            setDepositBy(person.id);
+                            if (person.id === 'Dad (Anbazhakan)') {
+                              setDepositNotes("Temporary float injected by Dad to bridge auction pot");
+                            } else if (person.id === 'Mom (Parimalam)') {
+                              setDepositNotes("Reserve cash deposit by Mom");
+                            } else if (person.id === 'Dr. Kishor') {
+                              setDepositNotes("Emergency capital injected by Dr. Kishor");
+                            }
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
+                            isSelected
+                              ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black shadow-md'
+                              : 'bg-white/10 text-slate-200 border-white/10 hover:bg-white/15'
+                          }`}
+                        >
+                          {person.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {depositBy === 'Other' && (
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter depositor name..."
+                      value={depositCustomBy}
+                      onChange={(e) => setDepositCustomBy(e.target.value)}
+                      className="w-full mt-2 bg-slate-800/80 border border-slate-700 focus:border-emerald-400 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none"
+                    />
+                  )}
+                </div>
+
+                {/* Destination Account */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-slate-300 font-bold uppercase tracking-wider block">
+                    Deposit Into Vault (Destination)
+                  </label>
                   <select
-                    value={transferSource}
-                    onChange={(e) => setTransferSource(e.target.value as WalletType)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    value={depositDest}
+                    onChange={(e) => setDepositDest(e.target.value as WalletType)}
+                    className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-400 rounded-xl px-3 py-2.5 text-xs font-bold text-white focus:outline-none"
                   >
-                    <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                    <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                    <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                    <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                    <option value="cash_in_hand">💵 Physical Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
+                    <option value="kishor_bank">🏦 Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
+                    <option value="dad_bank">🏦 Dad Bank ({formatCurrency(balances.dad_bank)})</option>
+                    <option value="mom_bank">🏦 Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                  </select>
+
+                  <label className="text-[10px] text-slate-300 font-bold uppercase tracking-wider block pt-1">
+                    Category Tag
+                  </label>
+                  <select
+                    value={depositTag}
+                    onChange={(e) => setDepositTag(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-400 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none"
+                  >
+                    <option value="Auction Payout Float">Auction Payout Float (Temporary Bridge)</option>
+                    <option value="General Capital Inflow">General Capital Inflow</option>
+                    <option value="Emergency Reserve">Emergency Reserve Injection</option>
+                    <option value="Personal Float">Personal Float Rotation</option>
                   </select>
                 </div>
 
+                {/* Deposit Amount & Quick Presets */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Destination Account</label>
-                  <select
-                    value={transferDest}
-                    onChange={(e) => setTransferDest(e.target.value as WalletType)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                  >
-                    <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                    <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                    <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                    <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Transfer Amount (₹)</label>
-                <input
-                  type="number"
-                  required
-                  placeholder="e.g. 50000"
-                  value={transferAmount}
-                  onChange={(e) => setTransferAmount(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Reason / Purpose Notes</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Funds for auction payout, bank rebalancing..."
-                  value={transferNotes}
-                  onChange={(e) => setTransferNotes(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-xs font-medium text-gray-900 focus:outline-none shadow-2xs"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isProcessingTransfer}
-                className="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
-              >
-                {isProcessingTransfer ? 'Transferring...' : 'Execute Inter-Vault Transfer'}
-              </button>
-            </form>
-          </div>
-
-          {/* ATM Bank-to-Cash Relocation (2-Step Verification) */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                <Banknote size={16} className="text-indigo-600" />
-                ATM Bank-to-Cash Relocation
-              </h3>
-              <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
-                2-Step Verify
-              </span>
-            </div>
-
-            <form onSubmit={handleTriggerATMRelocation} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Source Bank Account</label>
-                  <select
-                    value={relocateSource}
-                    onChange={(e) => setRelocateSource(e.target.value as Exclude<WalletType, 'cash_in_hand'>)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                  >
-                    <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                    <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                    <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Withdrawal Amount (₹)</label>
+                  <label className="text-[10px] text-slate-300 font-bold uppercase tracking-wider block">
+                    Deposit Amount (₹)
+                  </label>
                   <input
                     type="number"
                     required
                     placeholder="e.g. 20000"
-                    value={relocateAmount}
-                    onChange={(e) => setRelocateAmount(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-400 rounded-xl px-3.5 py-2.5 text-sm font-black text-emerald-300 focus:outline-none placeholder-slate-500 font-mono"
+                  />
+
+                  {/* Preset Pills */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {[5000, 10000, 20000, 30000, 50000, 100000].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setDepositAmount(String(amt))}
+                        className="text-[10px] font-bold bg-white/10 hover:bg-emerald-500 hover:text-slate-950 border border-white/15 text-slate-200 px-2 py-1 rounded-lg transition-all cursor-pointer"
+                      >
+                        ₹{amt >= 100000 ? `${amt / 100000}L` : `${amt / 1000}k`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Purpose Notes & Submit */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center pt-2 border-t border-white/10">
+                <div className="md:col-span-8">
+                  <input
+                    type="text"
+                    placeholder="Optional notes (e.g. ₹20k put in Cash Box for auction winner payout while awaiting member dues)..."
+                    value={depositNotes}
+                    onChange={(e) => setDepositNotes(e.target.value)}
+                    className="w-full bg-slate-800/80 border border-slate-700 focus:border-emerald-400 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none"
                   />
                 </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all cursor-pointer"
-              >
-                Trigger ATM Withdrawal
-              </button>
-            </form>
-
-            {/* Pending Physical Inflow Verification Queue */}
-            {relocations.length > 0 && (
-              <div className="space-y-2.5 pt-3.5 border-t border-gray-100">
-                <h4 className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
-                  <AlertCircle size={13} />
-                  Pending Physical Cash Box Verification
-                </h4>
-                
-                <div className="space-y-2">
-                  {relocations.map((reloc) => (
-                    <div key={reloc.id} className="flex justify-between items-center bg-amber-50/70 border border-amber-200 p-3.5 rounded-2xl">
-                      <div>
-                        <span className="text-[10px] font-bold text-gray-500 uppercase block">From: {WALLET_META[reloc.source]?.name}</span>
-                        <span className="text-sm font-extrabold text-gray-900 font-mono mt-0.5 block">{formatCurrency(reloc.amount)}</span>
-                        <span className="text-[10px] text-gray-400 font-mono">{reloc.createdAt}</span>
-                      </div>
-                      <button
-                        onClick={() => handleVerifyATMRelocation(reloc.id, reloc.amount, reloc.source)}
-                        className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
-                      >
-                        <Check size={13} /> Confirm Inflow
-                      </button>
-                    </div>
-                  ))}
+                <div className="md:col-span-4">
+                  <button
+                    type="submit"
+                    disabled={isProcessingDeposit}
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-98 text-slate-950 font-black text-xs py-3 rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <Plus size={15} />
+                    {isProcessingDeposit ? 'Depositing...' : 'Deposit Cash into Vault'}
+                  </button>
                 </div>
               </div>
-            )}
+            </form>
           </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+            
+            {/* Inter-Vault Transfer Box */}
+            <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
+                  <ArrowRightLeft size={16} className="text-blue-600" />
+                  Inter-Vault Cash / Bank Transfer
+                </h3>
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full">
+                  Internal Rebalance
+                </span>
+              </div>
+
+              <form onSubmit={handleExecuteTransfer} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Source Account</label>
+                    <select
+                      value={transferSource}
+                      onChange={(e) => setTransferSource(e.target.value as WalletType)}
+                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    >
+                      <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
+                      <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
+                      <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
+                      <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Destination Account</label>
+                    <select
+                      value={transferDest}
+                      onChange={(e) => setTransferDest(e.target.value as WalletType)}
+                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    >
+                      <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
+                      <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
+                      <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
+                      <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Transfer Amount (₹)</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="e.g. 50000"
+                    value={transferAmount}
+                    onChange={(e) => setTransferAmount(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Reason / Purpose Notes</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Funds for auction payout, bank rebalancing..."
+                    value={transferNotes}
+                    onChange={(e) => setTransferNotes(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-xs font-medium text-gray-900 focus:outline-none shadow-2xs"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isProcessingTransfer}
+                  className="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {isProcessingTransfer ? 'Transferring...' : 'Execute Inter-Vault Transfer'}
+                </button>
+              </form>
+            </div>
+
+            {/* ATM Bank-to-Cash Relocation (2-Step Verification) */}
+            <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Banknote size={16} className="text-indigo-600" />
+                  ATM Bank-to-Cash Relocation
+                </h3>
+                <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
+                  2-Step Verify
+                </span>
+              </div>
+
+              <form onSubmit={handleTriggerATMRelocation} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Source Bank Account</label>
+                    <select
+                      value={relocateSource}
+                      onChange={(e) => setRelocateSource(e.target.value as Exclude<WalletType, 'cash_in_hand'>)}
+                      className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    >
+                      <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
+                      <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
+                      <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Withdrawal Amount (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="e.g. 20000"
+                      value={relocateAmount}
+                      onChange={(e) => setRelocateAmount(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all cursor-pointer"
+                >
+                  Trigger ATM Withdrawal
+                </button>
+              </form>
+
+              {/* Pending Physical Inflow Verification Queue */}
+              {relocations.length > 0 && (
+                <div className="space-y-2.5 pt-3.5 border-t border-gray-100">
+                  <h4 className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
+                    <AlertCircle size={13} />
+                    Pending Physical Cash Box Verification
+                  </h4>
+                  
+                  <div className="space-y-2">
+                    {relocations.map((reloc) => (
+                      <div key={reloc.id} className="flex justify-between items-center bg-amber-50/70 border border-amber-200 p-3.5 rounded-2xl">
+                        <div>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase block">From: {WALLET_META[reloc.source]?.name}</span>
+                          <span className="text-sm font-extrabold text-gray-900 font-mono mt-0.5 block">{formatCurrency(reloc.amount)}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">{reloc.createdAt}</span>
+                        </div>
+                        <button
+                          onClick={() => handleVerifyATMRelocation(reloc.id, reloc.amount, reloc.source)}
+                          className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                        >
+                          <Check size={13} /> Confirm Inflow
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
         </div>
       )}
 
-      {/* ── SUBTAB 4: PERSONAL DRAWS & EXPENSES ── */}
+      {/* ── SUBTAB 4: PERSONAL DRAWS, EXPENSES & FLOATING CAPITAL ── */}
       {activeSubtab === 'spends' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+        <div className="space-y-6">
           
-          {/* Fast Expense Entry Card */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                <Coins size={16} className="text-rose-600" />
-                Fast Expense &amp; Personal Draw Logger
-              </h3>
-              <span className="text-[10px] text-rose-700 font-bold bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
-                Vault Debit
+          {/* Outstanding Personal Debt Overview Banner */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-gradient-to-br from-rose-50 to-red-100/60 border border-rose-200/80 rounded-2xl p-3.5 sm:p-4 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-wider flex items-center gap-1">
+                  <Coins size={12} className="text-rose-600" /> Total Owed
+                </span>
+                {personalDrawStats.outstandingCount > 0 && (
+                  <span className="text-[9px] font-extrabold bg-rose-600 text-white px-2 py-0.5 rounded-full animate-pulse">
+                    {personalDrawStats.outstandingCount} Active
+                  </span>
+                )}
+              </div>
+              <p className="text-base sm:text-xl font-black text-rose-900 font-mono mt-1">
+                {formatCurrency(personalDrawStats.totalOutstanding)}
+              </p>
+              <span className="text-[10px] text-rose-600 font-medium">Outstanding personal debt to be put back</span>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                  👨 Dad (Anbazhakan)
+                </span>
+                {floatStats.dadFloat > 0 && (
+                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md">
+                    +{formatCurrency(floatStats.dadFloat)} Float
+                  </span>
+                )}
+              </div>
+              <p className={`text-base sm:text-lg font-black font-mono ${personalDrawStats.dadOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {formatCurrency(personalDrawStats.dadOutstanding)}
+              </p>
+              <span className="text-[10px] text-gray-400 font-medium block">
+                {personalDrawStats.dadOutstanding > 0 ? 'Owed to treasury' : '✓ ₹0 Debt Owed'}
               </span>
             </div>
 
-            <form onSubmit={handleLogPersonalDraw} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                  👩 Mom (Parimalam)
+                </span>
+                {floatStats.momFloat > 0 && (
+                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md">
+                    +{formatCurrency(floatStats.momFloat)} Float
+                  </span>
+                )}
+              </div>
+              <p className={`text-base sm:text-lg font-black font-mono ${personalDrawStats.momOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {formatCurrency(personalDrawStats.momOutstanding)}
+              </p>
+              <span className="text-[10px] text-gray-400 font-medium block">
+                {personalDrawStats.momOutstanding > 0 ? 'Owed to treasury' : '✓ ₹0 Debt Owed'}
+              </span>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                  🧑‍⚕️ Dr. Kishor
+                </span>
+                {floatStats.kishorFloat > 0 && (
+                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md">
+                    +{formatCurrency(floatStats.kishorFloat)} Float
+                  </span>
+                )}
+              </div>
+              <p className={`text-base sm:text-lg font-black font-mono ${personalDrawStats.kishorOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {formatCurrency(personalDrawStats.kishorOutstanding)}
+              </p>
+              <span className="text-[10px] text-gray-400 font-medium block">
+                {personalDrawStats.kishorOutstanding > 0 ? 'Owed to treasury' : '✓ ₹0 Debt Owed'}
+              </span>
+            </div>
+          </div>
+
+          {/* 🌊 Active Floating Capital Available for 1-Tap Recovery */}
+          {floatStats.totalActiveFloat > 0 && (
+            <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/60 border border-emerald-300 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/80 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-xl bg-emerald-600 text-white">
+                    <Sparkles size={16} />
+                  </span>
+                  <div>
+                    <h4 className="text-sm font-black text-emerald-950 flex items-center gap-2">
+                      Active Floating Capital Injected by Organizers ({formatCurrency(floatStats.totalActiveFloat)})
+                    </h4>
+                    <p className="text-[11px] text-emerald-700 font-medium">
+                      Temporary funds put in to bridge payouts. Take your cash back anytime without creating personal debt.
+                    </p>
+                  </div>
+                </div>
+
+                <span className="text-xs font-black text-emerald-900 bg-emerald-200 border border-emerald-300 px-3 py-1 rounded-full self-start sm:self-auto font-mono">
+                  {floatStats.activeCount} Active Injections
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                {computedFloatingDeposits.filter(f => f.status === 'active').map((float) => (
+                  <div key={float.id} className="bg-white/90 border border-emerald-200 rounded-2xl p-3.5 flex flex-col justify-between gap-3 shadow-2xs">
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                          {float.depositedBy}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-mono">{float.timestamp}</span>
+                      </div>
+
+                      <div className="mt-2 flex items-baseline justify-between">
+                        <span className="text-base sm:text-lg font-black font-mono text-emerald-700">
+                          +{formatCurrency(float.amount)}
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-medium">
+                          in {WALLET_META[float.walletType]?.name}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-gray-700 font-semibold mt-1 line-clamp-2">
+                        {float.notes}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRecoverFloat(float)}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                    >
+                      <RotateCcw size={13} />
+                      ⚡ Take Back / Recover ₹{float.amount.toLocaleString('en-IN')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
+            
+            {/* Fast Expense Entry Card (5 Cols) */}
+            <div className="lg:col-span-5 bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Coins size={16} className="text-rose-600" />
+                  Fast Expense &amp; Personal Draw Logger
+                </h3>
+                <span className="text-[10px] text-rose-700 font-bold bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
+                  Vault Debit
+                </span>
+              </div>
+
+              <form onSubmit={handleLogPersonalDraw} className="space-y-4">
+                
+                {/* Who Took It Selector (Large intuitive buttons for family) */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Debit From Account</label>
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
+                    <span>Who Took This Money? (Taken By)</span>
+                    <span className="text-[9px] text-indigo-600 font-bold">1-Tap Select</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'Dad (Anbazhakan)', label: '👨 Dad (Anbazhakan)' },
+                      { id: 'Mom (Parimalam)', label: '👩 Mom (Parimalam)' },
+                      { id: 'Dr. Kishor', label: '🧑‍⚕️ Dr. Kishor' },
+                      { id: 'Other', label: '✍️ Other / Custom' },
+                    ].map((person) => {
+                      const isSelected = spendTakenBy === person.id;
+                      return (
+                        <button
+                          key={person.id}
+                          type="button"
+                          onClick={() => {
+                            setSpendTakenBy(person.id);
+                            if (person.id === 'Dad (Anbazhakan)') {
+                              setSpendDesc("Cash taken by Dad for personal use / rotation");
+                            } else if (person.id === 'Mom (Parimalam)') {
+                              setSpendDesc("Household expense / groceries taken by Mom");
+                            } else if (person.id === 'Dr. Kishor') {
+                              setSpendDesc("Collection travel expense by Dr. Kishor");
+                            }
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-left flex items-center justify-between cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50'
+                          }`}
+                        >
+                          <span className="truncate">{person.label}</span>
+                          {isSelected && <Check size={12} className="shrink-0 ml-1" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {spendTakenBy === 'Other' && (
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter person name (e.g. Relative, Assistant)..."
+                      value={spendCustomTakenBy}
+                      onChange={(e) => setSpendCustomTakenBy(e.target.value)}
+                      className="w-full mt-2 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Debit From Account</label>
+                    <select
+                      value={spendWallet}
+                      onChange={(e) => setSpendWallet(e.target.value as WalletType)}
+                      className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    >
+                      <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
+                      <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
+                      <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
+                      <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Spend Amount (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="e.g. 500"
+                      value={spendAmount}
+                      onChange={(e) => setSpendAmount(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick amount presets */}
+                <div className="flex flex-wrap gap-1.5">
+                  {[500, 1000, 2000, 5000, 7000, 10000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setSpendAmount(String(amt))}
+                      className="text-[10px] font-bold bg-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-gray-200 text-gray-600 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                    >
+                      ₹{amt.toLocaleString('en-IN')}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Category Tag</label>
                   <select
-                    value={spendWallet}
-                    onChange={(e) => setSpendWallet(e.target.value as WalletType)}
+                    value={spendTag}
+                    onChange={(e) => setSpendTag(e.target.value as PersonalDraw['tag'])}
                     className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
                   >
-                    <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                    <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                    <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                    <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                    <option value="Personal Expense">Personal Expense / Use</option>
+                    <option value="Money Lending / Rotation">Money Lending / Temporary Rotation</option>
+                    <option value="Petrol">Petrol</option>
+                    <option value="Maintenance">Bike / Vehicle Maintenance</option>
+                    <option value="Tea & Refreshments">Tea &amp; Refreshments</option>
+                    <option value="Collection Visits">Collection Visits</option>
+                    <option value="Groceries">Groceries / Household</option>
+                    <option value="Emergency Cash">Emergency Cash</option>
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Spend Amount (₹)</label>
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
+                    <span>Reason / Description</span>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        if (spendTakenBy.includes('Dad')) {
+                          setSpendDesc("Cash taken by Dad for personal rotation / lending");
+                        } else if (spendTakenBy.includes('Mom')) {
+                          setSpendDesc("Household / personal expense taken by Mom");
+                        } else {
+                          setSpendDesc("Collection travel & refreshments expense");
+                        }
+                      }} 
+                      className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 hover:text-indigo-800 cursor-pointer"
+                    >
+                      <Mic size={11} /> Auto-fill
+                    </button>
+                  </label>
+                  <textarea
+                    placeholder="e.g. Petrol for collection visits, personal loan rotation, cash taken by Dad..."
+                    value={spendDesc}
+                    onChange={(e) => setSpendDesc(e.target.value)}
+                    rows={2}
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none resize-none font-medium shadow-2xs leading-relaxed"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingSpend}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-3.5 rounded-xl transition-all duration-150 shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingSpend ? 'Logging Draw...' : 'Log Personal Draw / Expense'}
+                </button>
+              </form>
+            </div>
+
+            {/* Personal Draws & Spends Ledger (7 Cols) */}
+            <div className="lg:col-span-7 bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-gray-900">Personal Draws &amp; Spends Ledger</h3>
+                  <span className="text-[11px] text-gray-500">Track who took cash &amp; settle outstanding amounts</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
+                    {personalDrawStats.outstandingCount} Owed
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full">
+                    {personalDrawStats.settledCount} Settled
+                  </span>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search */}
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {/* Status Filters */}
+                  <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                    {[
+                      { id: 'all', label: `All (${computedPersonalDraws.length})` },
+                      { id: 'outstanding', label: `⚡ Outstanding (${personalDrawStats.outstandingCount})` },
+                      { id: 'settled', label: `✓ Settled (${personalDrawStats.settledCount})` },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setPersonalDrawStatusFilter(tab.id as any)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          personalDrawStatusFilter === tab.id
+                            ? 'bg-white text-gray-900 shadow-xs'
+                            : 'text-gray-500 hover:text-gray-900'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Person Filter */}
+                  <select
+                    value={personalDrawPersonFilter}
+                    onChange={(e) => setPersonalDrawPersonFilter(e.target.value)}
+                    className="bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer"
+                  >
+                    <option value="all">All People</option>
+                    <option value="dad">👨 Dad (Anbazhakan)</option>
+                    <option value="mom">👩 Mom (Parimalam)</option>
+                    <option value="kishor">🧑‍⚕️ Dr. Kishor</option>
+                    <option value="other">✍️ Others</option>
+                  </select>
+                </div>
+
+                {/* Search input */}
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
-                    type="number"
-                    required
-                    placeholder="e.g. 500"
-                    value={spendAmount}
-                    onChange={(e) => setSpendAmount(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    type="text"
+                    placeholder="Search by reason, name, category, or amount..."
+                    value={personalDrawSearch}
+                    onChange={(e) => setPersonalDrawSearch(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Category Tag</label>
-                <select
-                  value={spendTag}
-                  onChange={(e) => setSpendTag(e.target.value as PersonalDraw['tag'])}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                >
-                  <option value="Petrol">Petrol</option>
-                  <option value="Maintenance">Bike / Vehicle Maintenance</option>
-                  <option value="Tea & Refreshments">Tea &amp; Refreshments</option>
-                  <option value="Collection Visits">Collection Visits</option>
-                  <option value="Groceries">Groceries</option>
-                  <option value="Emergency Cash">Emergency Cash</option>
-                  <option value="Personal Expense">Personal Expense</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
-                  <span>Reason / Description</span>
-                  <button 
-                    type="button" 
-                    onClick={() => setSpendDesc("Petrol filled for Dad's bike for collection visit")} 
-                    className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 hover:text-indigo-800 cursor-pointer"
-                  >
-                    <Mic size={11} /> Auto-fill
-                  </button>
-                </label>
-                <textarea
-                  placeholder="e.g. Petrol for collection visits, tea for subscribers..."
-                  value={spendDesc}
-                  onChange={(e) => setSpendDesc(e.target.value)}
-                  rows={2}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none resize-none font-medium shadow-2xs leading-relaxed"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-3.5 rounded-xl transition-all duration-150 shadow-2xs cursor-pointer"
-              >
-                Log Personal Draw / Expense
-              </button>
-            </form>
-          </div>
-
-          {/* Personal Draws Audit Ledger */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-sm sm:text-base font-bold text-gray-900">Personal Draws &amp; Spends Ledger</h3>
-              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
-                {personalDraws.length} logged
-              </span>
-            </div>
-
-            <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-              {personalDraws.length === 0 ? (
-                <div className="py-12 text-center text-xs text-gray-400">
-                  No personal draws logged in this session.
-                </div>
-              ) : (
-                personalDraws.map((draw) => (
-                  <div key={draw.id} className="bg-gray-50/80 border border-gray-200 p-4 rounded-2xl flex justify-between items-start">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full">
-                          {draw.tag}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-mono">{draw.timestamp}</span>
-                      </div>
-                      <p className="text-xs text-gray-800 font-semibold leading-relaxed">{draw.description}</p>
-                      <span className="text-[11px] text-indigo-600 font-bold block">Logged by: {draw.adminName}</span>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-sm font-extrabold text-rose-600 block font-mono">-{formatCurrency(draw.amount)}</span>
-                      <button 
-                        onClick={() => handleDeletePersonalDraw(draw.id, draw.amount)}
-                        className="text-gray-400 hover:text-rose-600 p-1.5 mt-1 transition-colors inline-block cursor-pointer"
-                        title="Delete spend & Refund vault"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+              {/* Draws List */}
+              <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                {filteredPersonalDraws.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-gray-400 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                    No personal draws matching the selected filter.
                   </div>
-                ))
-              )}
+                ) : (
+                  filteredPersonalDraws.map((draw) => {
+                    const isOutstanding = draw.status === 'outstanding';
+                    return (
+                      <div 
+                        key={draw.id} 
+                        className={`p-4 rounded-2xl border transition-all ${
+                          isOutstanding 
+                            ? 'bg-rose-50/30 border-rose-200/70 hover:border-rose-300' 
+                            : 'bg-gray-50/80 border-gray-200/80'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {/* Status Badge */}
+                              {isOutstanding ? (
+                                <span className="bg-rose-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                                  <Clock size={10} /> Outstanding Owed
+                                </span>
+                              ) : (
+                                <span className="bg-emerald-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                                  <CheckCircle2 size={10} /> Settled / Repaid
+                                </span>
+                              )}
+
+                              {/* Taken By Badge */}
+                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <User size={10} /> Taken By: {draw.takenBy}
+                              </span>
+
+                              {/* Category Tag */}
+                              <span className="bg-gray-100 text-gray-700 border border-gray-200 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
+                                {draw.tag}
+                              </span>
+
+                              {/* Source Wallet Tag */}
+                              <span className="text-[10px] text-gray-500 font-mono">
+                                from {WALLET_META[draw.walletType]?.name}
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-gray-900 font-semibold leading-relaxed">
+                              {draw.description}
+                            </p>
+
+                            {/* Settlement Details Banner if Settled */}
+                            {!isOutstanding && draw.settlementDetails && (
+                              <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-2 text-[11px] text-emerald-800 font-medium flex items-center gap-1.5">
+                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                                <span>{draw.settlementDetails.notes || `Settled on ${draw.settlementDetails.settledAt}`}</span>
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-3 text-[10px] text-gray-400 font-mono">
+                              <span>Recorded: {draw.timestamp}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0 flex flex-col items-end gap-2">
+                            <span className={`text-base font-black font-mono ${isOutstanding ? 'text-rose-600' : 'text-gray-500'}`}>
+                              -{formatCurrency(draw.amount)}
+                            </span>
+
+                            {isOutstanding ? (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenSettleModal(draw)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                                >
+                                  <Banknote size={13} /> Put Cash Back
+                                </button>
+                                <button 
+                                  onClick={() => handleDeletePersonalDraw(draw)}
+                                  className="text-gray-400 hover:text-rose-600 p-1.5 transition-colors cursor-pointer"
+                                  title="Delete draw & Refund vault"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => handleDeletePersonalDraw(draw)}
+                                className="text-gray-300 hover:text-rose-500 p-1 transition-colors cursor-pointer"
+                                title="Delete log record"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
+
           </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
+            
+            {/* Fast Expense Entry Card (5 Cols) */}
+            <div className="lg:col-span-5 bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Coins size={16} className="text-rose-600" />
+                  Fast Expense &amp; Personal Draw Logger
+                </h3>
+                <span className="text-[10px] text-rose-700 font-bold bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
+                  Vault Debit
+                </span>
+              </div>
+
+              <form onSubmit={handleLogPersonalDraw} className="space-y-4">
+                
+                {/* Who Took It Selector (Large intuitive buttons for family) */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
+                    <span>Who Took This Money? (Taken By)</span>
+                    <span className="text-[9px] text-indigo-600 font-bold">1-Tap Select</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'Dad (Anbazhakan)', label: '👨 Dad (Anbazhakan)' },
+                      { id: 'Mom (Parimalam)', label: '👩 Mom (Parimalam)' },
+                      { id: 'Dr. Kishor', label: '🧑‍⚕️ Dr. Kishor' },
+                      { id: 'Other', label: '✍️ Other / Custom' },
+                    ].map((person) => {
+                      const isSelected = spendTakenBy === person.id;
+                      return (
+                        <button
+                          key={person.id}
+                          type="button"
+                          onClick={() => {
+                            setSpendTakenBy(person.id);
+                            if (person.id === 'Dad (Anbazhakan)') {
+                              setSpendDesc("Cash taken by Dad for personal use / rotation");
+                            } else if (person.id === 'Mom (Parimalam)') {
+                              setSpendDesc("Household expense / groceries taken by Mom");
+                            } else if (person.id === 'Dr. Kishor') {
+                              setSpendDesc("Collection travel expense by Dr. Kishor");
+                            }
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-left flex items-center justify-between cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50'
+                          }`}
+                        >
+                          <span className="truncate">{person.label}</span>
+                          {isSelected && <Check size={12} className="shrink-0 ml-1" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {spendTakenBy === 'Other' && (
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter person name (e.g. Relative, Assistant)..."
+                      value={spendCustomTakenBy}
+                      onChange={(e) => setSpendCustomTakenBy(e.target.value)}
+                      className="w-full mt-2 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Debit From Account</label>
+                    <select
+                      value={spendWallet}
+                      onChange={(e) => setSpendWallet(e.target.value as WalletType)}
+                      className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    >
+                      <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
+                      <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
+                      <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
+                      <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Spend Amount (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="e.g. 500"
+                      value={spendAmount}
+                      onChange={(e) => setSpendAmount(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick amount presets */}
+                <div className="flex flex-wrap gap-1.5">
+                  {[500, 1000, 2000, 5000, 7000, 10000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setSpendAmount(String(amt))}
+                      className="text-[10px] font-bold bg-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-gray-200 text-gray-600 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                    >
+                      ₹{amt.toLocaleString('en-IN')}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Category Tag</label>
+                  <select
+                    value={spendTag}
+                    onChange={(e) => setSpendTag(e.target.value as PersonalDraw['tag'])}
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                  >
+                    <option value="Personal Expense">Personal Expense / Use</option>
+                    <option value="Money Lending / Rotation">Money Lending / Temporary Rotation</option>
+                    <option value="Petrol">Petrol</option>
+                    <option value="Maintenance">Bike / Vehicle Maintenance</option>
+                    <option value="Tea & Refreshments">Tea &amp; Refreshments</option>
+                    <option value="Collection Visits">Collection Visits</option>
+                    <option value="Groceries">Groceries / Household</option>
+                    <option value="Emergency Cash">Emergency Cash</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
+                    <span>Reason / Description</span>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        if (spendTakenBy.includes('Dad')) {
+                          setSpendDesc("Cash taken by Dad for personal rotation / lending");
+                        } else if (spendTakenBy.includes('Mom')) {
+                          setSpendDesc("Household / personal expense taken by Mom");
+                        } else {
+                          setSpendDesc("Collection travel & refreshments expense");
+                        }
+                      }} 
+                      className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 hover:text-indigo-800 cursor-pointer"
+                    >
+                      <Mic size={11} /> Auto-fill
+                    </button>
+                  </label>
+                  <textarea
+                    placeholder="e.g. Petrol for collection visits, personal loan rotation, cash taken by Dad..."
+                    value={spendDesc}
+                    onChange={(e) => setSpendDesc(e.target.value)}
+                    rows={2}
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none resize-none font-medium shadow-2xs leading-relaxed"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingSpend}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-3.5 rounded-xl transition-all duration-150 shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingSpend ? 'Logging Draw...' : 'Log Personal Draw / Expense'}
+                </button>
+              </form>
+            </div>
+
+            {/* Personal Draws & Spends Ledger (7 Cols) */}
+            <div className="lg:col-span-7 bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-gray-900">Personal Draws &amp; Spends Ledger</h3>
+                  <span className="text-[11px] text-gray-500">Track who took cash &amp; settle outstanding amounts</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
+                    {personalDrawStats.outstandingCount} Owed
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full">
+                    {personalDrawStats.settledCount} Settled
+                  </span>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search */}
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {/* Status Filters */}
+                  <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                    {[
+                      { id: 'all', label: `All (${computedPersonalDraws.length})` },
+                      { id: 'outstanding', label: `⚡ Outstanding (${personalDrawStats.outstandingCount})` },
+                      { id: 'settled', label: `✓ Settled (${personalDrawStats.settledCount})` },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setPersonalDrawStatusFilter(tab.id as any)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          personalDrawStatusFilter === tab.id
+                            ? 'bg-white text-gray-900 shadow-xs'
+                            : 'text-gray-500 hover:text-gray-900'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Person Filter */}
+                  <select
+                    value={personalDrawPersonFilter}
+                    onChange={(e) => setPersonalDrawPersonFilter(e.target.value)}
+                    className="bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer"
+                  >
+                    <option value="all">All People</option>
+                    <option value="dad">👨 Dad (Anbazhakan)</option>
+                    <option value="mom">👩 Mom (Parimalam)</option>
+                    <option value="kishor">🧑‍⚕️ Dr. Kishor</option>
+                    <option value="other">✍️ Others</option>
+                  </select>
+                </div>
+
+                {/* Search input */}
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by reason, name, category, or amount..."
+                    value={personalDrawSearch}
+                    onChange={(e) => setPersonalDrawSearch(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Draws List */}
+              <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                {filteredPersonalDraws.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-gray-400 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                    No personal draws matching the selected filter.
+                  </div>
+                ) : (
+                  filteredPersonalDraws.map((draw) => {
+                    const isOutstanding = draw.status === 'outstanding';
+                    return (
+                      <div 
+                        key={draw.id} 
+                        className={`p-4 rounded-2xl border transition-all ${
+                          isOutstanding 
+                            ? 'bg-rose-50/30 border-rose-200/70 hover:border-rose-300' 
+                            : 'bg-gray-50/80 border-gray-200/80'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {/* Status Badge */}
+                              {isOutstanding ? (
+                                <span className="bg-rose-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                                  <Clock size={10} /> Outstanding Owed
+                                </span>
+                              ) : (
+                                <span className="bg-emerald-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                                  <CheckCircle2 size={10} /> Settled / Repaid
+                                </span>
+                              )}
+
+                              {/* Taken By Badge */}
+                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <User size={10} /> Taken By: {draw.takenBy}
+                              </span>
+
+                              {/* Category Tag */}
+                              <span className="bg-gray-100 text-gray-700 border border-gray-200 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
+                                {draw.tag}
+                              </span>
+
+                              {/* Source Wallet Tag */}
+                              <span className="text-[10px] text-gray-500 font-mono">
+                                from {WALLET_META[draw.walletType]?.name}
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-gray-900 font-semibold leading-relaxed">
+                              {draw.description}
+                            </p>
+
+                            {/* Settlement Details Banner if Settled */}
+                            {!isOutstanding && draw.settlementDetails && (
+                              <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-2 text-[11px] text-emerald-800 font-medium flex items-center gap-1.5">
+                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                                <span>{draw.settlementDetails.notes || `Settled on ${draw.settlementDetails.settledAt}`}</span>
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-3 text-[10px] text-gray-400 font-mono">
+                              <span>Recorded: {draw.timestamp}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0 flex flex-col items-end gap-2">
+                            <span className={`text-base font-black font-mono ${isOutstanding ? 'text-rose-600' : 'text-gray-500'}`}>
+                              -{formatCurrency(draw.amount)}
+                            </span>
+
+                            {isOutstanding ? (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenSettleModal(draw)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                                >
+                                  <Banknote size={13} /> Put Cash Back
+                                </button>
+                                <button 
+                                  onClick={() => handleDeletePersonalDraw(draw)}
+                                  className="text-gray-400 hover:text-rose-600 p-1.5 transition-colors cursor-pointer"
+                                  title="Delete draw & Refund vault"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => handleDeletePersonalDraw(draw)}
+                                className="text-gray-300 hover:text-rose-500 p-1 transition-colors cursor-pointer"
+                                title="Delete log record"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* ── SIMPLE MODAL: PUT CASH BACK INTO VAULT ── */}
+          {settlingDraw && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                
+                {/* Modal Header */}
+                <div className="flex items-start justify-between border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
+                      <Banknote size={20} className="text-emerald-600" />
+                      Put Cash Back into Vault
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Settle {settlingDraw.takenBy}&apos;s draw of {formatCurrency(settlingDraw.amount)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSettlingDraw(null)}
+                    className="text-gray-400 hover:text-gray-700 p-1.5 rounded-xl hover:bg-gray-100 cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleConfirmSettlement} className="space-y-4">
+                  <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-4 space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-emerald-900 font-bold uppercase tracking-wider">
+                        Put Back Into Account
+                      </label>
+                      <select
+                        value={settleDestWallet}
+                        onChange={(e) => setSettleDestWallet(e.target.value as WalletType)}
+                        className="w-full bg-white border border-emerald-300 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                      >
+                        <option value="cash_in_hand">Physical Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
+                        <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
+                        <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
+                        <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] text-emerald-900 font-bold uppercase tracking-wider">
+                          Amount to Put Back (₹)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setSettleAmount(String(settlingDraw.amount))}
+                          className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer"
+                        >
+                          Full: {formatCurrency(settlingDraw.amount)}
+                        </button>
+                      </div>
+                      <input
+                        type="number"
+                        required
+                        min={1}
+                        max={settlingDraw.amount}
+                        value={settleAmount}
+                        onChange={(e) => setSettleAmount(e.target.value)}
+                        className={`w-full bg-white border rounded-xl px-3.5 py-2.5 text-sm font-black text-gray-900 focus:outline-none font-mono shadow-2xs ${
+                          Number(settleAmount) > settlingDraw.amount 
+                            ? 'border-rose-400 focus:border-rose-500 bg-rose-50/30 text-rose-900' 
+                            : 'border-emerald-300 focus:border-emerald-500'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Exceeded Warning */}
+                    {Number(settleAmount) > settlingDraw.amount && (
+                      <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-[11px] text-rose-800 font-medium leading-relaxed">
+                        ⚠️ <strong>Cannot exceed draw amount:</strong> This draw is for {formatCurrency(settlingDraw.amount)}. You cannot put back more than {formatCurrency(settlingDraw.amount)} for this specific draw. To deposit extra cash, use the <strong>Move Money</strong> tab.
+                      </div>
+                    )}
+
+                    {/* Partial Settlement Info */}
+                    {Number(settleAmount) > 0 && Number(settleAmount) < settlingDraw.amount && (
+                      <div className="bg-amber-50 border border-amber-200 p-2 rounded-xl text-[11px] text-amber-900 font-medium">
+                        ℹ️ <strong>Partial Settlement:</strong> Remaining <span className="font-bold font-mono">{formatCurrency(settlingDraw.amount - Number(settleAmount))}</span> will remain as active debt for {settlingDraw.takenBy}.
+                      </div>
+                    )}
+
+                    {/* Normal Full Settlement Info */}
+                    {Number(settleAmount) === settlingDraw.amount && (
+                      <p className="text-[11px] text-emerald-800 font-medium">
+                        ✓ Will credit <span className="font-bold">{formatCurrency(Number(settleAmount))}</span> back into {WALLET_META[settleDestWallet]?.name} and mark this draw as fully Settled.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setSettlingDraw(null)}
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isProcessingSettle || Number(settleAmount) <= 0 || Number(settleAmount) > settlingDraw.amount}
+                      className="flex-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isProcessingSettle 
+                        ? 'Putting Cash Back...' 
+                        : Number(settleAmount) > settlingDraw.amount
+                        ? `Cannot Exceed ${formatCurrency(settlingDraw.amount)}`
+                        : `✓ Put ${formatCurrency(Number(settleAmount) || settlingDraw.amount)} Back`
+                      }
+                    </button>
+                  </div>
+                </form>
+
+              </div>
+            </div>
+          )}
 
         </div>
       )}

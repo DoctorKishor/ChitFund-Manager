@@ -38,7 +38,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
     { id: 'communication', name: 'Communication', icon: MessageSquare, adminOnly: false },
     { id: 'auctions', name: 'Auctions', icon: Gavel, adminOnly: false },
     { id: 'reports', name: 'Reports', icon: BarChart3, adminOnly: false },
-    { id: 'cash', name: 'Cash Handling', icon: Vault, adminOnly: true },
+    { id: 'cash', name: 'Treasury', icon: Vault, adminOnly: true },
   ];
 
   const handleTabClick = (itemId: string, adminOnly: boolean) => {

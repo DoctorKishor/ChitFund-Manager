@@ -32,7 +32,7 @@ export default function MobileBottomNav({
     { id: 'members', name: 'Members', icon: Users },
     { id: 'auctions', name: 'Auctions', icon: Gavel },
     ...(isUserAdminOrManager 
-      ? [{ id: 'cash', name: 'Vault', icon: Vault }]
+      ? [{ id: 'cash', name: 'Treasury', icon: Vault }]
       : []
     ),
   ];
