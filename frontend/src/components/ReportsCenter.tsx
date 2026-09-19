@@ -972,7 +972,7 @@ export default function ReportsCenter() {
       const winnerName = member?.profiles?.full_name || a.profiles?.full_name || (a as any).winner_name || 'Subscriber';
 
       // Find all payout transactions recorded for this group & month / winner
-      const monthPattern = new RegExp(`\\bMonth\\s+${a.month}\\b`, 'i');
+      const monthPattern = new RegExp(`\\bMonth\\s+${a.month}\\b|\\bM${a.month}\\b|\\bM\\s*${a.month}\\b`, 'i');
       const winnerPayoutTxs = groupTxs.filter(t => 
         t.type === 'payout' && 
         (
@@ -1158,7 +1158,7 @@ export default function ReportsCenter() {
       : (totalVal - 5000);
 
     // Find actual prize payout transactions for this member
-    const winMonthPattern = winAuction ? new RegExp(`\\bMonth\\s+${winAuction.month}\\b`, 'i') : null;
+    const winMonthPattern = winAuction ? new RegExp(`\\bMonth\\s+${winAuction.month}\\b|\\bM${winAuction.month}\\b|\\bM\\s*${winAuction.month}\\b`, 'i') : null;
     const memberPayoutTxs = transactions.filter(t => 
       t.group_id === selectedGroup.id && 
       t.type === 'payout' && 

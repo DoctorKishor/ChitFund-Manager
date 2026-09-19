@@ -3001,9 +3001,13 @@ Thank you for your prompt payment! 🙏`;
                   const winnerTicketNum = winnerMember?.ticket || currentMonthAuction.winner_ticket;
 
                   // Find payout transactions for this month
-                  const monthPattern = new RegExp(`\\bMonth\\s+${selectedDashboardMonth}\\b`, 'i');
+                  const monthPattern = new RegExp(`\\bMonth\\s+${selectedDashboardMonth}\\b|\\bM${selectedDashboardMonth}\\b|\\bM\\s*${selectedDashboardMonth}\\b`, 'i');
                   const monthPayoutTxs = dashboardTransactions.filter(t =>
-                    t.type === 'payout' && (t.notes ? monthPattern.test(t.notes) : true)
+                    t.type === 'payout' && (
+                      (t.notes && monthPattern.test(t.notes)) ||
+                      (winnerProfileId && (t.profile_id === winnerProfileId || t.group_member_id === winnerProfileId)) ||
+                      (winnerMember && (t.group_member_id === winnerMember.id || t.profile_id === winnerMember.profileId))
+                    )
                   );
                   const totalPrizeDisbursed = monthPayoutTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
                   const remainingPrizeDue = Math.max(0, netPrizePot - totalPrizeDisbursed);
@@ -6675,9 +6679,13 @@ Thank you for your prompt payment! 🙏`;
 
         const totalDeductionsAmount = activeDeductionsList.reduce((sum, d) => sum + d.amount, 0);
 
-        const monthPattern = new RegExp(`\\bMonth\\s+${selectedDashboardMonth}\\b`, 'i');
+        const monthPattern = new RegExp(`\\bMonth\\s+${selectedDashboardMonth}\\b|\\bM${selectedDashboardMonth}\\b|\\bM\\s*${selectedDashboardMonth}\\b`, 'i');
         const monthPayoutTxs = dashboardTransactions.filter(t =>
-          t.type === 'payout' && (t.notes ? monthPattern.test(t.notes) : true)
+          t.type === 'payout' && (
+            (t.notes && monthPattern.test(t.notes)) ||
+            (winnerProfileId && (t.profile_id === winnerProfileId || t.group_member_id === winnerProfileId)) ||
+            (winnerMember && (t.group_member_id === winnerMember.id || t.profile_id === winnerMember.profileId))
+          )
         );
         const totalPrizeDisbursed = monthPayoutTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
         const remainingPrizeDue = Math.max(0, netPrizePot - totalPrizeDisbursed);
