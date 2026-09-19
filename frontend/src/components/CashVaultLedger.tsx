@@ -22,7 +22,9 @@ import {
   Sparkles,
   Banknote,
   CheckCircle2,
-  X
+  X,
+  History,
+  Activity
 } from 'lucide-react';
 
 interface Relocation {
@@ -49,13 +51,14 @@ interface DebtLiability {
   liabilityAmount: number;
 }
 
-interface MemberCollection {
+interface TreasuryTx {
   id: string;
-  memberName: string;
-  totalDue: number;
-  amountLogged: number;
-  targetVault: WalletType;
-  status: 'completed' | 'pending_verification';
+  created_at: string;
+  type: string;
+  amount: number;
+  wallet_type: WalletType;
+  notes?: string;
+  description?: string;
 }
 
 export default function CashVaultLedger() {
@@ -67,10 +70,10 @@ export default function CashVaultLedger() {
   const [relocations, setRelocations] = useState<Relocation[]>([]);
   const [personalDraws, setPersonalDraws] = useState<PersonalDraw[]>([]);
   const [liabilities, setLiabilities] = useState<DebtLiability[]>([]);
-  const [collections, setCollections] = useState<MemberCollection[]>([]);
+  const [recentTransactions, setRecentTransactions] = useState<TreasuryTx[]>([]);
   const [availableGroups, setAvailableGroups] = useState<{ id: string; name: string }[]>([]);
 
-  // Fetch groups and recent collections from Supabase
+  // Fetch groups and recent treasury transactions from Supabase
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
@@ -80,47 +83,15 @@ export default function CashVaultLedger() {
           setSplitGroup(groups[0].name);
         }
 
-        // Fetch members with dues from group_members joined with profiles and chit_groups
-        const { data: membersData } = await supabase
-          .from('group_members')
-          .select(`
-            id,
-            ticket_number,
-            custom_installment,
-            profiles:profile_id (
-              id,
-              full_name
-            ),
-            chit_groups (
-              id,
-              name,
-              total_value,
-              duration_months,
-              current_month,
-              kai_iruppu_pool
-            )
-          `)
-          .limit(20);
+        // Fetch recent treasury transactions
+        const { data: txs } = await supabase
+          .from('transactions')
+          .select('id, created_at, type, amount, wallet_type, notes, description')
+          .order('created_at', { ascending: false })
+          .limit(15);
 
-        if (membersData && membersData.length > 0) {
-          const parsedCols: MemberCollection[] = membersData.map((m: any) => {
-            const prof = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-            const g = Array.isArray(m.chit_groups) ? m.chit_groups[0] : m.chit_groups;
-            const totalVal = Number(g?.total_value) || 200000;
-            const duration = Number(g?.duration_months) || 20;
-            const baseInst = Math.round(totalVal / duration);
-            const due = m.custom_installment !== null ? Number(m.custom_installment) : baseInst;
-
-            return {
-              id: m.id,
-              memberName: prof?.full_name || `Member #${m.ticket_number}`,
-              totalDue: due,
-              amountLogged: 0,
-              targetVault: 'cash_in_hand',
-              status: 'completed',
-            };
-          });
-          setCollections(parsedCols);
+        if (txs) {
+          setRecentTransactions(txs);
         }
       } catch (e) {
         console.error('Error loading cash ledger initial data:', e);
@@ -142,16 +113,22 @@ export default function CashVaultLedger() {
   const [splitPaid, setSplitPaid] = useState<string>('');
   const [splitSourceWallet, setSplitSourceWallet] = useState<WalletType>('dad_bank');
 
-  const [activePaymentMemberId, setActivePaymentMemberId] = useState<string | null>(null);
-  const [partialPaymentVal, setPartialPaymentVal] = useState<string>('');
-  const [partialPaymentWallet, setPartialPaymentWallet] = useState<WalletType>('cash_in_hand');
-
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       maximumFractionDigits: 0
     }).format(val);
+  };
+
+  const getWalletDisplayName = (w: WalletType) => {
+    switch (w) {
+      case 'cash_in_hand': return 'Cash Box';
+      case 'kishor_bank': return 'Kishor Bank';
+      case 'dad_bank': return 'Dad Bank';
+      case 'mom_bank': return 'Mom Bank';
+      default: return w;
+    }
   };
 
   // Action handlers
@@ -230,41 +207,6 @@ export default function CashVaultLedger() {
     setLiabilities([newLiab, ...liabilities]);
     setSplitTotal('');
     setSplitPaid('');
-  };
-
-  const handleLogPartialPayment = (e: React.FormEvent, memberId: string) => {
-    e.preventDefault();
-    const pay = Number(partialPaymentVal);
-    const member = collections.find(c => c.id === memberId);
-    if (isNaN(pay) || pay <= 0 || !member) return;
-
-    const needsVerification = partialPaymentWallet !== 'cash_in_hand';
-
-    setCollections(prev => prev.map(c => {
-      if (c.id === memberId) {
-        const newLogged = c.amountLogged + pay;
-        return {
-          ...c,
-          amountLogged: newLogged > c.totalDue ? c.totalDue : newLogged,
-          targetVault: partialPaymentWallet,
-          status: needsVerification ? 'pending_verification' : 'completed'
-        };
-      }
-      return c;
-    }));
-
-    if (!needsVerification) {
-      updateBalance('cash_in_hand', pay);
-    } else {
-      updateBalance(partialPaymentWallet, pay);
-    }
-
-    setActivePaymentMemberId(null);
-    setPartialPaymentVal('');
-  };
-
-  const handleVerifyCollection = (id: string) => {
-    setCollections(prev => prev.map(c => c.id === id ? { ...c, status: 'completed' } : c));
   };
 
   return (
@@ -498,238 +440,35 @@ export default function CashVaultLedger() {
 
         </div>
 
-        {/* Right Side Ledgers / Partial Payment Matrix (Collections & Liabilities) */}
+        {/* Right Side: Debt Liabilities, Personal Draws Ledger, and Real-Time Vault Activity */}
         <div className="lg:col-span-3 space-y-5 sm:space-y-6">
           
-          {/* Collection Balance Ledger */}
+          {/* Outstanding Payout Liabilities ledger */}
           <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-snug">Monthly Collection Balance Ledger</h3>
-                <p className="text-xs text-gray-500 mt-0.5">Rolling monthly payments tracked in real-time</p>
-              </div>
-              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full">
-                {collections.length} members
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Scale size={16} className="text-rose-600" />
+                Outstanding Payout Debt Liabilities
+              </h3>
+              <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
+                {liabilities.length} active
               </span>
             </div>
 
-            {/* Mobile Cards Stream (for small screens < md) */}
-            <div className="space-y-3 md:hidden">
-              {collections.length === 0 ? (
-                <div className="py-8 text-center text-xs text-gray-400">No collection records found.</div>
-              ) : (
-                collections.map((col) => {
-                  const isPaying = activePaymentMemberId === col.id;
-                  const remaining = col.totalDue - col.amountLogged;
-
-                  return (
-                    <div key={col.id} className="p-4 bg-gray-50/70 border border-gray-200 rounded-2xl space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="font-bold text-sm text-gray-900 block leading-snug">{col.memberName}</span>
-                          <span className="text-xs text-gray-500 font-mono mt-0.5 block">
-                            Due: {formatCurrency(col.totalDue)} · Logged: {formatCurrency(col.amountLogged)}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className={`text-sm font-extrabold block ${remaining === 0 ? 'text-emerald-600' : 'text-gray-900'}`}>
-                            {remaining === 0 ? 'Paid' : formatCurrency(remaining)}
-                          </span>
-                          <span className="text-[10px] font-mono text-gray-400 uppercase mt-0.5 block">{col.targetVault.replace(/_/g, ' ')}</span>
-                        </div>
-                      </div>
-
-                      {!isPaying ? (
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200/60">
-                          {col.status === 'pending_verification' && (
-                            <button
-                              onClick={() => handleVerifyCollection(col.id)}
-                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold px-3.5 py-1.5 rounded-xl"
-                            >
-                              Verify
-                            </button>
-                          )}
-                          {remaining > 0 && (
-                            <button
-                              onClick={() => {
-                                setActivePaymentMemberId(col.id);
-                                setPartialPaymentVal(remaining.toString());
-                              }}
-                              className="bg-gray-900 hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-xl shadow-2xs active:scale-95 transition-all"
-                            >
-                              Record Payment
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <form 
-                          onSubmit={(e) => handleLogPartialPayment(e, col.id)}
-                          className="pt-2.5 border-t border-gray-200 space-y-2.5"
-                        >
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="number"
-                              placeholder="Amount"
-                              required
-                              value={partialPaymentVal}
-                              onChange={(e) => setPartialPaymentVal(e.target.value)}
-                              className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
-                            />
-                            <select
-                              value={partialPaymentWallet}
-                              onChange={(e) => setPartialPaymentWallet(e.target.value as WalletType)}
-                              className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
-                            >
-                              <option value="cash_in_hand">Cash Box</option>
-                              <option value="kishor_bank">Kishor Bank</option>
-                              <option value="dad_bank">Dad Bank</option>
-                              <option value="mom_bank">Mom Bank</option>
-                            </select>
-                          </div>
-                          <div className="flex justify-end gap-2">
-                            <button 
-                              type="button" 
-                              onClick={() => setActivePaymentMemberId(null)} 
-                              className="text-xs text-gray-500 font-semibold px-3 py-1.5 rounded-xl border border-gray-200"
-                            >
-                              Cancel
-                            </button>
-                            <button 
-                              type="submit" 
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-1.5 rounded-xl shadow-2xs"
-                            >
-                              Save
-                            </button>
-                          </div>
-                        </form>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Desktop Table View (hidden on small screens < md) */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-xs text-left text-gray-600">
-                <thead className="text-[10px] text-gray-400 uppercase bg-gray-50/80 font-bold tracking-wider">
-                  <tr>
-                    <th className="py-3.5 px-4">Member</th>
-                    <th className="py-3.5 px-4">Due / Logged</th>
-                    <th className="py-3.5 px-4">Remaining</th>
-                    <th className="py-3.5 px-4">Target Vault</th>
-                    <th className="py-3.5 px-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {collections.map((col) => {
-                    const isPaying = activePaymentMemberId === col.id;
-                    const remaining = col.totalDue - col.amountLogged;
-
-                    return (
-                      <tr key={col.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4">
-                          <span className="font-bold text-gray-900 block text-xs">{col.memberName}</span>
-                          <span className={`text-[10px] mt-0.5 inline-block font-bold ${
-                            col.status === 'completed' 
-                              ? 'text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200' 
-                              : 'text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200'
-                          }`}>
-                            {col.status.toUpperCase().replace('_', ' ')}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-gray-500 font-medium">
-                          {formatCurrency(col.totalDue)} / <span className="text-gray-900 font-bold">{formatCurrency(col.amountLogged)}</span>
-                        </td>
-                        <td className="py-3.5 px-4 font-bold text-gray-800">
-                          {remaining === 0 ? (
-                            <span className="text-emerald-600 font-extrabold">Paid</span>
-                          ) : (
-                            formatCurrency(remaining)
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-[11px] text-gray-500">
-                          {col.targetVault.replace(/_/g, ' ')}
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          {!isPaying ? (
-                            <div className="flex justify-end gap-2">
-                              {col.status === 'pending_verification' && (
-                                <button
-                                  onClick={() => handleVerifyCollection(col.id)}
-                                  className="bg-emerald-50 hover:bg-emerald-600 border border-emerald-200 hover:border-emerald-600 text-emerald-700 hover:text-white text-xs font-bold px-3 py-1.5 rounded-xl transition-all duration-150"
-                                >
-                                  Verify
-                                </button>
-                              )}
-                              {remaining > 0 && (
-                                <button
-                                  onClick={() => {
-                                    setActivePaymentMemberId(col.id);
-                                    setPartialPaymentVal(remaining.toString());
-                                  }}
-                                  className="bg-gray-900 hover:bg-black text-white text-xs font-bold px-3.5 py-1.5 rounded-xl transition-colors duration-150 active:scale-95"
-                                >
-                                  Pay
-                                </button>
-                              )}
-                            </div>
-                          ) : (
-                            /* mini collection form */
-                            <form 
-                              onSubmit={(e) => handleLogPartialPayment(e, col.id)}
-                              className="flex flex-col gap-2 max-w-[170px] ml-auto text-left"
-                            >
-                              <div className="flex gap-1.5">
-                                <input
-                                  type="number"
-                                  placeholder="Amount"
-                                  required
-                                  value={partialPaymentVal}
-                                  onChange={(e) => setPartialPaymentVal(e.target.value)}
-                                  className="w-20 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-gray-900 focus:outline-none"
-                                />
-                                <select
-                                  value={partialPaymentWallet}
-                                  onChange={(e) => setPartialPaymentWallet(e.target.value as WalletType)}
-                                  className="w-20 bg-gray-50 border border-gray-200 rounded-lg px-1.5 py-1 text-xs font-bold text-gray-900 focus:outline-none"
-                                >
-                                  <option value="cash_in_hand">Cash</option>
-                                  <option value="kishor_bank">Kishor</option>
-                                  <option value="dad_bank">Dad</option>
-                                  <option value="mom_bank">Mom</option>
-                                </select>
-                              </div>
-                              <div className="flex justify-end gap-1.5">
-                                <button type="button" onClick={() => setActivePaymentMemberId(null)} className="text-xs text-gray-500 hover:text-gray-700 font-semibold px-2 py-0.5">Cancel</button>
-                                <button type="submit" className="bg-gray-900 text-white text-xs font-bold px-3 py-0.5 rounded-lg">Log</button>
-                              </div>
-                            </form>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Outstanding Payout Liabilities ledger */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
-            <h3 className="text-sm font-bold text-gray-900">Outstanding Payout Debt Liabilities</h3>
             <div className="space-y-3">
               {liabilities.length === 0 ? (
-                <p className="text-xs text-gray-400 italic py-2">No outstanding debt liabilities.</p>
+                <div className="py-6 text-center text-xs text-gray-400">
+                  ✅ No outstanding debt liabilities across active chit groups.
+                </div>
               ) : (
                 liabilities.map((liab) => (
                   <div key={liab.id} className="flex justify-between items-center bg-gray-50/80 border border-gray-200 p-4 rounded-2xl">
                     <div>
                       <span className="text-xs font-bold text-gray-800 block">{liab.groupName} Outstanding</span>
-                      <span className="text-xs text-gray-500 mt-1 block">Total: {formatCurrency(liab.totalPayout)} | Paid: {formatCurrency(liab.paidAmount)}</span>
+                      <span className="text-xs text-gray-500 mt-1 block font-mono">Total: {formatCurrency(liab.totalPayout)} | Paid: {formatCurrency(liab.paidAmount)}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm font-extrabold text-rose-600 block">{formatCurrency(liab.liabilityAmount)}</span>
+                      <span className="text-sm font-extrabold text-rose-600 block font-mono">{formatCurrency(liab.liabilityAmount)}</span>
                       <button 
                         onClick={() => {
                           if (balances.cash_in_hand >= liab.liabilityAmount) {
@@ -752,10 +491,21 @@ export default function CashVaultLedger() {
 
           {/* Personal Spends Draws Ledger */}
           <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
-            <h3 className="text-sm font-bold text-gray-900">Personal Draws Ledger</h3>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Coins size={16} className="text-rose-600" />
+                Personal Draws Ledger
+              </h3>
+              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
+                {personalDraws.length} logged
+              </span>
+            </div>
+
             <div className="space-y-3 max-h-[260px] overflow-y-auto pr-1">
               {personalDraws.length === 0 ? (
-                <p className="text-xs text-gray-400 italic py-2">No personal draws logged today.</p>
+                <div className="py-6 text-center text-xs text-gray-400">
+                  No personal draws logged in this session.
+                </div>
               ) : (
                 personalDraws.map((draw) => (
                   <div key={draw.id} className="bg-gray-50/80 border border-gray-200 p-4 rounded-2xl flex justify-between items-start">
@@ -770,7 +520,7 @@ export default function CashVaultLedger() {
                       <span className="text-[11px] text-indigo-600 font-bold block">Taken by: {draw.adminName}</span>
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="text-sm font-extrabold text-rose-600 block">-{formatCurrency(draw.amount)}</span>
+                      <span className="text-sm font-extrabold text-rose-600 block font-mono">-{formatCurrency(draw.amount)}</span>
                       <button 
                         onClick={() => {
                           updateBalance('cash_in_hand', draw.amount);
@@ -788,6 +538,65 @@ export default function CashVaultLedger() {
             </div>
           </div>
 
+          {/* Real-time Vault Transaction Activity Log */}
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Activity size={16} className="text-indigo-600" />
+                Live Treasury Activity &amp; Audit Trail
+              </h3>
+              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
+                Supabase Realtime
+              </span>
+            </div>
+
+            <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
+              {recentTransactions.length === 0 ? (
+                <div className="py-6 text-center text-xs text-gray-400">
+                  No treasury transactions recorded yet.
+                </div>
+              ) : (
+                recentTransactions.map((tx) => {
+                  const isCredit = tx.type === 'collection';
+                  const dateLabel = tx.created_at 
+                    ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                    : 'Recent';
+
+                  return (
+                    <div key={tx.id} className="p-3.5 bg-gray-50/80 border border-gray-100 rounded-2xl flex items-center justify-between gap-3">
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${
+                            isCredit 
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                              : tx.type === 'payout' 
+                              ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                              : 'bg-rose-50 text-rose-700 border-rose-200'
+                          }`}>
+                            {tx.type.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
+                        </div>
+                        <p className="text-xs font-semibold text-gray-800 truncate">
+                          {tx.notes || tx.description || 'Treasury Movement'}
+                        </p>
+                        <span className="text-[10px] text-gray-500 font-medium block">
+                          Vault: <strong className="text-gray-700">{getWalletDisplayName(tx.wallet_type)}</strong>
+                        </span>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className={`text-xs sm:text-sm font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
         </div>
 
       </div>
@@ -795,4 +604,3 @@ export default function CashVaultLedger() {
     </div>
   );
 }
-
