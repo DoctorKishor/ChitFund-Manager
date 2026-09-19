@@ -301,14 +301,79 @@ export default function CashVaultLedger() {
     return recentTransactions.filter(t => t.wallet_type === selectedWalletDetail);
   }, [recentTransactions, selectedWalletDetail]);
 
+  // Helper to accurately classify if a treasury movement is an Inflow/Credit (+) or Outflow/Debit (-)
+  const getTxDirection = (tx: TreasuryTx, perspectiveWallet?: WalletType): { isCredit: boolean; badgeLabel: string; badgeColor: string } => {
+    const type = tx.type;
+    const notes = (tx.notes || tx.description || '').toLowerCase();
+    const targetWallet = perspectiveWallet || tx.wallet_type;
+
+    // 1. Collections are ALWAYS Inflow/Credit
+    if (type === 'collection') {
+      return { isCredit: true, badgeLabel: 'COLLECTION (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    }
+
+    // 2. Payouts
+    if (type === 'payout') {
+      return { isCredit: false, badgeLabel: 'PRIZE PAYOUT (-)', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200' };
+    }
+
+    // 3. Personal Draws
+    if (type === 'personal_draw') {
+      return { isCredit: false, badgeLabel: 'PERSONAL DRAW (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' };
+    }
+
+    // 4. External Deposits / Floating Capital Injections
+    if (notes.includes('[floating deposit') || notes.includes('deposit into') || notes.includes('reserve cash deposit') || notes.includes('external cash deposit') || notes.includes('deposited by')) {
+      return { isCredit: true, badgeLabel: 'FLOAT DEPOSIT (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    }
+
+    // 5. Float Recoveries
+    if (notes.includes('float recovery') || notes.includes('recovered (withdrawn')) {
+      return { isCredit: false, badgeLabel: 'FLOAT RECOVERY (-)', badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+    }
+
+    // 6. Personal Draw Repayments / Put Cash Back
+    if (notes.includes('repaid by') || notes.includes('put cash back') || notes.includes('put back')) {
+      return { isCredit: true, badgeLabel: 'DRAW REPAYMENT (+)', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200' };
+    }
+
+    // 7. ATM Relocations
+    if (type === 'atm_withdrawal') {
+      if (tx.wallet_type === 'cash_in_hand' || notes.includes('into cash box') || notes.includes('into physical cash box')) {
+        return { isCredit: true, badgeLabel: 'ATM INFLOW (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      }
+      return { isCredit: false, badgeLabel: 'ATM DEBIT (-)', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' };
+    }
+
+    // 8. Inter-Vault Transfers
+    if (type === 'transfer') {
+      const walletName = (WALLET_META[targetWallet]?.name || targetWallet).toLowerCase();
+      
+      // Check destination
+      if (notes.includes(`-> ${walletName}`) || notes.includes(`to ${walletName}`) || notes.includes(`into ${walletName}`) || notes.includes(`into ${targetWallet}`) || notes.includes(`to ${targetWallet}`)) {
+        return { isCredit: true, badgeLabel: 'TRANSFER IN (+)', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' };
+      }
+      // Check source
+      if (notes.includes(`${walletName} ->`) || notes.includes(`from ${walletName}`) || notes.includes(`from ${targetWallet}`)) {
+        return { isCredit: false, badgeLabel: 'TRANSFER OUT (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' };
+      }
+
+      if (notes.includes('into') || notes.includes('deposit') || notes.includes('credit')) {
+        return { isCredit: true, badgeLabel: 'INFLOW (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      }
+    }
+
+    return { isCredit: false, badgeLabel: 'OUTFLOW (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' };
+  };
+
   const walletStats = useMemo(() => {
     const txs = walletSpecificTxs;
     const totalInflow = txs
-      .filter(t => t.type === 'collection' || (t.type === 'transfer' && t.notes?.includes(`to ${selectedWalletDetail}`)))
+      .filter(t => getTxDirection(t, selectedWalletDetail).isCredit)
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
     const totalOutflow = txs
-      .filter(t => t.type === 'payout' || t.type === 'personal_draw' || t.type === 'atm_withdrawal' || (t.type === 'transfer' && t.notes?.includes(`from ${selectedWalletDetail}`)))
+      .filter(t => !getTxDirection(t, selectedWalletDetail).isCredit)
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
     const netFlow = totalInflow - totalOutflow;
@@ -1102,7 +1167,7 @@ export default function CashVaultLedger() {
 
             <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
               {recentTransactions.slice(0, 8).map((tx) => {
-                const isCredit = tx.type === 'collection' || (tx.type === 'transfer' && tx.notes?.includes('into Cash Box'));
+                const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx);
                 const dateLabel = tx.created_at 
                   ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                   : 'Recent';
@@ -1111,16 +1176,8 @@ export default function CashVaultLedger() {
                   <div key={tx.id} className="p-3.5 bg-gray-50/80 border border-gray-100 rounded-2xl flex items-center justify-between gap-3">
                     <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${
-                          isCredit 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                            : tx.type === 'payout' 
-                            ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                            : tx.type === 'transfer'
-                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
-                          {tx.type.replace(/_/g, ' ')}
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                          {badgeLabel}
                         </span>
                         <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
                       </div>
@@ -1279,7 +1336,7 @@ export default function CashVaultLedger() {
                 </div>
               ) : (
                 walletSpecificTxs.map((tx) => {
-                  const isCredit = tx.type === 'collection' || (tx.type === 'transfer' && tx.notes?.includes(`to ${selectedWalletDetail}`));
+                  const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx, selectedWalletDetail);
                   const dateLabel = tx.created_at 
                     ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                     : 'Recent';
@@ -1288,12 +1345,8 @@ export default function CashVaultLedger() {
                     <div key={tx.id} className="p-4 bg-gray-50/70 border border-gray-100 rounded-2xl flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${
-                            isCredit 
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                              : 'bg-rose-50 text-rose-700 border-rose-200'
-                          }`}>
-                            {tx.type.replace(/_/g, ' ')}
+                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                            {badgeLabel}
                           </span>
                           <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
                         </div>
@@ -2961,7 +3014,7 @@ export default function CashVaultLedger() {
               </div>
             ) : (
               filteredMasterLedger.map((tx) => {
-                const isCredit = tx.type === 'collection' || (tx.type === 'transfer' && tx.notes?.includes('into Cash Box'));
+                const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx);
                 const dateLabel = tx.created_at 
                   ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                   : 'Recent';
@@ -2970,16 +3023,8 @@ export default function CashVaultLedger() {
                   <div key={tx.id} className="p-4 bg-gray-50/70 border border-gray-100 rounded-2xl flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${
-                          isCredit 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                            : tx.type === 'payout' 
-                            ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                            : tx.type === 'transfer'
-                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
-                          {tx.type.replace(/_/g, ' ')}
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                          {badgeLabel}
                         </span>
                         <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
                       </div>
