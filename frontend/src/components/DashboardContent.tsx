@@ -3122,14 +3122,21 @@ Thank you for your prompt payment! 🙏`;
                       {/* Action Buttons & Recent Payout Receipts */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          {/* 1-Tap Disburse Prize Button */}
-                          <button
-                            onClick={() => handleOpenDisburseModal(remainingPrizeDue)}
-                            className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs active:scale-95"
-                          >
-                            <Banknote size={15} />
-                            <span>{remainingPrizeDue > 0 ? `Disburse Prize (₹${remainingPrizeDue.toLocaleString('en-IN')})` : 'Disburse Additional / Re-disburse'}</span>
-                          </button>
+                          {/* Disburse Prize Button when pending or Settled Badge */}
+                          {remainingPrizeDue > 0 ? (
+                            <button
+                              onClick={() => handleOpenDisburseModal(remainingPrizeDue)}
+                              className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer"
+                            >
+                              <Banknote size={15} />
+                              <span>Disburse Prize ({formatCurrency(remainingPrizeDue)})</span>
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-100/80 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-xl shadow-2xs">
+                              <CheckCheck size={14} className="text-emerald-700" />
+                              <span>Prize Pot Fully Disbursed</span>
+                            </div>
+                          )}
 
                           {/* WhatsApp Payout Receipt Generator Button */}
                           <button
