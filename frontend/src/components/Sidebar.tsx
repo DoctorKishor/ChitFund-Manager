@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { canAccessTab, MainTabId } from '@/utils/rbac';
 import { 
   LayoutDashboard, 
   Gavel, 
@@ -29,23 +30,22 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
   const { profile, signOut } = useAuth();
 
   const activeUserRole = profile?.role || 'subscriber';
-  const isUserAdminOrManager = activeUserRole === 'admin' || activeUserRole === 'manager';
 
-  const navItems = [
-    { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
-    { id: 'chits', name: 'Chits', icon: Briefcase, adminOnly: false },
-    { id: 'members', name: 'Members', icon: Users, adminOnly: false },
-    { id: 'communication', name: 'Communication', icon: MessageSquare, adminOnly: false },
-    { id: 'auctions', name: 'Auctions', icon: Gavel, adminOnly: false },
-    { id: 'reports', name: 'Reports', icon: BarChart3, adminOnly: false },
-    { id: 'cash', name: 'Treasury', icon: Vault, adminOnly: true },
+  const navItems: { id: MainTabId; name: string; icon: any }[] = [
+    { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
+    { id: 'chits', name: 'Chits', icon: Briefcase },
+    { id: 'members', name: 'Members', icon: Users },
+    { id: 'communication', name: 'Communication', icon: MessageSquare },
+    { id: 'auctions', name: 'Auctions', icon: Gavel },
+    { id: 'reports', name: 'Reports', icon: BarChart3 },
+    { id: 'cash', name: 'Treasury', icon: Vault },
   ];
 
-  const handleTabClick = (itemId: string, adminOnly: boolean) => {
-    if (adminOnly && !isUserAdminOrManager) {
-      return; // Block subscribers from admin-only sections
+  const handleTabClick = (tabId: MainTabId) => {
+    if (!canAccessTab(activeUserRole, tabId)) {
+      return; // Block restricted roles from accessing tab
     }
-    setActiveTab(itemId);
+    setActiveTab(tabId);
     if (setMobileOpen) {
       setMobileOpen(false);
     }
@@ -92,12 +92,12 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
-                  const isRestricted = item.adminOnly && !isUserAdminOrManager;
+                  const isRestricted = !canAccessTab(activeUserRole, item.id);
 
                   return (
                     <button
                       key={item.id}
-                      onClick={() => handleTabClick(item.id, item.adminOnly)}
+                      onClick={() => handleTabClick(item.id)}
                       disabled={isRestricted}
                       className={`w-full flex items-center justify-between rounded-xl px-3.5 py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.98] ${
                         isRestricted 
@@ -187,12 +187,12 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
-              const isRestricted = item.adminOnly && !isUserAdminOrManager;
+              const isRestricted = !canAccessTab(activeUserRole, item.id);
 
               return (
                 <button
                   key={item.id}
-                  onClick={() => handleTabClick(item.id, item.adminOnly)}
+                  onClick={() => handleTabClick(item.id)}
                   disabled={isRestricted}
                   className={`w-full flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative group ${
                     isRestricted 

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { canAccessTab, MainTabId } from '@/utils/rbac';
 import { 
   LayoutDashboard, 
   Briefcase, 
@@ -24,18 +25,16 @@ export default function MobileBottomNav({
 }: MobileBottomNavProps) {
   const { profile } = useAuth();
   const activeUserRole = profile?.role || 'subscriber';
-  const isUserAdminOrManager = activeUserRole === 'admin' || activeUserRole === 'manager';
 
-  const bottomItems = [
+  const allPossibleItems: { id: MainTabId; name: string; icon: any }[] = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
     { id: 'chits', name: 'Chits', icon: Briefcase },
     { id: 'members', name: 'Members', icon: Users },
     { id: 'auctions', name: 'Auctions', icon: Gavel },
-    ...(isUserAdminOrManager 
-      ? [{ id: 'cash', name: 'Treasury', icon: Vault }]
-      : []
-    ),
+    { id: 'cash', name: 'Treasury', icon: Vault },
   ];
+
+  const bottomItems = allPossibleItems.filter(item => canAccessTab(activeUserRole, item.id));
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/80 px-2 py-1.5 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] md:hidden">

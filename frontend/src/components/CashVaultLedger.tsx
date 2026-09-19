@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useWallet, WalletType } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase/client';
+import { canAccessTreasurySubtab } from '@/utils/rbac';
 import { 
   Wallet, 
   Landmark, 
@@ -1023,7 +1024,7 @@ export default function CashVaultLedger() {
       {/* ── 1. TOP SUBTAB NAVIGATION ── */}
       <div className="bg-slate-100/80 border border-gray-200/80 rounded-3xl p-2 sm:p-2.5 shadow-2xs">
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar scroll-smooth">
-          {CASH_SUBTABS.map((tab) => {
+          {CASH_SUBTABS.filter(tab => canAccessTreasurySubtab(profile?.role, tab.id)).map((tab) => {
             const Icon = tab.icon;
             const isActive = activeSubtab === tab.id;
 
