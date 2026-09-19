@@ -8,7 +8,8 @@ export type MainTabId =
   | 'communication' 
   | 'auctions' 
   | 'reports' 
-  | 'cash';
+  | 'cash'
+  | 'users';
 
 export type PermissionAction =
   // Chit Management
@@ -54,6 +55,7 @@ export const TAB_PERMISSIONS: Record<MainTabId, UserRole[]> = {
   auctions: ['admin', 'manager', 'subscriber'],
   reports: ['admin', 'manager'],
   cash: ['admin', 'manager'],
+  users: ['admin'],
 };
 
 /**

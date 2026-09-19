@@ -7,6 +7,7 @@ import CashVaultLedger from './CashVaultLedger';
 import MemberMatrix from './MemberMatrix';
 import CommunicationBroadcastCenter from './CommunicationBroadcastCenter';
 import ReportsCenter from './ReportsCenter';
+import UserAccessManager from './UserAccessManager';
 import { 
   DollarSign, 
   Users, 
@@ -3921,6 +3922,9 @@ Thank you for your prompt payment! 🙏`;
 
     case 'reports':
       return <ReportsCenter />;
+
+    case 'users':
+      return <UserAccessManager />;
 
     case 'chits':
       const selectedWorkspaceGroup = localGroups.find(g => g.id === selectedWorkspaceGroupId);

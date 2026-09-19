@@ -15,7 +15,8 @@ import {
   LogOut,
   User,
   Lock,
-  MessageSquare
+  MessageSquare,
+  ShieldCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -39,6 +40,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
     { id: 'auctions', name: 'Auctions', icon: Gavel },
     { id: 'reports', name: 'Reports', icon: BarChart3 },
     { id: 'cash', name: 'Treasury', icon: Vault },
+    { id: 'users', name: 'Access Control', icon: ShieldCheck },
   ];
 
   const handleTabClick = (tabId: MainTabId) => {
