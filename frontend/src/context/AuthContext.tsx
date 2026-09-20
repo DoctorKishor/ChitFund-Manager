@@ -28,6 +28,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PASSBOOK_SESSION_KEY = 'cf_passbook_token_session';
+const SUBSCRIBER_SESSION_KEY = 'cf_subscriber_session_id';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -93,6 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Persist in localStorage for refresh persistence
       if (typeof window !== 'undefined') {
         localStorage.setItem(PASSBOOK_SESSION_KEY, cleanToken);
+        localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
       }
 
       return { success: true };
@@ -114,45 +116,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, error: 'Please enter a valid mobile number.' };
       }
 
-      // Check exact 10-digit match or raw phone number match in Supabase
-      let { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('phone_number', cleanPhone)
-        .maybeSingle();
+      // Use Security Definer RPC to authenticate subscriber safely bypassing anon RLS
+      const { data, error } = await supabase.rpc('authenticate_by_phone_and_mpin', {
+        p_phone: cleanPhone,
+        p_mpin: cleanMpin || '1234',
+      });
 
-      if (!data) {
-        const fallback = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('phone_number', rawDigits)
-          .maybeSingle();
-        data = fallback.data;
-        error = fallback.error;
+      if (error) {
+        return { success: false, error: error.message };
       }
 
-      if (error || !data) {
-        return { success: false, error: 'No member profile found with this phone number.' };
-      }
-
-      const expectedMpin = data.mpin || '1234';
-      if (cleanMpin !== expectedMpin && cleanMpin !== '1234') {
-        return { success: false, error: 'Incorrect 4-digit PIN. Default PIN is 1234.' };
+      if (!data || !data.success || !data.user) {
+        return { success: false, error: data?.error || 'Login failed.' };
       }
 
       const subscriberProfile: UserProfile = {
-        id: data.id,
-        fullName: data.full_name || 'Subscriber',
-        phoneNumber: data.phone_number || '',
-        role: (data.role as UserRole) || 'subscriber',
-        passbookToken: data.passbook_token || undefined,
+        id: data.user.id,
+        fullName: data.user.fullName || 'Subscriber',
+        phoneNumber: data.user.phoneNumber || '',
+        role: (data.user.role as UserRole) || 'subscriber',
+        passbookToken: data.user.passbookToken || undefined,
       };
 
       setProfile(subscriberProfile);
       setUser(null);
 
-      if (data.passbook_token && typeof window !== 'undefined') {
-        localStorage.setItem(PASSBOOK_SESSION_KEY, data.passbook_token);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(SUBSCRIBER_SESSION_KEY, data.user.id);
+        if (data.user.passbookToken) {
+          localStorage.setItem(PASSBOOK_SESSION_KEY, data.user.passbookToken);
+        }
       }
 
       return { success: true };
@@ -168,6 +161,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await fetchProfile(user.id, user.email);
     } else if (profile?.passbookToken) {
       await loginWithPassbookToken(profile.passbookToken);
+    } else if (profile?.id) {
+      const { data } = await supabase.rpc('authenticate_by_subscriber_id', { p_id: profile.id });
+      if (data?.success && data?.user) {
+        setProfile({
+          id: data.user.id,
+          fullName: data.user.fullName || 'Subscriber',
+          phoneNumber: data.user.phoneNumber || '',
+          role: (data.user.role as UserRole) || 'subscriber',
+          passbookToken: data.user.passbookToken || undefined,
+        });
+      }
     }
   };
 
@@ -196,6 +200,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             localStorage.removeItem(PASSBOOK_SESSION_KEY);
           }
         }
+
+        // 3. Check Direct Subscriber Session ID
+        const savedSubscriberId = localStorage.getItem(SUBSCRIBER_SESSION_KEY);
+        if (savedSubscriberId) {
+          const { data, error } = await supabase.rpc('authenticate_by_subscriber_id', {
+            p_id: savedSubscriberId,
+          });
+          if (!error && data?.success && data?.user) {
+            setProfile({
+              id: data.user.id,
+              fullName: data.user.fullName || 'Subscriber',
+              phoneNumber: data.user.phoneNumber || '',
+              role: (data.user.role as UserRole) || 'subscriber',
+              passbookToken: data.user.passbookToken || undefined,
+            });
+            setUser(null);
+            setLoading(false);
+            return;
+          } else {
+            localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
+          }
+        }
       }
 
       setUser(null);
@@ -210,7 +236,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session?.user) {
         setUser(session.user);
         await fetchProfile(session.user.id, session.user.email);
-      } else if (!localStorage.getItem(PASSBOOK_SESSION_KEY)) {
+      } else if (!localStorage.getItem(PASSBOOK_SESSION_KEY) && !localStorage.getItem(SUBSCRIBER_SESSION_KEY)) {
         setUser(null);
         setProfile(null);
       }
@@ -225,6 +251,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(PASSBOOK_SESSION_KEY);
+      localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
     }
     await supabase.auth.signOut();
     setUser(null);

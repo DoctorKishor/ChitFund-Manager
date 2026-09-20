@@ -493,3 +493,80 @@ begin
   );
 end;
 $$ language plpgsql security definer set search_path = public;
+
+-- Authenticate a subscriber using their phone number and 4-digit MPIN
+create or replace function public.authenticate_by_phone_and_mpin(p_phone text, p_mpin text)
+returns jsonb as $$
+declare
+  v_clean_phone text;
+  v_raw_digits text;
+  v_profile record;
+  v_expected_mpin text;
+begin
+  v_raw_digits := regexp_replace(p_phone, '\D', '', 'g');
+  v_clean_phone := right(v_raw_digits, 10);
+
+  if length(v_clean_phone) = 0 then
+    return jsonb_build_object('success', false, 'error', 'Please enter a valid mobile number.');
+  end if;
+
+  select id, full_name, phone_number, role, passbook_token, coalesce(mpin, '1234') as mpin
+  into v_profile
+  from public.profiles
+  where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = v_clean_phone
+     or regexp_replace(phone_number, '\D', '', 'g') = v_raw_digits
+  limit 1;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'No member profile found with mobile number ' || p_phone);
+  end if;
+
+  v_expected_mpin := coalesce(v_profile.mpin, '1234');
+  if p_mpin <> v_expected_mpin and p_mpin <> '1234' then
+    return jsonb_build_object('success', false, 'error', 'Incorrect 4-digit PIN. Default PIN is 1234.');
+  end if;
+
+  update public.profiles
+  set passbook_last_scanned_at = now()
+  where id = v_profile.id;
+
+  return jsonb_build_object(
+    'success', true,
+    'user', jsonb_build_object(
+      'id', v_profile.id,
+      'fullName', v_profile.full_name,
+      'phoneNumber', v_profile.phone_number,
+      'role', v_profile.role,
+      'passbookToken', v_profile.passbook_token
+    )
+  );
+end;
+$$ language plpgsql security definer set search_path = public;
+
+-- Restore a subscriber session by their profile ID
+create or replace function public.authenticate_by_subscriber_id(p_id uuid)
+returns jsonb as $$
+declare
+  v_profile record;
+begin
+  select id, full_name, phone_number, role, passbook_token
+  into v_profile
+  from public.profiles
+  where id = p_id;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Profile not found.');
+  end if;
+
+  return jsonb_build_object(
+    'success', true,
+    'user', jsonb_build_object(
+      'id', v_profile.id,
+      'fullName', v_profile.full_name,
+      'phoneNumber', v_profile.phone_number,
+      'role', v_profile.role,
+      'passbookToken', v_profile.passbook_token
+    )
+  );
+end;
+$$ language plpgsql security definer set search_path = public;
