@@ -12,17 +12,16 @@ import {
   History, 
   QrCode, 
   LogOut, 
-  RefreshCw, 
   CheckCircle2, 
   ChevronRight, 
   FileText, 
-  Layers,
-  ShieldCheck,
-  ArrowDownLeft,
-  Calendar,
-  Share2,
-  Copy,
-  Check
+  Layers, 
+  ShieldCheck, 
+  ArrowDownLeft, 
+  Copy, 
+  Check, 
+  Sun, 
+  Moon 
 } from 'lucide-react';
 import QRCode from 'qrcode';
 
@@ -72,7 +71,7 @@ export default function SubscriberPortal() {
   const { profile, signOut } = useAuth();
 
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [activeTab, setActiveTab] = useState<'overview' | 'chits' | 'passbook' | 'auctions' | 'qr'>('overview');
   
   const [groups, setGroups] = useState<EnrolledGroup[]>([]);
@@ -83,6 +82,24 @@ export default function SubscriberPortal() {
   // Digital QR Passbook Data URL & Copied State
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState(false);
+
+  // Initialize theme from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('cf_subscriber_theme') as 'dark' | 'light';
+      if (savedTheme) {
+        setTheme(savedTheme);
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cf_subscriber_theme', newTheme);
+    }
+  };
 
   const loadSubscriberData = useCallback(async () => {
     if (!profile?.id) return;
@@ -105,7 +122,6 @@ export default function SubscriberPortal() {
       console.error('Error in subscriber data fetching:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [profile?.id]);
 
@@ -131,11 +147,6 @@ export default function SubscriberPortal() {
     }
   }, [profile]);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadSubscriberData();
-  };
-
   const handleCopyPassbookId = () => {
     const idToCopy = profile?.phoneNumber || profile?.id || '';
     if (idToCopy && typeof navigator !== 'undefined') {
@@ -152,22 +163,28 @@ export default function SubscriberPortal() {
 
   const wonGroupsCount = groups.filter(g => g.hasWonRegular).length;
 
+  const isDark = theme === 'dark';
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white px-4">
+      <div className={`min-h-screen flex items-center justify-center px-4 ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-900'}`}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-9 h-9 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs text-slate-400 font-medium tracking-tight">Loading Member Passbook...</span>
+          <span className="text-xs font-medium tracking-tight opacity-70">Loading Member Passbook...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white pb-24 md:pb-8 antialiased">
+    <div className={`min-h-screen flex flex-col font-sans selection:bg-indigo-500 selection:text-white pb-24 md:pb-8 antialiased transition-colors duration-200 ${
+      isDark ? 'bg-[#090d16] text-slate-100' : 'bg-slate-50 text-slate-900'
+    }`}>
       
-      {/* 1. TOP APP BAR (Compact & Clean on Mobile) */}
-      <header className="sticky top-0 z-30 bg-[#0c1220]/95 backdrop-blur-md border-b border-slate-800/80 px-3.5 sm:px-6 py-2.5">
+      {/* 1. TOP APP BAR */}
+      <header className={`sticky top-0 z-30 backdrop-blur-md border-b px-3.5 sm:px-6 py-2.5 transition-colors ${
+        isDark ? 'bg-[#0c1220]/95 border-slate-800/80' : 'bg-white/95 border-slate-200 shadow-2xs'
+      }`}>
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           
           {/* User Identity / Brand */}
@@ -177,10 +194,10 @@ export default function SubscriberPortal() {
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-xs sm:text-sm text-white truncate">
+                <span className={`font-bold text-xs sm:text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {profile?.fullName || 'Subscriber'}
                 </span>
-                <span className="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                <span className="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
                   Member
                 </span>
               </div>
@@ -192,22 +209,33 @@ export default function SubscriberPortal() {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <FontSizeSwitcher />
             
+            {/* LIGHT / DARK MODE TOGGLE */}
             <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              title="Refresh"
-              aria-label="Refresh"
-              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all text-xs flex items-center gap-1 active:scale-95"
+              onClick={toggleTheme}
+              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              aria-label="Toggle Light / Dark Mode"
+              className={`p-2 rounded-xl transition-all text-xs flex items-center gap-1.5 active:scale-95 border ${
+                isDark 
+                  ? 'bg-slate-800/80 hover:bg-slate-700 text-amber-300 border-slate-700' 
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+              }`}
             >
-              <RefreshCw size={13} className={refreshing ? 'animate-spin text-indigo-400' : ''} />
-              <span className="hidden sm:inline text-[11px] font-semibold">Refresh</span>
+              {isDark ? (
+                <Sun size={14} className="text-amber-300" />
+              ) : (
+                <Moon size={14} className="text-slate-700" />
+              )}
+              <span className="hidden sm:inline text-[11px] font-semibold">
+                {isDark ? 'Light' : 'Dark'}
+              </span>
             </button>
 
+            {/* LOGOUT */}
             <button
               onClick={signOut}
               title="Sign Out"
               aria-label="Sign Out"
-              className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all text-xs flex items-center gap-1 active:scale-95 font-semibold"
+              className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 transition-all text-xs flex items-center gap-1 active:scale-95 font-semibold"
             >
               <LogOut size={13} />
               <span className="hidden sm:inline text-[11px]">Logout</span>
@@ -219,8 +247,12 @@ export default function SubscriberPortal() {
       {/* 2. MAIN CONTAINER */}
       <main className="max-w-5xl w-full mx-auto px-3.5 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 flex-1">
         
-        {/* HERO WELCOME & PORTFOLIO SNAPSHOT (Zero horizontal spill) */}
-        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-indigo-950/70 via-slate-900 to-slate-900 border border-indigo-500/20 p-4 sm:p-6 shadow-xl">
+        {/* HERO WELCOME & PORTFOLIO SNAPSHOT */}
+        <div className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 shadow-xl transition-all ${
+          isDark 
+            ? 'bg-gradient-to-br from-indigo-950/70 via-slate-900 to-slate-900 border-indigo-500/20' 
+            : 'bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 border-indigo-700 text-white'
+        }`}>
           <div className="absolute -top-12 -right-12 w-40 h-40 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
           
           <div className="relative z-10 flex items-start justify-between gap-3">
@@ -246,7 +278,7 @@ export default function SubscriberPortal() {
             </button>
           </div>
 
-          {/* 4-METRIC GRID (Optimized for 2-column mobile screens without text wrap) */}
+          {/* 4-METRIC GRID */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3.5 mt-4">
             
             {/* Stat 1: Total Contributed */}
@@ -317,14 +349,14 @@ export default function SubscriberPortal() {
           </div>
         </div>
 
-        {/* 3. DESKTOP TABS (Hidden on mobile, since Mobile Bottom Bar controls navigation) */}
-        <div className="hidden md:flex items-center gap-2 border-b border-slate-800 pb-2">
+        {/* 3. DESKTOP TABS */}
+        <div className={`hidden md:flex items-center gap-2 border-b pb-2 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
           <button
             onClick={() => setActiveTab('overview')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'overview'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <Layers size={13} /> Overview
@@ -334,7 +366,7 @@ export default function SubscriberPortal() {
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'chits'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <Ticket size={13} /> My Chits ({groups.length})
@@ -344,7 +376,7 @@ export default function SubscriberPortal() {
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'passbook'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <History size={13} /> Passbook Ledger ({transactions.length})
@@ -354,7 +386,7 @@ export default function SubscriberPortal() {
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'auctions'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <Trophy size={13} /> Auctions ({auctions.length})
@@ -364,7 +396,7 @@ export default function SubscriberPortal() {
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'qr'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <QrCode size={13} /> Passbook QR
@@ -377,9 +409,9 @@ export default function SubscriberPortal() {
         {activeTab === 'overview' && (
           <div className="space-y-4">
             {groups.length === 0 ? (
-              <div className="text-center py-10 bg-slate-900/60 rounded-2xl border border-slate-800 p-6">
-                <Ticket className="mx-auto h-10 w-10 text-slate-600 mb-2" />
-                <h3 className="text-sm font-bold text-white">No Enrolled Chits Found</h3>
+              <div className={`text-center py-10 rounded-2xl border p-6 ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                <Ticket className="mx-auto h-10 w-10 text-slate-400 mb-2" />
+                <h3 className="text-sm font-bold">No Enrolled Chits Found</h3>
                 <p className="text-[11px] text-slate-400 max-w-xs mx-auto mt-1">
                   You are not currently enrolled in any chit groups. Contact your Chit Fund Manager.
                 </p>
@@ -400,7 +432,9 @@ export default function SubscriberPortal() {
                     return (
                       <div
                         key={grp.groupId}
-                        className="bg-slate-900/90 border border-slate-800/90 hover:border-slate-700 transition-all rounded-2xl p-3.5 sm:p-5 shadow-lg space-y-3"
+                        className={`border transition-all rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3 ${
+                          isDark ? 'bg-slate-900/90 border-slate-800/90 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
                       >
                         {/* Header: Name + Value */}
                         <div className="flex items-start justify-between gap-2">
@@ -408,27 +442,29 @@ export default function SubscriberPortal() {
                             <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 text-[10px] font-bold font-mono border border-indigo-500/20 mb-1">
                               Ticket #{grp.ticketNumber}
                             </div>
-                            <h3 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
+                            <h3 className={`text-sm sm:text-base font-black tracking-tight truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
                               {grp.groupName}
                             </h3>
                             <p className="text-[10px] text-slate-400 mt-0.5">
-                              {grp.durationMonths} Months • Current: <strong className="text-white font-mono">Month {grp.currentMonth}</strong>
+                              {grp.durationMonths} Months • Current: <strong className={`font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>Month {grp.currentMonth}</strong>
                             </p>
                           </div>
 
                           <div className="text-right font-mono shrink-0">
                             <span className="text-[9px] text-slate-400 uppercase font-semibold">Chit Value</span>
-                            <div className="text-sm sm:text-lg font-black text-emerald-400 whitespace-nowrap">
+                            <div className="text-sm sm:text-lg font-black text-emerald-500 whitespace-nowrap">
                               ₹{grp.totalValue.toLocaleString('en-IN')}
                             </div>
                           </div>
                         </div>
 
                         {/* 2-Column Key Metrics */}
-                        <div className="grid grid-cols-2 gap-2 bg-[#080d17] p-2.5 rounded-xl border border-slate-800/80">
+                        <div className={`grid grid-cols-2 gap-2 p-2.5 rounded-xl border ${
+                          isDark ? 'bg-[#080d17] border-slate-800/80' : 'bg-slate-50 border-slate-200'
+                        }`}>
                           <div>
                             <span className="text-[9px] text-slate-400 uppercase font-semibold">Monthly Due</span>
-                            <div className="text-xs sm:text-sm font-bold text-white font-mono mt-0.2 whitespace-nowrap">
+                            <div className={`text-xs sm:text-sm font-bold font-mono mt-0.2 whitespace-nowrap ${isDark ? 'text-white' : 'text-slate-900'}`}>
                               ₹{grp.monthlyInstallment.toLocaleString('en-IN')}
                             </div>
                           </div>
@@ -436,11 +472,11 @@ export default function SubscriberPortal() {
                             <span className="text-[9px] text-slate-400 uppercase font-semibold">Auction Status</span>
                             <div className="text-xs sm:text-sm font-bold mt-0.2">
                               {grp.hasWonRegular ? (
-                                <span className="text-amber-400 flex items-center gap-1 font-mono">
+                                <span className="text-amber-500 flex items-center gap-1 font-mono">
                                   <Trophy size={12} /> Won
                                 </span>
                               ) : (
-                                <span className="text-emerald-400 flex items-center gap-1 font-mono">
+                                <span className="text-emerald-500 flex items-center gap-1 font-mono">
                                   <CheckCircle2 size={12} /> Eligible
                                 </span>
                               )}
@@ -449,19 +485,25 @@ export default function SubscriberPortal() {
                         </div>
 
                         {/* Laaba Seetu Progress Box */}
-                        <div className="bg-gradient-to-r from-violet-950/40 to-indigo-950/40 border border-violet-500/20 rounded-xl p-2.5 sm:p-3">
+                        <div className={`border rounded-xl p-2.5 sm:p-3 ${
+                          isDark 
+                            ? 'bg-gradient-to-r from-violet-950/40 to-indigo-950/40 border-violet-500/20' 
+                            : 'bg-gradient-to-r from-violet-50 to-indigo-50 border-violet-200'
+                        }`}>
                           <div className="flex items-center justify-between text-[10px] sm:text-xs mb-1.5">
-                            <span className="font-bold text-violet-300 flex items-center gap-1 truncate">
-                              <Sparkles size={12} className="text-violet-400 shrink-0" />
+                            <span className="font-bold text-violet-500 flex items-center gap-1 truncate">
+                              <Sparkles size={12} className="shrink-0" />
                               <span>லாப சீட்டு (Laaba Seetu)</span>
                             </span>
-                            <span className="font-mono text-white font-bold whitespace-nowrap text-[10px] sm:text-xs">
+                            <span className={`font-mono font-bold whitespace-nowrap text-[10px] sm:text-xs ${isDark ? 'text-white' : 'text-slate-800'}`}>
                               ₹{grp.kaiIruppuPool.toLocaleString('en-IN')} / ₹{grp.totalValue.toLocaleString('en-IN')}
                             </span>
                           </div>
 
                           {/* Progress Bar */}
-                          <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                          <div className={`w-full rounded-full h-2 overflow-hidden border ${
+                            isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-200 border-slate-300'
+                          }`}>
                             <div
                               className={`h-full rounded-full transition-all duration-500 ${
                                 isLaabaReady
@@ -474,7 +516,7 @@ export default function SubscriberPortal() {
 
                           <div className="flex items-center justify-between text-[9px] text-slate-400 mt-1.5">
                             <span>{isLaabaReady ? '🎉 Target reached! Next month is FREE' : `${laabaProgress}% towards ₹0 Free Month`}</span>
-                            <span className="font-mono text-violet-300 font-bold">{laabaProgress}%</span>
+                            <span className="font-mono text-violet-500 font-bold">{laabaProgress}%</span>
                           </div>
                         </div>
 
@@ -482,7 +524,9 @@ export default function SubscriberPortal() {
                         <div className="grid grid-cols-2 gap-2 pt-0.5">
                           <button
                             onClick={() => setActiveTab('passbook')}
-                            className="py-2 px-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-white text-[11px] font-bold transition-all flex items-center justify-center gap-1 active:scale-95"
+                            className={`py-2 px-2.5 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 active:scale-95 border ${
+                              isDark ? 'bg-slate-800/90 hover:bg-slate-700 text-white border-slate-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'
+                            }`}
                           >
                             <FileText size={12} /> Passbook
                           </button>
@@ -500,38 +544,42 @@ export default function SubscriberPortal() {
               </div>
             )}
 
-            {/* RECENT PASSBOOK TRANSACTIONS (Mobile-Native List) */}
-            <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-3.5 sm:p-5 shadow-lg space-y-3">
+            {/* RECENT PASSBOOK TRANSACTIONS */}
+            <div className={`border rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3 ${
+              isDark ? 'bg-slate-900/90 border-slate-800/90' : 'bg-white border-slate-200'
+            }`}>
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                   <History className="text-indigo-400" size={13} /> Recent Collections ({transactions.length})
                 </h3>
                 <button
                   onClick={() => setActiveTab('passbook')}
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-0.5"
+                  className="text-[11px] text-indigo-400 hover:text-indigo-500 font-bold flex items-center gap-0.5"
                 >
                   View All <ChevronRight size={13} />
                 </button>
               </div>
 
               {transactions.length === 0 ? (
-                <div className="text-center py-6 text-slate-500 text-[11px]">
+                <div className="text-center py-6 text-slate-400 text-[11px]">
                   No verified collection receipts yet.
                 </div>
               ) : (
-                <div className="divide-y divide-slate-800/80">
+                <div className={`divide-y ${isDark ? 'divide-slate-800/80' : 'divide-slate-100'}`}>
                   {transactions.slice(0, 4).map((tx) => (
                     <div 
                       key={tx.id} 
                       onClick={() => setSelectedTx(tx)}
-                      className="py-2.5 flex items-center justify-between gap-2.5 cursor-pointer hover:bg-slate-800/40 rounded-lg px-1 transition-all active:scale-[0.99]"
+                      className={`py-2.5 flex items-center justify-between gap-2.5 cursor-pointer rounded-lg px-1 transition-all active:scale-[0.99] ${
+                        isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
+                      }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center shrink-0">
                           <ArrowDownLeft size={14} />
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-white truncate">{tx.groupName}</div>
+                          <div className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{tx.groupName}</div>
                           <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.2">
                             <span>
                               {new Date(tx.createdAt).toLocaleDateString('en-IN', {
@@ -540,7 +588,9 @@ export default function SubscriberPortal() {
                               })}
                             </span>
                             <span>•</span>
-                            <span className="uppercase text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-300">
+                            <span className={`uppercase text-[9px] px-1 py-0.2 rounded font-mono ${
+                              isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
+                            }`}>
                               {tx.walletType.replace(/_/g, ' ')}
                             </span>
                           </div>
@@ -548,10 +598,10 @@ export default function SubscriberPortal() {
                       </div>
 
                       <div className="text-right font-mono shrink-0">
-                        <div className="text-xs font-black text-emerald-400">
+                        <div className="text-xs font-black text-emerald-500">
                           +₹{Number(tx.amount).toLocaleString('en-IN')}
                         </div>
-                        <span className="text-[9px] uppercase font-bold text-slate-500">
+                        <span className="text-[9px] uppercase font-bold text-slate-400">
                           {tx.status}
                         </span>
                       </div>
@@ -574,48 +624,56 @@ export default function SubscriberPortal() {
               {groups.map((grp) => (
                 <div
                   key={grp.groupId}
-                  className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-3.5 sm:p-5 shadow-lg space-y-3"
+                  className={`border rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3 ${
+                    isDark ? 'bg-slate-900/90 border-slate-800/90' : 'bg-white border-slate-200'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 text-[10px] font-bold font-mono border border-indigo-500/20 mb-1">
                         Ticket #{grp.ticketNumber}
                       </span>
-                      <h3 className="text-sm sm:text-base font-black text-white">{grp.groupName}</h3>
+                      <h3 className={`text-sm sm:text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{grp.groupName}</h3>
                       <p className="text-[10px] text-slate-400 mt-0.5">
                         {grp.durationMonths} Months Duration • {grp.memberCount} Members
                       </p>
                     </div>
 
-                    <div className="text-right font-mono shrink-0 bg-[#080d17] p-2 rounded-xl border border-slate-800">
+                    <div className={`text-right font-mono shrink-0 p-2 rounded-xl border ${
+                      isDark ? 'bg-[#080d17] border-slate-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
                       <span className="text-[9px] text-slate-400 uppercase font-semibold">Value</span>
-                      <div className="text-sm font-black text-emerald-400 whitespace-nowrap">
+                      <div className="text-sm font-black text-emerald-500 whitespace-nowrap">
                         ₹{grp.totalValue.toLocaleString('en-IN')}
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 bg-[#080d17] p-2.5 rounded-xl border border-slate-800/80">
+                  <div className={`grid grid-cols-2 gap-2 p-2.5 rounded-xl border ${
+                    isDark ? 'bg-[#080d17] border-slate-800/80' : 'bg-slate-50 border-slate-200'
+                  }`}>
                     <div>
                       <span className="text-[9px] text-slate-400 uppercase font-semibold">Monthly Due</span>
-                      <div className="text-xs font-bold text-white font-mono mt-0.2 whitespace-nowrap">
+                      <div className={`text-xs font-bold font-mono mt-0.2 whitespace-nowrap ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         ₹{grp.monthlyInstallment.toLocaleString('en-IN')}
                       </div>
                     </div>
                     <div>
                       <span className="text-[9px] text-slate-400 uppercase font-semibold">Current Month</span>
-                      <div className="text-xs font-bold text-white font-mono mt-0.2">
+                      <div className={`text-xs font-bold font-mono mt-0.2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         Month {grp.currentMonth} of {grp.durationMonths}
                       </div>
                     </div>
                   </div>
 
                   {/* Rules Summary Card */}
-                  <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/20 text-[11px] text-slate-300 space-y-1">
-                    <div className="font-bold text-indigo-300 flex items-center gap-1 text-[11px]">
+                  <div className={`p-3 rounded-xl border text-[11px] space-y-1 ${
+                    isDark ? 'bg-indigo-950/30 border-indigo-500/20 text-slate-300' : 'bg-indigo-50/70 border-indigo-200 text-slate-700'
+                  }`}>
+                    <div className="font-bold text-indigo-500 flex items-center gap-1 text-[11px]">
                       <Sparkles size={13} /> Key Group Parameters
                     </div>
-                    <p className="text-[10px] text-slate-400">
+                    <p className="text-[10px] opacity-80">
                       • Month 0: Organizer Profit (₹{grp.totalValue.toLocaleString('en-IN')})<br />
                       • Months 1 to {grp.durationMonths}: Monthly Live Auctions<br />
                       • Laaba Seetu: ₹0 Free Installment when pool reaches ₹{grp.totalValue.toLocaleString('en-IN')}
@@ -627,7 +685,7 @@ export default function SubscriberPortal() {
           </div>
         )}
 
-        {/* TAB 3: PASSBOOK LEDGER (Mobile-Optimized Cards & Filter) */}
+        {/* TAB 3: PASSBOOK LEDGER */}
         {activeTab === 'passbook' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between px-0.5">
@@ -638,14 +696,16 @@ export default function SubscriberPortal() {
               </div>
               <div className="text-right font-mono shrink-0">
                 <span className="text-[9px] text-slate-400 uppercase">Verified Sum: </span>
-                <span className="text-xs font-black text-emerald-400">₹{totalPaid.toLocaleString('en-IN')}</span>
+                <span className="text-xs font-black text-emerald-500">₹{totalPaid.toLocaleString('en-IN')}</span>
               </div>
             </div>
 
             {transactions.length === 0 ? (
-              <div className="text-center py-10 bg-slate-900/60 rounded-2xl border border-slate-800 p-6">
-                <FileText className="mx-auto h-10 w-10 text-slate-600 mb-2" />
-                <h3 className="text-sm font-bold text-white">No Passbook Entries Recorded</h3>
+              <div className={`text-center py-10 rounded-2xl border p-6 ${
+                isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+              }`}>
+                <FileText className="mx-auto h-10 w-10 text-slate-400 mb-2" />
+                <h3 className="text-sm font-bold">No Passbook Entries Recorded</h3>
                 <p className="text-[11px] text-slate-400 max-w-xs mx-auto mt-1">
                   Once your installments are recorded by the counter manager, entries will appear here.
                 </p>
@@ -656,14 +716,16 @@ export default function SubscriberPortal() {
                   <div
                     key={tx.id}
                     onClick={() => setSelectedTx(tx)}
-                    className="bg-slate-900/90 border border-slate-800/90 hover:border-slate-700 transition-all rounded-xl p-3 shadow-md flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99]"
+                    className={`border transition-all rounded-xl p-3 shadow-2xs flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99] ${
+                      isDark ? 'bg-slate-900/90 border-slate-800/90 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center shrink-0">
                         <CheckCircle2 size={16} />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-xs font-bold text-white truncate">{tx.groupName}</div>
+                        <div className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{tx.groupName}</div>
                         <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
                           <span>
                             {new Date(tx.createdAt).toLocaleDateString('en-IN', {
@@ -673,7 +735,9 @@ export default function SubscriberPortal() {
                             })}
                           </span>
                           <span>•</span>
-                          <span className="uppercase text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">
+                          <span className={`uppercase text-[9px] px-1.5 py-0.2 rounded font-mono ${
+                            isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
+                          }`}>
                             {tx.walletType.replace(/_/g, ' ')}
                           </span>
                         </div>
@@ -681,10 +745,10 @@ export default function SubscriberPortal() {
                     </div>
 
                     <div className="text-right font-mono shrink-0">
-                      <div className="text-sm font-black text-emerald-400">
+                      <div className="text-sm font-black text-emerald-500">
                         +₹{Number(tx.amount).toLocaleString('en-IN')}
                       </div>
-                      <span className="text-[9px] uppercase font-bold text-slate-500">
+                      <span className="text-[9px] uppercase font-bold text-slate-400">
                         {tx.status}
                       </span>
                     </div>
@@ -703,9 +767,11 @@ export default function SubscriberPortal() {
             </h2>
 
             {auctions.length === 0 ? (
-              <div className="text-center py-10 bg-slate-900/60 rounded-2xl border border-slate-800 p-6">
-                <Trophy className="mx-auto h-10 w-10 text-slate-600 mb-2" />
-                <h3 className="text-sm font-bold text-white">No Auction Rounds Conducted Yet</h3>
+              <div className={`text-center py-10 rounded-2xl border p-6 ${
+                isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+              }`}>
+                <Trophy className="mx-auto h-10 w-10 text-slate-400 mb-2" />
+                <h3 className="text-sm font-bold">No Auction Rounds Conducted Yet</h3>
                 <p className="text-[11px] text-slate-400 max-w-xs mx-auto mt-1">
                   Starting Month 1, live bidding discounts and winner announcements will be published here.
                 </p>
@@ -715,10 +781,12 @@ export default function SubscriberPortal() {
                 {auctions.map((auc) => (
                   <div
                     key={auc.id}
-                    className={`rounded-2xl p-3.5 sm:p-5 border transition-all shadow-lg space-y-2.5 ${
+                    className={`rounded-2xl p-3.5 sm:p-5 border transition-all shadow-sm space-y-2.5 ${
                       auc.isCurrentSubscriberWinner
-                        ? 'bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-900 border-amber-500/40'
-                        : 'bg-slate-900/90 border-slate-800/90'
+                        ? isDark 
+                          ? 'bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-900 border-amber-500/40' 
+                          : 'bg-gradient-to-br from-amber-50 via-white to-white border-amber-300'
+                        : isDark ? 'bg-slate-900/90 border-slate-800/90' : 'bg-white border-slate-200'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -726,7 +794,7 @@ export default function SubscriberPortal() {
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 text-[10px] font-bold font-mono border border-indigo-500/20 mb-1">
                           Month {auc.month} Auction
                         </span>
-                        <h3 className="text-xs sm:text-sm font-black text-white truncate">{auc.groupName}</h3>
+                        <h3 className={`text-xs sm:text-sm font-black truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{auc.groupName}</h3>
                         <p className="text-[10px] text-slate-400">
                           {new Date(auc.createdAt).toLocaleDateString('en-IN', {
                             day: 'numeric',
@@ -737,32 +805,34 @@ export default function SubscriberPortal() {
                       </div>
 
                       {auc.isLaabaSeetu && (
-                        <span className="px-2 py-0.5 rounded-md bg-violet-500/20 text-violet-300 text-[10px] font-bold border border-violet-500/30 shrink-0">
+                        <span className="px-2 py-0.5 rounded-md bg-violet-500/20 text-violet-500 text-[10px] font-bold border border-violet-500/30 shrink-0">
                           🎉 Laaba Seetu
                         </span>
                       )}
                     </div>
 
                     {/* Breakdown */}
-                    <div className="bg-[#080d17] rounded-xl p-2.5 border border-slate-800 space-y-1.5 text-xs">
+                    <div className={`rounded-xl p-2.5 border space-y-1.5 text-xs ${
+                      isDark ? 'bg-[#080d17] border-slate-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-slate-400">Winner</span>
-                        <span className="text-[11px] font-bold text-white flex items-center gap-1">
-                          <Trophy size={12} className="text-amber-400" />
+                        <span className={`text-[11px] font-bold flex items-center gap-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          <Trophy size={12} className="text-amber-500" />
                           {auc.winnerName} {auc.isCurrentSubscriberWinner && '(You!)'}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-slate-400">Winning Discount</span>
-                        <span className="text-[11px] font-mono font-bold text-rose-400">
+                        <span className="text-[11px] font-mono font-bold text-rose-500">
                           -₹{Number(auc.winningDiscount).toLocaleString('en-IN')}
                         </span>
                       </div>
 
-                      <div className="pt-1.5 border-t border-slate-800 flex items-center justify-between">
-                        <span className="text-[11px] font-semibold text-indigo-300">Winner Net Payout</span>
-                        <span className="text-xs sm:text-sm font-mono font-black text-emerald-400">
+                      <div className={`pt-1.5 border-t flex items-center justify-between ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                        <span className="text-[11px] font-semibold text-indigo-500">Winner Net Payout</span>
+                        <span className="text-xs sm:text-sm font-mono font-black text-emerald-500">
                           ₹{Number(auc.netPayout).toLocaleString('en-IN')}
                         </span>
                       </div>
@@ -778,21 +848,23 @@ export default function SubscriberPortal() {
         {activeTab === 'qr' && (
           <div className="max-w-sm mx-auto space-y-3.5 px-0.5">
             <div className="text-center">
-              <h2 className="text-sm font-bold text-white flex items-center justify-center gap-1.5">
-                <QrCode className="text-indigo-400" size={16} /> Official Digital Passbook QR
+              <h2 className={`text-sm font-bold flex items-center justify-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <QrCode className="text-indigo-500" size={16} /> Official Digital Passbook QR
               </h2>
               <p className="text-[11px] text-slate-400 mt-0.5">
                 Show this QR at the counter for physical book sync & payments.
               </p>
             </div>
 
-            <div className="bg-white text-slate-950 rounded-2xl p-4 sm:p-6 shadow-2xl flex flex-col items-center justify-center text-center space-y-3">
+            <div className={`rounded-2xl p-4 sm:p-6 shadow-2xl flex flex-col items-center justify-center text-center space-y-3 border ${
+              isDark ? 'bg-white text-slate-950 border-transparent' : 'bg-white text-slate-950 border-slate-200'
+            }`}>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold font-mono">
                 Member ID: {profile?.phoneNumber || profile?.id?.slice(0, 8)}
               </div>
 
               {qrDataUrl ? (
-                <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-xs">
+                <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={qrDataUrl}
@@ -838,14 +910,16 @@ export default function SubscriberPortal() {
       {/* 5. TRANSACTION DETAIL POPUP MODAL */}
       {selectedTx && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <FileText size={15} className="text-indigo-400" /> Receipt Details
+          <div className={`w-full max-w-sm border rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 ${
+            isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            <div className={`flex items-center justify-between pb-3 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+              <h3 className="text-sm font-bold flex items-center gap-1.5">
+                <FileText size={15} className="text-indigo-500" /> Receipt Details
               </h3>
               <button
                 onClick={() => setSelectedTx(null)}
-                className="text-xs text-slate-400 hover:text-white p-1"
+                className="text-xs opacity-60 hover:opacity-100 p-1"
               >
                 ✕
               </button>
@@ -853,28 +927,28 @@ export default function SubscriberPortal() {
 
             <div className="space-y-2.5 text-xs">
               <div className="flex justify-between">
-                <span className="text-slate-400">Chit Group:</span>
-                <span className="font-bold text-white">{selectedTx.groupName}</span>
+                <span className="opacity-60">Chit Group:</span>
+                <span className="font-bold">{selectedTx.groupName}</span>
               </div>
               <div className="flex justify-between font-mono">
-                <span className="text-slate-400">Paid Amount:</span>
-                <span className="font-black text-emerald-400 text-sm">₹{Number(selectedTx.amount).toLocaleString('en-IN')}</span>
+                <span className="opacity-60">Paid Amount:</span>
+                <span className="font-black text-emerald-500 text-sm">₹{Number(selectedTx.amount).toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Payment Mode:</span>
-                <span className="uppercase font-mono text-white">{selectedTx.walletType.replace(/_/g, ' ')}</span>
+                <span className="opacity-60">Payment Mode:</span>
+                <span className="uppercase font-mono">{selectedTx.walletType.replace(/_/g, ' ')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Date:</span>
-                <span className="font-mono text-white">{new Date(selectedTx.createdAt).toLocaleString('en-IN')}</span>
+                <span className="opacity-60">Date:</span>
+                <span className="font-mono">{new Date(selectedTx.createdAt).toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Status:</span>
-                <span className="text-emerald-400 font-bold uppercase">{selectedTx.status}</span>
+                <span className="opacity-60">Status:</span>
+                <span className="text-emerald-500 font-bold uppercase">{selectedTx.status}</span>
               </div>
               {selectedTx.notes && (
-                <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-300">
-                  <span className="text-slate-400 block mb-0.5">Notes:</span>
+                <div className={`pt-2 border-t text-[11px] ${isDark ? 'border-slate-800 text-slate-300' : 'border-slate-100 text-slate-600'}`}>
+                  <span className="opacity-60 block mb-0.5">Notes:</span>
                   {selectedTx.notes}
                 </div>
               )}
@@ -882,7 +956,9 @@ export default function SubscriberPortal() {
 
             <button
               onClick={() => setSelectedTx(null)}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all"
+              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
+                isDark ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+              }`}
             >
               Close
             </button>
@@ -891,11 +967,13 @@ export default function SubscriberPortal() {
       )}
 
       {/* 6. FIXED MOBILE BOTTOM NAVIGATION BAR */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c1220]/95 backdrop-blur-lg border-t border-slate-800/90 px-2 py-1.5 flex items-center justify-around">
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-lg border-t px-2 py-1.5 flex items-center justify-around transition-colors ${
+        isDark ? 'bg-[#0c1220]/95 border-slate-800/90' : 'bg-white/95 border-slate-200 shadow-lg'
+      }`}>
         <button
           onClick={() => setActiveTab('overview')}
           className={`flex flex-col items-center gap-0.5 text-[9px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'overview' ? 'text-indigo-400 scale-105' : 'text-slate-400'
+            activeTab === 'overview' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
           <Layers size={17} />
@@ -905,7 +983,7 @@ export default function SubscriberPortal() {
         <button
           onClick={() => setActiveTab('chits')}
           className={`flex flex-col items-center gap-0.5 text-[9px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'chits' ? 'text-indigo-400 scale-105' : 'text-slate-400'
+            activeTab === 'chits' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
           <Ticket size={17} />
@@ -915,7 +993,7 @@ export default function SubscriberPortal() {
         <button
           onClick={() => setActiveTab('passbook')}
           className={`flex flex-col items-center gap-0.5 text-[9px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'passbook' ? 'text-indigo-400 scale-105' : 'text-slate-400'
+            activeTab === 'passbook' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
           <History size={17} />
@@ -925,7 +1003,7 @@ export default function SubscriberPortal() {
         <button
           onClick={() => setActiveTab('auctions')}
           className={`flex flex-col items-center gap-0.5 text-[9px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'auctions' ? 'text-indigo-400 scale-105' : 'text-slate-400'
+            activeTab === 'auctions' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
           <Trophy size={17} />
@@ -935,7 +1013,7 @@ export default function SubscriberPortal() {
         <button
           onClick={() => setActiveTab('qr')}
           className={`flex flex-col items-center gap-0.5 text-[9px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'qr' ? 'text-indigo-400 scale-105' : 'text-slate-400'
+            activeTab === 'qr' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
           <QrCode size={17} />
