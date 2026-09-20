@@ -16,8 +16,8 @@ create table public.profiles (
   phone_number text not null unique,
   full_name text not null,
   role text not null default 'subscriber' check (role in ('admin', 'manager', 'subscriber')),
-  passbook_token uuid default gen_random_uuid() unique,
-  passbook_issued_at timestamp with time zone default timezone('utc'::text, now()),
+  passbook_token uuid default null unique,
+  passbook_issued_at timestamp with time zone default null,
   passbook_last_scanned_at timestamp with time zone,
   mpin varchar(6) default '1234',
   created_at timestamp with time zone not null default timezone('utc'::text, now())
@@ -446,6 +446,50 @@ begin
     'batch_code', p_batch_code,
     'count', p_count,
     'tokens', v_tokens
+  );
+end;
+$$ language plpgsql security definer set search_path = public;
+
+-- Revoke or unpair a passbook QR token from a subscriber profile
+create or replace function public.revoke_passbook_qr(p_profile_id uuid)
+returns jsonb as $$
+declare
+  v_old_token uuid;
+  v_profile_name text;
+begin
+  select passbook_token, full_name
+  into v_old_token, v_profile_name
+  from public.profiles
+  where id = p_profile_id;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Profile not found.');
+  end if;
+
+  if v_old_token is not null then
+    update public.passbook_inventory
+    set is_assigned = false,
+        assigned_to_profile_id = null,
+        assigned_at = null
+    where token = v_old_token;
+  end if;
+
+  update public.profiles
+  set passbook_token = null,
+      passbook_issued_at = null
+  where id = p_profile_id;
+
+  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
+  values (
+    auth.uid(),
+    'REVOKED PASSBOOK QR for subscriber ' || v_profile_name || ' (Token: ' || coalesce(v_old_token::text, 'none') || ')',
+    'profiles',
+    now()
+  );
+
+  return jsonb_build_object(
+    'success', true,
+    'message', 'Passbook QR successfully revoked for ' || v_profile_name
   );
 end;
 $$ language plpgsql security definer set search_path = public;
