@@ -18,10 +18,15 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs text-slate-400 font-medium">Connecting to Supabase...</span>
+      <div className="min-h-screen bg-[#090d16] flex items-center justify-center text-white px-4 selection:bg-indigo-500">
+        <div className="flex flex-col items-center gap-3 animate-in fade-in duration-200">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center font-black text-white text-base shadow-xl shadow-indigo-600/30 animate-pulse">
+            CF
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-slate-400 font-medium tracking-tight font-mono">Verifying Session...</span>
+          </div>
         </div>
       </div>
     );

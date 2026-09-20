@@ -176,74 +176,101 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    let initialAuthDone = false;
+
     const initAuth = async () => {
-      setLoading(true);
+      try {
+        setLoading(true);
 
-      // 1. Check Supabase Auth Session (Admins / Managers / Email accounts)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user.id, session.user.email);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Check Passbook Token Session in localStorage
-      if (typeof window !== 'undefined') {
-        const savedPassbookToken = localStorage.getItem(PASSBOOK_SESSION_KEY);
-        if (savedPassbookToken) {
-          const res = await loginWithPassbookToken(savedPassbookToken);
-          if (res.success) {
-            setLoading(false);
-            return;
-          } else {
-            localStorage.removeItem(PASSBOOK_SESSION_KEY);
+        // 1. Check Passbook Token Session in localStorage (Fast direct check)
+        if (typeof window !== 'undefined') {
+          const savedPassbookToken = localStorage.getItem(PASSBOOK_SESSION_KEY);
+          if (savedPassbookToken) {
+            const res = await loginWithPassbookToken(savedPassbookToken);
+            if (res.success && isMounted) {
+              initialAuthDone = true;
+              setLoading(false);
+              return;
+            } else if (typeof window !== 'undefined') {
+              localStorage.removeItem(PASSBOOK_SESSION_KEY);
+            }
           }
-        }
 
-        // 3. Check Direct Subscriber Session ID
-        const savedSubscriberId = localStorage.getItem(SUBSCRIBER_SESSION_KEY);
-        if (savedSubscriberId) {
-          const { data, error } = await supabase.rpc('authenticate_by_subscriber_id', {
-            p_id: savedSubscriberId,
-          });
-          if (!error && data?.success && data?.user) {
-            setProfile({
-              id: data.user.id,
-              fullName: data.user.fullName || 'Subscriber',
-              phoneNumber: data.user.phoneNumber || '',
-              role: (data.user.role as UserRole) || 'subscriber',
-              passbookToken: data.user.passbookToken || undefined,
+          // 2. Check Direct Subscriber Session ID in localStorage
+          const savedSubscriberId = localStorage.getItem(SUBSCRIBER_SESSION_KEY);
+          if (savedSubscriberId) {
+            const { data, error } = await supabase.rpc('authenticate_by_subscriber_id', {
+              p_id: savedSubscriberId,
             });
-            setUser(null);
-            setLoading(false);
-            return;
-          } else {
-            localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
+            if (!error && data?.success && data?.user && isMounted) {
+              setProfile({
+                id: data.user.id,
+                fullName: data.user.fullName || 'Subscriber',
+                phoneNumber: data.user.phoneNumber || '',
+                role: (data.user.role as UserRole) || 'subscriber',
+                passbookToken: data.user.passbookToken || undefined,
+              });
+              setUser(null);
+              initialAuthDone = true;
+              setLoading(false);
+              return;
+            } else if (typeof window !== 'undefined') {
+              localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
+            }
           }
         }
-      }
 
-      setUser(null);
-      setProfile(null);
-      setLoading(false);
+        // 3. Check Supabase Auth Session (Admins / Managers / Email accounts)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && isMounted) {
+          setUser(session.user);
+          await fetchProfile(session.user.id, session.user.email);
+          initialAuthDone = true;
+          setLoading(false);
+          return;
+        }
+
+        if (isMounted) {
+          setUser(null);
+          setProfile(null);
+        }
+      } catch (err) {
+        console.error('Error in initAuth:', err);
+      } finally {
+        if (isMounted) {
+          initialAuthDone = true;
+          setLoading(false);
+        }
+      }
     };
 
     initAuth();
 
-    // Listen to Supabase Auth State Changes
+    // Listen to Supabase Auth State Changes (ignore premature initial firing)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+
+      if (event === 'INITIAL_SESSION' && !initialAuthDone) {
+        // Do not prematurely dismiss loading during initial session restore
+        return;
+      }
+
       if (session?.user) {
         setUser(session.user);
         await fetchProfile(session.user.id, session.user.email);
-      } else if (!localStorage.getItem(PASSBOOK_SESSION_KEY) && !localStorage.getItem(SUBSCRIBER_SESSION_KEY)) {
-        setUser(null);
-        setProfile(null);
+        setLoading(false);
+      } else if (event === 'SIGNED_OUT') {
+        if (typeof window !== 'undefined' && !localStorage.getItem(PASSBOOK_SESSION_KEY) && !localStorage.getItem(SUBSCRIBER_SESSION_KEY)) {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        }
       }
-      setLoading(false);
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
