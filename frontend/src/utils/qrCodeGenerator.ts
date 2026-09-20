@@ -11,11 +11,22 @@ export interface PassbookQrOptions {
 
 /**
  * Builds the canonical scan-to-login URL for a passbook token.
+ * Automatically adapts to the deployed production domain or environment variable.
  */
 export function getPassbookScanUrl(token: string): string {
-  if (typeof window !== 'undefined') {
+  // 1. Check if a production custom domain is configured in environment variables
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (envUrl && envUrl.trim()) {
+    const cleanBase = envUrl.trim().replace(/\/+$/, '');
+    return `${cleanBase}/passbook?key=${token}`;
+  }
+
+  // 2. Automatically use whatever live domain the browser is currently running on
+  if (typeof window !== 'undefined' && window.location.origin) {
     return `${window.location.origin}/passbook?key=${token}`;
   }
+
+  // 3. Fallback default
   return `https://chitfund.app/passbook?key=${token}`;
 }
 
