@@ -106,14 +106,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginWithPhoneAndMpin = async (phone: string, mpin: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
-      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      const rawDigits = phone.replace(/\D/g, '');
+      const cleanPhone = rawDigits.slice(-10);
       const cleanMpin = mpin.trim();
 
-      const { data, error } = await supabase
+      if (!rawDigits) {
+        return { success: false, error: 'Please enter a valid mobile number.' };
+      }
+
+      // Check exact 10-digit match or raw phone number match in Supabase
+      let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('phone_number', cleanPhone)
         .maybeSingle();
+
+      if (!data) {
+        const fallback = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('phone_number', rawDigits)
+          .maybeSingle();
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error || !data) {
         return { success: false, error: 'No member profile found with this phone number.' };
@@ -121,7 +137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const expectedMpin = data.mpin || '1234';
       if (cleanMpin !== expectedMpin && cleanMpin !== '1234') {
-        return { success: false, error: 'Incorrect 4-digit MPIN. Default PIN is 1234.' };
+        return { success: false, error: 'Incorrect 4-digit PIN. Default PIN is 1234.' };
       }
 
       const subscriberProfile: UserProfile = {
