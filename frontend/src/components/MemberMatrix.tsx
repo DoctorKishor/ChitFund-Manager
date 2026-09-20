@@ -4,6 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import MemberDetailsView from './MemberDetailsView';
+import PassbookScannerModal from './PassbookScannerModal';
+import PassbookSheetGeneratorModal, { StickerItem } from './PassbookSheetGeneratorModal';
+import PassbookInventoryModal from './PassbookInventoryModal';
+import { getPassbookScanUrl } from '@/utils/qrCodeGenerator';
 import { 
   Users, 
   Search, 
@@ -19,7 +23,12 @@ import {
   CheckCircle2,
   XCircle,
   X,
-  Plus
+  Plus,
+  QrCode,
+  Printer,
+  Layers,
+  Sparkles,
+  Share2
 } from 'lucide-react';
 
 interface Member {
@@ -29,6 +38,8 @@ interface Member {
   role: string;
   groups: { id: string; name: string; ticket: number }[];
   physicalBookSynced: boolean;
+  passbookToken?: string;
+  mpin?: string;
 }
 
 interface MemberMatrixProps {
@@ -49,7 +60,14 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
   const [newPhoneNumber, setNewPhoneNumber] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Fetch real subscribers, enrolled groups, and audit logs from Supabase
+  // Passbook QR modals
+  const [pairingMember, setPairingMember] = useState<Member | null>(null);
+  const [isInventoryOpen, setIsInventoryOpen] = useState<boolean>(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [printItems, setPrintItems] = useState<StickerItem[]>([]);
+  const [printSheetTitle, setPrintSheetTitle] = useState<string>('Passbook QR Sticker Sheet');
+
+  // Fetch real subscribers, enrolled groups, and passbook metadata from Supabase
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -98,6 +116,8 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
               role: p.role || 'subscriber',
               groups: assignedGroups,
               physicalBookSynced: isSynced,
+              passbookToken: p.passbook_token || undefined,
+              mpin: p.mpin || '1234',
             };
           })
         );
@@ -137,6 +157,126 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
     }
   };
 
+  // 📷 Handle QR Pairing
+  const handlePairScanSuccess = async (scannedToken: string) => {
+    if (!pairingMember) return;
+
+    try {
+      const { data, error } = await supabase.rpc('pair_passbook_qr', {
+        p_token: scannedToken,
+        p_profile_id: pairingMember.id,
+      });
+
+      if (error) throw error;
+      if (!data || !data.success) throw new Error(data?.error || 'Failed to pair QR code.');
+
+      alert(`Success: Passbook QR token paired to ${pairingMember.fullName}!`);
+      setPairingMember(null);
+      await fetchData();
+
+      if (onAddAuditLog) {
+        onAddAuditLog(`PAIRED Passbook QR [${scannedToken.slice(0, 8)}...] to ${pairingMember.fullName}`);
+      }
+    } catch (err: any) {
+      alert(`Pairing Failed: ${err.message}`);
+    }
+  };
+
+  // 🖨️ Print Single Member Stickers (copies matching enrolled groups)
+  const handlePrintMemberStickers = (e: React.MouseEvent, member: Member) => {
+    e.stopPropagation();
+    if (!member.passbookToken) {
+      alert(`This member does not have a Passbook QR token linked yet. Tap "Pair Passbook QR" first.`);
+      return;
+    }
+
+    const copiesCount = Math.max(1, member.groups.length);
+    const items: StickerItem[] = [];
+
+    if (member.groups.length > 0) {
+      member.groups.forEach((g) => {
+        items.push({
+          token: member.passbookToken!,
+          name: member.fullName,
+          phone: member.phoneNumber,
+          groupName: g.name,
+          ticketNumber: g.ticket,
+        });
+      });
+    } else {
+      items.push({
+        token: member.passbookToken,
+        name: member.fullName,
+        phone: member.phoneNumber,
+        groupName: 'Universal Passbook',
+      });
+    }
+
+    setPrintItems(items);
+    setPrintSheetTitle(`${member.fullName} — Passbook Sticker Sheet (${items.length} copies)`);
+    setIsPrintModalOpen(true);
+  };
+
+  // 🖨️ Print All Filtered Members Stickers
+  const handlePrintAllStickers = () => {
+    const items: StickerItem[] = [];
+
+    filteredMembers.forEach((m) => {
+      if (m.passbookToken) {
+        if (m.groups.length > 0) {
+          m.groups.forEach((g) => {
+            items.push({
+              token: m.passbookToken!,
+              name: m.fullName,
+              phone: m.phoneNumber,
+              groupName: g.name,
+              ticketNumber: g.ticket,
+            });
+          });
+        } else {
+          items.push({
+            token: m.passbookToken,
+            name: m.fullName,
+            phone: m.phoneNumber,
+            groupName: 'Universal Passbook',
+          });
+        }
+      }
+    });
+
+    if (items.length === 0) {
+      alert('No members with linked passbook tokens found in the current view.');
+      return;
+    }
+
+    setPrintItems(items);
+    setPrintSheetTitle(`All Members Passbook Sticker Sheet (${items.length} stickers)`);
+    setIsPrintModalOpen(true);
+  };
+
+  // 💬 Share WhatsApp Passbook Card
+  const handleShareWhatsApp = (e: React.MouseEvent, member: Member) => {
+    e.stopPropagation();
+    const cleanPhone = normalizePhoneDigits(member.phoneNumber);
+    if (!cleanPhone) {
+      alert('This member does not have a valid mobile number.');
+      return;
+    }
+
+    const scanUrl = member.passbookToken ? getPassbookScanUrl(member.passbookToken) : 'https://chitfund.app';
+    const message = `📱 *Hello ${member.fullName}!*
+Welcome to your Chit Fund Member Portal.
+
+Access your digital passbook, payment ledger & live auction bidding anytime:
+🔗 *Passbook Direct Link*: ${scanUrl}
+👤 *Mobile Number*: ${cleanPhone}
+🔑 *Initial MPIN*: ${member.mpin || '1234'}
+
+_(Point any camera at your physical pocket book QR sticker to log in instantly)_`;
+
+    window.open(`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
   // Open Add Member Modal
   const handleOpenAddModal = () => {
     setEditingMember(null);
@@ -154,7 +294,6 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
     setIsAddModalOpen(true);
   };
 
-  // Normalize phone number to core 10 digits
   const normalizePhoneDigits = (raw: string): string => {
     const digits = raw.replace(/\D/g, '');
     if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
@@ -162,27 +301,21 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
     return digits;
   };
 
-  // Save Member (Add or Edit)
-  const handleSaveMember = async (e: React.FormEvent) => {
+  // Submit Add or Edit Member Form
+  const handleSubmitMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFullName.trim()) {
-      alert('Please enter a member full name.');
+    if (isSubmitting) return;
+
+    const cleanName = newFullName.trim();
+    const cleanPhone = normalizePhoneDigits(newPhoneNumber);
+
+    if (!cleanName) {
+      alert('Please enter a valid member name.');
       return;
     }
 
-    const coreDigits = normalizePhoneDigits(newPhoneNumber);
-    if (!newPhoneNumber.trim() || coreDigits.length === 0) {
-      alert('Phone Number Required:\n\nPlease enter a valid 10-digit mobile number.');
-      return;
-    }
-
-    if (coreDigits.length < 10) {
-      alert(`Invalid Phone Number Warning:\n\nThe phone number entered is too short (${coreDigits.length}/10 digits).\nExpected exactly 10 digits (e.g. 9842235740). You entered: "${newPhoneNumber}". Please check and re-enter.`);
-      return;
-    }
-
-    if (coreDigits.length > 10) {
-      alert(`Invalid Phone Number Warning:\n\nThe phone number entered has too many digits (${coreDigits.length}/10 digits).\nExpected exactly 10 digits (e.g. 9842235740). You entered: "${newPhoneNumber}". Please check and re-enter.`);
+    if (cleanPhone.length !== 10) {
+      alert('Please enter a valid 10-digit mobile number.');
       return;
     }
 
@@ -190,34 +323,36 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
       setIsSubmitting(true);
 
       if (editingMember) {
-        // Update existing profile
         const { error } = await supabase
           .from('profiles')
           .update({
-            full_name: newFullName.trim(),
-            phone_number: coreDigits,
+            full_name: cleanName,
+            phone_number: cleanPhone,
           })
           .eq('id', editingMember.id);
 
         if (error) throw error;
 
         if (onAddAuditLog) {
-          onAddAuditLog(`PROFILE UPDATED: ${newFullName.trim()} (${coreDigits})`);
+          onAddAuditLog(
+            `EDIT profile: Updated details for subscriber ${cleanName} (${cleanPhone})`
+          );
         }
       } else {
-        // Insert new profile
         const { error } = await supabase
           .from('profiles')
           .insert({
-            full_name: newFullName.trim(),
-            phone_number: coreDigits,
+            full_name: cleanName,
+            phone_number: cleanPhone,
             role: 'subscriber',
           });
 
         if (error) throw error;
 
         if (onAddAuditLog) {
-          onAddAuditLog(`NEW MEMBER ENROLLED: ${newFullName.trim()} (${coreDigits})`);
+          onAddAuditLog(
+            `REGISTER new subscriber: Created profile for ${cleanName} (${cleanPhone})`
+          );
         }
       }
 
@@ -225,25 +360,26 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
       await fetchData();
     } catch (err: any) {
       console.error('Error saving member:', err);
-      alert('Failed to save member: ' + err.message);
+      alert('Database error: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Delete Member
+  // Delete Member Profile
   const handleDeleteMember = async (e: React.MouseEvent, member: Member) => {
     e.stopPropagation();
-    if (!window.confirm(`Are you sure you want to remove member "${member.fullName}"?`)) return;
+    if (!confirm(`Are you sure you want to remove ${member.fullName}? This will unenroll them from all chits.`)) {
+      return;
+    }
 
     try {
-      // 1. Delete group memberships first
       await supabase.from('group_members').delete().eq('profile_id', member.id);
-      // 2. Delete profile
-      await supabase.from('profiles').delete().eq('id', member.id);
+      const { error } = await supabase.from('profiles').delete().eq('id', member.id);
+      if (error) throw error;
 
       if (onAddAuditLog) {
-        onAddAuditLog(`MEMBER DELETED: ${member.fullName}`);
+        onAddAuditLog(`DELETE subscriber profile: Removed ${member.fullName}`);
       }
 
       await fetchData();
@@ -276,9 +412,9 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
   return (
     <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
       
-      {/* Top Search and Add Member Control Bar */}
+      {/* Top Search and Action Bar */}
       <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-        <div className="relative w-full sm:w-96">
+        <div className="relative w-full sm:w-80">
           <Search size={15} className="absolute left-3.5 top-3 text-gray-400" />
           <input
             type="text"
@@ -289,10 +425,24 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
           />
         </div>
 
-        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end">
-          <span className="text-xs font-bold text-gray-500">
-            {filteredMembers.length} {filteredMembers.length === 1 ? 'member' : 'members'}
-          </span>
+        <div className="flex flex-wrap items-center gap-2 justify-between sm:justify-end">
+          <button
+            type="button"
+            onClick={() => setIsInventoryOpen(true)}
+            className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+          >
+            <Layers size={14} className="text-indigo-600" />
+            <span>Blank QR Inventory</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrintAllStickers}
+            className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+          >
+            <Printer size={14} className="text-indigo-600" />
+            <span>Print All Stickers</span>
+          </button>
 
           <button
             onClick={handleOpenAddModal}
@@ -367,6 +517,47 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                   </div>
                 </div>
 
+                {/* Passbook QR Status Pill */}
+                <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-gray-150 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <QrCode size={14} className={member.passbookToken ? 'text-indigo-600' : 'text-gray-400'} />
+                    <span className="font-bold text-gray-700 text-[11px]">Passbook QR:</span>
+                    {member.passbookToken ? (
+                      <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                        Linked 🟢
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-md">
+                        Unlinked
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPairingMember(member);
+                      }}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg shadow-2xs"
+                    >
+                      {member.passbookToken ? 'Re-Pair 📷' : 'Pair QR 📷'}
+                    </button>
+
+                    {member.passbookToken && (
+                      <button
+                        type="button"
+                        onClick={(e) => handlePrintMemberStickers(e, member)}
+                        title="Print stickers"
+                        className="p-1 text-gray-600 hover:text-indigo-600 bg-white border border-gray-200 rounded-lg"
+                      >
+                        <Printer size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Enrolled Chits Badges */}
                 {member.groups.length > 0 && (
                   <div className="flex flex-wrap gap-2 pt-0.5">
@@ -384,7 +575,6 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
 
                 {/* Footer with Direct Phone/WhatsApp & Physical Book Sync */}
                 <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2.5 text-xs">
-                  {/* Quick Contact buttons */}
                   <div className="flex items-center gap-2">
                     {cleanPhone ? (
                       <>
@@ -396,22 +586,20 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                           <Phone size={12} className="text-indigo-600" />
                           <span>Call</span>
                         </a>
-                        <a
-                          href={`https://wa.me/91${cleanPhone}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
+                        <button
+                          type="button"
+                          onClick={(e) => handleShareWhatsApp(e, member)}
                           className="flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs px-3 py-1.5 rounded-xl border border-emerald-200 active:scale-95 transition-all"
                         >
+                          <Share2 size={12} />
                           <span>WhatsApp</span>
-                        </a>
+                        </button>
                       </>
                     ) : (
                       <span className="text-xs text-gray-400 italic">No phone</span>
                     )}
                   </div>
 
-                  {/* Pocket Book Sync Toggle */}
                   <button
                     onClick={(e) => handleToggleSync(e, member.id)}
                     className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all inline-flex items-center gap-1.5 active:scale-95 ${
@@ -438,6 +626,7 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
               <tr>
                 <th className="py-4 px-6">Name</th>
                 <th className="py-4 px-5">Phone</th>
+                <th className="py-4 px-5">Passbook QR Key</th>
                 <th className="py-4 px-5">Enrolled Chits &amp; Tickets</th>
                 <th className="py-4 px-5">Portal Status</th>
                 <th className="py-4 px-5 text-center">Physical Ledger</th>
@@ -447,7 +636,7 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
             <tbody className="divide-y divide-gray-100 text-gray-700">
               {filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-14 text-center text-gray-400 text-xs">
+                  <td colSpan={7} className="py-14 text-center text-gray-400 text-xs">
                     No members found matching your search. Use &quot;Add Member&quot; to enroll new subscribers.
                   </td>
                 </tr>
@@ -482,6 +671,44 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                       {/* Phone */}
                       <td className="py-4 px-5 font-mono font-medium text-gray-600 text-xs">
                         {member.phoneNumber || '—'}
+                      </td>
+
+                      {/* Passbook QR Status & Actions */}
+                      <td className="py-4 px-5">
+                        <div className="flex items-center gap-2">
+                          {member.passbookToken ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                              <CheckCircle2 size={12} /> Linked
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">
+                              Unlinked
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPairingMember(member);
+                            }}
+                            title="Scan QR on physical passbook to pair"
+                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded-lg transition-colors"
+                          >
+                            <QrCode size={13} />
+                          </button>
+
+                          {member.passbookToken && (
+                            <button
+                              type="button"
+                              onClick={(e) => handlePrintMemberStickers(e, member)}
+                              title="Print A4 sticker sheet for this member"
+                              className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 rounded-lg transition-colors"
+                            >
+                              <Printer size={13} />
+                            </button>
+                          )}
+                        </div>
                       </td>
 
                       {/* Enrolled Chits */}
@@ -532,7 +759,15 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
 
                       {/* Actions */}
                       <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => handleShareWhatsApp(e, member)}
+                            title="Share passbook login card via WhatsApp"
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                          >
+                            <Share2 size={14} />
+                          </button>
                           <button
                             type="button"
                             onClick={(e) => handleOpenEditModal(e, member)}
@@ -549,7 +784,6 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
                           >
                             <Trash2 size={14} />
                           </button>
-                          <ChevronRight size={16} className="text-gray-300 group-hover:text-gray-600 transition-colors ml-1" />
                         </div>
                       </td>
                     </tr>
@@ -563,106 +797,100 @@ export default function MemberMatrix({ onAddAuditLog }: MemberMatrixProps) {
 
       {/* Add / Edit Member Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <form
-            onSubmit={handleSaveMember}
-            className="bg-white rounded-2xl border border-gray-200 p-6 w-full max-w-md space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150"
-          >
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-800 flex items-center justify-center font-bold text-xs">
-                  <UserPlus size={16} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                  <UserPlus size={18} />
                 </div>
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900">
-                    {editingMember ? 'Edit Member Profile' : 'Enroll New Subscriber'}
-                  </h4>
-                  <p className="text-[10px] text-gray-500">
-                    {editingMember ? 'Update subscriber details' : 'Register member into database'}
-                  </p>
-                </div>
+                <h3 className="font-bold text-gray-900 text-sm">
+                  {editingMember ? 'Edit Subscriber Profile' : 'Enroll New Subscriber'}
+                </h3>
               </div>
               <button
-                type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-gray-400 hover:text-gray-700 p-1 rounded-lg"
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Full Name</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Ramesh Kumar"
-                value={newFullName}
-                onChange={(e) => setNewFullName(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                  Phone Number (10 Digits) *
+            <form onSubmit={handleSubmitMember} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Full Name <span className="text-rose-500">*</span>
                 </label>
-                {newPhoneNumber.trim() && (
-                  <span className={`text-[10px] font-bold ${
-                    normalizePhoneDigits(newPhoneNumber).length === 10
-                      ? 'text-emerald-600'
-                      : normalizePhoneDigits(newPhoneNumber).length < 10
-                        ? 'text-amber-600'
-                        : 'text-rose-600'
-                  }`}>
-                    {normalizePhoneDigits(newPhoneNumber).length === 10 
-                      ? '✓ Valid 10 digits' 
-                      : `${normalizePhoneDigits(newPhoneNumber).length}/10 digits`}
-                  </span>
-                )}
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ramesh Kumar"
+                  value={newFullName}
+                  onChange={(e) => setNewFullName(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-semibold focus:outline-none"
+                />
               </div>
-              <input
-                type="tel"
-                required
-                placeholder="e.g. 9842235740"
-                value={newPhoneNumber}
-                onChange={(e) => setNewPhoneNumber(e.target.value)}
-                className={`w-full bg-gray-50 border rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none font-mono ${
-                  !newPhoneNumber.trim()
-                    ? 'border-gray-200 focus:border-indigo-500'
-                    : normalizePhoneDigits(newPhoneNumber).length === 10
-                      ? 'border-emerald-400 focus:border-emerald-500 bg-emerald-50/20'
-                      : 'border-amber-400 focus:border-amber-500 bg-amber-50/20'
-                }`}
-              />
-              {newPhoneNumber.trim() && normalizePhoneDigits(newPhoneNumber).length !== 10 && (
-                <p className="text-[10px] text-amber-600 font-medium">
-                  ⚠️ Phone number must be exactly 10 digits ({normalizePhoneDigits(newPhoneNumber).length > 10 ? `${normalizePhoneDigits(newPhoneNumber).length - 10} digits too many` : `${10 - normalizePhoneDigits(newPhoneNumber).length} digits remaining`})
-                </p>
-              )}
-            </div>
 
-            <div className="flex gap-2 justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => setIsAddModalOpen(false)}
-                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <Check size={14} />
-                <span>{isSubmitting ? 'Saving...' : editingMember ? 'Save changes' : 'Add Member'}</span>
-              </button>
-            </div>
-          </form>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  10-Digit Mobile Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 9876543210"
+                  maxLength={10}
+                  value={newPhoneNumber}
+                  onChange={(e) => setNewPhoneNumber(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-mono focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+                >
+                  {isSubmitting ? 'Saving...' : editingMember ? 'Update Profile' : 'Enroll Subscriber'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
+
+      {/* Camera QR Scanner Modal for Pairing */}
+      <PassbookScannerModal
+        isOpen={!!pairingMember}
+        onClose={() => setPairingMember(null)}
+        onScanSuccess={handlePairScanSuccess}
+        title="Pair Physical Passbook QR"
+        subtitle="Point camera at the QR sticker on the member's physical pocket book"
+        targetMemberName={pairingMember?.fullName}
+      />
+
+      {/* A4 PDF Sticker Sheet Exporter */}
+      <PassbookSheetGeneratorModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        items={printItems}
+        defaultTitle={printSheetTitle}
+      />
+
+      {/* Blank QR Inventory Modal */}
+      <PassbookInventoryModal
+        isOpen={isInventoryOpen}
+        onClose={() => setIsInventoryOpen(false)}
+        onRefresh={fetchData}
+      />
     </div>
   );
 }

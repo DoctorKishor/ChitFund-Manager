@@ -16,6 +16,10 @@ create table public.profiles (
   phone_number text not null unique,
   full_name text not null,
   role text not null default 'subscriber' check (role in ('admin', 'manager', 'subscriber')),
+  passbook_token uuid default gen_random_uuid() unique,
+  passbook_issued_at timestamp with time zone default timezone('utc'::text, now()),
+  passbook_last_scanned_at timestamp with time zone,
+  mpin varchar(6) default '1234',
   created_at timestamp with time zone not null default timezone('utc'::text, now())
 );
 
@@ -314,3 +318,134 @@ create policy "Allow auction_logs write access to admin/manager" on public.aucti
 create policy "Allow security_audit_logs SELECT access to admin/manager" on public.security_audit_logs
   for select
   using (public.is_admin_or_manager());
+
+-- ==========================================
+-- 5. Passbook Inventory & Token Authentication
+-- ==========================================
+
+create table if not exists public.passbook_inventory (
+  id uuid primary key default gen_random_uuid(),
+  token uuid not null unique default gen_random_uuid(),
+  batch_code text not null default 'BATCH_001',
+  is_assigned boolean not null default false,
+  assigned_to_profile_id uuid references public.profiles(id) on delete set null,
+  assigned_at timestamp with time zone,
+  created_at timestamp with time zone not null default timezone('utc'::text, now())
+);
+
+create index if not exists idx_passbook_inventory_token on public.passbook_inventory(token);
+create index if not exists idx_passbook_inventory_batch on public.passbook_inventory(batch_code);
+
+alter table public.passbook_inventory enable row level security;
+
+create policy "Allow passbook_inventory access to admin/manager" on public.passbook_inventory
+  for all
+  using (public.is_admin_or_manager())
+  with check (public.is_admin_or_manager());
+
+create policy "Allow passbook_inventory SELECT access for token check" on public.passbook_inventory
+  for select
+  using (true);
+
+-- Authenticate a subscriber using their Passbook QR UUID token
+create or replace function public.authenticate_by_passbook_token(p_token uuid)
+returns jsonb as $$
+declare
+  v_profile record;
+begin
+  select id, full_name, phone_number, role, passbook_token, mpin
+  into v_profile
+  from public.profiles
+  where passbook_token = p_token;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Invalid or unassigned passbook QR code.');
+  end if;
+
+  update public.profiles
+  set passbook_last_scanned_at = now()
+  where id = v_profile.id;
+
+  return jsonb_build_object(
+    'success', true,
+    'user', jsonb_build_object(
+      'id', v_profile.id,
+      'fullName', v_profile.full_name,
+      'phoneNumber', v_profile.phone_number,
+      'role', v_profile.role,
+      'passbookToken', v_profile.passbook_token
+    )
+  );
+end;
+$$ language plpgsql security definer set search_path = public;
+
+-- Atomically pair a physical Passbook QR token to a member profile
+create or replace function public.pair_passbook_qr(p_token uuid, p_profile_id uuid)
+returns jsonb as $$
+declare
+  v_profile record;
+begin
+  select id, full_name, phone_number, role
+  into v_profile
+  from public.profiles
+  where id = p_profile_id;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Member profile not found.');
+  end if;
+
+  insert into public.passbook_inventory (token, batch_code, is_assigned, assigned_to_profile_id, assigned_at)
+  values (p_token, 'MANUAL_PAIR', true, p_profile_id, now())
+  on conflict (token) do update
+  set is_assigned = true,
+      assigned_to_profile_id = p_profile_id,
+      assigned_at = now();
+
+  update public.profiles
+  set passbook_token = p_token,
+      passbook_issued_at = now()
+  where id = p_profile_id;
+
+  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
+  values (
+    auth.uid(),
+    'PAIRED PASSBOOK QR: ' || p_token::text || ' to subscriber ' || v_profile.full_name || ' (' || v_profile.phone_number || ')',
+    'profiles',
+    now()
+  );
+
+  return jsonb_build_object(
+    'success', true,
+    'message', 'Passbook QR successfully paired to ' || v_profile.full_name,
+    'token', p_token
+  );
+end;
+$$ language plpgsql security definer set search_path = public;
+
+-- Bulk generate a batch of unassigned blank passbook tokens for print inventory
+create or replace function public.generate_blank_passbook_batch(p_count int, p_batch_code text default 'BATCH_001')
+returns jsonb as $$
+declare
+  i int;
+  v_token uuid;
+  v_tokens uuid[] := array[]::uuid[];
+begin
+  if p_count <= 0 or p_count > 1000 then
+    return jsonb_build_object('success', false, 'error', 'Count must be between 1 and 1000.');
+  end if;
+
+  for i in 1..p_count loop
+    v_token := gen_random_uuid();
+    insert into public.passbook_inventory (token, batch_code, is_assigned, created_at)
+    values (v_token, p_batch_code, false, now());
+    v_tokens := array_append(v_tokens, v_token);
+  end loop;
+
+  return jsonb_build_object(
+    'success', true,
+    'batch_code', p_batch_code,
+    'count', p_count,
+    'tokens', v_tokens
+  );
+end;
+$$ language plpgsql security definer set search_path = public;

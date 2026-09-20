@@ -3,6 +3,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth, UserRole } from '../context/AuthContext';
 import { supabase } from '../utils/supabase/client';
+import PassbookScannerModal from './PassbookScannerModal';
+import PassbookSheetGeneratorModal, { StickerItem } from './PassbookSheetGeneratorModal';
+import PassbookInventoryModal from './PassbookInventoryModal';
+import { getPassbookScanUrl } from '@/utils/qrCodeGenerator';
 import { 
   ShieldCheck, 
   ShieldAlert, 
@@ -23,7 +27,10 @@ import {
   Shield,
   Briefcase,
   Layers,
-  AlertCircle
+  AlertCircle,
+  QrCode,
+  Printer,
+  Share2
 } from 'lucide-react';
 
 interface ProfileRecord {
@@ -32,6 +39,8 @@ interface ProfileRecord {
   phone_number: string;
   role: UserRole;
   created_at: string;
+  passbook_token?: string;
+  mpin?: string;
 }
 
 const ROLE_META: Record<UserRole, { label: string; bg: string; text: string; border: string; desc: string }> = {
@@ -79,6 +88,13 @@ export default function UserAccessManager() {
   const [editRole, setEditRole] = useState<UserRole>('subscriber');
   const [isSubmittingEdit, setIsSubmittingEdit] = useState<boolean>(false);
 
+  // Passbook QR modals
+  const [pairingProfile, setPairingProfile] = useState<ProfileRecord | null>(null);
+  const [isInventoryOpen, setIsInventoryOpen] = useState<boolean>(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [printItems, setPrintItems] = useState<StickerItem[]>([]);
+  const [printSheetTitle, setPrintSheetTitle] = useState<string>('Passbook QR Sticker Sheet');
+
   // Fetch all profiles from Supabase
   const fetchProfiles = async () => {
     setLoading(true);
@@ -121,24 +137,27 @@ export default function UserAccessManager() {
     });
   }, [profiles, roleFilter, searchQuery]);
 
-  // Role summary stats
+  // Statistics
   const stats = useMemo(() => {
     const total = profiles.length;
     const adminCount = profiles.filter((p) => p.role === 'admin').length;
     const managerCount = profiles.filter((p) => p.role === 'manager').length;
     const subscriberCount = profiles.filter((p) => p.role === 'subscriber').length;
-
-    return { total, adminCount, managerCount, subscriberCount };
+    const qrLinkedCount = profiles.filter((p) => p.passbook_token).length;
+    return { total, adminCount, managerCount, subscriberCount, qrLinkedCount };
   }, [profiles]);
 
-  // Action: Quick Role Change
-  const handleQuickRoleChange = async (profileId: string, newTargetRole: UserRole, personName: string) => {
-    if (profileId === currentAdminProfile?.id && newTargetRole !== 'admin') {
-      alert("You cannot remove Admin role from your own active admin account.");
-      return;
-    }
+  const normalizePhone = (raw: string): string => {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+    if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+    return digits;
+  };
 
-    if (!confirm(`Change ${personName}'s role to ${ROLE_META[newTargetRole].label.toUpperCase()}?`)) {
+  // Quick Role Change
+  const handleQuickRoleChange = async (userId: string, newTargetRole: UserRole, userName: string) => {
+    if (userId === currentAdminProfile?.id) {
+      alert('Security Warning: You cannot modify your own administrator role to prevent lockouts.');
       return;
     }
 
@@ -146,66 +165,135 @@ export default function UserAccessManager() {
       const { error } = await supabase
         .from('profiles')
         .update({ role: newTargetRole })
-        .eq('id', profileId);
+        .eq('id', userId);
 
       if (error) throw error;
 
       setProfiles((prev) =>
-        prev.map((p) => (p.id === profileId ? { ...p, role: newTargetRole } : p))
+        prev.map((p) => (p.id === userId ? { ...p, role: newTargetRole } : p))
       );
-      alert(`✓ Successfully updated ${personName}'s role to ${ROLE_META[newTargetRole].label}!`);
     } catch (err: any) {
-      console.error('Error updating role:', err);
-      alert('Failed to update role: ' + (err.message || 'Unknown error'));
+      alert(`Failed to update role: ${err.message}`);
     }
   };
 
-  // Action: Create Profile
-  const handleCreateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFullName.trim() || !newPhoneNumber.trim()) {
-      alert("Please provide both full name and phone number.");
+  // 📷 Handle QR Pairing
+  const handlePairScanSuccess = async (scannedToken: string) => {
+    if (!pairingProfile) return;
+
+    try {
+      const { data, error } = await supabase.rpc('pair_passbook_qr', {
+        p_token: scannedToken,
+        p_profile_id: pairingProfile.id,
+      });
+
+      if (error) throw error;
+      if (!data || !data.success) throw new Error(data?.error || 'Failed to pair QR code.');
+
+      alert(`Success: Passbook QR token paired to ${pairingProfile.full_name}!`);
+      setPairingProfile(null);
+      await fetchProfiles();
+    } catch (err: any) {
+      alert(`Pairing Failed: ${err.message}`);
+    }
+  };
+
+  // 🖨️ Print Single Member Sticker
+  const handlePrintSticker = (p: ProfileRecord) => {
+    if (!p.passbook_token) {
+      alert(`This user does not have a Passbook QR token linked yet.`);
       return;
     }
 
-    setIsSubmittingCreate(true);
-    try {
-      const cleanPhone = newPhoneNumber.replace(/\D/g, '');
-      const newId = crypto.randomUUID();
+    setPrintItems([
+      {
+        token: p.passbook_token,
+        name: p.full_name,
+        phone: p.phone_number,
+        groupName: 'Member Passbook',
+      },
+    ]);
+    setPrintSheetTitle(`${p.full_name} — Passbook Sticker`);
+    setIsPrintModalOpen(true);
+  };
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: newId,
-            full_name: newFullName.trim(),
-            phone_number: cleanPhone,
-            role: newRole,
-          },
-        ])
-        .select()
-        .single();
+  // 🖨️ Print All Stickers
+  const handlePrintAllStickers = () => {
+    const items: StickerItem[] = filteredProfiles
+      .filter((p) => p.passbook_token)
+      .map((p) => ({
+        token: p.passbook_token!,
+        name: p.full_name,
+        phone: p.phone_number,
+        groupName: 'Member Passbook',
+      }));
+
+    if (items.length === 0) {
+      alert('No users with linked passbook tokens in the current filtered list.');
+      return;
+    }
+
+    setPrintItems(items);
+    setPrintSheetTitle(`All Users Passbook Stickers (${items.length} items)`);
+    setIsPrintModalOpen(true);
+  };
+
+  // 💬 WhatsApp Share
+  const handleShareWhatsApp = (p: ProfileRecord) => {
+    const cleanPhone = normalizePhone(p.phone_number);
+    if (!cleanPhone) {
+      alert('This user does not have a valid mobile number.');
+      return;
+    }
+
+    const scanUrl = p.passbook_token ? getPassbookScanUrl(p.passbook_token) : 'https://chitfund.app';
+    const message = `📱 *Hello ${p.full_name}!*
+Welcome to Chit Fund Manager.
+
+Access your digital passbook & auctions anytime:
+🔗 *Passbook Link*: ${scanUrl}
+👤 *Mobile*: ${cleanPhone}
+🔑 *Initial PIN*: ${p.mpin || '1234'}`;
+
+    window.open(`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  // Handle Create Profile
+  const handleCreateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmittingCreate) return;
+
+    const cleanName = newFullName.trim();
+    const cleanPhone = normalizePhone(newPhoneNumber);
+
+    if (!cleanName || cleanPhone.length !== 10) {
+      alert('Please enter a valid full name and 10-digit mobile number.');
+      return;
+    }
+
+    try {
+      setIsSubmittingCreate(true);
+      const { error } = await supabase.from('profiles').insert({
+        full_name: cleanName,
+        phone_number: cleanPhone,
+        role: newRole,
+      });
 
       if (error) throw error;
-
-      if (data) {
-        setProfiles([data as ProfileRecord, ...profiles]);
-      }
 
       setIsCreateModalOpen(false);
       setNewFullName('');
       setNewPhoneNumber('');
       setNewRole('subscriber');
-      alert(`✓ Successfully registered ${newFullName.trim()} as ${ROLE_META[newRole].label}!`);
+      await fetchProfiles();
     } catch (err: any) {
-      console.error('Error creating profile:', err);
-      alert('Error creating profile: ' + (err.message || 'Unknown error'));
+      alert(`Failed to create profile: ${err.message}`);
     } finally {
       setIsSubmittingCreate(false);
     }
   };
 
-  // Action: Edit Profile
+  // Handle Edit Profile
   const handleOpenEditModal = (p: ProfileRecord) => {
     setEditingProfile(p);
     setEditFullName(p.full_name);
@@ -213,23 +301,24 @@ export default function UserAccessManager() {
     setEditRole(p.role);
   };
 
-  const handleConfirmEditProfile = async (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingProfile) return;
+    if (!editingProfile || isSubmittingEdit) return;
 
-    if (editingProfile.id === currentAdminProfile?.id && editRole !== 'admin') {
-      alert("You cannot remove Admin role from your own active admin account.");
+    const cleanName = editFullName.trim();
+    const cleanPhone = normalizePhone(editPhoneNumber);
+
+    if (!cleanName || cleanPhone.length !== 10) {
+      alert('Please enter a valid full name and 10-digit mobile number.');
       return;
     }
 
-    setIsSubmittingEdit(true);
     try {
-      const cleanPhone = editPhoneNumber.replace(/\D/g, '');
-
+      setIsSubmittingEdit(true);
       const { error } = await supabase
         .from('profiles')
         .update({
-          full_name: editFullName.trim(),
+          full_name: cleanName,
           phone_number: cleanPhone,
           role: editRole,
         })
@@ -237,205 +326,87 @@ export default function UserAccessManager() {
 
       if (error) throw error;
 
-      setProfiles((prev) =>
-        prev.map((p) =>
-          p.id === editingProfile.id
-            ? { ...p, full_name: editFullName.trim(), phone_number: cleanPhone, role: editRole }
-            : p
-        )
-      );
-
       setEditingProfile(null);
-      alert(`✓ Successfully updated profile for ${editFullName.trim()}!`);
+      await fetchProfiles();
     } catch (err: any) {
-      console.error('Error updating profile:', err);
-      alert('Error updating profile: ' + (err.message || 'Unknown error'));
+      alert(`Failed to update profile: ${err.message}`);
     } finally {
       setIsSubmittingEdit(false);
     }
   };
 
-  // Action: Delete Profile
+  // Handle Delete Profile
   const handleDeleteProfile = async (p: ProfileRecord) => {
     if (p.id === currentAdminProfile?.id) {
-      alert("You cannot delete your own active admin profile.");
+      alert('You cannot delete your own active administrator account.');
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete profile "${p.full_name}" (${p.phone_number})?\n\nWarning: This will remove user access and disassociate any non-critical profile linkages.`)) {
+    if (!confirm(`Are you sure you want to delete profile "${p.full_name}"?`)) {
       return;
     }
 
     try {
       const { error } = await supabase.from('profiles').delete().eq('id', p.id);
       if (error) throw error;
-
-      setProfiles((prev) => prev.filter((item) => item.id !== p.id));
-      alert(`✓ Removed profile "${p.full_name}".`);
+      await fetchProfiles();
     } catch (err: any) {
-      console.error('Error deleting profile:', err);
-      alert('Error deleting profile: ' + (err.message || 'Unknown error'));
+      alert(`Failed to delete profile: ${err.message}`);
     }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       
-      {/* ── 1. TOP ANALYTICS & ROLE METRIC CARDS ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        
-        {/* Total Users */}
-        <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-              <Users size={14} className="text-gray-700" /> Total Users
-            </span>
-            <span className="text-[10px] font-extrabold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
-              Registered
-            </span>
+      {/* ── 1. TOP ANALYTICS & STATS RIBBON ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between text-gray-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Total Users</span>
+            <Users size={16} className="text-slate-700" />
           </div>
-          <span className="text-2xl sm:text-3xl font-black font-mono text-gray-900 block">
-            {stats.total}
-          </span>
-          <span className="text-[11px] text-gray-400 font-medium">All workspace profiles</span>
+          <p className="text-2xl font-black text-gray-900 mt-1">{stats.total}</p>
+          <span className="text-[10px] text-gray-400 font-semibold">Registered in Supabase</span>
         </div>
 
-        {/* Admins */}
-        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold text-purple-700 uppercase tracking-wider flex items-center gap-1.5">
-              <ShieldCheck size={14} className="text-purple-600" /> Admins
-            </span>
-            <span className="text-[9px] font-extrabold bg-purple-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
-              Full Access
-            </span>
+        <div className="bg-white border border-purple-200 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between text-purple-600">
+            <span className="text-xs font-bold uppercase tracking-wider">Admins</span>
+            <ShieldCheck size={16} />
           </div>
-          <span className="text-2xl sm:text-3xl font-black font-mono text-purple-900 block">
-            {stats.adminCount}
-          </span>
-          <span className="text-[11px] text-purple-700 font-medium">System administrators</span>
+          <p className="text-2xl font-black text-purple-700 mt-1">{stats.adminCount}</p>
+          <span className="text-[10px] text-purple-600 font-semibold">Full Unrestricted Access</span>
         </div>
 
-        {/* Managers */}
-        <div className="bg-white border border-blue-200/80 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
-              <Briefcase size={14} className="text-blue-600" /> Managers
-            </span>
-            <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">
-              Operations
-            </span>
+        <div className="bg-white border border-blue-200 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between text-blue-600">
+            <span className="text-xs font-bold uppercase tracking-wider">Managers</span>
+            <Briefcase size={16} />
           </div>
-          <span className="text-2xl sm:text-3xl font-black font-mono text-blue-900 block">
-            {stats.managerCount}
-          </span>
-          <span className="text-[11px] text-blue-600 font-medium">Operational staff</span>
+          <p className="text-2xl font-black text-blue-700 mt-1">{stats.managerCount}</p>
+          <span className="text-[10px] text-blue-600 font-semibold">Operations &amp; Bidding</span>
         </div>
 
-        {/* Subscribers */}
-        <div className="bg-white border border-emerald-200/80 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
-              <UserCheck size={14} className="text-emerald-600" /> Subscribers
-            </span>
-            <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
-              Member Portal
-            </span>
+        <div className="bg-white border border-emerald-200 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between text-emerald-600">
+            <span className="text-xs font-bold uppercase tracking-wider">Subscribers</span>
+            <UserCheck size={16} />
           </div>
-          <span className="text-2xl sm:text-3xl font-black font-mono text-emerald-800 block">
-            {stats.subscriberCount}
-          </span>
-          <span className="text-[11px] text-emerald-600 font-medium">Enrolled subscribers</span>
+          <p className="text-2xl font-black text-emerald-700 mt-1">{stats.subscriberCount}</p>
+          <span className="text-[10px] text-emerald-600 font-semibold">Passbook &amp; Member Portal</span>
         </div>
 
-      </div>
-
-      {/* ── 2. ROLE PERMISSION MATRIX OVERVIEW BANNER ── */}
-      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 border border-indigo-500/20 rounded-3xl p-5 sm:p-6 text-white shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-              <Shield size={20} />
-            </span>
-            <div>
-              <h3 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
-                Role-Based Access Control (RBAC) Hierarchy
-              </h3>
-              <p className="text-xs text-slate-300 font-medium">
-                Live permission gates mapped across tabs, auctions, broadcasts, and treasury operations
-              </p>
-            </div>
+        <div className="bg-white border border-indigo-200 rounded-2xl p-4 shadow-2xs col-span-2 sm:col-span-1">
+          <div className="flex items-center justify-between text-indigo-600">
+            <span className="text-xs font-bold uppercase tracking-wider">QR Linked</span>
+            <QrCode size={16} />
           </div>
-
-          <button
-            type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
-          >
-            <Plus size={15} /> Add User Profile
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-          
-          {/* Admin Role Card */}
-          <div className="bg-white/5 border border-purple-400/30 rounded-2xl p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-purple-300 flex items-center gap-1.5">
-                <ShieldCheck size={14} /> ADMIN
-              </span>
-              <span className="text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-400/30 px-2 py-0.5 rounded-full">
-                Full Privileges
-              </span>
-            </div>
-            <ul className="text-[11px] text-slate-300 space-y-1">
-              <li className="flex items-center gap-1.5">✓ All 7 Primary Tabs (Treasury, Reports, Chits)</li>
-              <li className="flex items-center gap-1.5">✓ Group Creation, Deletion &amp; Month Advance</li>
-              <li className="flex items-center gap-1.5">✓ Treasury Vault Transfers &amp; Float Recovery</li>
-              <li className="flex items-center gap-1.5">✓ User Role Assignment &amp; Security Audits</li>
-            </ul>
-          </div>
-
-          {/* Manager Role Card */}
-          <div className="bg-white/5 border border-blue-400/30 rounded-2xl p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-blue-300 flex items-center gap-1.5">
-                <Briefcase size={14} /> MANAGER
-              </span>
-              <span className="text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full">
-                Operations
-              </span>
-            </div>
-            <ul className="text-[11px] text-slate-300 space-y-1">
-              <li className="flex items-center gap-1.5">✓ Member Matrix &amp; Dues Collection Logging</li>
-              <li className="flex items-center gap-1.5">✓ Live Bidding Engine &amp; Prize Pot Disbursal</li>
-              <li className="flex items-center gap-1.5">✓ WhatsApp Broadcasting &amp; Reminders</li>
-              <li className="flex items-center gap-1.5">✓ Treasury View &amp; Move Money Operations</li>
-            </ul>
-          </div>
-
-          {/* Subscriber Role Card */}
-          <div className="bg-white/5 border border-emerald-400/30 rounded-2xl p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-emerald-300 flex items-center gap-1.5">
-                <UserCheck size={14} /> SUBSCRIBER
-              </span>
-              <span className="text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full">
-                Member Portal
-              </span>
-            </div>
-            <ul className="text-[11px] text-slate-300 space-y-1">
-              <li className="flex items-center gap-1.5">✓ View Personal Enrolled Chit Tickets</li>
-              <li className="flex items-center gap-1.5">✓ Live Auction Bidding Participation</li>
-              <li className="flex items-center gap-1.5">✓ Personal Payment History &amp; Passbook</li>
-              <li className="flex items-center gap-1.5 text-slate-400">✗ Blocked from Treasury &amp; Admin Config</li>
-            </ul>
-          </div>
-
+          <p className="text-2xl font-black text-indigo-700 mt-1">{stats.qrLinkedCount}</p>
+          <span className="text-[10px] text-indigo-600 font-semibold">Active Digital Keys</span>
         </div>
       </div>
 
-      {/* ── 3. USERS DIRECTORY & LIVE ROLE ASSIGNMENT TABLE ── */}
+      {/* ── 2. USERS DIRECTORY & ROLE ASSIGNMENT TABLE ── */}
       <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
         
         {/* Header, Search & Filter Bar */}
@@ -443,14 +414,14 @@ export default function UserAccessManager() {
           <div>
             <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <UserCheck size={18} className="text-indigo-600" />
-              Users Directory &amp; Role Assignments
+              Users Directory &amp; Access Controls
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Assign and modify roles in real-time to adjust access permissions
+              Assign roles, manage passbook QR digital keys, and generate print sheets
             </p>
           </div>
 
-          {/* Search and Filters */}
+          {/* Search, Inventory, Print & Add */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -459,40 +430,35 @@ export default function UserAccessManager() {
                 placeholder="Search user name or phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none w-44 sm:w-60"
+                className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none w-44 sm:w-56"
               />
-            </div>
-
-            {/* Role Filter Pills */}
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-              {[
-                { id: 'all', label: `All (${stats.total})` },
-                { id: 'admin', label: `Admin (${stats.adminCount})` },
-                { id: 'manager', label: `Manager (${stats.managerCount})` },
-                { id: 'subscriber', label: `Subscriber (${stats.subscriberCount})` },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setRoleFilter(tab.id as any)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    roleFilter === tab.id
-                      ? 'bg-white text-gray-900 shadow-xs'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
             </div>
 
             <button
               type="button"
-              onClick={fetchProfiles}
-              title="Refresh profiles"
-              className="p-2 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50 cursor-pointer"
+              onClick={() => setIsInventoryOpen(true)}
+              className="px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs flex items-center gap-1.5"
             >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              <Layers size={13} className="text-indigo-600" />
+              <span>QR Inventory</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintAllStickers}
+              className="px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs flex items-center gap-1.5"
+            >
+              <Printer size={13} className="text-indigo-600" />
+              <span>Print Stickers</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs active:scale-95"
+            >
+              <Plus size={14} />
+              <span>Add User</span>
             </button>
           </div>
         </div>
@@ -504,9 +470,9 @@ export default function UserAccessManager() {
               <tr className="border-b border-gray-100 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
                 <th className="py-3 px-3">User Profile</th>
                 <th className="py-3 px-3">Phone Number</th>
+                <th className="py-3 px-3">Passbook QR</th>
                 <th className="py-3 px-3">Current Role</th>
-                <th className="py-3 px-3">Assign / Change Role</th>
-                <th className="py-3 px-3">Joined Date</th>
+                <th className="py-3 px-3">Assign Role</th>
                 <th className="py-3 px-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -524,7 +490,6 @@ export default function UserAccessManager() {
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
-                      
                       {/* Name & Avatar */}
                       <td className="py-3.5 px-3">
                         <div className="flex items-center gap-2.5">
@@ -548,6 +513,41 @@ export default function UserAccessManager() {
                       {/* Phone */}
                       <td className="py-3.5 px-3 font-mono font-semibold text-gray-800">
                         {p.phone_number || '—'}
+                      </td>
+
+                      {/* Passbook QR */}
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center gap-1.5">
+                          {p.passbook_token ? (
+                            <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                              Linked 🟢
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md">
+                              Unlinked
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setPairingProfile(p)}
+                            title="Pair QR sticker"
+                            className="p-1 text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded-md"
+                          >
+                            <QrCode size={12} />
+                          </button>
+
+                          {p.passbook_token && (
+                            <button
+                              type="button"
+                              onClick={() => handlePrintSticker(p)}
+                              title="Print sticker"
+                              className="p-1 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 rounded-md"
+                            >
+                              <Printer size={12} />
+                            </button>
+                          )}
+                        </div>
                       </td>
 
                       {/* Role Badge */}
@@ -574,35 +574,37 @@ export default function UserAccessManager() {
                         </select>
                       </td>
 
-                      {/* Joined Date */}
-                      <td className="py-3.5 px-3 text-gray-400 font-mono text-[11px]">
-                        {new Date(p.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </td>
-
                       {/* Action buttons */}
                       <td className="py-3.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             type="button"
+                            onClick={() => handleShareWhatsApp(p)}
+                            title="Share WhatsApp Passbook Card"
+                            className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+                          >
+                            <Share2 size={13} />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleOpenEditModal(p)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                             title="Edit Profile"
                           >
-                            <Edit3 size={14} />
+                            <Edit3 size={13} />
                           </button>
                           {!isCurrentAdmin && (
                             <button
                               type="button"
                               onClick={() => handleDeleteProfile(p)}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                               title="Delete Profile"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           )}
                         </div>
                       </td>
-
                     </tr>
                   );
                 })
@@ -610,175 +612,164 @@ export default function UserAccessManager() {
             </tbody>
           </table>
         </div>
-
       </div>
 
-      {/* ── CREATE USER MODAL ── */}
+      {/* Add User Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
-            
-            <div className="flex items-start justify-between border-b border-gray-100 pb-3">
-              <div>
-                <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
-                  <UserCheck size={20} className="text-indigo-600" />
-                  Register New User Profile
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Create a profile and assign their access role
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="text-gray-400 hover:text-gray-700 p-1.5 rounded-xl hover:bg-gray-100 cursor-pointer"
-              >
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 text-sm">Register New User Profile</h3>
+              <button onClick={() => setIsCreateModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-600">
                 <X size={18} />
               </button>
             </div>
-
-            <form onSubmit={handleCreateProfile} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Full Name</label>
+            <form onSubmit={handleCreateProfile} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Full Name *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Dr. Kishor / Anbazhakan / Subscriber Name"
+                  placeholder="e.g. Ramesh Kumar"
                   value={newFullName}
                   onChange={(e) => setNewFullName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500"
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Phone Number</label>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">10-Digit Mobile Number *</label>
                 <input
                   type="tel"
                   required
-                  placeholder="e.g. 9943609010"
+                  maxLength={10}
+                  placeholder="e.g. 9876543210"
                   value={newPhoneNumber}
                   onChange={(e) => setNewPhoneNumber(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-indigo-500"
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Initial Role Assignment</label>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">System Role *</label>
                 <select
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value as UserRole)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="subscriber">👤 Subscriber (Member Portal Access)</option>
-                  <option value="manager">👔 Manager (Operations & Collections Access)</option>
-                  <option value="admin">👑 Admin (Full System & Treasury Access)</option>
+                  <option value="subscriber">👤 Subscriber (Member Portal)</option>
+                  <option value="manager">👔 Manager (Operations)</option>
+                  <option value="admin">👑 Administrator (Full Control)</option>
                 </select>
               </div>
-
-              <div className="flex gap-2.5 pt-2">
+              <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingCreate}
-                  className="flex-2 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                  className="bg-slate-900 text-white font-bold text-xs px-5 py-2 rounded-xl shadow-xs"
                 >
-                  {isSubmittingCreate ? 'Registering...' : '+ Register Profile'}
+                  {isSubmittingCreate ? 'Creating...' : 'Create Profile'}
                 </button>
               </div>
             </form>
-
           </div>
         </div>
       )}
 
-      {/* ── EDIT USER MODAL ── */}
+      {/* Edit User Modal */}
       {editingProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
-            
-            <div className="flex items-start justify-between border-b border-gray-100 pb-3">
-              <div>
-                <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
-                  <Edit3 size={20} className="text-indigo-600" />
-                  Edit User Profile
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Update full name, phone number or assigned role
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingProfile(null)}
-                className="text-gray-400 hover:text-gray-700 p-1.5 rounded-xl hover:bg-gray-100 cursor-pointer"
-              >
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 text-sm">Edit User Profile</h3>
+              <button onClick={() => setEditingProfile(null)} className="p-1 text-gray-400 hover:text-gray-600">
                 <X size={18} />
               </button>
             </div>
-
-            <form onSubmit={handleConfirmEditProfile} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Full Name</label>
+            <form onSubmit={handleUpdateProfile} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Full Name</label>
                 <input
                   type="text"
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500"
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Phone Number</label>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Mobile Number</label>
                 <input
                   type="tel"
                   required
+                  maxLength={10}
                   value={editPhoneNumber}
                   onChange={(e) => setEditPhoneNumber(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-indigo-500"
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Assigned Role</label>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Role</label>
                 <select
                   value={editRole}
                   onChange={(e) => setEditRole(e.target.value as UserRole)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="subscriber">👤 Subscriber (Member Portal)</option>
-                  <option value="manager">👔 Manager (Operations & Collections)</option>
-                  <option value="admin">👑 Admin (Full System & Treasury)</option>
+                  <option value="subscriber">👤 Subscriber</option>
+                  <option value="manager">👔 Manager</option>
+                  <option value="admin">👑 Administrator</option>
                 </select>
               </div>
-
-              <div className="flex gap-2.5 pt-2">
+              <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingProfile(null)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingEdit}
-                  className="flex-2 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                  className="bg-slate-900 text-white font-bold text-xs px-5 py-2 rounded-xl shadow-xs"
                 >
-                  {isSubmittingEdit ? 'Saving Changes...' : 'Save Changes'}
+                  {isSubmittingEdit ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
-
           </div>
         </div>
       )}
 
+      {/* Camera QR Scanner Modal for Pairing */}
+      <PassbookScannerModal
+        isOpen={!!pairingProfile}
+        onClose={() => setPairingProfile(null)}
+        onScanSuccess={handlePairScanSuccess}
+        title="Pair Passbook QR Sticker"
+        subtitle="Point camera at physical passbook QR code"
+        targetMemberName={pairingProfile?.full_name}
+      />
+
+      {/* A4 PDF Sheet Generator */}
+      <PassbookSheetGeneratorModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        items={printItems}
+        defaultTitle={printSheetTitle}
+      />
+
+      {/* Blank QR Inventory Modal */}
+      <PassbookInventoryModal
+        isOpen={isInventoryOpen}
+        onClose={() => setIsInventoryOpen(false)}
+        onRefresh={fetchProfiles}
+      />
     </div>
   );
 }

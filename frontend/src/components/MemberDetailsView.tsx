@@ -4,6 +4,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useWallet, WalletType } from '@/context/WalletContext';
+import PassbookScannerModal from './PassbookScannerModal';
+import PassbookSheetGeneratorModal, { StickerItem } from './PassbookSheetGeneratorModal';
+import { getPassbookScanUrl } from '@/utils/qrCodeGenerator';
 import { 
   ArrowLeft,
   CheckCircle2, 
@@ -32,7 +35,9 @@ import {
   ShieldAlert,
   ArrowUpRight,
   ArrowDownLeft,
-  Filter
+  Filter,
+  QrCode,
+  Printer
 } from 'lucide-react';
 
 interface MemberDetailsViewProps {
@@ -43,6 +48,9 @@ interface MemberDetailsViewProps {
 
 export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: MemberDetailsViewProps) {
   const { profile } = useAuth();
+  const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printItems, setPrintItems] = useState<StickerItem[]>([]);
   const { updateBalance } = useWallet();
 
   const [activeSubtab, setActiveSubtab] = useState<'chits' | 'payments' | 'prizes' | 'activity'>('chits');
@@ -558,6 +566,80 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
   const memberName = memberProfile?.full_name || 'Subscriber';
   const memberInitial = memberName.charAt(0).toUpperCase();
 
+  const handlePairScanSuccess = async (scannedToken: string) => {
+    try {
+      const { data, error } = await supabase.rpc('pair_passbook_qr', {
+        p_token: scannedToken,
+        p_profile_id: memberId,
+      });
+
+      if (error) throw error;
+      if (!data || !data.success) throw new Error(data?.error || 'Failed to pair QR code.');
+
+      alert(`Success: Passbook QR token paired to ${memberName}!`);
+      setIsPairingModalOpen(false);
+      setMemberProfile((prev: any) => ({ ...prev, passbook_token: scannedToken }));
+
+      if (onAddAuditLog) {
+        onAddAuditLog(`PAIRED Passbook QR [${scannedToken.slice(0, 8)}...] to ${memberName}`);
+      }
+    } catch (err: any) {
+      alert(`Pairing Failed: ${err.message}`);
+    }
+  };
+
+  const handlePrintMemberStickers = () => {
+    if (!memberProfile?.passbook_token) {
+      alert(`This member does not have a Passbook QR token linked yet. Tap "Pair Passbook QR" first.`);
+      return;
+    }
+
+    const items: StickerItem[] = [];
+    if (memberEnrollments.length > 0) {
+      memberEnrollments.forEach((e: any) => {
+        const g = Array.isArray(e.chit_groups) ? e.chit_groups[0] : e.chit_groups;
+        items.push({
+          token: memberProfile.passbook_token,
+          name: memberName,
+          phone: memberProfile.phone_number,
+          groupName: g?.name || 'Chit Group',
+          ticketNumber: e.ticket_number,
+        });
+      });
+    } else {
+      items.push({
+        token: memberProfile.passbook_token,
+        name: memberName,
+        phone: memberProfile.phone_number,
+        groupName: 'Member Passbook',
+      });
+    }
+
+    setPrintItems(items);
+    setIsPrintModalOpen(true);
+  };
+
+  const handleSharePassbookWhatsApp = () => {
+    const cleanPhone = (memberProfile?.phone_number || '').replace(/\D/g, '').slice(-10);
+    if (!cleanPhone) {
+      alert('No valid mobile number found for this member.');
+      return;
+    }
+
+    const scanUrl = memberProfile?.passbook_token ? getPassbookScanUrl(memberProfile.passbook_token) : 'https://chitfund.app';
+    const message = `📱 *Hello ${memberName}!*
+Welcome to your Chit Fund Member Portal.
+
+Access your digital passbook, payment ledger & live auction bidding anytime:
+🔗 *Passbook Direct Link*: ${scanUrl}
+👤 *Mobile Number*: ${cleanPhone}
+🔑 *Initial PIN*: ${memberProfile?.mpin || '1234'}
+
+_(Point any camera at your physical pocket book QR sticker to log in instantly)_`;
+
+    window.open(`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       
@@ -598,6 +680,15 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
                 <span className="text-xs font-semibold bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full">
                   Portal · {memberProfile?.role === 'subscriber' ? 'Active' : 'Admin'}
                 </span>
+                {memberProfile?.passbook_token ? (
+                  <span className="text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <CheckCircle2 size={12} /> QR Linked
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full">
+                    QR Unlinked
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-500 flex items-center gap-2 font-medium">
                 <Phone size={13} className="text-gray-400" />
@@ -606,7 +697,36 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
             </div>
           </div>
 
-          <div className="flex gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsPairingModalOpen(true)}
+              className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+            >
+              <QrCode size={14} className="text-indigo-600" />
+              <span>{memberProfile?.passbook_token ? 'Re-Pair QR' : 'Pair Passbook QR'}</span>
+            </button>
+
+            {memberProfile?.passbook_token && (
+              <button
+                type="button"
+                onClick={handlePrintMemberStickers}
+                className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+              >
+                <Printer size={14} className="text-indigo-600" />
+                <span>Print Sticker ({Math.max(1, memberEnrollments.length)})</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSharePassbookWhatsApp}
+              className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+            >
+              <Share2 size={14} />
+              <span>WhatsApp Card</span>
+            </button>
+
             <button
               onClick={() => handleOpenRecordPayment()}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95"
@@ -1266,6 +1386,24 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
           </form>
         </div>
       )}
+
+      {/* Camera QR Scanner Modal for Pairing */}
+      <PassbookScannerModal
+        isOpen={isPairingModalOpen}
+        onClose={() => setIsPairingModalOpen(false)}
+        onScanSuccess={handlePairScanSuccess}
+        title="Pair Physical Passbook QR"
+        subtitle="Point camera at the QR code on the physical pocket book"
+        targetMemberName={memberName}
+      />
+
+      {/* A4 PDF Sticker Sheet Exporter */}
+      <PassbookSheetGeneratorModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        items={printItems}
+        defaultTitle={`${memberName} — Passbook Sticker Sheet`}
+      />
     </div>
   );
 }

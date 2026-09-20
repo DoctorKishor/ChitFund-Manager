@@ -4,6 +4,7 @@ import "./globals.css";
 import { WalletProvider } from "@/context/WalletContext";
 import { AuthProvider } from "@/context/AuthContext";
 import ServiceWorkerCleanup from "@/components/ServiceWorkerCleanup";
+import NetworkStatusBanner from "@/components/NetworkStatusBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,6 +33,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-slate-950 text-slate-100 flex flex-col">
         <ServiceWorkerCleanup />
+        <NetworkStatusBanner />
         <AuthProvider>
           <WalletProvider>
             {children}
