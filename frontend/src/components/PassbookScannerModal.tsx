@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { X, Camera, RefreshCw, CheckCircle2, AlertCircle, ShieldCheck, QrCode, AlertTriangle } from 'lucide-react';
+import { triggerHapticFeedback } from '@/utils/haptics';
 
 interface PassbookScannerModalProps {
   isOpen: boolean;
@@ -92,7 +93,8 @@ export default function PassbookScannerModal({
           const validation = extractAndValidatePassbookToken(decodedText);
 
           if (!validation.isValid || !validation.token) {
-            // Unrecognized or foreign QR code: warn user and keep scanning!
+            // Unrecognized or foreign QR code: trigger warning haptic & keep scanning!
+            triggerHapticFeedback('warning');
             setScannerWarning(validation.error || 'Unrecognized QR code format.');
             if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
             warningTimeoutRef.current = setTimeout(() => {
@@ -101,7 +103,8 @@ export default function PassbookScannerModal({
             return;
           }
 
-          // Valid passbook QR token detected!
+          // Valid passbook QR token detected! Trigger success haptic
+          triggerHapticFeedback('success');
           setScannerWarning(null);
           setHasScanned(true);
           setIsProcessing(true);
