@@ -26,7 +26,7 @@ export default function Home() {
     );
   }
 
-  if (!user) {
+  if (!user && !profile) {
     return <AuthScreen />;
   }
 

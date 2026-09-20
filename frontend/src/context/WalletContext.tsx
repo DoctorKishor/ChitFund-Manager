@@ -31,20 +31,27 @@ const DEFAULT_BALANCES: WalletBalances = {
 };
 
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [balances, setBalances] = useState<WalletBalances>(DEFAULT_BALANCES);
   const [lastChangedWallet, setLastChangedWallet] = useState<WalletType | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Fetch balances from Supabase & seed if empty
+  const isPrivileged = profile?.role === 'admin' || profile?.role === 'manager' || !!user;
+
+  // Fetch balances from Supabase & seed if empty (Admin/Manager only)
   const fetchTreasury = async () => {
+    if (!isPrivileged) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('global_treasury')
         .select('*');
 
       if (error) {
-        console.warn('Supabase global_treasury read note:', error.message);
+        setLoading(false);
         return;
       }
 
@@ -68,7 +75,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         setBalances(loaded);
       }
     } catch (err) {
-      console.error('Error fetching treasury:', err);
+      console.warn('Treasury load note:', err);
     } finally {
       setLoading(false);
     }
@@ -76,6 +83,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   // Helper to reset all balances in Supabase to 0
   const resetTreasuryToZero = async () => {
+    if (!isPrivileged) return;
     const zeroRows = [
       { wallet_type: 'cash_in_hand', current_balance: 0 },
       { wallet_type: 'kishor_bank', current_balance: 0 },
@@ -88,6 +96,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     fetchTreasury();
+
+    if (!isPrivileged) return;
 
     // Subscribe to Supabase Realtime changes
     const channel = supabase
@@ -109,7 +119,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, profile?.role]);
 
   // Flash indicator reset
   useEffect(() => {
