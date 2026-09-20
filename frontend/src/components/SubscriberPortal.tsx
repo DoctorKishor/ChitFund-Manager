@@ -10,7 +10,6 @@ import {
   Trophy, 
   Sparkles, 
   History, 
-  QrCode, 
   LogOut, 
   CheckCircle2, 
   ChevronRight, 
@@ -18,12 +17,9 @@ import {
   Layers, 
   ShieldCheck, 
   ArrowDownLeft, 
-  Copy, 
-  Check, 
   Sun, 
   Moon 
 } from 'lucide-react';
-import QRCode from 'qrcode';
 
 interface EnrolledGroup {
   groupId: string;
@@ -72,16 +68,12 @@ export default function SubscriberPortal() {
 
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [activeTab, setActiveTab] = useState<'overview' | 'chits' | 'passbook' | 'auctions' | 'qr'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chits' | 'passbook' | 'auctions'>('overview');
   
   const [groups, setGroups] = useState<EnrolledGroup[]>([]);
   const [transactions, setTransactions] = useState<SubscriberTransaction[]>([]);
   const [auctions, setAuctions] = useState<GroupAuction[]>([]);
   const [selectedTx, setSelectedTx] = useState<SubscriberTransaction | null>(null);
-
-  // Digital QR Passbook Data URL & Copied State
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState(false);
 
   // Initialize theme from localStorage
   useEffect(() => {
@@ -128,33 +120,6 @@ export default function SubscriberPortal() {
   useEffect(() => {
     loadSubscriberData();
   }, [loadSubscriberData]);
-
-  // Generate QR Passbook image
-  useEffect(() => {
-    if (profile?.passbookToken || profile?.id) {
-      const qrPayload = profile.passbookToken 
-        ? `${typeof window !== 'undefined' ? window.location.origin : ''}/passbook?token=${profile.passbookToken}`
-        : `CHIT_MEMBER:${profile.phoneNumber || profile.id}`;
-
-      QRCode.toDataURL(qrPayload, {
-        width: 360,
-        margin: 1,
-        color: {
-          dark: '#090d16',
-          light: '#ffffff',
-        },
-      }).then(setQrDataUrl).catch(console.error);
-    }
-  }, [profile]);
-
-  const handleCopyPassbookId = () => {
-    const idToCopy = profile?.phoneNumber || profile?.id || '';
-    if (idToCopy && typeof navigator !== 'undefined') {
-      navigator.clipboard.writeText(idToCopy);
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 2000);
-    }
-  };
 
   // Portfolio Totals
   const totalPaid = transactions
@@ -255,27 +220,16 @@ export default function SubscriberPortal() {
         }`}>
           <div className="absolute -top-12 -right-12 w-40 h-40 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
           
-          <div className="relative z-10 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-indigo-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">
-                <ShieldCheck size={13} className="shrink-0" /> Official Chit Passbook
-              </div>
-              <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight truncate">
-                வணக்கம், {profile?.fullName?.split(' ')[0] || 'Member'}!
-              </h1>
-              <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 max-w-md line-clamp-1 sm:line-clamp-none">
-                Live dues, auction schedule, and Laaba Seetu tracker.
-              </p>
+          <div className="relative z-10">
+            <div className="flex items-center gap-1.5 text-indigo-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">
+              <ShieldCheck size={13} className="shrink-0" /> Official Chit Passbook
             </div>
-
-            {/* Quick QR Passbook Trigger */}
-            <button
-              onClick={() => setActiveTab('qr')}
-              className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-[11px] sm:text-xs flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30 shrink-0"
-            >
-              <QrCode size={14} />
-              <span className="whitespace-nowrap">QR Pass</span>
-            </button>
+            <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight truncate">
+              வணக்கம், {profile?.fullName?.split(' ')[0] || 'Member'}!
+            </h1>
+            <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 max-w-md">
+              Live dues, auction schedule, and Laaba Seetu tracker.
+            </p>
           </div>
 
           {/* 4-METRIC GRID */}
@@ -349,7 +303,7 @@ export default function SubscriberPortal() {
           </div>
         </div>
 
-        {/* 3. DESKTOP TABS */}
+        {/* 3. DESKTOP TABS (4 Streamlined Tabs) */}
         <div className={`hidden md:flex items-center gap-2 border-b pb-2 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
           <button
             onClick={() => setActiveTab('overview')}
@@ -390,16 +344,6 @@ export default function SubscriberPortal() {
             }`}
           >
             <Trophy size={13} /> Auctions ({auctions.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('qr')}
-            className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === 'qr'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <QrCode size={13} /> Passbook QR
           </button>
         </div>
 
@@ -844,67 +788,6 @@ export default function SubscriberPortal() {
           </div>
         )}
 
-        {/* TAB 5: DIGITAL PASSBOOK QR */}
-        {activeTab === 'qr' && (
-          <div className="max-w-sm mx-auto space-y-3.5 px-0.5">
-            <div className="text-center">
-              <h2 className={`text-sm font-bold flex items-center justify-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                <QrCode className="text-indigo-500" size={16} /> Official Digital Passbook QR
-              </h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Show this QR at the counter for physical book sync & payments.
-              </p>
-            </div>
-
-            <div className={`rounded-2xl p-4 sm:p-6 shadow-2xl flex flex-col items-center justify-center text-center space-y-3 border ${
-              isDark ? 'bg-white text-slate-950 border-transparent' : 'bg-white text-slate-950 border-slate-200'
-            }`}>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold font-mono">
-                Member ID: {profile?.phoneNumber || profile?.id?.slice(0, 8)}
-              </div>
-
-              {qrDataUrl ? (
-                <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={qrDataUrl}
-                    alt="Subscriber Passbook QR Code"
-                    className="w-48 h-48 sm:w-56 sm:h-56 mx-auto object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="w-48 h-48 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 text-xs">
-                  Generating QR...
-                </div>
-              )}
-
-              <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900">{profile?.fullName}</h3>
-                <p className="text-[11px] text-slate-500 font-mono mt-0.2">{profile?.phoneNumber}</p>
-              </div>
-
-              <div className="w-full pt-2.5 border-t border-slate-100 text-left space-y-1 text-[11px] text-slate-600">
-                <div className="flex justify-between font-mono">
-                  <span>Enrolled Chits:</span>
-                  <span className="font-bold text-slate-900">{groups.length} Groups</span>
-                </div>
-                <div className="flex justify-between font-mono">
-                  <span>Total Contributed:</span>
-                  <span className="font-bold text-emerald-600">₹{totalPaid.toLocaleString('en-IN')}</span>
-                </div>
-              </div>
-
-              <button
-                onClick={handleCopyPassbookId}
-                className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                {copiedId ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                <span>{copiedId ? 'Copied Member ID!' : 'Copy Member ID'}</span>
-              </button>
-            </div>
-          </div>
-        )}
-
       </main>
 
       {/* 5. TRANSACTION DETAIL POPUP MODAL */}
@@ -966,58 +849,48 @@ export default function SubscriberPortal() {
         </div>
       )}
 
-      {/* 6. FIXED MOBILE BOTTOM NAVIGATION BAR */}
-      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-lg border-t px-2 py-1.5 flex items-center justify-around transition-colors ${
+      {/* 6. FIXED MOBILE BOTTOM NAVIGATION BAR (4 Streamlined Tabs) */}
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-lg border-t px-3 py-1.5 flex items-center justify-around transition-colors ${
         isDark ? 'bg-[#0c1220]/95 border-slate-800/90' : 'bg-white/95 border-slate-200 shadow-lg'
       }`}>
         <button
           onClick={() => setActiveTab('overview')}
-          className={`flex flex-col items-center gap-0.5 text-[9px] font-bold p-1 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all ${
             activeTab === 'overview' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
-          <Layers size={17} />
+          <Layers size={18} />
           <span>Overview</span>
         </button>
 
         <button
           onClick={() => setActiveTab('chits')}
-          className={`flex flex-col items-center gap-0.5 text-[9px] font-bold p-1 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all ${
             activeTab === 'chits' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
-          <Ticket size={17} />
+          <Ticket size={18} />
           <span>My Chits</span>
         </button>
 
         <button
           onClick={() => setActiveTab('passbook')}
-          className={`flex flex-col items-center gap-0.5 text-[9px] font-bold p-1 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all ${
             activeTab === 'passbook' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
-          <History size={17} />
+          <History size={18} />
           <span>Passbook</span>
         </button>
 
         <button
           onClick={() => setActiveTab('auctions')}
-          className={`flex flex-col items-center gap-0.5 text-[9px] font-bold p-1 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all ${
             activeTab === 'auctions' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
-          <Trophy size={17} />
+          <Trophy size={18} />
           <span>Auctions</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('qr')}
-          className={`flex flex-col items-center gap-0.5 text-[9px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'qr' ? 'text-indigo-500 scale-105' : 'text-slate-400'
-          }`}
-        >
-          <QrCode size={17} />
-          <span>QR Pass</span>
         </button>
       </nav>
     </div>
