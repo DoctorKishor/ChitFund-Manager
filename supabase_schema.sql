@@ -570,3 +570,100 @@ begin
   );
 end;
 $$ language plpgsql security definer set search_path = public;
+
+-- Fetch all subscriber portal data (enrolled chits, payment history, and auctions)
+create or replace function public.get_subscriber_portal_data(p_profile_id uuid)
+returns jsonb as $$
+declare
+  v_profile jsonb;
+  v_groups jsonb;
+  v_transactions jsonb;
+  v_auctions jsonb;
+begin
+  -- 1. Fetch Profile
+  select jsonb_build_object(
+    'id', p.id,
+    'fullName', p.full_name,
+    'phoneNumber', p.phone_number,
+    'role', p.role,
+    'passbookToken', p.passbook_token,
+    'passbookIssuedAt', p.passbook_issued_at
+  )
+  into v_profile
+  from public.profiles p
+  where p.id = p_profile_id;
+
+  if v_profile is null then
+    return jsonb_build_object('success', false, 'error', 'Subscriber not found.');
+  end if;
+
+  -- 2. Fetch Enrolled Chit Groups
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'groupId', cg.id,
+    'groupName', cg.name,
+    'totalValue', cg.total_value,
+    'memberCount', cg.member_count,
+    'durationMonths', cg.duration_months,
+    'currentMonth', cg.current_month,
+    'kaiIruppuPool', cg.kai_iruppu_pool,
+    'status', cg.status,
+    'startDate', cg.start_date,
+    'ticketNumber', gm.ticket_number,
+    'hasWonRegular', gm.has_won_regular,
+    'physicalBookSynced', gm.physical_book_synced,
+    'monthlyInstallment', (cg.total_value / cg.member_count)
+  ) order by cg.created_at desc), '[]'::jsonb)
+  into v_groups
+  from public.group_members gm
+  join public.chit_groups cg on cg.id = gm.group_id
+  where gm.profile_id = p_profile_id;
+
+  -- 3. Fetch Transactions for this Subscriber
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', t.id,
+    'groupId', t.group_id,
+    'groupName', coalesce(cg.name, 'Direct'),
+    'type', t.type,
+    'amount', t.amount,
+    'walletType', t.wallet_type,
+    'status', t.status,
+    'notes', t.notes,
+    'createdAt', t.created_at
+  ) order by t.created_at desc), '[]'::jsonb)
+  into v_transactions
+  from public.transactions t
+  left join public.chit_groups cg on cg.id = t.group_id
+  where t.profile_id = p_profile_id;
+
+  -- 4. Fetch Auction Logs for the Subscriber's Chit Groups
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', al.id,
+    'groupId', al.group_id,
+    'groupName', cg.name,
+    'month', al.month,
+    'winningDiscount', al.winning_discount,
+    'winnerId', al.winning_bidder_id,
+    'winnerName', p.full_name,
+    'isLaabaSeetu', al.is_laaba_seetu,
+    'createdAt', al.created_at,
+    'netPayout', (cg.total_value - al.winning_discount),
+    'isCurrentSubscriberWinner', (al.winning_bidder_id = p_profile_id)
+  ) order by al.created_at desc), '[]'::jsonb)
+  into v_auctions
+  from public.auction_logs al
+  join public.chit_groups cg on cg.id = al.group_id
+  join public.profiles p on p.id = al.winning_bidder_id
+  where al.group_id in (
+    select group_id from public.group_members where profile_id = p_profile_id
+  );
+
+  return jsonb_build_object(
+    'success', true,
+    'profile', v_profile,
+    'groups', v_groups,
+    'transactions', v_transactions,
+    'auctions', v_auctions
+  );
+end;
+$$ language plpgsql security definer set search_path = public;
+

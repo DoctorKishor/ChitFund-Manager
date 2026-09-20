@@ -8,6 +8,7 @@ import UserProfileBadge from '@/components/UserProfileBadge';
 import FontSizeSwitcher from '@/components/FontSizeSwitcher';
 import DashboardContent from '@/components/DashboardContent';
 import AuthScreen from '@/components/AuthScreen';
+import SubscriberPortal from '@/components/SubscriberPortal';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Home() {
@@ -28,6 +29,11 @@ export default function Home() {
 
   if (!user && !profile) {
     return <AuthScreen />;
+  }
+
+  // DEDICATED SUBSCRIBER PORTAL FOR SUBSCRIBERS
+  if (profile?.role === 'subscriber') {
+    return <SubscriberPortal />;
   }
 
   const getTabTitle = (tab: string) => {
