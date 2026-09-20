@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { X, Camera, RefreshCw, CheckCircle2, AlertCircle, ShieldCheck, QrCode } from 'lucide-react';
+import { X, Camera, RefreshCw, CheckCircle2, AlertCircle, ShieldCheck, QrCode, AlertTriangle } from 'lucide-react';
 
 interface PassbookScannerModalProps {
   isOpen: boolean;
@@ -11,6 +11,44 @@ interface PassbookScannerModalProps {
   title?: string;
   subtitle?: string;
   targetMemberName?: string;
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function extractAndValidatePassbookToken(rawText: string): { isValid: boolean; token?: string; error?: string } {
+  const clean = rawText.trim();
+
+  // Case A: URL containing /passbook?key=<UUID>
+  if (clean.includes('/passbook') && clean.includes('key=')) {
+    try {
+      const parsedUrl = new URL(clean);
+      const key = parsedUrl.searchParams.get('key');
+      if (key && UUID_REGEX.test(key)) {
+        return { isValid: true, token: key };
+      }
+    } catch {
+      const match = clean.match(/[?&]key=([0-9a-fA-F-]{36})/);
+      if (match && match[1] && UUID_REGEX.test(match[1])) {
+        return { isValid: true, token: match[1] };
+      }
+    }
+    return { isValid: false, error: 'Malformed Passbook URL: Invalid security token.' };
+  }
+
+  // Case B: Raw 36-character UUID token
+  if (UUID_REGEX.test(clean)) {
+    return { isValid: true, token: clean };
+  }
+
+  // Case C: Specific recognizable third-party QR payloads for helpful error text
+  if (clean.startsWith('upi://')) {
+    return { isValid: false, error: 'UPI Payment QR detected. Please scan an official Passbook QR sticker.' };
+  }
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return { isValid: false, error: 'External website QR detected. Please scan your official Passbook QR sticker.' };
+  }
+
+  return { isValid: false, error: 'Invalid QR Code: Not a valid ChitFund Manager Passbook QR.' };
 }
 
 export default function PassbookScannerModal({
@@ -22,9 +60,11 @@ export default function PassbookScannerModal({
   targetMemberName,
 }: PassbookScannerModalProps) {
   const [scannerError, setScannerError] = useState<string | null>(null);
+  const [scannerWarning, setScannerWarning] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [hasScanned, setHasScanned] = useState<boolean>(false);
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const readerElementId = 'passbook-qr-reader';
 
   useEffect(() => {
@@ -32,6 +72,7 @@ export default function PassbookScannerModal({
 
     let isMounted = true;
     setScannerError(null);
+    setScannerWarning(null);
     setHasScanned(false);
     setIsProcessing(false);
 
@@ -46,11 +87,27 @@ export default function PassbookScannerModal({
 
         const qrCodeSuccessCallback = async (decodedText: string) => {
           if (isProcessing || hasScanned) return;
+
+          // Validate that the scanned QR code is strictly our app's passbook format
+          const validation = extractAndValidatePassbookToken(decodedText);
+
+          if (!validation.isValid || !validation.token) {
+            // Unrecognized or foreign QR code: warn user and keep scanning!
+            setScannerWarning(validation.error || 'Unrecognized QR code format.');
+            if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+            warningTimeoutRef.current = setTimeout(() => {
+              setScannerWarning(null);
+            }, 3000);
+            return;
+          }
+
+          // Valid passbook QR token detected!
+          setScannerWarning(null);
           setHasScanned(true);
           setIsProcessing(true);
 
           try {
-            // Stop camera once scanned
+            // Stop camera once valid passbook is scanned
             if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
               await html5QrCodeRef.current.stop();
             }
@@ -58,21 +115,8 @@ export default function PassbookScannerModal({
             console.warn('Scanner stop note:', stopErr);
           }
 
-          // Extract token if decodedText is a full URL or direct token
-          let extractedToken = decodedText.trim();
-          if (extractedToken.includes('key=')) {
-            try {
-              const url = new URL(extractedToken);
-              const key = url.searchParams.get('key');
-              if (key) extractedToken = key;
-            } catch {
-              const match = extractedToken.match(/key=([a-zA-Z0-9_-]+)/);
-              if (match && match[1]) extractedToken = match[1];
-            }
-          }
-
           try {
-            await onScanSuccess(extractedToken);
+            await onScanSuccess(validation.token);
           } catch (err: any) {
             setScannerError(err.message || 'Failed to process scanned QR code.');
             setIsProcessing(false);
@@ -106,6 +150,7 @@ export default function PassbookScannerModal({
 
     return () => {
       isMounted = false;
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
       if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
         html5QrCodeRef.current
           .stop()
@@ -117,6 +162,7 @@ export default function PassbookScannerModal({
   if (!isOpen) return null;
 
   const handleClose = async () => {
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
     if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
       try {
         await html5QrCodeRef.current.stop();
@@ -154,37 +200,52 @@ export default function PassbookScannerModal({
 
         {/* Camera View Area */}
         <div className="p-4 sm:p-6 flex flex-col items-center justify-center">
-          <div className="relative w-full max-w-[280px] aspect-square rounded-2xl overflow-hidden bg-slate-950 border-2 border-indigo-500/40 shadow-inner flex items-center justify-center">
+          <div className={`relative w-full max-w-[280px] aspect-square rounded-2xl overflow-hidden bg-slate-950 border-2 shadow-inner flex items-center justify-center transition-colors ${
+            scannerWarning ? 'border-amber-500/80 animate-shake' : 'border-indigo-500/40'
+          }`}>
             <div id={readerElementId} className="w-full h-full object-cover" />
 
             {/* Target Scanning Overlay Frame */}
             <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-              <div className="w-48 h-48 border-2 border-dashed border-indigo-400/70 rounded-xl relative animate-pulse">
+              <div className={`w-48 h-48 border-2 border-dashed rounded-xl relative transition-colors ${
+                scannerWarning ? 'border-amber-400' : 'border-indigo-400/70 animate-pulse'
+              }`}>
                 {/* Corner Markers */}
-                <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-indigo-400" />
-                <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-indigo-400" />
-                <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-indigo-400" />
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-indigo-400" />
+                <div className={`absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 ${scannerWarning ? 'border-amber-400' : 'border-indigo-400'}`} />
+                <div className={`absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 ${scannerWarning ? 'border-amber-400' : 'border-indigo-400'}`} />
+                <div className={`absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 ${scannerWarning ? 'border-amber-400' : 'border-indigo-400'}`} />
+                <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 ${scannerWarning ? 'border-amber-400' : 'border-indigo-400'}`} />
               </div>
             </div>
 
             {isProcessing && (
-              <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white">
+              <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white">
                 <RefreshCw className="animate-spin text-indigo-400" size={28} />
                 <span className="text-xs font-bold">Verifying Passbook Token...</span>
               </div>
             )}
           </div>
 
+          {/* Warning for foreign / invalid QR codes */}
+          {scannerWarning && (
+            <div className="mt-3 p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2 max-w-sm text-left animate-in fade-in duration-200">
+              <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-400" />
+              <div>
+                <span className="font-bold block">Invalid QR Code</span>
+                <span className="text-[11px] text-amber-200/90">{scannerWarning}</span>
+              </div>
+            </div>
+          )}
+
           {scannerError ? (
             <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-start gap-2 max-w-sm text-left">
               <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <span>{scannerError}</span>
             </div>
-          ) : (
+          ) : !scannerWarning && (
             <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-400">
               <ShieldCheck size={14} className="text-emerald-400" />
-              <span>High-contrast QR detection active</span>
+              <span>Official Passbook QR verification active</span>
             </div>
           )}
         </div>
