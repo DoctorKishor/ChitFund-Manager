@@ -1628,7 +1628,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       ? Number(activeGroup.currentMonth) 
       : 0;
 
-    // Build month breakdown for all months from 0 to duration - 1
+    // Build month breakdown for all months from 0 to duration (N+1 total cycles: M0 Launch + M1..MN)
     const monthsData: {
       month: number;
       label: string;
@@ -1640,7 +1640,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       isFuture: boolean;
     }[] = [];
 
-    for (let m = 0; m < duration; m++) {
+    for (let m = 0; m <= duration; m++) {
       const alreadyPaid = getMemberPaidAmountForMonth(member.profileId || member.id, m);
       const isArrear = m < activeCurrentCycleMonth;
       const isCurrent = m === activeCurrentCycleMonth;
@@ -5491,11 +5491,11 @@ Thank you for your prompt payment! 🙏`;
                         </div>
 
                         <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Chit Duration</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Total Chit Lifecycle</span>
                           <strong className="text-sm sm:text-base font-extrabold text-gray-900 mt-0.5 block">
-                            {newGroupDuration} Months
+                            {Number(newGroupDuration) + 1} Months ({newGroupDuration} Tickets)
                           </strong>
-                          <span className="text-[10px] text-gray-500">Month 0 to Month {Number(newGroupDuration) - 1}</span>
+                          <span className="text-[10px] text-gray-500">Month 0 (Launch) to Month {newGroupDuration}</span>
                         </div>
 
                         <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
@@ -5951,8 +5951,8 @@ Thank you for your prompt payment! 🙏`;
                       <strong className="text-indigo-600 mt-0.5 block truncate text-sm font-extrabold">{formatCurrency(Number(newGroupValue))}</strong>
                     </div>
                     <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Duration</span>
-                      <strong className="text-gray-900 mt-0.5 block truncate text-sm font-bold">{newGroupDuration} Months ({newGroupDuration} Tickets)</strong>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Total Lifecycle</span>
+                      <strong className="text-gray-900 mt-0.5 block truncate text-sm font-bold">{Number(newGroupDuration) + 1} Months (M0 to M{newGroupDuration})</strong>
                     </div>
                     <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
                       <span className="text-gray-400 block text-[10px] uppercase font-bold">Monthly Due</span>
