@@ -408,12 +408,12 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
               ticket: m.ticket_number,
               hasWon: m.has_won_regular,
               bookSynced: m.physical_book_synced,
-              profileId: m.profile_id,
-              splitPool: m.split_pool || null,
-              customInstallment: m.custom_installment ? Number(m.custom_installment) : null,
-              exitMonth: m.exit_month || null,
-              transferredFrom: m.transferred_from || null,
-              transferEffectiveMonth: m.transfer_effective_month || null,
+              profileId: m.profile_id || undefined,
+              splitPool: m.profile_id ? (m.split_pool || null) : null,
+              customInstallment: m.profile_id && m.custom_installment ? Number(m.custom_installment) : null,
+              exitMonth: m.profile_id ? (m.exit_month || null) : null,
+              transferredFrom: m.profile_id ? (m.transferred_from || null) : null,
+              transferEffectiveMonth: m.profile_id ? (m.transfer_effective_month || null) : null,
               name: prof?.full_name || 'Subscriber',
               phone: prof?.phone_number || '',
             };
@@ -485,11 +485,11 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           hasWon: !!row?.has_won_regular,
           bookSynced: row?.physical_book_synced ?? true,
           profileId: row?.profile_id || undefined,
-          splitPool: row?.split_pool || null,
-          customInstallment: row?.custom_installment ? Number(row.custom_installment) : null,
-          exitMonth: row?.exit_month || null,
-          transferredFrom: row?.transferred_from || null,
-          transferEffectiveMonth: row?.transfer_effective_month || null,
+          splitPool: row?.profile_id ? (row?.split_pool || null) : null,
+          customInstallment: row?.profile_id && row?.custom_installment ? Number(row.custom_installment) : null,
+          exitMonth: row?.profile_id ? (row?.exit_month || null) : null,
+          transferredFrom: row?.profile_id ? (row?.transferred_from || null) : null,
+          transferEffectiveMonth: row?.profile_id ? (row?.transfer_effective_month || null) : null,
           name: resolvedName,
           phone: resolvedPhone,
         };
@@ -518,57 +518,65 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           total_value: valNum,
           member_count: countNum,
           duration_months: countNum,
-          current_month: editGroupCurrentMonth,
+          current_month: Number(editGroupCurrentMonth),
+          start_date: editGroupStartDate,
           status: editGroupStatus,
-          start_date: editGroupStartDate || null,
         })
         .eq('id', editingGroup.id);
 
       if (groupError) {
-        alert(`Failed to update group: ${groupError.message}`);
+        alert(`Error updating chit group parameters: ${groupError.message}`);
         return;
       }
 
-      // 2. Update local state
+      // 2. Sync group_members to Supabase
+      const assigned = editGroupMembers.filter(m => m.profileId);
+      for (const m of assigned) {
+        const payload: any = {
+          group_id: editingGroup.id,
+          ticket_number: m.ticket,
+          profile_id: m.profileId,
+          has_won_regular: m.hasWon,
+          physical_book_synced: m.bookSynced ?? true,
+          split_pool: m.splitPool || null,
+          custom_installment: m.customInstallment || null,
+          exit_month: m.exitMonth || null,
+          transferred_from: m.transferredFrom || null,
+          transfer_effective_month: m.transferEffectiveMonth || null,
+        };
+        await supabase
+          .from('group_members')
+          .upsert(payload, { onConflict: 'group_id,ticket_number' });
+      }
+
+      // Update local state
       setLocalGroups(prev =>
-        prev.map(g =>
-          g.id === editingGroup.id
+        prev.map(cg =>
+          cg.id === editingGroup.id
             ? {
-                ...g,
+                ...cg,
                 name: editGroupName.trim(),
                 totalValue: valNum,
-                duration: countNum,
                 memberCount: countNum,
-                currentMonth: editGroupCurrentMonth,
-                status: editGroupStatus,
+                duration: countNum,
+                currentMonth: Number(editGroupCurrentMonth),
                 startDate: editGroupStartDate,
-                active: editGroupStatus !== 'completed',
+                status: editGroupStatus,
+                active: editGroupStatus === 'active',
               }
-            : g
+            : cg
         )
       );
 
-      // 3. Security audit log
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'chit_groups',
-          desc: `UPDATED CHIT GROUP: "${editGroupName.trim()}" (Status: ${editGroupStatus.toUpperCase()}, Pool: ₹${valNum.toLocaleString('en-IN')}, Duration: ${countNum}M)`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
-
-      // 4. Refresh workspace members if on this group's workspace
       if (selectedWorkspaceGroupId === editingGroup.id) {
+        setSelectedWorkspaceGroupId(editingGroup.id);
         fetchWorkspaceMembers(editingGroup.id);
       }
 
       setEditingGroup(null);
+      triggerHapticFeedback('success');
     } catch (err: any) {
-      alert(`Error editing group: ${err.message}`);
+      alert(`Error saving edit group: ${err.message}`);
     } finally {
       setIsSavingEdit(false);
     }
@@ -584,6 +592,11 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           ticket_number: ticketNum,
           profile_id: newProfileId,
           physical_book_synced: true,
+          transferred_from: null,
+          transfer_effective_month: null,
+          exit_month: null,
+          split_pool: null,
+          custom_installment: null,
         }, { onConflict: 'group_id,ticket_number' })
         .select()
         .single();
@@ -598,7 +611,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       setEditGroupMembers(prev =>
         prev.map(m =>
           m.ticket === ticketNum
-            ? { ...m, id: assignedId, profileId: newProfileId, name: newName, phone: newPhone }
+            ? { ...m, id: assignedId, profileId: newProfileId, name: newName, phone: newPhone, transferredFrom: null, transferEffectiveMonth: null, exitMonth: null, splitPool: null, customInstallment: null }
             : m
         )
       );
@@ -607,7 +620,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         setWorkspaceMembers(prev =>
           prev.map(m =>
             m.ticket === ticketNum
-              ? { ...m, id: assignedId, profileId: newProfileId, name: newName, phone: newPhone }
+              ? { ...m, id: assignedId, profileId: newProfileId, name: newName, phone: newPhone, transferredFrom: null, transferEffectiveMonth: null, exitMonth: null, splitPool: null, customInstallment: null }
               : m
           )
         );
@@ -849,7 +862,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       setEditGroupMembers(prev =>
         prev.map(m =>
           m.ticket === ticketNum
-            ? { ...m, profileId: undefined, name: '', phone: '', splitPool: null, customInstallment: null, exitMonth: null }
+            ? { ...m, profileId: undefined, name: '', phone: '', splitPool: null, customInstallment: null, exitMonth: null, transferredFrom: null, transferEffectiveMonth: null }
             : m
         )
       );
@@ -858,7 +871,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         setWorkspaceMembers(prev =>
           prev.map(m =>
             m.ticket === ticketNum
-              ? { ...m, profileId: undefined, name: '', phone: '', splitPool: null, customInstallment: null, exitMonth: null }
+              ? { ...m, profileId: undefined, name: '', phone: '', splitPool: null, customInstallment: null, exitMonth: null, transferredFrom: null, transferEffectiveMonth: null }
               : m
           )
         );
@@ -6689,65 +6702,73 @@ Thank you for your prompt payment! 🙏`;
                             <button
                               type="button"
                               onClick={() => {
+                                if (!member?.profileId) return;
                                 setCustomAmountModalTicket(member);
                                 setCustomAmountVal(member?.customInstallment || standardDue);
                               }}
+                              disabled={!member?.profileId}
                               className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                                member?.customInstallment
+                                member?.profileId && member?.customInstallment
                                   ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
                               }`}
                             >
-                              {member?.customInstallment ? `Custom: ₹${member.customInstallment.toLocaleString('en-IN')}` : 'Set a custom amount'}
+                              {member?.profileId && member?.customInstallment ? `Custom: ₹${member.customInstallment.toLocaleString('en-IN')}` : 'Set a custom amount'}
                             </button>
 
                             <button
                               type="button"
                               onClick={() => {
+                                if (!member?.profileId) return;
                                 setSplitModalTicket(member);
                                 setSplitPayers(member?.splitPool || [
                                   { name: member?.name || 'Person 1', part: Math.round(standardDue / 2) },
                                   { name: 'Person 2', part: Math.round(standardDue / 2) }
                                 ]);
                               }}
+                              disabled={!member?.profileId}
                               className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                                member?.splitPool
+                                member?.profileId && member?.splitPool
                                   ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
                               }`}
                             >
-                              {member?.splitPool ? `Pool (${member.splitPool.length} payers)` : 'Split into a pool'}
+                              {member?.profileId && member?.splitPool ? `Pool (${member.splitPool.length} payers)` : 'Split into a pool'}
                             </button>
 
                             <button
                               type="button"
                               onClick={() => {
+                                if (!member?.profileId) return;
                                 setExitModalTicket(member);
                                 setExitMonthVal(member?.exitMonth || (editingGroup?.currentMonth || 1) + 1);
                               }}
+                              disabled={!member?.profileId}
                               className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                                member?.exitMonth
+                                member?.profileId && member?.exitMonth
                                   ? 'bg-red-50 text-red-700 border-red-200'
-                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
                               }`}
                             >
-                              {member?.exitMonth ? `Exits M${member.exitMonth}` : 'Member leaves the chit...'}
+                              {member?.profileId && member?.exitMonth ? `Exits M${member.exitMonth}` : 'Member leaves the chit...'}
                             </button>
 
                             <button
                               type="button"
                               onClick={() => {
+                                if (!member?.profileId) return;
                                 setTransferModalTicket(member);
                                 setTransferRecipientId('');
                                 setTransferMonthVal((editingGroup?.currentMonth || 1) + 1);
                               }}
+                              disabled={!member?.profileId}
                               className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                                member?.transferredFrom
+                                member?.profileId && member?.transferredFrom
                                   ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
                               }`}
                             >
-                              {member?.transferredFrom ? 'Transferred' : 'Transfer shares...'}
+                              {member?.profileId && member?.transferredFrom ? 'Transferred' : 'Transfer shares...'}
                             </button>
                           </div>
 
