@@ -1108,13 +1108,13 @@ export default function LiveAuctionEngine() {
     if (!selectedHistoricalLog || !historicalReportData || !group) return null;
 
     return (
-      <div className="fixed inset-0 bg-black/70 flex flex-col z-50 p-1 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-        <div className="bg-slate-100 border border-slate-300 rounded-2xl sm:rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[98dvh] sm:max-h-[96dvh]">
+      <div className="fixed inset-0 bg-slate-950/80 flex flex-col z-50 p-1 sm:p-4 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+        <div className="bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[98dvh] sm:max-h-[96dvh]">
           
           {/* Header Bar */}
-          <div className="bg-slate-900 text-white px-3.5 py-3 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-white/10 shrink-0">
+          <div className="bg-slate-900 text-white px-3.5 py-3 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-800 shrink-0">
             <div className="flex items-center gap-2.5 sm:gap-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-400 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-400 flex items-center justify-center shrink-0">
                 <History size={17} />
               </div>
               <div className="min-w-0">
@@ -1183,7 +1183,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               <button
                 type="button"
                 onClick={() => setSelectedHistoricalLog(null)}
-                className="px-2.5 sm:px-3.5 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer"
+                className="px-2.5 sm:px-3.5 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer border border-white/10"
               >
                 <X size={14} />
                 <span className="hidden sm:inline">Close</span>
@@ -1192,21 +1192,21 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
           </div>
 
           {/* Scrollable Document Container */}
-          <div className="p-2 sm:p-6 overflow-y-auto bg-slate-100 flex-1">
-            <div ref={historicalPrintableRef} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-2 sm:p-5 overflow-y-auto bg-slate-900/90 flex-1">
+            <div ref={historicalPrintableRef} className="bg-white rounded-xl sm:rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
               <AuctionReportDocument data={historicalReportData} id="historical-auction-report-doc" />
             </div>
           </div>
 
           {/* Modal Bottom Footer */}
-          <div className="p-2.5 sm:p-3 bg-white border-t border-gray-200 flex items-center justify-between gap-2 text-xs shrink-0">
-            <span className="text-gray-500 font-mono text-[10px] sm:text-[11px] truncate">
+          <div className="p-2.5 sm:p-3.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-2 text-xs shrink-0">
+            <span className="text-slate-400 font-mono text-[10px] sm:text-[11px] truncate">
               Audit ID: {selectedHistoricalLog.id}
             </span>
             <button
               type="button"
               onClick={() => setSelectedHistoricalLog(null)}
-              className="px-4 py-1.5 sm:px-5 sm:py-2 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-[11px] sm:text-xs transition-all active:scale-95 cursor-pointer shrink-0"
+              className="px-4 py-1.5 sm:px-5 sm:py-2 bg-white hover:bg-gray-100 text-slate-950 font-black rounded-xl text-[11px] sm:text-xs transition-all active:scale-95 cursor-pointer shrink-0 shadow-sm"
             >
               Close View
             </button>

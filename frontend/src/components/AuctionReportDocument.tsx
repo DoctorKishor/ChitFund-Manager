@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   Trophy, 
   Sparkles, 
@@ -13,7 +13,8 @@ import {
   AlertCircle,
   FileText,
   Building2,
-  Phone
+  Phone,
+  ArrowUpRight
 } from 'lucide-react';
 
 export interface AuctionReportData {
@@ -56,37 +57,74 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
 
   const monthlyInstallment = data.durationMonths > 0 ? data.totalValue / data.durationMonths : 0;
   const concludedDate = new Date(data.concludedAt);
-  const formattedDate = concludedDate.toLocaleDateString('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-  const formattedTime = concludedDate.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true,
-  });
+  const formattedDate = !isNaN(concludedDate.getTime())
+    ? concludedDate.toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : 'Concluded';
+
+  const formattedTime = !isNaN(concludedDate.getTime())
+    ? concludedDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      })
+    : '';
 
   const nextMonthNum = data.month + 1;
+
+  // Format bid timestamp (handles "01:56:07 AM", ISO strings, or 24h strings)
+  const formatBidTime = (timestamp: string) => {
+    if (!timestamp) return '—';
+    const trimmed = String(timestamp).trim();
+    if (/^\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM|am|pm)?$/i.test(trimmed)) {
+      return trimmed;
+    }
+    try {
+      const d = new Date(trimmed);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+        });
+      }
+    } catch {}
+    return trimmed;
+  };
+
+  // Normalise bid stream chronologically from 1st bid to winning bid
+  const chronologicalBids = useMemo(() => {
+    if (!data.bidStream || data.bidStream.length === 0) return [];
+    const bidsCopy = [...data.bidStream];
+    // If the first bid has a higher amount than the last, it was stored newest-first (descending) -> reverse to show true chronological timeline
+    if (bidsCopy.length > 1 && bidsCopy[0].amount > bidsCopy[bidsCopy.length - 1].amount) {
+      return bidsCopy.reverse();
+    }
+    return bidsCopy;
+  }, [data.bidStream]);
 
   return (
     <div id={id} className="bg-white text-gray-900 p-3.5 sm:p-8 space-y-4 sm:space-y-6 max-w-4xl mx-auto font-sans">
       
-      {/* ── SECTION 1: OFFICIAL REPORT HEADER BANNER ────────────────────── */}
-      <div className="pdf-section border border-gray-200 rounded-2xl p-4 sm:p-6 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white shadow-sm space-y-3 sm:space-y-4">
+      {/* ── SECTION 1: OFFICIAL REPORT HEADER BANNER (Matching dark slate palette) ────────────────────── */}
+      <div className="pdf-section border border-slate-800 rounded-2xl p-4 sm:p-6 bg-slate-900 text-white shadow-md space-y-3 sm:space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 border-b border-white/10 pb-3 sm:pb-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-black text-xs sm:text-sm shrink-0">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-black text-xs sm:text-sm shrink-0">
                 CF
               </span>
               <div className="min-w-0">
                 <h1 className="text-base sm:text-xl font-black tracking-tight text-white truncate">
                   {data.organizerName}
                 </h1>
-                <p className="text-[9px] sm:text-[10px] text-gray-300 font-medium truncate">
+                <p className="text-[10px] sm:text-[11px] text-slate-300 font-medium truncate">
                   Official Live Auction Audit Certificate &amp; Settlement Statement
                 </p>
               </div>
@@ -97,8 +135,8 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] sm:text-xs font-bold font-mono">
               <CheckCircle2 size={11} /> Concluded &amp; Sealed
             </span>
-            <p className="text-[10px] sm:text-[11px] text-gray-300 font-mono">
-              {formattedDate} • {formattedTime}
+            <p className="text-[10px] sm:text-[11px] text-slate-400 font-mono">
+              {formattedDate} {formattedTime ? `• ${formattedTime}` : ''}
             </p>
           </div>
         </div>
@@ -106,23 +144,23 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
         {/* Group Context Banner */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 pt-0.5 text-xs">
           <div className="bg-white/5 border border-white/10 rounded-xl p-2.5 sm:p-3">
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 block">Chit Group</span>
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">Chit Group</span>
             <span className="font-extrabold text-white text-xs sm:text-sm mt-0.5 block truncate">{data.groupName}</span>
           </div>
           <div className="bg-white/5 border border-white/10 rounded-xl p-2.5 sm:p-3">
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 block">Auction Cycle</span>
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">Auction Cycle</span>
             <span className="font-extrabold text-white text-xs sm:text-sm mt-0.5 block">
               Month {data.month} of {data.durationMonths}
             </span>
           </div>
           <div className="bg-white/5 border border-white/10 rounded-xl p-2.5 sm:p-3">
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 block">Total Chit Pot</span>
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">Total Chit Pot</span>
             <span className="font-extrabold text-amber-300 font-mono text-xs sm:text-sm mt-0.5 block">
               {formatCurrency(data.totalValue)}
             </span>
           </div>
           <div className="bg-white/5 border border-white/10 rounded-xl p-2.5 sm:p-3">
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 block">Base Installment</span>
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">Base Installment</span>
             <span className="font-extrabold text-white font-mono text-xs sm:text-sm mt-0.5 block">
               {formatCurrency(monthlyInstallment)} / member
             </span>
@@ -277,85 +315,102 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
         </div>
       )}
 
-      {/* ── SECTION 5: COMPLETE LIVE BIDDING TIMELINE STREAM ────────────── */}
-      <div className="pdf-section border border-gray-200 rounded-2xl p-3.5 sm:p-5 bg-white shadow-2xs space-y-2.5 sm:space-y-3">
-        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+      {/* ── SECTION 5: COMPLETE CHRONOLOGICAL LIVE BIDDING TIMELINE ────────────── */}
+      <div className="pdf-section border border-gray-200 rounded-2xl p-3.5 sm:p-5 bg-white shadow-2xs space-y-3">
+        <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
           <div className="flex items-center gap-2">
-            <TrendingUp size={15} className="text-indigo-600" />
-            <h3 className="text-xs sm:text-sm font-black text-gray-900">
-              Live Bidding Shouts Timeline &amp; Timestamp Audit Trail
-            </h3>
+            <TrendingUp size={16} className="text-indigo-600" />
+            <div>
+              <h3 className="text-xs sm:text-sm font-black text-gray-900">
+                Live Bidding Shouts Timeline &amp; Timestamp Audit Trail
+              </h3>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                Sequential live progression from opening bid to winning discount shout
+              </p>
+            </div>
           </div>
-          <span className="text-[10px] sm:text-[11px] font-bold font-mono px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-            {data.bidStream.length} {data.bidStream.length === 1 ? 'Bid' : 'Bids'}
+          <span className="text-[10px] sm:text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+            {chronologicalBids.length} {chronologicalBids.length === 1 ? 'Shout' : 'Shouts'}
           </span>
         </div>
 
-        {data.bidStream.length === 0 ? (
+        {chronologicalBids.length === 0 ? (
           <div className="py-6 text-center text-gray-400 text-xs italic">
             No live bidding shouts were recorded during this auction cycle.
           </div>
         ) : (
           <div className="overflow-x-auto -mx-1 sm:mx-0">
-            <table className="w-full text-left text-xs border-collapse min-w-[500px] sm:min-w-full">
+            <table className="w-full text-left text-xs border-collapse min-w-[540px] sm:min-w-full">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50/80 text-[9px] sm:text-[10px] uppercase font-bold text-gray-500">
-                  <th className="py-2 px-2.5">#</th>
-                  <th className="py-2 px-2.5">Time</th>
-                  <th className="py-2 px-2.5">Subscriber</th>
-                  <th className="py-2 px-2.5">Ticket</th>
-                  <th className="py-2 px-2.5 text-right">Discount Bid</th>
-                  <th className="py-2 px-2.5 text-right">Jump</th>
-                  <th className="py-2 px-2.5 text-right">Resulting Net Pot</th>
+                <tr className="border-b border-gray-200 bg-slate-50 text-[9px] sm:text-[10px] uppercase font-bold text-slate-500">
+                  <th className="py-2.5 px-3">#</th>
+                  <th className="py-2.5 px-3">Time</th>
+                  <th className="py-2.5 px-3">Subscriber</th>
+                  <th className="py-2.5 px-3">Ticket</th>
+                  <th className="py-2.5 px-3 text-right">Discount Bid</th>
+                  <th className="py-2.5 px-3 text-right">Jump</th>
+                  <th className="py-2.5 px-3 text-right">Resulting Net Pot</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-[10px] sm:text-[11px]">
-                {data.bidStream.map((bid, idx) => {
-                  const prevBid = idx > 0 ? data.bidStream[idx - 1] : null;
+                {chronologicalBids.map((bid, idx) => {
+                  const prevBid = idx > 0 ? chronologicalBids[idx - 1] : null;
                   const jump = prevBid ? bid.amount - prevBid.amount : 0;
                   const resultingPot = Math.max(0, data.totalValue - bid.amount);
-                  const isWinningBid = idx === data.bidStream.length - 1;
-
-                  let timeStr = '—';
-                  try {
-                    const d = new Date(bid.timestamp);
-                    if (!isNaN(d.getTime())) {
-                      timeStr = d.toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: true,
-                      });
-                    }
-                  } catch {}
+                  const isWinningBid = idx === chronologicalBids.length - 1;
+                  const timeDisplay = formatBidTime(bid.timestamp);
 
                   return (
                     <tr 
                       key={bid.id || idx}
-                      className={isWinningBid ? 'bg-emerald-50/70 font-bold' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}
+                      className={`transition-colors ${
+                        isWinningBid 
+                          ? 'bg-emerald-50/80 font-bold border-l-4 border-l-emerald-600' 
+                          : idx % 2 === 0 
+                          ? 'bg-white' 
+                          : 'bg-slate-50/50'
+                      }`}
                     >
-                      <td className="py-1.5 px-2.5 font-mono text-gray-400">
-                        {idx + 1}
+                      <td className="py-2.5 px-3 font-mono">
+                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold ${
+                          isWinningBid 
+                            ? 'bg-emerald-600 text-white shadow-2xs' 
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {idx + 1}
+                        </span>
                       </td>
-                      <td className="py-1.5 px-2.5 font-mono text-gray-500">
-                        {timeStr}
+                      <td className="py-2.5 px-3 font-mono text-slate-500 whitespace-nowrap">
+                        {timeDisplay}
                       </td>
-                      <td className="py-1.5 px-2.5 text-gray-900 font-semibold">
+                      <td className="py-2.5 px-3 text-gray-900 font-semibold">
                         <div className="flex items-center gap-1.5">
-                          {isWinningBid && <Trophy size={11} className="text-amber-500 shrink-0" />}
-                          <span className="truncate max-w-[120px] sm:max-w-none">{bid.memberName}</span>
+                          {isWinningBid && <Trophy size={13} className="text-amber-500 shrink-0" />}
+                          <span className="truncate max-w-[140px] sm:max-w-none">{bid.memberName}</span>
+                          {isWinningBid && (
+                            <span className="text-[8px] uppercase tracking-wider px-1.5 py-0.2 rounded font-black bg-emerald-600 text-white shadow-2xs shrink-0">
+                              Winner
+                            </span>
+                          )}
                         </div>
                       </td>
-                      <td className="py-1.5 px-2.5 font-mono text-indigo-700 font-bold">
+                      <td className="py-2.5 px-3 font-mono text-indigo-700 font-bold">
                         #{bid.ticketNumber}
                       </td>
-                      <td className="py-1.5 px-2.5 text-right font-mono font-extrabold text-rose-600">
+                      <td className="py-2.5 px-3 text-right font-mono font-extrabold text-rose-600">
                         {formatCurrency(bid.amount)}
                       </td>
-                      <td className="py-1.5 px-2.5 text-right font-mono text-gray-500">
-                        {jump > 0 ? `+${formatCurrency(jump)}` : '—'}
+                      <td className="py-2.5 px-3 text-right font-mono">
+                        {jump > 0 ? (
+                          <span className="inline-flex items-center gap-0.5 text-indigo-700 font-bold">
+                            <ArrowUpRight size={10} />
+                            +{formatCurrency(jump)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">Opening</span>
+                        )}
                       </td>
-                      <td className="py-1.5 px-2.5 text-right font-mono font-black text-emerald-700">
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700">
                         {formatCurrency(resultingPot)}
                       </td>
                     </tr>
