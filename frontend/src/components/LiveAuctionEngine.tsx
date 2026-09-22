@@ -43,6 +43,7 @@ import {
   Printer
 } from 'lucide-react';
 import AuctionCountdownBanner from '@/components/AuctionCountdownBanner';
+import { HelpTooltip } from '@/components/HelpTooltip';
 import AuctionScheduleModal from '@/components/AuctionScheduleModal';
 import { computeNextAuctionDateTime } from '@/utils/auctionSchedule';
 import { triggerHapticFeedback } from '@/utils/haptics';
@@ -1160,7 +1161,10 @@ export default function LiveAuctionEngine() {
         {/* ── GROUP SNAPSHOT KEY METRICS ──── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Total Chit Pot</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center justify-between">
+              <span>Total Chit Pot</span>
+              <HelpTooltip text="Gross prize pot value collected across all members per monthly cycle." />
+            </span>
             <span className="text-base sm:text-lg font-black text-gray-900 mt-0.5 block">
               {formatCurrency(group.totalValue)}
             </span>
@@ -1170,7 +1174,10 @@ export default function LiveAuctionEngine() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Current Cycle</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center justify-between">
+              <span>Current Cycle</span>
+              <HelpTooltip text="Active auction month index and remaining rounds in this chit group." />
+            </span>
             <span className="text-base sm:text-lg font-black text-gray-900 mt-0.5 block">
               Month {group.currentMonth} <span className="text-xs text-gray-400 font-medium">of {group.durationMonths}</span>
             </span>
@@ -1180,7 +1187,10 @@ export default function LiveAuctionEngine() {
           </div>
 
           <div className="bg-white border border-amber-200/80 bg-amber-50/20 rounded-2xl p-4 shadow-2xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">Kai Iruppu Pool</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 flex items-center justify-between">
+              <span>Kai Iruppu Pool</span>
+              <HelpTooltip text="Accumulated winning bid discounts. When this reaches the total chit value, a Laaba Seetu (₹0 installment) month triggers." />
+            </span>
             <span className="text-base sm:text-lg font-black text-amber-900 mt-0.5 block">
               {formatCurrency(group.kai_iruppu_pool)}
             </span>
@@ -1190,7 +1200,10 @@ export default function LiveAuctionEngine() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Eligible Bidders</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center justify-between">
+              <span>Eligible Bidders</span>
+              <HelpTooltip text="Subscribers who haven't won a chit prize yet and are eligible to bid in this round." />
+            </span>
             <span className="text-base sm:text-lg font-black text-gray-900 mt-0.5 block">
               {eligibleCount} <span className="text-xs text-gray-400 font-medium">/ {members.length}</span>
             </span>
@@ -1202,57 +1215,64 @@ export default function LiveAuctionEngine() {
 
         {/* ── STAGE 1 STATUS & STUDIO ENTRY ACTION CARD ──── */}
         {group.currentMonth === 0 ? (
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="p-3 bg-amber-500 text-white rounded-2xl shrink-0 shadow-sm">
-                <Crown size={22} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-black text-amber-950">Month 0: Launch Phase (Organizer Profit)</h3>
-                  <span className="text-[9px] font-black uppercase bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md">
-                    No Live Auction
-                  </span>
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500 text-white rounded-2xl shrink-0 shadow-sm">
+                  <Crown size={20} />
                 </div>
-                <p className="text-xs text-amber-900/80 mt-1 leading-relaxed max-w-2xl">
-                  In Month 0, all {group.memberCount} member installments ({formatCurrency(group.totalValue)}) are allocated to the Organizer as Organizer Profit. Once launch collections are secured, advance to Month 1 to begin monthly live auctions.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleAdvanceMonth0}
-              disabled={isRecording}
-              className="bg-amber-600 hover:bg-amber-700 active:scale-98 text-white font-extrabold text-xs px-5 py-3 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
-            >
-              {isRecording ? (
-                <>
-                  <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Advancing to Month 1...</span>
-                </>
-              ) : (
-                <>
-                  <Rocket size={16} />
-                  <span>Confirm Launch &amp; Advance to Month 1</span>
-                </>
-              )}
-            </button>
-          </div>
-        ) : (
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                <div className={`p-3 rounded-2xl text-white shrink-0 shadow-sm ${
-                  isAuctionDateToday ? 'bg-emerald-600' : 'bg-amber-500'
-                }`}>
-                  {isAuctionDateToday ? <Flame size={24} className="animate-pulse" /> : <Lock size={24} />}
-                </div>
-
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base sm:text-lg font-black text-gray-900">
-                      {isAuctionDateToday ? 'Live Auction Ready to Commence' : 'Live Auction Locked for Today'}
+                    <h3 className="text-sm sm:text-base font-black text-amber-950 flex items-center gap-1.5">
+                      <span>Month 0: Launch Phase (Organizer Profit)</span>
+                      <HelpTooltip text={`In Month 0, all ${group.memberCount} member installments (${formatCurrency(group.totalValue)}) are allocated to the Organizer as Organizer Profit. Once launch collections are secured, advance to Month 1 to begin monthly live auctions.`} />
+                    </h3>
+                    <span className="text-[9px] font-black uppercase bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md">
+                      No Live Auction
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAdvanceMonth0}
+                disabled={isRecording}
+                className="bg-amber-600 hover:bg-amber-700 active:scale-98 text-white font-extrabold text-xs px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer ml-auto"
+              >
+                {isRecording ? (
+                  <>
+                    <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Advancing to Month 1...</span>
+                  </>
+                ) : (
+                  <>
+                    <Rocket size={15} />
+                    <span>Confirm Launch &amp; Advance to Month 1</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-5 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`p-2.5 sm:p-3 rounded-2xl text-white shrink-0 shadow-sm ${
+                  isAuctionDateToday ? 'bg-emerald-600' : 'bg-amber-500'
+                }`}>
+                  {isAuctionDateToday ? <Flame size={22} className="animate-pulse" /> : <Lock size={22} />}
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-1.5">
+                      <span>{isAuctionDateToday ? 'Live Auction Ready to Commence' : 'Live Auction Locked for Today'}</span>
+                      <HelpTooltip text={
+                        isAuctionDateToday 
+                          ? 'The live auction is scheduled for today. Enter the dedicated auction studio to conduct roll call, trigger member notifications, and record live shouted bids.'
+                          : 'Live bidding is restricted to the scheduled date to prevent unscheduled bids and keep all members synchronized. To conduct this auction today, please reschedule the date.'
+                      } />
                     </h3>
                     <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
                       isAuctionDateToday 
@@ -1262,12 +1282,6 @@ export default function LiveAuctionEngine() {
                       Scheduled: {formattedTargetAuctionDate} ({formattedTargetAuctionTime})
                     </span>
                   </div>
-
-                  <p className="text-xs text-gray-500 mt-1 max-w-2xl leading-relaxed">
-                    {isAuctionDateToday 
-                      ? 'The live auction is scheduled for today. Enter the dedicated auction studio to conduct roll call, trigger member notifications, and record live shouted bids.'
-                      : 'Live bidding is restricted to the scheduled date to prevent unscheduled bids and keep all members synchronized. To conduct this auction today, please reschedule the date below.'}
-                  </p>
                 </div>
               </div>
 
@@ -1276,7 +1290,7 @@ export default function LiveAuctionEngine() {
                   <button
                     type="button"
                     onClick={() => setShowScheduleModal(true)}
-                    className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs rounded-2xl transition-all flex items-center justify-center gap-2 border border-gray-300 cursor-pointer"
+                    className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs rounded-2xl transition-all flex items-center justify-center gap-2 border border-gray-300 cursor-pointer"
                   >
                     <CalendarClock size={15} className="text-indigo-600" />
                     <span>Reschedule Date</span>
@@ -1286,7 +1300,7 @@ export default function LiveAuctionEngine() {
                 <button
                   type="button"
                   onClick={handleEnterStudio}
-                  className={`px-6 py-3 font-black text-xs sm:text-sm rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-98 cursor-pointer ${
+                  className={`px-5 sm:px-6 py-2.5 sm:py-3 font-black text-xs sm:text-sm rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-98 cursor-pointer ${
                     isAuctionDateToday
                       ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/20 ring-2 ring-emerald-500/30'
                       : 'bg-slate-900 hover:bg-black text-white shadow-slate-900/20'
@@ -1309,12 +1323,10 @@ export default function LiveAuctionEngine() {
                 <Trophy size={15} />
               </div>
               <div className="min-w-0">
-                <h3 className="text-xs sm:text-base font-black text-gray-900 truncate">
-                  Historical Auction Records
+                <h3 className="text-xs sm:text-base font-black text-gray-900 truncate flex items-center gap-1.5">
+                  <span>Historical Auction Records</span>
+                  <HelpTooltip text="Concluded monthly auction rounds, winning subscriber declarations, and net payouts." />
                 </h3>
-                <p className="text-[10px] sm:text-[11px] text-gray-400 truncate sm:whitespace-normal">
-                  Concluded rounds, winners &amp; net payouts.
-                </p>
               </div>
             </div>
 

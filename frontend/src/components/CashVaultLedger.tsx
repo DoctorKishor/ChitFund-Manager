@@ -5,6 +5,7 @@ import { useWallet, WalletType } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase/client';
 import { canAccessTreasurySubtab } from '@/utils/rbac';
+import { HelpTooltip } from './HelpTooltip';
 import { 
   Wallet, 
   Landmark, 
@@ -1065,7 +1066,9 @@ export default function CashVaultLedger() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-gray-100 pb-3 sm:pb-4">
               <div>
                 <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                  <Activity size={13} className="text-emerald-600" /> Total Treasury Liquidity
+                  <Activity size={13} className="text-emerald-600" />
+                  <span>Total Treasury Liquidity</span>
+                  <HelpTooltip text="Real-time multi-account balance synchronized across Physical Cash in Hand, Kishor Bank, Dad Bank, and Mom Bank." />
                 </span>
                 <span className="text-2xl sm:text-4xl font-black block font-mono text-gray-900 tracking-tight mt-0.5 sm:mt-1">
                   {formatCurrency(totalTreasuryBalance)}

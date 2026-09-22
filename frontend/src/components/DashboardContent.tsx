@@ -14,6 +14,7 @@ import AuctionScheduleModal from './AuctionScheduleModal';
 import QuickMemberCollectModal, { CollectableMember } from './QuickMemberCollectModal';
 import QuickPersonalDrawModal from './QuickPersonalDrawModal';
 import QuickAtmWithdrawalModal from './QuickAtmWithdrawalModal';
+import { HelpTooltip } from './HelpTooltip';
 import { triggerHapticFeedback } from '../utils/haptics';
 import { computeNextAuctionDateTime, formatTime12h, getFirstSundayOnOrAfterDay } from '../utils/auctionSchedule';
 import { 
@@ -3334,6 +3335,7 @@ Thank you for your prompt payment! 🙏`;
                       <span className="text-xs font-normal text-gray-500 hidden sm:inline">
                         ({partialCount} partial · {unpaidCount} unpaid)
                       </span>
+                      <HelpTooltip text="Subscribers with unpaid or partial dues for the selected month cycle." />
                     </h3>
                   </div>
                   <div className="flex items-center gap-2">
@@ -3514,10 +3516,8 @@ Thank you for your prompt payment! 🙏`;
                     <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Banknote size={16} className="text-indigo-600" />
                       <span>Payments Breakdown Ledger</span>
+                      <HelpTooltip text={`Live payment receipts logged for Month ${selectedDashboardMonth}. Includes instant WhatsApp sharing and receipt editing.`} />
                     </h3>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      Live receipts for Month {selectedDashboardMonth} with WhatsApp share &amp; edit
-                    </p>
                   </div>
                   <span className="text-xs font-bold text-gray-500 shrink-0">
                     {currentMonthTransactions.length} receipts

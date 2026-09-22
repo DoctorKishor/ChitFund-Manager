@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { HelpTooltip } from './HelpTooltip';
 import { 
   Send, 
   Copy, 
@@ -140,17 +141,15 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
       
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-2xl p-4 sm:p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl shrink-0">
-              <MessageSquare size={20} />
-            </div>
-            <h2 className="text-base sm:text-xl font-bold tracking-tight">Communication & WhatsApp Broadcaster</h2>
+      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl shrink-0">
+            <MessageSquare size={20} />
           </div>
-          <p className="text-xs text-emerald-200/80 leading-relaxed">
-            Generate and broadcast monthly pre-auction notices and post-auction winner summaries directly to subscribers.
-          </p>
+          <h2 className="text-base sm:text-lg font-bold tracking-tight flex items-center gap-2">
+            <span>Communication &amp; WhatsApp Broadcaster</span>
+            <HelpTooltip text="Generate and broadcast monthly pre-auction notices and post-auction winner summaries directly to subscribers via WhatsApp." />
+          </h2>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -162,13 +161,13 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
       </div>
 
       {/* Organization Signature Configuration Card */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shadow-sm">
         <div>
           <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
             <FileText size={14} className="text-indigo-600" />
-            Organization Text Signature
+            <span>Organization Text Signature</span>
+            <HelpTooltip text="Appended to the footer of all compiled WhatsApp broadcast templates." />
           </h4>
-          <p className="text-[11px] text-gray-500 mt-0.5">Appended to the footer of all compiled WhatsApp broadcast templates</p>
         </div>
         <input
           type="text"
@@ -187,8 +186,10 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
               <Send size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-900">One-Tap WhatsApp Broadcast Engine</h3>
-              <p className="text-[11px] text-gray-500 mt-0.5">Select a chit group and template type to compile custom broadcast copy</p>
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                <span>One-Tap WhatsApp Broadcast Engine</span>
+                <HelpTooltip text="Select a chit group and template type to compile custom broadcast copy." />
+              </h3>
             </div>
           </div>
           
