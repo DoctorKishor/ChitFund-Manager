@@ -67,7 +67,7 @@ create table public.chit_groups (
 create table public.group_members (
   id uuid primary key default gen_random_uuid(),
   group_id uuid not null references public.chit_groups(id) on delete cascade,
-  profile_id uuid not null references public.profiles(id) on delete cascade,
+  profile_id uuid references public.profiles(id) on delete set null,
   ticket_number integer not null check (ticket_number > 0),
   has_won_regular boolean not null default false,
   physical_book_synced boolean not null default true,

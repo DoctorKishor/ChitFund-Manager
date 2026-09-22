@@ -826,6 +826,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   const handleUnassignTicket = async (ticketRecordId: string, ticketNum: number) => {
     try {
+      triggerHapticFeedback('light');
       if (!ticketRecordId.startsWith('unassigned-')) {
         const { error } = await supabase
           .from('group_members')
