@@ -5750,13 +5750,13 @@ Thank you for your prompt payment! 🙏`;
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[280px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[340px] sm:max-h-[420px] overflow-y-auto pr-1">
                       {enrollments.map((slot, index) => {
                         const isTargeted = targetSlotForAssign === index;
                         return (
                           <div 
                             key={index} 
-                            className={`flex gap-2 items-center p-2.5 rounded-xl border transition-all ${
+                            className={`flex gap-2.5 items-center p-2.5 sm:p-3 rounded-xl border transition-all ${
                               slot.name 
                                 ? 'bg-white border-gray-200 shadow-2xs hover:border-gray-300' 
                                 : isTargeted
@@ -5785,8 +5785,8 @@ Thank you for your prompt payment! 🙏`;
                               <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                                 <div className="truncate">
                                   <span className="text-xs font-bold text-gray-900 block truncate">{slot.name}</span>
-                                  <span className="text-[10px] text-gray-500 block truncate flex items-center gap-1">
-                                    <Phone size={9} className="text-gray-400 shrink-0" />
+                                  <span className="text-[10px] text-gray-500 block truncate flex items-center gap-1 mt-0.5">
+                                    <Phone size={10} className="text-gray-400 shrink-0" />
                                     {slot.phone}
                                   </span>
                                 </div>
@@ -5798,7 +5798,7 @@ Thank you for your prompt payment! 🙏`;
                                     handleClearSlot(index);
                                   }}
                                   title="Unassign member"
-                                  className="text-red-600 hover:text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-lg border border-red-200 shrink-0 bg-red-50/50 hover:bg-red-50 transition-colors flex items-center gap-0.5 active:scale-95"
+                                  className="text-red-600 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-red-200 shrink-0 bg-red-50/50 hover:bg-red-50 transition-colors flex items-center gap-1 active:scale-95"
                                 >
                                   <Trash2 size={10} /> Clear
                                 </button>
@@ -5820,12 +5820,15 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Master Member Directory */}
-                  <div className="space-y-2 border-t border-gray-150 pt-3">
-                    <h5 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                      Master Directory ({masterDirectory.length})
-                    </h5>
+                  <div className="space-y-2 border-t border-gray-150 pt-3.5">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                        Master Directory ({masterDirectory.length})
+                      </h5>
+                      <span className="text-[10px] text-gray-400">Tap to assign to open slot</span>
+                    </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[140px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
                       {masterDirectory.length === 0 ? (
                         <div className="col-span-full py-4 text-center text-xs text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                           No subscribers found. Tap <strong>&quot;+ Register&quot;</strong> to add one.
@@ -5840,21 +5843,24 @@ Thank you for your prompt payment! 🙏`;
                               type="button"
                               disabled={isAlreadyAdded}
                               onClick={() => handleAssignExistingMember(member)}
-                              className={`p-2 rounded-xl border text-left transition-all relative active:scale-95 ${
+                              className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all relative active:scale-95 flex flex-col justify-between ${
                                 isAlreadyAdded 
                                   ? 'bg-gray-50 border-gray-200 opacity-50 cursor-not-allowed' 
                                   : 'bg-white hover:bg-indigo-50/50 border-gray-200 hover:border-indigo-300 shadow-2xs'
                               }`}
                             >
-                              <div className="flex items-start justify-between gap-1">
-                                <span className="text-xs font-bold text-gray-900 block truncate">{member.name}</span>
+                              <div className="flex items-start justify-between gap-1 w-full">
+                                <span className="text-xs sm:text-sm font-bold text-gray-900 block truncate">{member.name}</span>
                                 {isAlreadyAdded && (
-                                  <span className="text-[8px] font-bold text-emerald-700 bg-emerald-100 px-1 py-0.5 rounded shrink-0">
+                                  <span className="text-[8px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded shrink-0">
                                     Enrolled
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] text-gray-500 block truncate">{member.phone}</span>
+                              <span className="text-[10px] sm:text-[11px] text-gray-500 block truncate mt-1 flex items-center gap-1">
+                                <Phone size={10} className="text-gray-400 shrink-0" />
+                                {member.phone}
+                              </span>
                             </button>
                           );
                         })
