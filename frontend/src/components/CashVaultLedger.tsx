@@ -108,7 +108,7 @@ export default function CashVaultLedger() {
   // Form State: External Cash Deposit / Float Inflow
   const [depositDest, setDepositDest] = useState<WalletType>('cash_in_hand');
   const [depositAmount, setDepositAmount] = useState<string>('');
-  const [depositBy, setDepositBy] = useState<string>('Dad (Anbazhakan)');
+  const [depositBy, setDepositBy] = useState<string>('Anbazhakan');
   const [depositCustomBy, setDepositCustomBy] = useState<string>('');
   const [depositTag, setDepositTag] = useState<string>('Temporary Auction Float');
   const [depositNotes, setDepositNotes] = useState<string>('');
@@ -131,7 +131,7 @@ export default function CashVaultLedger() {
   const [spendTag, setSpendTag] = useState<PersonalDraw['tag']>('Personal Expense');
   const [spendDesc, setSpendDesc] = useState<string>('');
   const [spendWallet, setSpendWallet] = useState<WalletType>('cash_in_hand');
-  const [spendTakenBy, setSpendTakenBy] = useState<string>('Dad (Anbazhakan)');
+  const [spendTakenBy, setSpendTakenBy] = useState<string>('Anbazhakan');
   const [spendCustomTakenBy, setSpendCustomTakenBy] = useState<string>('');
   const [isSubmittingSpend, setIsSubmittingSpend] = useState<boolean>(false);
 
@@ -235,7 +235,7 @@ export default function CashVaultLedger() {
     },
     kishor_bank: {
       name: 'Kishor Bank (UPI)',
-      owner: 'Dr. Kishor Anbazhakan',
+      owner: 'Kishor',
       accountNumber: '•••• 8492 · Primary Digital',
       typeLabel: 'Digital Vault · Primary Inflow',
       bgGradient: 'from-blue-50 via-indigo-50/40 to-white',
@@ -247,8 +247,8 @@ export default function CashVaultLedger() {
       icon: Landmark,
     },
     dad_bank: {
-      name: "Dad's Bank (Anbazhakan)",
-      owner: 'Anbazhakan (Dad)',
+      name: "Anbazhakan's Bank",
+      owner: 'Anbazhakan',
       accountNumber: '•••• 3108 · Primary Banking',
       typeLabel: 'Disbursement Vault · Primary Banking',
       bgGradient: 'from-purple-50 via-fuchsia-50/40 to-white',
@@ -260,8 +260,8 @@ export default function CashVaultLedger() {
       icon: CreditCard,
     },
     mom_bank: {
-      name: "Mom's Bank (Parimalam)",
-      owner: 'Parimalam (Mom)',
+      name: "Parimalam's Bank",
+      owner: 'Parimalam',
       accountNumber: '•••• 5521 · Reserve Account',
       typeLabel: 'Reserve Vault · Secondary Channel',
       bgGradient: 'from-amber-50 via-orange-50/40 to-white',
@@ -385,7 +385,7 @@ export default function CashVaultLedger() {
         const isSettled = notes.toLowerCase().includes('status: settled') || notes.toLowerCase().includes('status: repaid');
         const status: 'outstanding' | 'settled' = isSettled ? 'settled' : 'outstanding';
 
-        let takenBy = 'Dad (Anbazhakan)';
+        let takenBy = 'Anbazhakan';
         const takenByMatch = notes.match(/Taken By:\s*([^|]+)/i);
         if (takenByMatch) {
           takenBy = takenByMatch[1].trim();
@@ -435,7 +435,7 @@ export default function CashVaultLedger() {
       .filter((t) => t.type === 'transfer' && (t.notes || '').toLowerCase().includes('[floating deposit'))
       .map((tx) => {
         const notes = tx.notes || '';
-        let depositedBy = 'Dad (Anbazhakan)';
+        let depositedBy = 'Anbazhakan';
         const byMatch = notes.match(/Deposited By:\s*([^|]+)/i);
         if (byMatch) {
           depositedBy = byMatch[1].trim();
@@ -479,12 +479,12 @@ export default function CashVaultLedger() {
     const active = computedFloatingDeposits.filter(f => f.status === 'active');
     const total = active.reduce((sum, f) => sum + f.amount, 0);
 
-    const dad = active
-      .filter(f => f.depositedBy.toLowerCase().includes('dad') || f.depositedBy.toLowerCase().includes('anbazhakan'))
+    const anbazhakan = active
+      .filter(f => f.depositedBy.toLowerCase().includes('anbazhakan') || f.depositedBy.toLowerCase().includes('dad'))
       .reduce((sum, f) => sum + f.amount, 0);
 
-    const mom = active
-      .filter(f => f.depositedBy.toLowerCase().includes('mom') || f.depositedBy.toLowerCase().includes('parimalam'))
+    const parimalam = active
+      .filter(f => f.depositedBy.toLowerCase().includes('parimalam') || f.depositedBy.toLowerCase().includes('mom'))
       .reduce((sum, f) => sum + f.amount, 0);
 
     const kishor = active
@@ -495,7 +495,7 @@ export default function CashVaultLedger() {
       .filter(f => !f.depositedBy.toLowerCase().includes('dad') && !f.depositedBy.toLowerCase().includes('anbazhakan') && !f.depositedBy.toLowerCase().includes('mom') && !f.depositedBy.toLowerCase().includes('parimalam') && !f.depositedBy.toLowerCase().includes('kishor'))
       .reduce((sum, f) => sum + f.amount, 0);
 
-    return { total, dad, mom, kishor, other, activeCount: active.length };
+    return { total, anbazhakan, parimalam, kishor, other, activeCount: active.length };
   }, [computedFloatingDeposits]);
 
   // Personal Draws Stats Per Person
@@ -503,12 +503,12 @@ export default function CashVaultLedger() {
     const active = computedPersonalDraws.filter(d => d.status === 'outstanding');
     const total = active.reduce((sum, d) => sum + d.amount, 0);
 
-    const dad = active
-      .filter(d => d.takenBy.toLowerCase().includes('dad') || d.takenBy.toLowerCase().includes('anbazhakan'))
+    const anbazhakan = active
+      .filter(d => d.takenBy.toLowerCase().includes('anbazhakan') || d.takenBy.toLowerCase().includes('dad'))
       .reduce((sum, d) => sum + d.amount, 0);
 
-    const mom = active
-      .filter(d => d.takenBy.toLowerCase().includes('mom') || d.takenBy.toLowerCase().includes('parimalam'))
+    const parimalam = active
+      .filter(d => d.takenBy.toLowerCase().includes('parimalam') || d.takenBy.toLowerCase().includes('mom'))
       .reduce((sum, d) => sum + d.amount, 0);
 
     const kishor = active
@@ -519,7 +519,7 @@ export default function CashVaultLedger() {
       .filter(d => !d.takenBy.toLowerCase().includes('dad') && !d.takenBy.toLowerCase().includes('anbazhakan') && !d.takenBy.toLowerCase().includes('mom') && !d.takenBy.toLowerCase().includes('parimalam') && !d.takenBy.toLowerCase().includes('kishor'))
       .reduce((sum, d) => sum + d.amount, 0);
 
-    return { total, dad, mom, kishor, other, activeCount: active.length };
+    return { total, anbazhakan, parimalam, kishor, other, activeCount: active.length };
   }, [computedPersonalDraws]);
 
   // WhatsApp Reminder Link Generator for Personal Draws
@@ -530,7 +530,7 @@ export default function CashVaultLedger() {
     const total = draws.reduce((sum, d) => sum + d.amount, 0);
     const itemsList = draws.map(d => `• ₹${d.amount.toLocaleString('en-IN')} — ${d.tag} (${d.description || 'Cash Draw'}) taken on ${new Date(d.created_at).toLocaleDateString('en-IN')}`).join('\n');
     
-    const personLabel = personFilter === 'dad' ? 'Dad (Anbazhakan)' : personFilter === 'mom' ? 'Mom (Parimalam)' : personFilter === 'kishor' ? 'Dr. Kishor' : 'Family Member';
+    const personLabel = personFilter === 'anbazhakan' || personFilter === 'dad' ? 'Anbazhakan' : personFilter === 'parimalam' || personFilter === 'mom' ? 'Parimalam' : personFilter === 'kishor' ? 'Kishor' : 'Family Member';
 
     const msg = `*CHIT FUND — PERSONAL CASH DRAW REMINDER*\n\n` +
       `Hello ${personLabel},\n` +
@@ -550,7 +550,7 @@ export default function CashVaultLedger() {
     const total = floats.reduce((sum, f) => sum + f.amount, 0);
     const itemsList = floats.map(f => `• ₹${f.amount.toLocaleString('en-IN')} — ${f.tag} (${f.notes || 'Float Inflow'}) deposited on ${new Date(f.created_at).toLocaleDateString('en-IN')}`).join('\n');
     
-    const personLabel = personFilter === 'dad' ? 'Dad (Anbazhakan)' : personFilter === 'mom' ? 'Mom (Parimalam)' : personFilter === 'kishor' ? 'Dr. Kishor' : 'Family Member';
+    const personLabel = personFilter === 'anbazhakan' || personFilter === 'dad' ? 'Anbazhakan' : personFilter === 'parimalam' || personFilter === 'mom' ? 'Parimalam' : personFilter === 'kishor' ? 'Kishor' : 'Family Member';
 
     const msg = `*CHIT FUND — FLOATING CAPITAL RESERVE RECORD*\n\n` +
       `Hello ${personLabel},\n` +
@@ -1253,52 +1253,52 @@ export default function CashVaultLedger() {
             </div>
           </div>
 
-          {/* Per-Person Stat Cards (Dad, Mom, Kishor, Total) */}
+          {/* Per-Person Stat Cards (Anbazhakan, Parimalam, Kishor, Total) */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-            {/* Dad */}
+            {/* Anbazhakan */}
             <div 
-              onClick={() => setKhatabookPersonFilter(prev => prev === 'dad' ? 'all' : 'dad')}
+              onClick={() => setKhatabookPersonFilter(prev => prev === 'anbazhakan' ? 'all' : 'anbazhakan')}
               className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                khatabookPersonFilter === 'dad' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
+                khatabookPersonFilter === 'anbazhakan' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
               }`}
             >
-              <span className="text-[10px] font-bold text-gray-500 uppercase block">Dad (Anbazhakan)</span>
+              <span className="text-[10px] font-bold text-gray-500 uppercase block">Anbazhakan</span>
               <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
                 khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
               }`}>
-                {formatCurrency(khatabookTab === 'floats' ? floatStats.dad : personalDrawStats.dad)}
+                {formatCurrency(khatabookTab === 'floats' ? floatStats.anbazhakan : personalDrawStats.anbazhakan)}
               </span>
               <span className="text-[9px] text-gray-400 font-medium block mt-0.5">
                 {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
               </span>
             </div>
 
-            {/* Mom */}
+            {/* Parimalam */}
             <div 
-              onClick={() => setKhatabookPersonFilter(prev => prev === 'mom' ? 'all' : 'mom')}
+              onClick={() => setKhatabookPersonFilter(prev => prev === 'parimalam' ? 'all' : 'parimalam')}
               className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                khatabookPersonFilter === 'mom' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
+                khatabookPersonFilter === 'parimalam' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
               }`}
             >
-              <span className="text-[10px] font-bold text-gray-500 uppercase block">Mom (Parimalam)</span>
+              <span className="text-[10px] font-bold text-gray-500 uppercase block">Parimalam</span>
               <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
                 khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
               }`}>
-                {formatCurrency(khatabookTab === 'floats' ? floatStats.mom : personalDrawStats.mom)}
+                {formatCurrency(khatabookTab === 'floats' ? floatStats.parimalam : personalDrawStats.parimalam)}
               </span>
               <span className="text-[9px] text-gray-400 font-medium block mt-0.5">
                 {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
               </span>
             </div>
 
-            {/* Dr. Kishor */}
+            {/* Kishor */}
             <div 
               onClick={() => setKhatabookPersonFilter(prev => prev === 'kishor' ? 'all' : 'kishor')}
               className={`p-3 rounded-2xl border transition-all cursor-pointer ${
                 khatabookPersonFilter === 'kishor' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
               }`}
             >
-              <span className="text-[10px] font-bold text-gray-500 uppercase block">Dr. Kishor</span>
+              <span className="text-[10px] font-bold text-gray-500 uppercase block">Kishor</span>
               <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
                 khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
               }`}>
@@ -1339,9 +1339,9 @@ export default function CashVaultLedger() {
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-nowrap">
               {[
                 { id: 'all', label: 'All Members' },
-                { id: 'dad', label: 'Dad (Anbazhakan)' },
-                { id: 'mom', label: 'Mom (Parimalam)' },
-                { id: 'kishor', label: 'Dr. Kishor' },
+                { id: 'anbazhakan', label: 'Anbazhakan' },
+                { id: 'parimalam', label: 'Parimalam' },
+                { id: 'kishor', label: 'Kishor' },
               ].map((p) => {
                 const isSelected = khatabookPersonFilter === p.id;
                 return (
@@ -1865,7 +1865,7 @@ export default function CashVaultLedger() {
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-700 uppercase">Who is taking the cash?</label>
                 <div className="grid grid-cols-4 gap-1.5">
-                  {['Dad (Anbazhakan)', 'Mom (Parimalam)', 'Dr. Kishor', 'Other'].map((person) => (
+                  {['Anbazhakan', 'Parimalam', 'Kishor', 'Other'].map((person) => (
                     <button
                       key={person}
                       type="button"
@@ -1874,10 +1874,20 @@ export default function CashVaultLedger() {
                         spendTakenBy === person ? 'bg-rose-600 text-white border-rose-700 shadow-xs' : 'bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200'
                       }`}
                     >
-                      {person.split(' ')[0]}
+                      {person}
                     </button>
                   ))}
                 </div>
+                {spendTakenBy === 'Other' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter name of person..."
+                    value={spendCustomTakenBy}
+                    onChange={(e) => setSpendCustomTakenBy(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-600 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-900 focus:outline-none animate-in fade-in"
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -1906,8 +1916,8 @@ export default function CashVaultLedger() {
                   >
                     <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
                     <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                    <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                    <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                    <option value="dad_bank">Anbazhakan's Bank ({formatCurrency(balances.dad_bank)})</option>
+                    <option value="mom_bank">Parimalam's Bank ({formatCurrency(balances.mom_bank)})</option>
                   </select>
                 </div>
               </div>
@@ -1977,9 +1987,10 @@ export default function CashVaultLedger() {
                     onChange={(e) => setDepositBy(e.target.value)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
                   >
-                    <option value="Dad (Anbazhakan)">Dad (Anbazhakan)</option>
-                    <option value="Mom (Parimalam)">Mom (Parimalam)</option>
-                    <option value="Dr. Kishor">Dr. Kishor</option>
+                    <option value="Anbazhakan">Anbazhakan</option>
+                    <option value="Parimalam">Parimalam</option>
+                    <option value="Kishor">Kishor</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 
