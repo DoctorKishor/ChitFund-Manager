@@ -6278,7 +6278,7 @@ Thank you for your prompt payment! 🙏`;
                 <input
                   type="number"
                   min={1}
-                  step={500}
+                  step="any"
                   value={customAmountVal || ''}
                   placeholder="e.g. 15000"
                   onChange={(e) => setCustomAmountVal(Number(e.target.value) || 0)}

@@ -155,7 +155,7 @@ export default function QuickPersonalDrawModal({
                 type="number"
                 required
                 min={1}
-                step={10}
+                step="any"
                 placeholder="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}

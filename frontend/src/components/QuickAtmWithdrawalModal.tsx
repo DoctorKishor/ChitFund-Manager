@@ -139,8 +139,8 @@ export default function QuickAtmWithdrawalModal({
               <input
                 type="number"
                 required
-                min={100}
-                step={500}
+                min={1}
+                step="any"
                 placeholder="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
