@@ -238,6 +238,8 @@ export default function CashVaultLedger() {
     borderClass: string;
     textAccent: string;
     dotColor: string;
+    badgeBg: string;
+    iconBg: string;
     icon: React.ComponentType<{ size?: number; className?: string }>;
   }> = {
     cash_in_hand: {
@@ -245,10 +247,12 @@ export default function CashVaultLedger() {
       owner: 'On-Premises Locker',
       accountNumber: 'Vault #01',
       typeLabel: 'Cash Vault · Physical Liquidity',
-      bgGradient: 'from-emerald-900 via-teal-900 to-slate-950',
-      borderClass: 'border-emerald-500/30',
-      textAccent: 'text-emerald-400',
-      dotColor: 'bg-emerald-400',
+      bgGradient: 'from-emerald-50/80 via-teal-50/40 to-white',
+      borderClass: 'border-emerald-200/90 hover:border-emerald-300',
+      textAccent: 'text-emerald-700',
+      dotColor: 'bg-emerald-500',
+      badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      iconBg: 'bg-emerald-100 text-emerald-700',
       icon: Banknote,
     },
     kishor_bank: {
@@ -256,10 +260,12 @@ export default function CashVaultLedger() {
       owner: 'Dr. Kishor Anbazhakan',
       accountNumber: '•••• 8492 · UPI / NetBanking',
       typeLabel: 'Digital Vault · Primary Inflow',
-      bgGradient: 'from-blue-900 via-indigo-950 to-slate-950',
-      borderClass: 'border-blue-500/30',
-      textAccent: 'text-blue-400',
-      dotColor: 'bg-blue-400',
+      bgGradient: 'from-blue-50/80 via-indigo-50/40 to-white',
+      borderClass: 'border-blue-200/90 hover:border-blue-300',
+      textAccent: 'text-blue-700',
+      dotColor: 'bg-blue-500',
+      badgeBg: 'bg-blue-100 text-blue-800 border-blue-200',
+      iconBg: 'bg-blue-100 text-blue-700',
       icon: Landmark,
     },
     dad_bank: {
@@ -267,10 +273,12 @@ export default function CashVaultLedger() {
       owner: 'Anbazhakan (Dad)',
       accountNumber: '•••• 3108 · Primary Banking',
       typeLabel: 'Disbursement Vault · Primary Channel',
-      bgGradient: 'from-purple-950 via-slate-900 to-slate-950',
-      borderClass: 'border-purple-500/30',
-      textAccent: 'text-purple-400',
-      dotColor: 'bg-purple-400',
+      bgGradient: 'from-purple-50/80 via-fuchsia-50/40 to-white',
+      borderClass: 'border-purple-200/90 hover:border-purple-300',
+      textAccent: 'text-purple-700',
+      dotColor: 'bg-purple-500',
+      badgeBg: 'bg-purple-100 text-purple-800 border-purple-200',
+      iconBg: 'bg-purple-100 text-purple-700',
       icon: CreditCard,
     },
     mom_bank: {
@@ -278,10 +286,12 @@ export default function CashVaultLedger() {
       owner: 'Parimalam (Mom)',
       accountNumber: '•••• 5521 · Reserve Channel',
       typeLabel: 'Reserve Vault · Secondary Channel',
-      bgGradient: 'from-amber-950 via-stone-900 to-slate-950',
-      borderClass: 'border-amber-500/30',
-      textAccent: 'text-amber-400',
-      dotColor: 'bg-amber-400',
+      bgGradient: 'from-amber-50/80 via-orange-50/40 to-white',
+      borderClass: 'border-amber-200/90 hover:border-amber-300',
+      textAccent: 'text-amber-700',
+      dotColor: 'bg-amber-500',
+      badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
+      iconBg: 'bg-amber-100 text-amber-700',
       icon: Wallet,
     },
   };
@@ -1022,7 +1032,7 @@ export default function CashVaultLedger() {
     <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-200">
       
       {/* ── 1. TOP SUBTAB NAVIGATION ── */}
-      <div className="bg-slate-100/80 border border-gray-200/80 rounded-3xl p-2 sm:p-2.5 shadow-2xs">
+      <div className="bg-slate-100/80 border border-gray-200/80 rounded-2xl sm:rounded-3xl p-1.5 sm:p-2.5 shadow-2xs">
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar scroll-smooth">
           {CASH_SUBTABS.filter(tab => canAccessTreasurySubtab(profile?.role, tab.id)).map((tab) => {
             const Icon = tab.icon;
@@ -1032,14 +1042,14 @@ export default function CashVaultLedger() {
               <button
                 key={tab.id}
                 onClick={() => setActiveSubtab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-[11px] sm:text-xs shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
                   isActive
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'bg-transparent text-gray-600 hover:text-gray-900 hover:bg-white/60'
                 }`}
               >
-                <Icon size={15} className={isActive ? 'text-emerald-400' : 'text-gray-400'} />
-                <span className="leading-none">{tab.label}</span>
+                <Icon size={14} className={isActive ? 'text-emerald-400' : 'text-gray-400'} />
+                <span className="leading-none whitespace-nowrap">{tab.label}</span>
               </button>
             );
           })}
@@ -1048,67 +1058,67 @@ export default function CashVaultLedger() {
 
       {/* ── SUBTAB 1: OVERVIEW & VAULTS ── */}
       {activeSubtab === 'overview' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           
           {/* Top Liquidity Card */}
-          <div className="bg-gradient-to-br from-slate-900 via-slate-950 to-black text-white rounded-3xl p-5 sm:p-7 border border-slate-800 shadow-xl space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-2xs space-y-3.5 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-gray-100 pb-3 sm:pb-4">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <Activity size={14} className="text-emerald-400" /> Total Treasury Liquidity
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                  <Activity size={13} className="text-emerald-600" /> Total Treasury Liquidity
                 </span>
-                <span className="text-3xl sm:text-4xl font-black block font-mono text-white tracking-tight mt-1">
+                <span className="text-2xl sm:text-4xl font-black block font-mono text-gray-900 tracking-tight mt-0.5 sm:mt-1">
                   {formatCurrency(totalTreasuryBalance)}
                 </span>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold rounded-full">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> 4 Vaults Synchronized
+              <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] sm:text-xs font-bold rounded-full w-fit">
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-pulse" /> 4 Vaults Synchronized
               </span>
             </div>
 
             {/* Split Progress Track */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between text-xs font-bold text-slate-300">
-                <span>Physical Cash: <strong className="text-emerald-400">{formatCurrency(balances.cash_in_hand)}</strong> ({physicalCashPercent}%)</span>
-                <span>Digital Banks: <strong className="text-blue-400">{formatCurrency(totalTreasuryBalance - balances.cash_in_hand)}</strong> ({digitalBanksPercent}%)</span>
+            <div className="space-y-1.5 pt-0.5">
+              <div className="flex justify-between text-[11px] sm:text-xs font-bold text-gray-600">
+                <span>Cash: <strong className="text-emerald-700">{formatCurrency(balances.cash_in_hand)}</strong> ({physicalCashPercent}%)</span>
+                <span>Banks: <strong className="text-blue-700">{formatCurrency(totalTreasuryBalance - balances.cash_in_hand)}</strong> ({digitalBanksPercent}%)</span>
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden flex">
+              <div className="w-full bg-gray-100 rounded-full h-2 sm:h-2.5 overflow-hidden flex border border-gray-200">
                 <div className="bg-emerald-500 h-full transition-all duration-300" style={{ width: `${physicalCashPercent}%` }} />
                 <div className="bg-blue-500 h-full transition-all duration-300" style={{ width: `${digitalBanksPercent}%` }} />
               </div>
             </div>
 
             {/* Quick Action Buttons */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 pt-1">
               <button
                 onClick={() => setActiveSubtab('transfers')}
-                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                className="p-2.5 sm:p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold text-gray-700 flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs"
               >
-                <ArrowRightLeft size={14} className="text-emerald-400" /> Move Money
+                <ArrowRightLeft size={13} className="text-emerald-600" /> Move Money
               </button>
               <button
                 onClick={() => setActiveSubtab('spends')}
-                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                className="p-2.5 sm:p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold text-gray-700 flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs"
               >
-                <Coins size={14} className="text-rose-400" /> Log Spend
+                <Coins size={13} className="text-rose-600" /> Log Spend
               </button>
               <button
                 onClick={() => setActiveSubtab('denominations')}
-                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                className="p-2.5 sm:p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold text-gray-700 flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs"
               >
-                <Calculator size={14} className="text-amber-400" /> Count Cash
+                <Calculator size={13} className="text-amber-600" /> Count Cash
               </button>
               <button
                 onClick={() => setActiveSubtab('ledger')}
-                className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                className="p-2.5 sm:p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold text-gray-700 flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs"
               >
-                <History size={14} className="text-blue-400" /> View Ledger
+                <History size={13} className="text-blue-600" /> View Ledger
               </button>
             </div>
           </div>
 
           {/* 4 Dedicated GPay-Style Vault Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
             {(['cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank'] as WalletType[]).map((wKey) => {
               const meta = WALLET_META[wKey];
               const Icon = meta.icon;
@@ -1121,30 +1131,30 @@ export default function CashVaultLedger() {
                     setSelectedWalletDetail(wKey);
                     setActiveSubtab('wallets');
                   }}
-                  className={`bg-gradient-to-br ${meta.bgGradient} text-white p-5 rounded-3xl border ${meta.borderClass} shadow-lg hover:shadow-2xl transition-all duration-200 cursor-pointer group space-y-4 hover:-translate-y-1 relative overflow-hidden`}
+                  className={`bg-gradient-to-br ${meta.bgGradient} p-4 sm:p-5 rounded-2xl sm:rounded-3xl border ${meta.borderClass} shadow-2xs hover:shadow-xs transition-all duration-200 cursor-pointer group space-y-3 sm:space-y-4 hover:-translate-y-0.5 relative overflow-hidden`}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-xs">
-                      <Icon size={20} className={meta.textAccent} />
+                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl ${meta.iconBg} flex items-center justify-center shadow-2xs`}>
+                      <Icon size={18} className={meta.textAccent} />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/10 backdrop-blur-xs flex items-center gap-1.5">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 sm:px-2.5 py-0.5 rounded-full border ${meta.badgeBg} flex items-center gap-1`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${meta.dotColor}`} /> Live
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-xs text-slate-400 font-semibold block">{meta.name}</span>
-                    <span className="text-2xl font-black font-mono block mt-0.5 text-white tracking-tight">
+                    <span className="text-xs text-gray-500 font-semibold block">{meta.name}</span>
+                    <span className="text-xl sm:text-2xl font-black font-mono block mt-0.5 text-gray-900 tracking-tight">
                       {formatCurrency(bal)}
                     </span>
-                    <span className="text-[11px] text-slate-400 font-mono mt-1 block truncate">
+                    <span className="text-[10px] sm:text-[11px] text-gray-400 font-mono mt-0.5 sm:mt-1 block truncate">
                       {meta.accountNumber}
                     </span>
                   </div>
 
-                  <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs font-bold text-slate-300 group-hover:text-white transition-colors">
+                  <div className="pt-2 border-t border-gray-200/60 flex items-center justify-between text-[11px] sm:text-xs font-bold text-gray-600 group-hover:text-gray-900 transition-colors">
                     <span>View Dedicated Statement</span>
-                    <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform text-gray-400 group-hover:text-gray-900" />
                   </div>
                 </div>
               );
@@ -1152,10 +1162,10 @@ export default function CashVaultLedger() {
           </div>
 
           {/* Live Recent Activity Stream */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3 sm:space-y-4 shadow-2xs">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <History size={16} className="text-indigo-600" />
+                <History size={15} className="text-indigo-600" />
                 Live Treasury Audit Activity
               </h3>
               <button
@@ -1166,7 +1176,7 @@ export default function CashVaultLedger() {
               </button>
             </div>
 
-            <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
               {recentTransactions.slice(0, 8).map((tx) => {
                 const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx);
                 const dateLabel = tx.created_at 
@@ -1174,15 +1184,15 @@ export default function CashVaultLedger() {
                   : 'Recent';
 
                 return (
-                  <div key={tx.id} className="p-3.5 bg-gray-50/80 border border-gray-100 rounded-2xl flex items-center justify-between gap-3">
-                    <div className="space-y-0.5 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                  <div key={tx.id} className="p-3 sm:p-3.5 bg-gray-50/80 border border-gray-100 rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3">
+                    <div className="space-y-0.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-md border ${badgeColor}`}>
                           {badgeLabel}
                         </span>
                         <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
                       </div>
-                      <p className="text-xs font-semibold text-gray-800 truncate">
+                      <p className="text-xs font-semibold text-gray-800 truncate mt-0.5">
                         {tx.notes || tx.description || 'Treasury Movement'}
                       </p>
                       <span className="text-[10px] text-gray-500 font-medium block">
@@ -1206,10 +1216,10 @@ export default function CashVaultLedger() {
 
       {/* ── SUBTAB 2: DEDICATED GPAY-STYLE WALLET PAGES ── */}
       {activeSubtab === 'wallets' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           
           {/* Wallet Selector Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5">
             {(['cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank'] as WalletType[]).map((wKey) => {
               const meta = WALLET_META[wKey];
               const isSelected = selectedWalletDetail === wKey;
@@ -1218,14 +1228,14 @@ export default function CashVaultLedger() {
                 <button
                   key={wKey}
                   onClick={() => setSelectedWalletDetail(wKey)}
-                  className={`px-4 py-2.5 rounded-2xl font-bold text-xs shrink-0 transition-all flex items-center gap-2 shadow-2xs cursor-pointer ${
+                  className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-[11px] sm:text-xs shrink-0 transition-all flex items-center gap-1.5 sm:gap-2 shadow-2xs cursor-pointer ${
                     isSelected
                       ? 'bg-slate-900 text-white shadow-xs'
                       : 'bg-white border border-gray-200 text-gray-600 hover:bg-slate-50'
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${meta.dotColor}`} />
-                  <span>{meta.name}</span>
+                  <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${meta.dotColor}`} />
+                  <span className="whitespace-nowrap">{meta.name}</span>
                 </button>
               );
             })}
@@ -1238,99 +1248,108 @@ export default function CashVaultLedger() {
             const bal = balances[selectedWalletDetail] || 0;
 
             return (
-              <div className={`bg-gradient-to-br ${meta.bgGradient} text-white rounded-3xl p-6 sm:p-8 border ${meta.borderClass} shadow-xl space-y-6`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xs flex items-center justify-center">
-                      <Icon size={24} className={meta.textAccent} />
+              <div className={`bg-gradient-to-br ${meta.bgGradient} rounded-2xl sm:rounded-3xl p-4 sm:p-8 border ${meta.borderClass} shadow-2xs space-y-4 sm:space-y-6 text-gray-900`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+                  <div className="flex items-center gap-2.5 sm:gap-3">
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl ${meta.iconBg} flex items-center justify-center shadow-2xs shrink-0`}>
+                      <Icon size={20} className={meta.textAccent} />
                     </div>
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white leading-tight">{meta.name}</h3>
-                      <span className="text-xs text-slate-400 font-medium block">{meta.owner} · {meta.accountNumber}</span>
+                    <div className="min-w-0">
+                      <h3 className="text-base sm:text-xl font-black text-gray-900 leading-tight truncate">{meta.name}</h3>
+                      <span className="text-[11px] sm:text-xs text-gray-500 font-medium block truncate">{meta.owner} · {meta.accountNumber}</span>
                     </div>
                   </div>
-                  <span className="text-[11px] font-bold px-3 py-1 bg-white/10 text-white rounded-full border border-white/10">
+                  <span className={`text-[10px] sm:text-[11px] font-bold px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border ${meta.badgeBg} w-fit`}>
                     {meta.typeLabel}
                   </span>
                 </div>
 
                 <div>
-                  <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider block">Available Balance</span>
-                  <span className="text-4xl sm:text-5xl font-black font-mono text-white block mt-1 tracking-tight">
+                  <span className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase tracking-wider block">Available Balance</span>
+                  <span className="text-3xl sm:text-5xl font-black font-mono text-gray-900 block mt-0.5 sm:mt-1 tracking-tight">
                     {formatCurrency(bal)}
                   </span>
                 </div>
 
                 {/* GPay Fast Action Buttons */}
-                <div className="grid grid-cols-3 gap-3 pt-2 border-t border-white/10">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-3 border-t border-gray-200/70">
                   <button
                     onClick={() => {
                       setTransferDest(selectedWalletDetail);
                       setActiveSubtab('transfers');
                     }}
-                    className="py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                    className="py-2.5 sm:py-3 px-1 sm:px-2 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs text-center"
                   >
-                    <Plus size={15} className="text-emerald-400" /> Add / Inflow
+                    <Plus size={14} className="text-emerald-600 shrink-0" />
+                    <span className="truncate">Add / Inflow</span>
                   </button>
                   <button
                     onClick={() => {
                       setTransferSource(selectedWalletDetail);
                       setActiveSubtab('transfers');
                     }}
-                    className="py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                    className="py-2.5 sm:py-3 px-1 sm:px-2 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs text-center"
                   >
-                    <ArrowRightLeft size={15} className="text-blue-400" /> Transfer
+                    <ArrowRightLeft size={14} className="text-blue-600 shrink-0" />
+                    <span className="truncate">Transfer</span>
                   </button>
                   <button
                     onClick={() => {
                       setSpendWallet(selectedWalletDetail);
                       setActiveSubtab('spends');
                     }}
-                    className="py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                    className="py-2.5 sm:py-3 px-1 sm:px-2 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs text-center"
                   >
-                    <Coins size={15} className="text-rose-400" /> Spend / Draw
+                    <Coins size={14} className="text-rose-600 shrink-0" />
+                    <span className="truncate">Spend / Draw</span>
                   </button>
                 </div>
               </div>
             );
           })()}
 
-          {/* 3 Flow Metric Cards */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white border border-emerald-200/90 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-1">
-              <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">TOTAL INFLOW</span>
-              <span className="text-xl sm:text-2xl font-black font-mono text-emerald-600 block">
+          {/* 3 Flow Metric Cards - Mobile Optimized */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="bg-white border border-emerald-200/90 rounded-2xl sm:rounded-3xl p-2.5 sm:p-5 shadow-2xs space-y-0.5 sm:space-y-1 overflow-hidden">
+              <span className="text-[9px] sm:text-[11px] font-bold text-emerald-700 uppercase tracking-wider block truncate">
+                Total Inflow
+              </span>
+              <span className="text-xs sm:text-lg md:text-2xl font-black font-mono text-emerald-600 block truncate" title={`+${formatCurrency(walletStats.totalInflow)}`}>
                 +{formatCurrency(walletStats.totalInflow)}
               </span>
             </div>
 
-            <div className="bg-white border border-rose-200/90 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-1">
-              <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider block">TOTAL OUTFLOW</span>
-              <span className="text-xl sm:text-2xl font-black font-mono text-rose-600 block">
+            <div className="bg-white border border-rose-200/90 rounded-2xl sm:rounded-3xl p-2.5 sm:p-5 shadow-2xs space-y-0.5 sm:space-y-1 overflow-hidden">
+              <span className="text-[9px] sm:text-[11px] font-bold text-rose-700 uppercase tracking-wider block truncate">
+                Total Outflow
+              </span>
+              <span className="text-xs sm:text-lg md:text-2xl font-black font-mono text-rose-600 block truncate" title={`-${formatCurrency(walletStats.totalOutflow)}`}>
                 -{formatCurrency(walletStats.totalOutflow)}
               </span>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-1">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">NET FLOW</span>
-              <span className={`text-xl sm:text-2xl font-black font-mono block ${walletStats.netFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-2.5 sm:p-5 shadow-2xs space-y-0.5 sm:space-y-1 overflow-hidden">
+              <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block truncate">
+                Net Flow
+              </span>
+              <span className={`text-xs sm:text-lg md:text-2xl font-black font-mono block truncate ${walletStats.netFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} title={`${walletStats.netFlow >= 0 ? '+' : ''}${formatCurrency(walletStats.netFlow)}`}>
                 {walletStats.netFlow >= 0 ? '+' : ''}{formatCurrency(walletStats.netFlow)}
               </span>
             </div>
           </div>
 
           {/* Wallet Statement Feed */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3 sm:space-y-4 shadow-2xs">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h4 className="text-sm font-bold text-gray-900">
+              <h4 className="text-xs sm:text-sm font-bold text-gray-900">
                 {WALLET_META[selectedWalletDetail].name} Statement Feed
               </h4>
-              <span className="text-xs text-gray-400 font-mono">
+              <span className="text-[11px] sm:text-xs text-gray-400 font-mono">
                 {walletSpecificTxs.length} transactions
               </span>
             </div>
 
-            <div className="space-y-2.5 max-h-[450px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[450px] overflow-y-auto pr-1">
               {walletSpecificTxs.length === 0 ? (
                 <div className="py-12 text-center text-xs text-gray-400">
                   No transaction history recorded for this account yet.
@@ -1339,25 +1358,25 @@ export default function CashVaultLedger() {
                 walletSpecificTxs.map((tx) => {
                   const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx, selectedWalletDetail);
                   const dateLabel = tx.created_at 
-                    ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                     : 'Recent';
 
                   return (
-                    <div key={tx.id} className="p-4 bg-gray-50/70 border border-gray-100 rounded-2xl flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                    <div key={tx.id} className="p-3 sm:p-4 bg-gray-50/70 border border-gray-100 rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3 hover:bg-slate-50 transition-colors">
+                      <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                          <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-md border ${badgeColor}`}>
                             {badgeLabel}
                           </span>
                           <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
                         </div>
-                        <p className="text-xs font-semibold text-gray-800 leading-snug">
+                        <p className="text-xs font-semibold text-gray-800 leading-snug truncate mt-0.5">
                           {tx.notes || tx.description || 'Treasury Transaction'}
                         </p>
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className={`text-sm sm:text-base font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        <span className={`text-xs sm:text-base font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
                         </span>
                       </div>
@@ -1373,40 +1392,39 @@ export default function CashVaultLedger() {
 
       {/* ── SUBTAB 3: MOVE MONEY, TRANSFERS & DEPOSITS ── */}
       {activeSubtab === 'transfers' && (
-        <div className="space-y-6">
-          
+        <div className="space-y-4 sm:space-y-6">
           {/* Top Banner: External Cash Deposit / Organizer Float Injection */}
-          <div className="bg-gradient-to-br from-emerald-900 via-slate-900 to-indigo-950 border border-emerald-500/30 rounded-3xl p-5 sm:p-7 text-white shadow-xl space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3.5 sm:space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-gray-100 pb-3 sm:pb-3.5">
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    <HandCoins size={20} />
+                <div className="flex items-center gap-2 sm:gap-2.5">
+                  <span className="p-1.5 sm:p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                    <HandCoins size={16} />
                   </span>
                   <div>
-                    <h3 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
                       External Cash Deposit &amp; Organizer Float
                     </h3>
-                    <p className="text-xs text-slate-300 font-medium">
+                    <p className="text-[11px] sm:text-xs text-gray-500 font-medium leading-tight">
                       Inject outside personal capital (e.g. Dad/Mom bridging auction pot deficit) into the Cash Box or Bank
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-3 py-1 rounded-full flex items-center gap-1.5">
-                  <Sparkles size={12} /> Auto-Tracked as Floating Capital
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <Sparkles size={11} className="text-emerald-600" /> Auto-Tracked as Floating Capital
                 </span>
               </div>
             </div>
 
-            <form onSubmit={handleExecuteDeposit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <form onSubmit={handleExecuteDeposit} className="space-y-3.5 sm:space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
                 
                 {/* Deposited By */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-300 font-bold uppercase tracking-wider block">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
                     Who Is Depositing? (Deposited By)
                   </label>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -1433,8 +1451,8 @@ export default function CashVaultLedger() {
                           }}
                           className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
                             isSelected
-                              ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black shadow-md'
-                              : 'bg-white/10 text-slate-200 border-white/10 hover:bg-white/15'
+                              ? 'bg-emerald-600 text-white border-emerald-700 font-extrabold shadow-xs'
+                              : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
                           }`}
                         >
                           {person.label}
@@ -1450,20 +1468,20 @@ export default function CashVaultLedger() {
                       placeholder="Enter depositor name..."
                       value={depositCustomBy}
                       onChange={(e) => setDepositCustomBy(e.target.value)}
-                      className="w-full mt-2 bg-slate-800/80 border border-slate-700 focus:border-emerald-400 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none"
+                      className="w-full mt-2 bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none transition-all"
                     />
                   )}
                 </div>
 
                 {/* Destination Account */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-300 font-bold uppercase tracking-wider block">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
                     Deposit Into Vault (Destination)
                   </label>
                   <select
                     value={depositDest}
                     onChange={(e) => setDepositDest(e.target.value as WalletType)}
-                    className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-400 rounded-xl px-3 py-2.5 text-xs font-bold text-white focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:bg-white rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none transition-all"
                   >
                     <option value="cash_in_hand">💵 Physical Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
                     <option value="kishor_bank">🏦 Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
@@ -1471,13 +1489,13 @@ export default function CashVaultLedger() {
                     <option value="mom_bank">🏦 Mom Bank ({formatCurrency(balances.mom_bank)})</option>
                   </select>
 
-                  <label className="text-[10px] text-slate-300 font-bold uppercase tracking-wider block pt-1">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block pt-1">
                     Category Tag
                   </label>
                   <select
                     value={depositTag}
                     onChange={(e) => setDepositTag(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-400 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none transition-all"
                   >
                     <option value="Auction Payout Float">Auction Payout Float (Temporary Bridge)</option>
                     <option value="General Capital Inflow">General Capital Inflow</option>
@@ -1488,7 +1506,7 @@ export default function CashVaultLedger() {
 
                 {/* Deposit Amount & Quick Presets */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-300 font-bold uppercase tracking-wider block">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
                     Deposit Amount (₹)
                   </label>
                   <input
@@ -1497,7 +1515,7 @@ export default function CashVaultLedger() {
                     placeholder="e.g. 20000"
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-400 rounded-xl px-3.5 py-2.5 text-sm font-black text-emerald-300 focus:outline-none placeholder-slate-500 font-mono"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-sm font-black text-emerald-700 focus:outline-none placeholder-gray-400 font-mono transition-all"
                   />
 
                   {/* Preset Pills */}
@@ -1507,7 +1525,7 @@ export default function CashVaultLedger() {
                         key={amt}
                         type="button"
                         onClick={() => setDepositAmount(String(amt))}
-                        className="text-[10px] font-bold bg-white/10 hover:bg-emerald-500 hover:text-slate-950 border border-white/15 text-slate-200 px-2 py-1 rounded-lg transition-all cursor-pointer"
+                        className="text-[10px] font-bold bg-gray-100 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 border border-gray-200 text-gray-700 px-2 py-1 rounded-lg transition-all cursor-pointer"
                       >
                         ₹{amt >= 100000 ? `${amt / 100000}L` : `${amt / 1000}k`}
                       </button>
@@ -1518,21 +1536,21 @@ export default function CashVaultLedger() {
               </div>
 
               {/* Purpose Notes & Submit */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center pt-2 border-t border-white/10">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3 items-center pt-2.5 sm:pt-3 border-t border-gray-100">
                 <div className="md:col-span-8">
                   <input
                     type="text"
                     placeholder="Optional notes (e.g. ₹20k put in Cash Box for auction winner payout while awaiting member dues)..."
                     value={depositNotes}
                     onChange={(e) => setDepositNotes(e.target.value)}
-                    className="w-full bg-slate-800/80 border border-slate-700 focus:border-emerald-400 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:bg-white rounded-xl px-3.5 py-2 text-xs text-gray-900 placeholder-gray-400 focus:outline-none transition-all"
                   />
                 </div>
                 <div className="md:col-span-4">
                   <button
                     type="submit"
                     disabled={isProcessingDeposit}
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-98 text-slate-950 font-black text-xs py-3 rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-extrabold text-xs py-2.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     <Plus size={15} />
                     {isProcessingDeposit ? 'Depositing...' : 'Deposit Cash into Vault'}
@@ -1542,10 +1560,10 @@ export default function CashVaultLedger() {
             </form>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             
             {/* Inter-Vault Transfer Box */}
-            <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+            <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xs">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
                   <ArrowRightLeft size={16} className="text-blue-600" />
@@ -1556,8 +1574,8 @@ export default function CashVaultLedger() {
                 </span>
               </div>
 
-              <form onSubmit={handleExecuteTransfer} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+              <form onSubmit={handleExecuteTransfer} className="space-y-3.5 sm:space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   <div className="space-y-1.5">
                     <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Source Account</label>
                     <select
@@ -1613,7 +1631,7 @@ export default function CashVaultLedger() {
                 <button
                   type="submit"
                   disabled={isProcessingTransfer}
-                  className="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
+                  className="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3 rounded-xl shadow-2xs active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isProcessingTransfer ? 'Transferring...' : 'Execute Inter-Vault Transfer'}
                 </button>
@@ -1621,7 +1639,7 @@ export default function CashVaultLedger() {
             </div>
 
             {/* ATM Bank-to-Cash Relocation (2-Step Verification) */}
-            <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+            <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xs">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
                   <Banknote size={16} className="text-indigo-600" />
@@ -1632,8 +1650,8 @@ export default function CashVaultLedger() {
                 </span>
               </div>
 
-              <form onSubmit={handleTriggerATMRelocation} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+              <form onSubmit={handleTriggerATMRelocation} className="space-y-3.5 sm:space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   <div className="space-y-1.5">
                     <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Source Bank Account</label>
                     <select
@@ -1662,7 +1680,7 @@ export default function CashVaultLedger() {
 
                 <button
                   type="submit"
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all cursor-pointer"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3 rounded-xl shadow-2xs active:scale-98 transition-all cursor-pointer"
                 >
                   Trigger ATM Withdrawal
                 </button>
@@ -1678,17 +1696,17 @@ export default function CashVaultLedger() {
                   
                   <div className="space-y-2">
                     {relocations.map((reloc) => (
-                      <div key={reloc.id} className="flex justify-between items-center bg-amber-50/70 border border-amber-200 p-3.5 rounded-2xl">
-                        <div>
-                          <span className="text-[10px] font-bold text-gray-500 uppercase block">From: {WALLET_META[reloc.source]?.name}</span>
+                      <div key={reloc.id} className="flex justify-between items-center bg-amber-50/70 border border-amber-200 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl gap-2">
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase block truncate">From: {WALLET_META[reloc.source]?.name}</span>
                           <span className="text-sm font-extrabold text-gray-900 font-mono mt-0.5 block">{formatCurrency(reloc.amount)}</span>
                           <span className="text-[10px] text-gray-400 font-mono">{reloc.createdAt}</span>
                         </div>
                         <button
                           onClick={() => handleVerifyATMRelocation(reloc.id, reloc.amount, reloc.source)}
-                          className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                          className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs px-3 sm:px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer shrink-0"
                         >
-                          <Check size={13} /> Confirm Inflow
+                          <Check size={13} /> <span className="hidden sm:inline">Confirm</span> Inflow
                         </button>
                       </div>
                     ))}
@@ -1703,11 +1721,11 @@ export default function CashVaultLedger() {
 
       {/* ── SUBTAB 4: PERSONAL DRAWS, EXPENSES & FLOATING CAPITAL ── */}
       {activeSubtab === 'spends' && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           
           {/* Outstanding Personal Debt Overview Banner */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-gradient-to-br from-rose-50 to-red-100/60 border border-rose-200/80 rounded-2xl p-3.5 sm:p-4 shadow-2xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
+            <div className="bg-gradient-to-br from-rose-50 to-red-100/60 border border-rose-200/80 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-wider flex items-center gap-1">
                   <Coins size={12} className="text-rose-600" /> Total Owed
@@ -1718,65 +1736,65 @@ export default function CashVaultLedger() {
                   </span>
                 )}
               </div>
-              <p className="text-base sm:text-xl font-black text-rose-900 font-mono mt-1">
+              <p className="text-sm sm:text-xl font-black text-rose-900 font-mono mt-1 truncate">
                 {formatCurrency(personalDrawStats.totalOutstanding)}
               </p>
-              <span className="text-[10px] text-rose-600 font-medium">Outstanding personal debt to be put back</span>
+              <span className="text-[10px] text-rose-600 font-medium block truncate">Outstanding personal debt</span>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-1">
+            <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                  👨 Dad (Anbazhakan)
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1 truncate">
+                  👨 Dad
                 </span>
                 {floatStats.dadFloat > 0 && (
-                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md">
-                    +{formatCurrency(floatStats.dadFloat)} Float
+                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md shrink-0">
+                    +{formatCurrency(floatStats.dadFloat)}
                   </span>
                 )}
               </div>
-              <p className={`text-base sm:text-lg font-black font-mono ${personalDrawStats.dadOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              <p className={`text-sm sm:text-lg font-black font-mono truncate ${personalDrawStats.dadOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                 {formatCurrency(personalDrawStats.dadOutstanding)}
               </p>
-              <span className="text-[10px] text-gray-400 font-medium block">
+              <span className="text-[10px] text-gray-400 font-medium block truncate">
                 {personalDrawStats.dadOutstanding > 0 ? 'Owed to treasury' : '✓ ₹0 Debt Owed'}
               </span>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-1">
+            <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                  👩 Mom (Parimalam)
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1 truncate">
+                  👩 Mom
                 </span>
                 {floatStats.momFloat > 0 && (
-                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md">
-                    +{formatCurrency(floatStats.momFloat)} Float
+                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md shrink-0">
+                    +{formatCurrency(floatStats.momFloat)}
                   </span>
                 )}
               </div>
-              <p className={`text-base sm:text-lg font-black font-mono ${personalDrawStats.momOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              <p className={`text-sm sm:text-lg font-black font-mono truncate ${personalDrawStats.momOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                 {formatCurrency(personalDrawStats.momOutstanding)}
               </p>
-              <span className="text-[10px] text-gray-400 font-medium block">
+              <span className="text-[10px] text-gray-400 font-medium block truncate">
                 {personalDrawStats.momOutstanding > 0 ? 'Owed to treasury' : '✓ ₹0 Debt Owed'}
               </span>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-1">
+            <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1 truncate">
                   🧑‍⚕️ Dr. Kishor
                 </span>
                 {floatStats.kishorFloat > 0 && (
-                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md">
-                    +{formatCurrency(floatStats.kishorFloat)} Float
+                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md shrink-0">
+                    +{formatCurrency(floatStats.kishorFloat)}
                   </span>
                 )}
               </div>
-              <p className={`text-base sm:text-lg font-black font-mono ${personalDrawStats.kishorOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              <p className={`text-sm sm:text-lg font-black font-mono truncate ${personalDrawStats.kishorOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                 {formatCurrency(personalDrawStats.kishorOutstanding)}
               </p>
-              <span className="text-[10px] text-gray-400 font-medium block">
+              <span className="text-[10px] text-gray-400 font-medium block truncate">
                 {personalDrawStats.kishorOutstanding > 0 ? 'Owed to treasury' : '✓ ₹0 Debt Owed'}
               </span>
             </div>
@@ -1784,30 +1802,30 @@ export default function CashVaultLedger() {
 
           {/* 🌊 Active Floating Capital Available for 1-Tap Recovery */}
           {floatStats.totalActiveFloat > 0 && (
-            <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/60 border border-emerald-300 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
+            <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/60 border border-emerald-300 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-2xs space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/80 pb-2.5">
                 <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-xl bg-emerald-600 text-white">
+                  <span className="p-1.5 rounded-xl bg-emerald-600 text-white shrink-0">
                     <Sparkles size={16} />
                   </span>
                   <div>
-                    <h4 className="text-sm font-black text-emerald-950 flex items-center gap-2">
+                    <h4 className="text-xs sm:text-sm font-black text-emerald-950 flex items-center gap-2">
                       Active Floating Capital Injected by Organizers ({formatCurrency(floatStats.totalActiveFloat)})
                     </h4>
-                    <p className="text-[11px] text-emerald-700 font-medium">
+                    <p className="text-[10px] sm:text-[11px] text-emerald-700 font-medium leading-tight">
                       Temporary funds put in to bridge payouts. Take your cash back anytime without creating personal debt.
                     </p>
                   </div>
                 </div>
 
-                <span className="text-xs font-black text-emerald-900 bg-emerald-200 border border-emerald-300 px-3 py-1 rounded-full self-start sm:self-auto font-mono">
+                <span className="text-xs font-black text-emerald-900 bg-emerald-200 border border-emerald-300 px-2.5 py-0.5 rounded-full self-start sm:self-auto font-mono shrink-0">
                   {floatStats.activeCount} Active Injections
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 pt-1">
                 {computedFloatingDeposits.filter(f => f.status === 'active').map((float) => (
-                  <div key={float.id} className="bg-white/90 border border-emerald-200 rounded-2xl p-3.5 flex flex-col justify-between gap-3 shadow-2xs">
+                  <div key={float.id} className="bg-white/90 border border-emerald-200 rounded-xl sm:rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between gap-2.5 sm:gap-3 shadow-2xs">
                     <div>
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
@@ -1844,10 +1862,10 @@ export default function CashVaultLedger() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
             
             {/* Fast Expense Entry Card (5 Cols) */}
-            <div className="lg:col-span-5 bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+            <div className="lg:col-span-5 bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xs">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
                   <Coins size={16} className="text-rose-600" />
@@ -1858,7 +1876,7 @@ export default function CashVaultLedger() {
                 </span>
               </div>
 
-              <form onSubmit={handleLogPersonalDraw} className="space-y-4">
+              <form onSubmit={handleLogPersonalDraw} className="space-y-3.5 sm:space-y-4">
                 
                 {/* Who Took It Selector (Large intuitive buttons for family) */}
                 <div className="space-y-1.5">
@@ -1866,12 +1884,12 @@ export default function CashVaultLedger() {
                     <span>Who Took This Money? (Taken By)</span>
                     <span className="text-[9px] text-indigo-600 font-bold">1-Tap Select</span>
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     {[
-                      { id: 'Dad (Anbazhakan)', label: '👨 Dad (Anbazhakan)' },
-                      { id: 'Mom (Parimalam)', label: '👩 Mom (Parimalam)' },
+                      { id: 'Dad (Anbazhakan)', label: '👨 Dad' },
+                      { id: 'Mom (Parimalam)', label: '👩 Mom' },
                       { id: 'Dr. Kishor', label: '🧑‍⚕️ Dr. Kishor' },
-                      { id: 'Other', label: '✍️ Other / Custom' },
+                      { id: 'Other', label: '✍️ Custom' },
                     ].map((person) => {
                       const isSelected = spendTakenBy === person.id;
                       return (
@@ -1888,7 +1906,7 @@ export default function CashVaultLedger() {
                               setSpendDesc("Collection travel expense by Dr. Kishor");
                             }
                           }}
-                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-left flex items-center justify-between cursor-pointer ${
+                          className={`py-2 px-2 sm:px-2.5 rounded-xl text-xs font-bold transition-all border text-left flex items-center justify-between cursor-pointer ${
                             isSelected
                               ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                               : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50'
@@ -1913,7 +1931,7 @@ export default function CashVaultLedger() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   <div className="space-y-1.5">
                     <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Debit From Account</label>
                     <select
@@ -2004,7 +2022,7 @@ export default function CashVaultLedger() {
                 <button
                   type="submit"
                   disabled={isSubmittingSpend}
-                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-3.5 rounded-xl transition-all duration-150 shadow-2xs cursor-pointer disabled:opacity-50"
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-3 rounded-xl transition-all duration-150 shadow-2xs cursor-pointer disabled:opacity-50"
                 >
                   {isSubmittingSpend ? 'Logging Draw...' : 'Log Personal Draw / Expense'}
                 </button>
@@ -2012,8 +2030,8 @@ export default function CashVaultLedger() {
             </div>
 
             {/* Personal Draws & Spends Ledger (7 Cols) */}
-            <div className="lg:col-span-7 bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+            <div className="lg:col-span-7 bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-gray-100 pb-3">
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-gray-900">Personal Draws &amp; Spends Ledger</h3>
                   <span className="text-[11px] text-gray-500">Track who took cash &amp; settle outstanding amounts</span>
@@ -2030,18 +2048,18 @@ export default function CashVaultLedger() {
 
               {/* Filter Tabs & Search */}
               <div className="space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   {/* Status Filters */}
-                  <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                  <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto no-scrollbar">
                     {[
                       { id: 'all', label: `All (${computedPersonalDraws.length})` },
-                      { id: 'outstanding', label: `⚡ Outstanding (${personalDrawStats.outstandingCount})` },
+                      { id: 'outstanding', label: `⚡ Owed (${personalDrawStats.outstandingCount})` },
                       { id: 'settled', label: `✓ Settled (${personalDrawStats.settledCount})` },
                     ].map((tab) => (
                       <button
                         key={tab.id}
                         onClick={() => setPersonalDrawStatusFilter(tab.id as any)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                           personalDrawStatusFilter === tab.id
                             ? 'bg-white text-gray-900 shadow-xs'
                             : 'text-gray-500 hover:text-gray-900'
@@ -2056,7 +2074,7 @@ export default function CashVaultLedger() {
                   <select
                     value={personalDrawPersonFilter}
                     onChange={(e) => setPersonalDrawPersonFilter(e.target.value)}
-                    className="bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer"
+                    className="bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer w-full sm:w-auto"
                   >
                     <option value="all">All People</option>
                     <option value="dad">👨 Dad (Anbazhakan)</option>
@@ -2080,7 +2098,7 @@ export default function CashVaultLedger() {
               </div>
 
               {/* Draws List */}
-              <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+              <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
                 {filteredPersonalDraws.length === 0 ? (
                   <div className="py-12 text-center text-xs text-gray-400 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
                     No personal draws matching the selected filter.
@@ -2091,29 +2109,29 @@ export default function CashVaultLedger() {
                     return (
                       <div 
                         key={draw.id} 
-                        className={`p-4 rounded-2xl border transition-all ${
+                        className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all ${
                           isOutstanding 
                             ? 'bg-rose-50/30 border-rose-200/70 hover:border-rose-300' 
                             : 'bg-gray-50/80 border-gray-200/80'
                         }`}
                       >
-                        <div className="flex justify-between items-start gap-3">
+                        <div className="flex justify-between items-start gap-2.5 sm:gap-3">
                           <div className="space-y-1.5 flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
                               {/* Status Badge */}
                               {isOutstanding ? (
                                 <span className="bg-rose-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
-                                  <Clock size={10} /> Outstanding Owed
+                                  <Clock size={10} /> Outstanding
                                 </span>
                               ) : (
                                 <span className="bg-emerald-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
-                                  <CheckCircle2 size={10} /> Settled / Repaid
+                                  <CheckCircle2 size={10} /> Settled
                                 </span>
                               )}
 
                               {/* Taken By Badge */}
-                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <User size={10} /> Taken By: {draw.takenBy}
+                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 truncate max-w-[150px]">
+                                <User size={10} className="shrink-0" /> {draw.takenBy}
                               </span>
 
                               {/* Category Tag */}
@@ -2144,361 +2162,19 @@ export default function CashVaultLedger() {
                             </div>
                           </div>
 
-                          <div className="text-right shrink-0 flex flex-col items-end gap-2">
-                            <span className={`text-base font-black font-mono ${isOutstanding ? 'text-rose-600' : 'text-gray-500'}`}>
+                          <div className="text-right shrink-0 flex flex-col items-end gap-1.5 sm:gap-2">
+                            <span className={`text-xs sm:text-base font-black font-mono block ${isOutstanding ? 'text-rose-600' : 'text-gray-500'}`}>
                               -{formatCurrency(draw.amount)}
                             </span>
 
                             {isOutstanding ? (
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1 sm:gap-1.5">
                                 <button
                                   type="button"
                                   onClick={() => handleOpenSettleModal(draw)}
-                                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1 transition-all shadow-xs cursor-pointer"
                                 >
-                                  <Banknote size={13} /> Put Cash Back
-                                </button>
-                                <button 
-                                  onClick={() => handleDeletePersonalDraw(draw)}
-                                  className="text-gray-400 hover:text-rose-600 p-1.5 transition-colors cursor-pointer"
-                                  title="Delete draw & Refund vault"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            ) : (
-                              <button 
-                                onClick={() => handleDeletePersonalDraw(draw)}
-                                className="text-gray-300 hover:text-rose-500 p-1 transition-colors cursor-pointer"
-                                title="Delete log record"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
-            
-            {/* Fast Expense Entry Card (5 Cols) */}
-            <div className="lg:col-span-5 bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                  <Coins size={16} className="text-rose-600" />
-                  Fast Expense &amp; Personal Draw Logger
-                </h3>
-                <span className="text-[10px] text-rose-700 font-bold bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
-                  Vault Debit
-                </span>
-              </div>
-
-              <form onSubmit={handleLogPersonalDraw} className="space-y-4">
-                
-                {/* Who Took It Selector (Large intuitive buttons for family) */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
-                    <span>Who Took This Money? (Taken By)</span>
-                    <span className="text-[9px] text-indigo-600 font-bold">1-Tap Select</span>
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'Dad (Anbazhakan)', label: '👨 Dad (Anbazhakan)' },
-                      { id: 'Mom (Parimalam)', label: '👩 Mom (Parimalam)' },
-                      { id: 'Dr. Kishor', label: '🧑‍⚕️ Dr. Kishor' },
-                      { id: 'Other', label: '✍️ Other / Custom' },
-                    ].map((person) => {
-                      const isSelected = spendTakenBy === person.id;
-                      return (
-                        <button
-                          key={person.id}
-                          type="button"
-                          onClick={() => {
-                            setSpendTakenBy(person.id);
-                            if (person.id === 'Dad (Anbazhakan)') {
-                              setSpendDesc("Cash taken by Dad for personal use / rotation");
-                            } else if (person.id === 'Mom (Parimalam)') {
-                              setSpendDesc("Household expense / groceries taken by Mom");
-                            } else if (person.id === 'Dr. Kishor') {
-                              setSpendDesc("Collection travel expense by Dr. Kishor");
-                            }
-                          }}
-                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-left flex items-center justify-between cursor-pointer ${
-                            isSelected
-                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50'
-                          }`}
-                        >
-                          <span className="truncate">{person.label}</span>
-                          {isSelected && <Check size={12} className="shrink-0 ml-1" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {spendTakenBy === 'Other' && (
-                    <input
-                      type="text"
-                      required
-                      placeholder="Enter person name (e.g. Relative, Assistant)..."
-                      value={spendCustomTakenBy}
-                      onChange={(e) => setSpendCustomTakenBy(e.target.value)}
-                      className="w-full mt-2 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                    />
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Debit From Account</label>
-                    <select
-                      value={spendWallet}
-                      onChange={(e) => setSpendWallet(e.target.value as WalletType)}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                    >
-                      <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                      <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                      <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                      <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Spend Amount (₹)</label>
-                    <input
-                      type="number"
-                      required
-                      placeholder="e.g. 500"
-                      value={spendAmount}
-                      onChange={(e) => setSpendAmount(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                    />
-                  </div>
-                </div>
-
-                {/* Quick amount presets */}
-                <div className="flex flex-wrap gap-1.5">
-                  {[500, 1000, 2000, 5000, 7000, 10000].map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setSpendAmount(String(amt))}
-                      className="text-[10px] font-bold bg-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-gray-200 text-gray-600 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                    >
-                      ₹{amt.toLocaleString('en-IN')}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Category Tag</label>
-                  <select
-                    value={spendTag}
-                    onChange={(e) => setSpendTag(e.target.value as PersonalDraw['tag'])}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                  >
-                    <option value="Personal Expense">Personal Expense / Use</option>
-                    <option value="Money Lending / Rotation">Money Lending / Temporary Rotation</option>
-                    <option value="Petrol">Petrol</option>
-                    <option value="Maintenance">Bike / Vehicle Maintenance</option>
-                    <option value="Tea & Refreshments">Tea &amp; Refreshments</option>
-                    <option value="Collection Visits">Collection Visits</option>
-                    <option value="Groceries">Groceries / Household</option>
-                    <option value="Emergency Cash">Emergency Cash</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
-                    <span>Reason / Description</span>
-                    <button 
-                      type="button" 
-                      onClick={() => {
-                        if (spendTakenBy.includes('Dad')) {
-                          setSpendDesc("Cash taken by Dad for personal rotation / lending");
-                        } else if (spendTakenBy.includes('Mom')) {
-                          setSpendDesc("Household / personal expense taken by Mom");
-                        } else {
-                          setSpendDesc("Collection travel & refreshments expense");
-                        }
-                      }} 
-                      className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 hover:text-indigo-800 cursor-pointer"
-                    >
-                      <Mic size={11} /> Auto-fill
-                    </button>
-                  </label>
-                  <textarea
-                    placeholder="e.g. Petrol for collection visits, personal loan rotation, cash taken by Dad..."
-                    value={spendDesc}
-                    onChange={(e) => setSpendDesc(e.target.value)}
-                    rows={2}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none resize-none font-medium shadow-2xs leading-relaxed"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmittingSpend}
-                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-3.5 rounded-xl transition-all duration-150 shadow-2xs cursor-pointer disabled:opacity-50"
-                >
-                  {isSubmittingSpend ? 'Logging Draw...' : 'Log Personal Draw / Expense'}
-                </button>
-              </form>
-            </div>
-
-            {/* Personal Draws & Spends Ledger (7 Cols) */}
-            <div className="lg:col-span-7 bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900">Personal Draws &amp; Spends Ledger</h3>
-                  <span className="text-[11px] text-gray-500">Track who took cash &amp; settle outstanding amounts</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
-                    {personalDrawStats.outstandingCount} Owed
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full">
-                    {personalDrawStats.settledCount} Settled
-                  </span>
-                </div>
-              </div>
-
-              {/* Filter Tabs & Search */}
-              <div className="space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  {/* Status Filters */}
-                  <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-                    {[
-                      { id: 'all', label: `All (${computedPersonalDraws.length})` },
-                      { id: 'outstanding', label: `⚡ Outstanding (${personalDrawStats.outstandingCount})` },
-                      { id: 'settled', label: `✓ Settled (${personalDrawStats.settledCount})` },
-                    ].map((tab) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setPersonalDrawStatusFilter(tab.id as any)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          personalDrawStatusFilter === tab.id
-                            ? 'bg-white text-gray-900 shadow-xs'
-                            : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Person Filter */}
-                  <select
-                    value={personalDrawPersonFilter}
-                    onChange={(e) => setPersonalDrawPersonFilter(e.target.value)}
-                    className="bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer"
-                  >
-                    <option value="all">All People</option>
-                    <option value="dad">👨 Dad (Anbazhakan)</option>
-                    <option value="mom">👩 Mom (Parimalam)</option>
-                    <option value="kishor">🧑‍⚕️ Dr. Kishor</option>
-                    <option value="other">✍️ Others</option>
-                  </select>
-                </div>
-
-                {/* Search input */}
-                <div className="relative">
-                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by reason, name, category, or amount..."
-                    value={personalDrawSearch}
-                    onChange={(e) => setPersonalDrawSearch(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Draws List */}
-              <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-                {filteredPersonalDraws.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-gray-400 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                    No personal draws matching the selected filter.
-                  </div>
-                ) : (
-                  filteredPersonalDraws.map((draw) => {
-                    const isOutstanding = draw.status === 'outstanding';
-                    return (
-                      <div 
-                        key={draw.id} 
-                        className={`p-4 rounded-2xl border transition-all ${
-                          isOutstanding 
-                            ? 'bg-rose-50/30 border-rose-200/70 hover:border-rose-300' 
-                            : 'bg-gray-50/80 border-gray-200/80'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start gap-3">
-                          <div className="space-y-1.5 flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {/* Status Badge */}
-                              {isOutstanding ? (
-                                <span className="bg-rose-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
-                                  <Clock size={10} /> Outstanding Owed
-                                </span>
-                              ) : (
-                                <span className="bg-emerald-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
-                                  <CheckCircle2 size={10} /> Settled / Repaid
-                                </span>
-                              )}
-
-                              {/* Taken By Badge */}
-                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <User size={10} /> Taken By: {draw.takenBy}
-                              </span>
-
-                              {/* Category Tag */}
-                              <span className="bg-gray-100 text-gray-700 border border-gray-200 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
-                                {draw.tag}
-                              </span>
-
-                              {/* Source Wallet Tag */}
-                              <span className="text-[10px] text-gray-500 font-mono">
-                                from {WALLET_META[draw.walletType]?.name}
-                              </span>
-                            </div>
-
-                            <p className="text-xs text-gray-900 font-semibold leading-relaxed">
-                              {draw.description}
-                            </p>
-
-                            {/* Settlement Details Banner if Settled */}
-                            {!isOutstanding && draw.settlementDetails && (
-                              <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-2 text-[11px] text-emerald-800 font-medium flex items-center gap-1.5">
-                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                                <span>{draw.settlementDetails.notes || `Settled on ${draw.settlementDetails.settledAt}`}</span>
-                              </div>
-                            )}
-
-                            <div className="flex items-center gap-3 text-[10px] text-gray-400 font-mono">
-                              <span>Recorded: {draw.timestamp}</span>
-                            </div>
-                          </div>
-
-                          <div className="text-right shrink-0 flex flex-col items-end gap-2">
-                            <span className={`text-base font-black font-mono ${isOutstanding ? 'text-rose-600' : 'text-gray-500'}`}>
-                              -{formatCurrency(draw.amount)}
-                            </span>
-
-                            {isOutstanding ? (
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenSettleModal(draw)}
-                                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-                                >
-                                  <Banknote size={13} /> Put Cash Back
+                                  <Banknote size={12} /> <span className="hidden sm:inline">Put Back</span><span className="sm:hidden">Settle</span>
                                 </button>
                                 <button 
                                   onClick={() => handleDeletePersonalDraw(draw)}
@@ -2530,8 +2206,8 @@ export default function CashVaultLedger() {
 
           {/* ── SIMPLE MODAL: PUT CASH BACK INTO VAULT ── */}
           {settlingDraw && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-              <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+              <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto">
                 
                 {/* Modal Header */}
                 <div className="flex items-start justify-between border-b border-gray-100 pb-3">
@@ -2554,7 +2230,7 @@ export default function CashVaultLedger() {
                 </div>
 
                 <form onSubmit={handleConfirmSettlement} className="space-y-4">
-                  <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-4 space-y-3">
+                  <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-3.5 sm:p-4 space-y-3">
                     <div className="space-y-1">
                       <label className="text-[10px] text-emerald-900 font-bold uppercase tracking-wider">
                         Put Back Into Account
@@ -2622,18 +2298,18 @@ export default function CashVaultLedger() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-2.5 pt-1">
+                  <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-2.5 pt-1">
                     <button
                       type="button"
                       onClick={() => setSettlingDraw(null)}
-                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer"
+                      className="w-full sm:flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer text-center"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={isProcessingSettle || Number(settleAmount) <= 0 || Number(settleAmount) > settlingDraw.amount}
-                      className="flex-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full sm:flex-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-center"
                     >
                       {isProcessingSettle 
                         ? 'Putting Cash Back...' 
@@ -2651,8 +2327,8 @@ export default function CashVaultLedger() {
 
           {/* ── INTERACTIVE MODAL: RECOVER ORGANIZER FLOAT (CHOOSE ANY SOURCE ACCOUNT) ── */}
           {recoveringFloat && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-              <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+              <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto">
                 
                 {/* Modal Header */}
                 <div className="flex items-start justify-between border-b border-gray-100 pb-3">
@@ -2716,7 +2392,7 @@ export default function CashVaultLedger() {
                             key={acc.type}
                             type="button"
                             onClick={() => setRecoverSourceWallet(acc.type)}
-                            className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                            className={`w-full p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                               isSelected
                                 ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
                                 : 'bg-gray-50 border-gray-200 hover:border-gray-300'
@@ -2783,25 +2459,25 @@ export default function CashVaultLedger() {
                   )}
 
                   {/* Action buttons */}
-                  <div className="flex gap-2.5 pt-2">
+                  <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-2.5 pt-2">
                     <button
                       type="button"
                       onClick={() => setRecoveringFloat(null)}
-                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer"
+                      className="w-full sm:flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer text-center"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={isProcessingRecover || Number(recoverAmount) <= 0 || Number(recoverAmount) > recoveringFloat.amount || balances[recoverSourceWallet] < Number(recoverAmount)}
-                      className="flex-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                      className="w-full sm:flex-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-center"
                     >
                       <RotateCcw size={13} />
                       {isProcessingRecover 
                         ? 'Processing Recovery...' 
                         : balances[recoverSourceWallet] < Number(recoverAmount)
                         ? 'Insufficient Balance'
-                        : `Withdraw ${formatCurrency(Number(recoverAmount) || recoveringFloat.amount)} from ${WALLET_META[recoverSourceWallet].name}`
+                        : `Withdraw ${formatCurrency(Number(recoverAmount) || recoveringFloat.amount)}`
                       }
                     </button>
                   </div>
@@ -2816,10 +2492,10 @@ export default function CashVaultLedger() {
 
       {/* ── SUBTAB 5: DENOMINATION COUNTER & RECONCILIATION ── */}
       {activeSubtab === 'denominations' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           
           {/* Note Counter Input Matrix */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xs">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
                 <Calculator size={16} className="text-emerald-600" />
@@ -2834,18 +2510,18 @@ export default function CashVaultLedger() {
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5 sm:space-y-3">
               {[500, 200, 100, 50, 20, 10].map((noteVal) => {
                 const count = denominations[noteVal] || 0;
                 const totalForNote = count * noteVal;
 
                 return (
-                  <div key={noteVal} className="flex items-center justify-between p-3 bg-gray-50/80 border border-gray-100 rounded-2xl gap-3">
-                    <div className="w-20">
-                      <span className="text-sm font-black font-mono text-gray-900">₹{noteVal}</span>
+                  <div key={noteVal} className="flex items-center justify-between p-2.5 sm:p-3 bg-gray-50/80 border border-gray-100 rounded-xl sm:rounded-2xl gap-2 sm:gap-3">
+                    <div className="w-16 sm:w-20 shrink-0">
+                      <span className="text-xs sm:text-sm font-black font-mono text-gray-900">₹{noteVal}</span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <span className="text-xs text-gray-400 font-bold">×</span>
                       <input
                         type="number"
@@ -2856,12 +2532,12 @@ export default function CashVaultLedger() {
                           const val = Math.max(0, parseInt(e.target.value) || 0);
                           setDenominations(prev => ({ ...prev, [noteVal]: val }));
                         }}
-                        className="w-24 bg-white border border-gray-200 focus:border-emerald-500 rounded-xl px-3 py-1.5 text-xs font-bold font-mono text-center text-gray-900 focus:outline-none"
+                        className="w-16 sm:w-24 bg-white border border-gray-200 focus:border-emerald-500 rounded-xl px-2 sm:px-3 py-1.5 text-xs font-bold font-mono text-center text-gray-900 focus:outline-none"
                       />
                     </div>
 
-                    <div className="w-28 text-right">
-                      <span className="text-xs sm:text-sm font-black font-mono text-emerald-700 block">
+                    <div className="w-24 sm:w-28 text-right shrink-0">
+                      <span className="text-xs sm:text-sm font-black font-mono text-emerald-700 block truncate">
                         {formatCurrency(totalForNote)}
                       </span>
                     </div>
@@ -2872,43 +2548,43 @@ export default function CashVaultLedger() {
           </div>
 
           {/* Physical Cash vs App Disparity Card */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-5 shadow-2xs flex flex-col justify-between">
-            <div className="space-y-4">
+          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs flex flex-col justify-between">
+            <div className="space-y-3.5 sm:space-y-4">
               <div className="border-b border-gray-100 pb-3">
                 <h3 className="text-sm sm:text-base font-bold text-gray-900">
                   Cash Box Reconciliation Audit
                 </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">
                   Live comparison between physical currency count and app records
                 </p>
               </div>
 
               {/* 2 Big Comparison Metric Cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-1">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                <div className="p-3.5 sm:p-4 bg-emerald-50/60 border border-emerald-200 rounded-xl sm:rounded-2xl space-y-1">
                   <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">PHYSICAL COUNTED</span>
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-emerald-700 block">
+                  <span className="text-xl sm:text-3xl font-black font-mono text-emerald-700 block truncate">
                     {formatCurrency(calculatedPhysicalCash)}
                   </span>
                 </div>
 
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+                <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl space-y-1">
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">APP CASH BOX</span>
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900 block">
+                  <span className="text-xl sm:text-3xl font-black font-mono text-slate-900 block truncate">
                     {formatCurrency(balances.cash_in_hand || 0)}
                   </span>
                 </div>
               </div>
 
               {/* Disparity Status Callout */}
-              <div className={`p-4 rounded-2xl border ${
+              <div className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border ${
                 cashDisparity === 0
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                   : cashDisparity > 0
                   ? 'bg-blue-50 border-blue-200 text-blue-800'
                   : 'bg-rose-50 border-rose-200 text-rose-800'
               }`}>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold">
                       {cashDisparity === 0 
@@ -2918,11 +2594,11 @@ export default function CashVaultLedger() {
                         : '⚠️ Physical Shortage Detected'}
                     </span>
                   </div>
-                  <span className="text-sm font-black font-mono">
+                  <span className="text-xs sm:text-sm font-black font-mono shrink-0">
                     {cashDisparity > 0 ? '+' : ''}{formatCurrency(cashDisparity)}
                   </span>
                 </div>
-                <p className="text-[11px] opacity-80 mt-1">
+                <p className="text-[10px] sm:text-[11px] opacity-80 mt-1">
                   {cashDisparity === 0
                     ? 'Physical banknotes in locker match the system balance exactly.'
                     : cashDisparity > 0
@@ -2932,7 +2608,7 @@ export default function CashVaultLedger() {
               </div>
 
               {lastReconciliationNote && (
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-600">
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl text-xs text-gray-600">
                   <span className="font-bold text-gray-800 block mb-0.5">Last Record:</span>
                   {lastReconciliationNote}
                 </div>
@@ -2942,7 +2618,7 @@ export default function CashVaultLedger() {
             <button
               type="button"
               onClick={handleSaveDenominations}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all cursor-pointer mt-4"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all cursor-pointer mt-3 sm:mt-4"
             >
               Record Reconciliation Snapshot
             </button>
@@ -2953,62 +2629,64 @@ export default function CashVaultLedger() {
 
       {/* ── SUBTAB 6: MASTER AUDIT LEDGER ── */}
       {activeSubtab === 'ledger' && (
-        <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-5 shadow-2xs">
+        <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs">
           
           {/* Header & Filter Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3 sm:pb-4">
             <div>
-              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
                 <History size={18} className="text-indigo-600" />
                 Treasury Audit &amp; Movements Timeline
               </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">
                 Complete verifiable history of collections, transfers, spends, and ATM cash movements
               </p>
             </div>
 
             {/* Filter Controls */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="relative w-full sm:w-48">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search ledger..."
                   value={ledgerSearch}
                   onChange={(e) => setLedgerSearch(e.target.value)}
-                  className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none w-36 sm:w-48"
+                  className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none w-full"
                 />
               </div>
 
-              <select
-                value={ledgerWalletFilter}
-                onChange={(e) => setLedgerWalletFilter(e.target.value)}
-                className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-700 focus:outline-none"
-              >
-                <option value="all">All Accounts</option>
-                <option value="cash_in_hand">Cash Box</option>
-                <option value="kishor_bank">Kishor Bank</option>
-                <option value="dad_bank">Dad Bank</option>
-                <option value="mom_bank">Mom Bank</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={ledgerWalletFilter}
+                  onChange={(e) => setLedgerWalletFilter(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-700 focus:outline-none flex-1 sm:flex-initial cursor-pointer"
+                >
+                  <option value="all">All Accounts</option>
+                  <option value="cash_in_hand">Cash Box</option>
+                  <option value="kishor_bank">Kishor Bank</option>
+                  <option value="dad_bank">Dad Bank</option>
+                  <option value="mom_bank">Mom Bank</option>
+                </select>
 
-              <select
-                value={ledgerTypeFilter}
-                onChange={(e) => setLedgerTypeFilter(e.target.value)}
-                className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-700 focus:outline-none"
-              >
-                <option value="all">All Types</option>
-                <option value="collection">Collections (+)</option>
-                <option value="payout">Prize Payouts (-)</option>
-                <option value="transfer">Transfers</option>
-                <option value="personal_draw">Personal Draws (-)</option>
-                <option value="atm_withdrawal">ATM Withdrawals</option>
-              </select>
+                <select
+                  value={ledgerTypeFilter}
+                  onChange={(e) => setLedgerTypeFilter(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-700 focus:outline-none flex-1 sm:flex-initial cursor-pointer"
+                >
+                  <option value="all">All Types</option>
+                  <option value="collection">Collections (+)</option>
+                  <option value="payout">Prize Payouts (-)</option>
+                  <option value="transfer">Transfers</option>
+                  <option value="personal_draw">Personal Draws (-)</option>
+                  <option value="atm_withdrawal">ATM Withdrawals</option>
+                </select>
+              </div>
             </div>
           </div>
 
           {/* Master Timeline Stream */}
-          <div className="space-y-2.5 max-h-[550px] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[550px] overflow-y-auto pr-1">
             {filteredMasterLedger.length === 0 ? (
               <div className="py-16 text-center text-xs text-gray-400">
                 No matching transactions found in the treasury ledger.
@@ -3021,24 +2699,24 @@ export default function CashVaultLedger() {
                   : 'Recent';
 
                 return (
-                  <div key={tx.id} className="p-4 bg-gray-50/70 border border-gray-100 rounded-2xl flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                  <div key={tx.id} className="p-3 sm:p-4 bg-gray-50/70 border border-gray-100 rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3 hover:bg-slate-50 transition-colors">
+                    <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-md border ${badgeColor}`}>
                           {badgeLabel}
                         </span>
                         <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
                       </div>
-                      <p className="text-xs font-semibold text-gray-800 leading-snug">
+                      <p className="text-xs font-semibold text-gray-800 leading-snug truncate mt-0.5">
                         {tx.notes || tx.description || 'Treasury Movement'}
                       </p>
-                      <span className="text-[10px] text-gray-500 font-medium block">
+                      <span className="text-[10px] text-gray-500 font-medium block truncate">
                         Account: <strong className="text-gray-700">{WALLET_META[tx.wallet_type]?.name || tx.wallet_type}</strong>
                       </span>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className={`text-sm sm:text-base font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <span className={`text-xs sm:text-base font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
                       </span>
                     </div>

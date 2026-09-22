@@ -16,7 +16,8 @@ import {
   User,
   Lock,
   MessageSquare,
-  ShieldCheck
+  ShieldCheck,
+  Settings
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -40,7 +41,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
     { id: 'auctions', name: 'Auctions', icon: Gavel },
     { id: 'reports', name: 'Reports', icon: BarChart3 },
     { id: 'cash', name: 'Treasury', icon: Vault },
-    { id: 'users', name: 'Access Control', icon: ShieldCheck },
+    { id: 'settings', name: 'Settings', icon: Settings },
   ];
 
   const handleTabClick = (tabId: MainTabId) => {

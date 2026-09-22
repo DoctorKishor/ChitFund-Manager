@@ -42,8 +42,8 @@ export default function NetworkStatusBanner() {
   if (isOnline) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-5 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4 max-h-[90dvh] overflow-y-auto my-auto">
         <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
           <WifiOff size={32} />
         </div>

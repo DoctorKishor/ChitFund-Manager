@@ -7,7 +7,6 @@ import {
   Lock, 
   Mail, 
   Phone, 
-  User, 
   Shield, 
   AlertCircle, 
   ArrowRight, 
@@ -15,7 +14,8 @@ import {
   QrCode, 
   Camera, 
   KeyRound, 
-  Sparkles 
+  Eye, 
+  EyeOff
 } from 'lucide-react';
 import PassbookScannerModal from './PassbookScannerModal';
 
@@ -35,17 +35,54 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
   // Phone + PIN state
   const [subscriberPhone, setSubscriberPhone] = useState('');
   const [subscriberPin, setSubscriberPin] = useState('');
+  const [rememberPhone, setRememberPhone] = useState(false);
+  const [rememberPin, setRememberPin] = useState(false);
 
   // Admin email state
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [adminPhone, setAdminPhone] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberEmail, setRememberEmail] = useState(false);
+  const [rememberPassword, setRememberPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Load saved credentials from localStorage on mount
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // 1. Admin saved credentials
+      const savedRememberEmail = localStorage.getItem('cf_admin_remember_email') === 'true';
+      const savedEmail = localStorage.getItem('cf_admin_saved_email');
+      if (savedRememberEmail && savedEmail) {
+        setEmail(savedEmail);
+        setRememberEmail(true);
+      }
+
+      const savedRememberPassword = localStorage.getItem('cf_admin_remember_password') === 'true';
+      const savedPassword = localStorage.getItem('cf_admin_saved_password');
+      if (savedRememberPassword && savedPassword) {
+        setPassword(savedPassword);
+        setRememberPassword(true);
+      }
+
+      // 2. PIN login saved credentials
+      const savedRememberPhone = localStorage.getItem('cf_pin_remember_phone') === 'true';
+      const savedPhone = localStorage.getItem('cf_pin_saved_phone');
+      if (savedRememberPhone && savedPhone) {
+        setSubscriberPhone(savedPhone);
+        setRememberPhone(true);
+      }
+
+      const savedRememberPin = localStorage.getItem('cf_pin_remember_pin') === 'true';
+      const savedPin = localStorage.getItem('cf_pin_saved_pin');
+      if (savedRememberPin && savedPin) {
+        setSubscriberPin(savedPin);
+        setRememberPin(true);
+      }
+    }
+  }, []);
 
   const normalizePhoneDigits = (raw: string): string => {
     const digits = raw.replace(/\D/g, '');
@@ -64,7 +101,7 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
       setLoading(true);
       const res = await loginWithPassbookToken(scannedToken);
       if (res.success) {
-        setSuccessMsg('Passbook verified! Loading subscriber dashboard...');
+        setSuccessMsg('Passbook verified! Loading dashboard...');
         if (onSuccess) onSuccess();
       } else {
         setErrorMsg(res.error || 'Invalid or unassigned passbook QR code.');
@@ -95,9 +132,29 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
 
     try {
       setLoading(true);
+
+      // Persist / Clear PIN Login credentials in localStorage
+      if (typeof window !== 'undefined') {
+        if (rememberPhone) {
+          localStorage.setItem('cf_pin_remember_phone', 'true');
+          localStorage.setItem('cf_pin_saved_phone', cleanPhone);
+        } else {
+          localStorage.removeItem('cf_pin_remember_phone');
+          localStorage.removeItem('cf_pin_saved_phone');
+        }
+
+        if (rememberPin) {
+          localStorage.setItem('cf_pin_remember_pin', 'true');
+          localStorage.setItem('cf_pin_saved_pin', subscriberPin);
+        } else {
+          localStorage.removeItem('cf_pin_remember_pin');
+          localStorage.removeItem('cf_pin_saved_pin');
+        }
+      }
+
       const res = await loginWithPhoneAndMpin(cleanPhone, subscriberPin);
       if (res.success) {
-        setSuccessMsg('Signed in successfully! Loading subscriber portal...');
+        setSuccessMsg('Signed in! Loading portal...');
         if (onSuccess) onSuccess();
       } else {
         setErrorMsg(res.error || 'Failed to sign in.');
@@ -115,45 +172,45 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
     setErrorMsg(null);
     setSuccessMsg(null);
 
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
+      setErrorMsg('Please enter your email and password.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      if (isSignUp) {
-        const coreDigits = normalizePhoneDigits(adminPhone);
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-              phone_number: coreDigits,
-              role: 'admin',
-            },
-          },
-        });
+      // Clear subscriber session keys in localStorage before admin login
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cf_passbook_token_session');
+        localStorage.removeItem('cf_subscriber_session_id');
 
-        if (error) throw error;
-
-        if (data.user) {
-          await supabase.from('profiles').upsert({
-            id: data.user.id,
-            full_name: fullName,
-            phone_number: coreDigits,
-            role: 'admin',
-          });
+        // Persist / Clear Admin credentials in localStorage
+        if (rememberEmail) {
+          localStorage.setItem('cf_admin_remember_email', 'true');
+          localStorage.setItem('cf_admin_saved_email', cleanEmail);
+        } else {
+          localStorage.removeItem('cf_admin_remember_email');
+          localStorage.removeItem('cf_admin_saved_email');
         }
 
-        setSuccessMsg('Admin account created! Logging you in...');
-        if (onSuccess) onSuccess();
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-        if (onSuccess) onSuccess();
+        if (rememberPassword) {
+          localStorage.setItem('cf_admin_remember_password', 'true');
+          localStorage.setItem('cf_admin_saved_password', password);
+        } else {
+          localStorage.removeItem('cf_admin_remember_password');
+          localStorage.removeItem('cf_admin_saved_password');
+        }
       }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+
+      if (error) throw error;
+      if (onSuccess) onSuccess();
     } catch (err: any) {
       setErrorMsg(err.message || 'Authentication failed. Please check your credentials.');
     } finally {
@@ -162,265 +219,302 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden">
-      {/* Glow Header */}
-      <div className="absolute -top-12 -right-12 w-48 h-48 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#070b14] flex flex-col justify-center items-center px-4 py-6 relative overflow-hidden font-sans">
+      
+      {/* Subtle Ambient Background Lighting */}
+      <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-80 bg-indigo-600/15 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-80 h-80 bg-purple-600/10 rounded-full blur-[100px] pointer-events-none" />
 
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-        {/* Brand Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white font-black text-xl mb-2.5 shadow-lg shadow-indigo-500/25">
-            CF
+      {/* Grid Pattern */}
+      <div className="absolute inset-0 bg-[radial-gradient(#1e293b1a_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
+
+      <div className="w-full max-w-sm sm:max-w-md relative z-10">
+        
+        {/* Main Card */}
+        <div className="bg-slate-900/90 backdrop-blur-2xl border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl shadow-black/60">
+          
+          {/* Brand Header */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white font-black text-xl mb-3 shadow-lg shadow-indigo-600/30">
+              CF
+            </div>
+            
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+              ChitFund <span className="text-indigo-400">Manager</span>
+            </h1>
+            <p className="text-xs text-slate-400 mt-1">Community Chit Fund Ledger</p>
           </div>
-          <h2 className="text-2xl font-black text-white tracking-tight">ChitFund Manager</h2>
-          <p className="text-xs text-slate-400 mt-1">High-Trust Community Chit Fund Ledger</p>
-        </div>
 
-        {/* Mode Selector Tabs */}
-        <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-6">
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode('qr_passbook');
-              setErrorMsg(null);
-            }}
-            className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 ${
-              authMode === 'qr_passbook'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <QrCode size={13} /> Passbook QR
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode('phone_pin');
-              setErrorMsg(null);
-            }}
-            className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 ${
-              authMode === 'phone_pin'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Phone size={13} /> Mobile & PIN
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode('admin_email');
-              setErrorMsg(null);
-            }}
-            className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 ${
-              authMode === 'admin_email'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Shield size={13} /> Admin
-          </button>
-        </div>
+          {/* Mode Selector Tabs (Clean, single-line, mobile-responsive) */}
+          <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-800/80 mb-5">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode('qr_passbook');
+                setErrorMsg(null);
+                setSuccessMsg(null);
+              }}
+              className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                authMode === 'qr_passbook'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <QrCode size={13} className="shrink-0" />
+              <span>Passbook</span>
+            </button>
 
-        {/* Alerts */}
-        {errorMsg && (
-          <div className="mb-4 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-            <AlertCircle size={16} className="shrink-0" />
-            <span>{errorMsg}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode('phone_pin');
+                setErrorMsg(null);
+                setSuccessMsg(null);
+              }}
+              className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                authMode === 'phone_pin'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Phone size={13} className="shrink-0" />
+              <span>PIN Login</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode('admin_email');
+                setErrorMsg(null);
+                setSuccessMsg(null);
+              }}
+              className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                authMode === 'admin_email'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Shield size={13} className="shrink-0" />
+              <span>Admin</span>
+            </button>
           </div>
-        )}
 
-        {successMsg && (
-          <div className="mb-4 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-            <CheckCircle2 size={16} className="shrink-0" />
-            <span>{successMsg}</span>
-          </div>
-        )}
+          {/* Feedback Alerts */}
+          {errorMsg && (
+            <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle size={15} className="shrink-0 text-rose-400" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
-        {/* TAB 1: PASSBOOK QR INSTANT ACCESS */}
-        {authMode === 'qr_passbook' && (
-          <div className="space-y-4 animate-in fade-in duration-200 text-center py-2">
-            <div className="p-6 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col items-center justify-center gap-3">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                <QrCode size={36} />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Scan Physical Passbook</h3>
-                <p className="text-[11px] text-slate-400 max-w-xs mt-0.5">
-                  Point camera at the QR code on your physical pocket book for instant passwordless login.
+          {successMsg && (
+            <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 size={15} className="shrink-0 text-emerald-400" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          {/* TAB 1: PASSBOOK QR SCANNER */}
+          {authMode === 'qr_passbook' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col items-center justify-center text-center">
+                
+                {/* Laser Viewfinder */}
+                <div className="relative mb-3">
+                  <div className="w-20 h-20 rounded-2xl bg-slate-900 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-inner relative overflow-hidden">
+                    {/* Vertical Laser Scan Animation */}
+                    <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_6px_#22d3ee] animate-laser-scan pointer-events-none" />
+                    
+                    <QrCode size={40} className="text-indigo-400" />
+                  </div>
+
+                  {/* Corner Brackets */}
+                  <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-cyan-400 rounded-tl-sm shadow-[0_0_4px_#22d3ee]" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-cyan-400 rounded-tr-sm shadow-[0_0_4px_#22d3ee]" />
+                  <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-cyan-400 rounded-bl-sm shadow-[0_0_4px_#22d3ee]" />
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-cyan-400 rounded-br-sm shadow-[0_0_4px_#22d3ee]" />
+                </div>
+
+                <h2 className="text-sm font-bold text-white">Scan Passbook QR</h2>
+                <p className="text-xs text-slate-400 max-w-[240px] mt-0.5">
+                  Point camera at the QR code on your physical chit book.
                 </p>
+
+                <button
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  disabled={loading}
+                  className="w-full mt-4 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/30"
+                >
+                  <Camera size={15} />
+                  <span>Open Camera Scanner</span>
+                </button>
+              </div>
+
+              <p className="text-center text-[11px] text-slate-500">
+                Tip: You can also scan directly with your phone's camera app.
+              </p>
+            </div>
+          )}
+
+          {/* TAB 2: SUBSCRIBER MOBILE & PIN LOGIN */}
+          {authMode === 'phone_pin' && (
+            <form onSubmit={handlePhonePinLogin} className="space-y-3.5 animate-in fade-in duration-200">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Mobile Number
+                </label>
+                <div className="relative flex rounded-xl bg-slate-950 border border-slate-800 focus-within:border-indigo-500 overflow-hidden transition-colors">
+                  <div className="px-3 py-2.5 bg-slate-900 border-r border-slate-800 text-xs font-semibold text-slate-400 flex items-center gap-1 shrink-0">
+                    +91
+                  </div>
+                  <input
+                    type="tel"
+                    required
+                    value={subscriberPhone}
+                    onChange={(e) => setSubscriberPhone(e.target.value)}
+                    placeholder="10-digit number"
+                    maxLength={10}
+                    className="w-full bg-transparent px-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
+                  />
+                </div>
+                <div className="mt-1.5 flex items-center">
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-[11px] text-slate-400 hover:text-slate-200 select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberPhone}
+                      onChange={(e) => setRememberPhone(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500/40 cursor-pointer w-3.5 h-3.5"
+                    />
+                    <span>Remember Mobile Number</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  4-Digit MPIN
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                    <KeyRound size={14} />
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    value={subscriberPin}
+                    onChange={(e) => setSubscriberPin(e.target.value)}
+                    placeholder="Enter PIN (Default: 1234)"
+                    maxLength={6}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono tracking-widest"
+                  />
+                </div>
+                <div className="mt-1.5 flex items-center">
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-[11px] text-slate-400 hover:text-slate-200 select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberPin}
+                      onChange={(e) => setRememberPin(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500/40 cursor-pointer w-3.5 h-3.5"
+                    />
+                    <span>Remember MPIN</span>
+                  </label>
+                </div>
               </div>
 
               <button
-                type="button"
-                onClick={() => setIsScannerOpen(true)}
+                type="submit"
                 disabled={loading}
-                className="w-full mt-2 py-3.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/30"
+                className="w-full mt-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/30"
               >
-                <Camera size={16} /> Open Camera Scanner
+                {loading ? 'Authenticating...' : 'Sign In'} <ArrowRight size={14} />
               </button>
-            </div>
+            </form>
+          )}
 
-            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/80 text-[10px] text-slate-400">
-              💡 <strong>Tip:</strong> You can also scan the QR sticker directly with Google Lens or your phone's camera app to open the app automatically.
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: SUBSCRIBER MOBILE & PIN LOGIN */}
-        {authMode === 'phone_pin' && (
-          <form onSubmit={handlePhonePinLogin} className="space-y-4 animate-in fade-in duration-200">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Registered Mobile Number
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Phone size={15} />
-                </div>
-                <input
-                  type="tel"
-                  required
-                  value={subscriberPhone}
-                  onChange={(e) => setSubscriberPhone(e.target.value)}
-                  placeholder="10-digit mobile number"
-                  maxLength={10}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                4-Digit MPIN
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <KeyRound size={15} />
-                </div>
-                <input
-                  type="password"
-                  required
-                  value={subscriberPin}
-                  onChange={(e) => setSubscriberPin(e.target.value)}
-                  placeholder="Enter PIN (Default: 1234)"
-                  maxLength={6}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono tracking-widest"
-                />
-              </div>
-              <p className="text-[10px] text-slate-500 mt-1">Default MPIN is 1234 unless updated.</p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/30"
-            >
-              {loading ? 'Authenticating...' : 'Sign In to Subscriber Portal'} <ArrowRight size={14} />
-            </button>
-          </form>
-        )}
-
-        {/* TAB 3: ADMIN SIGN-IN */}
-        {authMode === 'admin_email' && (
-          <form onSubmit={handleAdminAuth} className="space-y-4 animate-in fade-in duration-200">
-            {isSignUp && (
-              <>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Full Name</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                      <User size={15} />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Admin Name"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                    />
+          {/* TAB 3: ADMIN SIGN-IN */}
+          {authMode === 'admin_email' && (
+            <form onSubmit={handleAdminAuth} className="space-y-3.5 animate-in fade-in duration-200">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Admin Email</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                    <Mail size={14} />
                   </div>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="admin@chitfund.com"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  />
                 </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Mobile Number</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                      <Phone size={15} />
-                    </div>
+                <div className="mt-1.5 flex items-center">
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-[11px] text-slate-400 hover:text-slate-200 select-none">
                     <input
-                      type="tel"
-                      required
-                      value={adminPhone}
-                      onChange={(e) => setAdminPhone(e.target.value)}
-                      placeholder="10-digit mobile"
-                      maxLength={10}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+                      type="checkbox"
+                      checked={rememberEmail}
+                      onChange={(e) => setRememberEmail(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500/40 cursor-pointer w-3.5 h-3.5"
                     />
+                    <span>Remember Email</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Password</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                    <Lock size={14} />
                   </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
                 </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Admin Email</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Mail size={15} />
+                <div className="mt-1.5 flex items-center">
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-[11px] text-slate-400 hover:text-slate-200 select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberPassword}
+                      onChange={(e) => setRememberPassword(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500/40 cursor-pointer w-3.5 h-3.5"
+                    />
+                    <span>Remember Password</span>
+                  </label>
                 </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@chitfund.com"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Lock size={15} />
-                </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/30"
-            >
-              {loading ? 'Processing...' : isSignUp ? 'Create Admin Account' : 'Sign In as Administrator'}{' '}
-              <ArrowRight size={14} />
-            </button>
-
-            <div className="text-center mt-3">
               <button
-                type="button"
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setErrorMsg(null);
-                }}
-                className="text-xs text-indigo-400 hover:underline"
+                type="submit"
+                disabled={loading}
+                className="w-full mt-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/30"
               >
-                {isSignUp ? 'Already an admin? Sign in' : 'Create new administrator account'}
+                {loading ? 'Authenticating...' : 'Sign In as Administrator'}{' '}
+                <ArrowRight size={14} />
               </button>
-            </div>
-          </form>
-        )}
+
+              <div className="pt-1 text-center">
+                <span className="text-[11px] text-slate-500">
+                  🔒 Restricted to authorized personnel
+                </span>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
 
       {/* Camera QR Scanner Modal */}

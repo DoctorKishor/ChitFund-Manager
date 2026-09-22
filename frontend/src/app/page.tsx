@@ -3,16 +3,19 @@
 import React, { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import MobileBottomNav from '@/components/MobileBottomNav';
-import TopStatusRibbon from '@/components/TopStatusRibbon';
 import UserProfileBadge from '@/components/UserProfileBadge';
 import FontSizeSwitcher from '@/components/FontSizeSwitcher';
 import DashboardContent from '@/components/DashboardContent';
 import AuthScreen from '@/components/AuthScreen';
 import SubscriberPortal from '@/components/SubscriberPortal';
+import MaintenanceScreen from '@/components/MaintenanceScreen';
 import { useAuth } from '@/context/AuthContext';
+import { useMaintenance } from '@/context/MaintenanceContext';
+import { AlertTriangle, Wrench } from 'lucide-react';
 
 export default function Home() {
   const { user, profile, loading } = useAuth();
+  const { isMaintenanceMode } = useMaintenance();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
@@ -32,6 +35,11 @@ export default function Home() {
     );
   }
 
+  // 1. If maintenance mode is active, block anyone who is NOT an admin
+  if (isMaintenanceMode && profile?.role !== 'admin') {
+    return <MaintenanceScreen />;
+  }
+
   if (!user && !profile) {
     return <AuthScreen />;
   }
@@ -48,7 +56,7 @@ export default function Home() {
       case 'chits':
         return 'Chit Groups & Enrollment';
       case 'members':
-        return 'Members Directory';
+        return 'Members & Access Control';
       case 'communication':
         return 'Communication & WhatsApp Broadcaster';
       case 'auctions':
@@ -58,7 +66,9 @@ export default function Home() {
       case 'cash':
         return 'Treasury & Vault Ledger';
       case 'users':
-        return 'User Roles & Access Control';
+        return 'Members & Access Control';
+      case 'settings':
+        return 'Settings & Profile Management';
       default:
         return 'Chit Funds Workspace';
     }
@@ -83,6 +93,11 @@ export default function Home() {
             <h1 className="font-bold text-xs sm:text-base text-gray-900 tracking-tight uppercase truncate">
               {getTabTitle(activeTab)}
             </h1>
+            {isMaintenanceMode && (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                <Wrench size={10} className="text-amber-700" /> Maintenance Active
+              </span>
+            )}
           </div>
 
           {/* Right Header Actions: Font Scale Switcher + Authenticated User Profile (Desktop/Tablet) */}
@@ -94,11 +109,23 @@ export default function Home() {
           </div>
         </header>
 
+        {/* Maintenance Alert Ribbon for Admin */}
+        {isMaintenanceMode && (
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-between shadow-xs sticky top-14 sm:top-16 z-20">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={15} className="shrink-0 animate-bounce" />
+              <span>
+                <strong>System Maintenance Mode is ON:</strong> Non-admin users (Subscribers &amp; Managers) are currently redirected to the Maintenance Notice.
+              </span>
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md text-slate-950">
+              Admin Exclusive Access
+            </span>
+          </div>
+        )}
+
         {/* 2. Main Content Board Canvas (Wide on desktop, touch-friendly with bottom-safe padding on mobile) */}
         <main className="flex-1 p-3.5 sm:p-6 pb-24 sm:pb-6 space-y-4 sm:space-y-6 overflow-y-auto w-full max-w-[1600px] mx-auto">
-          {/* Top Status Ribbon (Multi-wallet summary asset pills) — shown exclusively in Cash Handling tab */}
-          {activeTab === 'cash' && <TopStatusRibbon />}
-
           {/* Dynamic Content Panel Board */}
           <div className="w-full">
             <DashboardContent activeTab={activeTab} />

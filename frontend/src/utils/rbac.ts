@@ -9,7 +9,8 @@ export type MainTabId =
   | 'auctions' 
   | 'reports' 
   | 'cash'
-  | 'users';
+  | 'users'
+  | 'settings';
 
 export type PermissionAction =
   // Chit Management
@@ -44,10 +45,22 @@ export type PermissionAction =
   // System & Roles
   | 'system:manage_users';
 
+export interface CustomRoleRecord {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  is_system?: boolean;
+  allowed_tabs?: string[];
+  allowed_actions?: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
 /**
- * Tab Accessibility Matrix by Role
+ * Tab Accessibility Matrix by Default System Role
  */
-export const TAB_PERMISSIONS: Record<MainTabId, UserRole[]> = {
+export const TAB_PERMISSIONS: Record<MainTabId, string[]> = {
   dashboard: ['admin', 'manager', 'subscriber'],
   chits: ['admin', 'manager', 'subscriber'],
   members: ['admin', 'manager', 'subscriber'],
@@ -56,12 +69,13 @@ export const TAB_PERMISSIONS: Record<MainTabId, UserRole[]> = {
   reports: ['admin', 'manager'],
   cash: ['admin', 'manager'],
   users: ['admin'],
+  settings: ['admin', 'manager'],
 };
 
 /**
- * Treasury Subtab Accessibility Matrix by Role
+ * Treasury Subtab Accessibility Matrix by Default System Role
  */
-export const TREASURY_SUBTAB_PERMISSIONS: Record<CashHandlingSubtab, UserRole[]> = {
+export const TREASURY_SUBTAB_PERMISSIONS: Record<CashHandlingSubtab, string[]> = {
   overview: ['admin', 'manager'],
   wallets: ['admin', 'manager'],
   transfers: ['admin', 'manager'],
@@ -71,9 +85,9 @@ export const TREASURY_SUBTAB_PERMISSIONS: Record<CashHandlingSubtab, UserRole[]>
 };
 
 /**
- * Granular Action Permission Matrix by Role
+ * Granular Action Permission Matrix by Default System Role
  */
-export const ACTION_PERMISSIONS: Record<PermissionAction, UserRole[]> = {
+export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
   // Chit Group Controls
   'chits:create': ['admin'],
   'chits:edit': ['admin', 'manager'],
@@ -116,8 +130,12 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, UserRole[]> = {
 /**
  * Helper to check if a user role can access a primary tab
  */
-export function canAccessTab(role: UserRole | undefined, tab: MainTabId): boolean {
+export function canAccessTab(role: UserRole | undefined, tab: MainTabId, customRole?: CustomRoleRecord | null): boolean {
   if (!role) return false;
+  if (role === 'admin') return true;
+  if (customRole && customRole.id === role) {
+    return customRole.allowed_tabs ? customRole.allowed_tabs.includes(tab) : false;
+  }
   const allowed = TAB_PERMISSIONS[tab];
   return allowed ? allowed.includes(role) : false;
 }
@@ -127,6 +145,7 @@ export function canAccessTab(role: UserRole | undefined, tab: MainTabId): boolea
  */
 export function canAccessTreasurySubtab(role: UserRole | undefined, subtab: CashHandlingSubtab): boolean {
   if (!role) return false;
+  if (role === 'admin') return true;
   const allowed = TREASURY_SUBTAB_PERMISSIONS[subtab];
   return allowed ? allowed.includes(role) : false;
 }
@@ -134,8 +153,13 @@ export function canAccessTreasurySubtab(role: UserRole | undefined, subtab: Cash
 /**
  * Helper to check if a user role has permission for a specific action
  */
-export function hasPermission(role: UserRole | undefined, action: PermissionAction): boolean {
+export function hasPermission(role: UserRole | undefined, action: PermissionAction, customRole?: CustomRoleRecord | null): boolean {
   if (!role) return false;
+  if (role === 'admin') return true;
+  if (customRole && customRole.id === role) {
+    return customRole.allowed_actions ? customRole.allowed_actions.includes(action) : false;
+  }
   const allowed = ACTION_PERMISSIONS[action];
   return allowed ? allowed.includes(role) : false;
 }
+

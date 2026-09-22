@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { supabase } from '@/utils/supabase/client';
 import { User } from '@supabase/supabase-js';
 
-export type UserRole = 'admin' | 'manager' | 'subscriber';
+export type UserRole = 'admin' | 'manager' | 'subscriber' | string;
 
 export interface UserProfile {
   id: string;
@@ -13,6 +13,7 @@ export interface UserProfile {
   role: UserRole;
   email?: string;
   passbookToken?: string;
+  isBlocked?: boolean;
 }
 
 interface AuthContextType {
@@ -45,10 +46,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error('Error fetching profile:', error);
-        return;
       }
 
       if (data) {
+        if (data.is_blocked && data.role !== 'admin') {
+          await supabase.auth.signOut();
+          setUser(null);
+          setProfile(null);
+          alert('Your account portal access has been suspended by an Administrator.');
+          return;
+        }
+
         setProfile({
           id: data.id,
           fullName: data.full_name || 'User',
@@ -56,6 +64,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           role: (data.role as UserRole) || 'subscriber',
           email: email || '',
           passbookToken: data.passbook_token || undefined,
+          isBlocked: data.is_blocked || false,
+        });
+      } else {
+        // Fallback: If auth user exists in Supabase Auth but profile row is delayed or missing,
+        // create or construct a fallback profile object from user metadata
+        const { data: userData } = await supabase.auth.getUser();
+        const userObj = userData?.user;
+        const fallbackRole = (userObj?.user_metadata?.role as UserRole) || 'admin';
+        const fallbackName = userObj?.user_metadata?.full_name || email?.split('@')[0] || 'Administrator';
+        const fallbackPhone = userObj?.user_metadata?.phone_number || userObj?.phone || '';
+
+        setProfile({
+          id: userId,
+          fullName: fallbackName,
+          phoneNumber: fallbackPhone,
+          role: fallbackRole,
+          email: email || userObj?.email || '',
+        });
+
+        // Ensure profile exists in profiles table
+        await supabase.from('profiles').upsert({
+          id: userId,
+          full_name: fallbackName,
+          phone_number: fallbackPhone,
+          role: fallbackRole,
         });
       }
     } catch (err) {
@@ -183,7 +216,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         setLoading(true);
 
-        // 1. Check Passbook Token Session in localStorage (Fast direct check)
+        // 1. Check Supabase Auth Session FIRST (Admins / Managers / Email accounts take highest precedence)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && isMounted) {
+          // Clear any stale subscriber tokens from localStorage
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem(PASSBOOK_SESSION_KEY);
+            localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
+          }
+          setUser(session.user);
+          await fetchProfile(session.user.id, session.user.email);
+          initialAuthDone = true;
+          setLoading(false);
+          return;
+        }
+
+        // 2. If no Supabase user session, check Passbook Token Session in localStorage
         if (typeof window !== 'undefined') {
           const savedPassbookToken = localStorage.getItem(PASSBOOK_SESSION_KEY);
           if (savedPassbookToken) {
@@ -197,7 +245,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
           }
 
-          // 2. Check Direct Subscriber Session ID in localStorage
+          // 3. Check Direct Subscriber Session ID in localStorage
           const savedSubscriberId = localStorage.getItem(SUBSCRIBER_SESSION_KEY);
           if (savedSubscriberId) {
             const { data, error } = await supabase.rpc('authenticate_by_subscriber_id', {
@@ -221,16 +269,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
-        // 3. Check Supabase Auth Session (Admins / Managers / Email accounts)
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user && isMounted) {
-          setUser(session.user);
-          await fetchProfile(session.user.id, session.user.email);
-          initialAuthDone = true;
-          setLoading(false);
-          return;
-        }
-
         if (isMounted) {
           setUser(null);
           setProfile(null);
@@ -247,16 +285,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     initAuth();
 
-    // Listen to Supabase Auth State Changes (ignore premature initial firing)
+    // Listen to Supabase Auth State Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
 
       if (event === 'INITIAL_SESSION' && !initialAuthDone) {
-        // Do not prematurely dismiss loading during initial session restore
         return;
       }
 
       if (session?.user) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(PASSBOOK_SESSION_KEY);
+          localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
+        }
         setUser(session.user);
         await fetchProfile(session.user.id, session.user.email);
         setLoading(false);

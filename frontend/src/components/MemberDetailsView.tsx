@@ -164,6 +164,27 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
 
   useEffect(() => {
     fetchMemberData();
+
+    // Realtime channel listener for live synchronization
+    const channel = supabase
+      .channel(`member-details-${memberId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        fetchMemberData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chit_groups' }, () => {
+        fetchMemberData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
+        fetchMemberData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'auction_logs' }, () => {
+        fetchMemberData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [memberId]);
 
   // Currency Formatter
@@ -173,6 +194,19 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       currency: 'INR',
       maximumFractionDigits: 0,
     }).format(val || 0);
+  };
+
+  // Helper: Month label calculation
+  const getMonthLabel = (startDateStr: string | null | undefined, monthNum: number) => {
+    if (monthNum === 0) return 'Month 0 (Launch)';
+    if (!startDateStr) return `Month ${monthNum}`;
+    try {
+      const base = new Date(startDateStr);
+      const targetDate = new Date(base.getFullYear(), base.getMonth() + monthNum, base.getDate() || 1);
+      return `${targetDate.toLocaleString('en-IN', { month: 'short' })} (M${monthNum})`;
+    } catch (e) {
+      return `Month ${monthNum}`;
+    }
   };
 
   // Helper: Image Compression
@@ -269,43 +303,168 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   }, [memberTransactions]);
 
-  // Aggregate expected total commitment and pending dues across all enrolled groups
-  const { totalExpectedDue, totalCurrentDue, totalRemainingToGo, allSettled } = useMemo(() => {
-    let expDue = 0;
-    let currDue = 0;
 
-    memberEnrollments.forEach((enroll: any) => {
+
+  // Detailed per-group and per-month dues breakdown matrix
+  const groupDuesBreakdowns = useMemo(() => {
+    return memberEnrollments.map((enroll) => {
       const g = Array.isArray(enroll.chit_groups) ? enroll.chit_groups[0] : enroll.chit_groups;
-      if (!g) return;
+      if (!g) return null;
 
       const duration = Number(g.duration_months) || 20;
       const totalVal = Number(g.total_value) || 200000;
       const baseInst = Math.round(totalVal / duration);
-      const memberInst = enroll.custom_installment !== null ? Number(enroll.custom_installment) : baseInst;
+      const memberInst = enroll.custom_installment !== null && enroll.custom_installment !== undefined 
+        ? Number(enroll.custom_installment) 
+        : baseInst;
+      const lifetimeCommitment = memberInst * duration;
 
-      // Total lifetime commitment for this ticket
-      expDue += memberInst * duration;
+      // Group auctions
+      const groupAuctions = auctionLogs.filter((a: any) => a.group_id === g.id);
+      const maxAuctionMonth = groupAuctions.length > 0 
+        ? Math.max(...groupAuctions.map((a: any) => a.month || 0)) 
+        : 0;
 
-      // Current month dues up to current_month
-      const currentM = (g.current_month !== undefined && g.current_month !== null) ? Number(g.current_month) : 0;
-      const isLaaba = (g.kai_iruppu_pool || 0) >= totalVal;
-      const monthDue = isLaaba ? 0 : memberInst;
-      
-      // Calculate months elapsed up to currentM
-      currDue += monthDue * (currentM + 1);
+      const effectiveCurrentMonth = Math.max(
+        g.current_month !== undefined && g.current_month !== null ? Number(g.current_month) : 0,
+        maxAuctionMonth
+      );
+
+      // Group collections
+      const groupTransactions = memberTransactions.filter(
+        (t: any) => (t.group_id === g.id || t.group_member_id === enroll.id) && t.type === 'collection'
+      );
+      const totalPaidForGroup = groupTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+      const monthDues: {
+        month: number;
+        label: string;
+        expectedDue: number;
+        paidAmount: number;
+        remainingDue: number;
+        status: 'paid' | 'partial' | 'unpaid' | 'free_laaba';
+        isCurrentCycle: boolean;
+      }[] = [];
+
+      for (let m = 0; m <= effectiveCurrentMonth; m++) {
+        const monthAuction = groupAuctions.find((a: any) => a.month === m);
+        const isLaaba = !!monthAuction?.is_laaba_seetu || (m > 0 && (g.kai_iruppu_pool || 0) >= totalVal);
+        const expectedDue = isLaaba ? 0 : memberInst;
+
+        // Month tag pattern e.g. "Month 0", "Month 1"
+        const monthPattern = new RegExp(`\\bMonth\\s+${m}\\b`, 'i');
+        const taggedTxs = groupTransactions.filter(t => t.notes && monthPattern.test(t.notes));
+        const taggedPaid = taggedTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        monthDues.push({
+          month: m,
+          label: getMonthLabel(g.start_date, m),
+          expectedDue,
+          paidAmount: taggedPaid,
+          remainingDue: Math.max(0, expectedDue - taggedPaid),
+          status: isLaaba ? 'free_laaba' : taggedPaid >= expectedDue ? 'paid' : taggedPaid > 0 ? 'partial' : 'unpaid',
+          isCurrentCycle: m === effectiveCurrentMonth,
+        });
+      }
+
+      // Sum of tagged paid amounts
+      const sumTaggedPaid = monthDues.reduce((sum, item) => sum + item.paidAmount, 0);
+
+      // If surplus exists beyond tagged payments, allocate FIFO to unallocated months
+      if (totalPaidForGroup > sumTaggedPaid) {
+        let surplus = totalPaidForGroup - sumTaggedPaid;
+        for (const item of monthDues) {
+          if (surplus <= 0) break;
+          if (item.remainingDue > 0) {
+            const canTake = Math.min(surplus, item.remainingDue);
+            item.paidAmount += canTake;
+            item.remainingDue = Math.max(0, item.expectedDue - item.paidAmount);
+            surplus -= canTake;
+            if (item.paidAmount >= item.expectedDue) {
+              item.status = 'paid';
+            } else if (item.paidAmount > 0) {
+              item.status = 'partial';
+            }
+          }
+        }
+      }
+
+      // If no tagged payments at all, allocate totalPaidForGroup purely FIFO from M0
+      if (sumTaggedPaid === 0 && totalPaidForGroup > 0) {
+        let remainingPool = totalPaidForGroup;
+        for (const item of monthDues) {
+          if (remainingPool <= 0) {
+            item.paidAmount = 0;
+            item.remainingDue = item.expectedDue;
+            item.status = item.expectedDue === 0 ? 'free_laaba' : 'unpaid';
+            continue;
+          }
+          const canTake = Math.min(remainingPool, item.expectedDue);
+          item.paidAmount = canTake;
+          item.remainingDue = Math.max(0, item.expectedDue - canTake);
+          remainingPool -= canTake;
+          if (item.paidAmount >= item.expectedDue) {
+            item.status = 'paid';
+          } else if (item.paidAmount > 0) {
+            item.status = 'partial';
+          } else {
+            item.status = item.expectedDue === 0 ? 'free_laaba' : 'unpaid';
+          }
+        }
+      }
+
+      const groupExpectedDue = monthDues.reduce((sum, item) => sum + item.expectedDue, 0);
+      const outstandingBalance = monthDues.reduce((sum, item) => sum + item.remainingDue, 0);
+      const isSettled = outstandingBalance === 0;
+      const unpaidMonths = monthDues.filter((item) => item.remainingDue > 0);
+
+      return {
+        enrollmentId: enroll.id,
+        groupId: g.id,
+        groupName: g.name,
+        ticketNumber: enroll.ticket_number,
+        totalValue: totalVal,
+        durationMonths: duration,
+        memberInstallment: memberInst,
+        startDate: g.start_date,
+        effectiveCurrentMonth,
+        totalPaidForGroup,
+        lifetimeCommitment,
+        lifetimeRemainingToGo: Math.max(0, lifetimeCommitment - totalPaidForGroup),
+        groupExpectedDue,
+        outstandingBalance,
+        isSettled,
+        unpaidMonths,
+        monthDues,
+      };
+    }).filter(Boolean) as any[];
+  }, [memberEnrollments, memberTransactions, auctionLogs]);
+
+  // Aggregate expected total commitment and pending dues across all enrolled groups
+  const { totalExpectedDue, totalCurrentDue, totalPendingCurrentDues, totalRemainingToGo, allSettled, groupsWithDues } = useMemo(() => {
+    let expTotal = 0;
+    let currTotalExpected = 0;
+    let pendingCurrent = 0;
+
+    (groupDuesBreakdowns || []).forEach((item: any) => {
+      expTotal += item.lifetimeCommitment;
+      currTotalExpected += item.groupExpectedDue;
+      pendingCurrent += item.outstandingBalance;
     });
 
-    const remainingToGo = Math.max(0, expDue - totalPaidIn);
-    const pendingCurrentDues = Math.max(0, currDue - totalPaidIn);
-    const settled = pendingCurrentDues === 0;
+    const remainingToGo = Math.max(0, expTotal - totalPaidIn);
+    const settled = pendingCurrent === 0;
+    const groupsWithPending = (groupDuesBreakdowns || []).filter((item: any) => item.outstandingBalance > 0);
 
     return {
-      totalExpectedDue: expDue,
-      totalCurrentDue: currDue,
+      totalExpectedDue: expTotal,
+      totalCurrentDue: currTotalExpected,
+      totalPendingCurrentDues: pendingCurrent,
       totalRemainingToGo: remainingToGo,
       allSettled: settled,
+      groupsWithDues: groupsWithPending,
     };
-  }, [memberEnrollments, totalPaidIn]);
+  }, [groupDuesBreakdowns, totalPaidIn]);
 
   // WhatsApp receipt generator
   const generateWhatsAppReceiptUrl = (tx: any) => {
@@ -322,17 +481,34 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
     return `https://web.whatsapp.com/send?phone=${memberProfile?.phone_number || ''}&text=${encodeURIComponent(text)}`;
   };
 
-  // Handle Record New Payment for this member
+  // Handle Record New Payment for this member with prefilled group, month, and amount
   const handleOpenRecordPayment = (groupId?: string, month?: number, defaultAmt?: number) => {
     setEditingTransaction(null);
     const targetGroup = groupId || memberEnrollments[0]?.group_id || '';
     setModalTargetGroupId(targetGroup);
-    setModalTargetMonth(month !== undefined ? month : 1);
-    setQuickPaymentAmount(defaultAmt ? String(defaultAmt) : '10000');
+
+    // If month not specified, find first unpaid month for this group
+    let targetM = month;
+    let targetDueAmt = defaultAmt;
+
+    if (targetM === undefined) {
+      const grpBreakdown = (groupDuesBreakdowns || []).find((b: any) => b.groupId === targetGroup);
+      const firstUnpaid = grpBreakdown?.unpaidMonths?.[0];
+      if (firstUnpaid) {
+        targetM = firstUnpaid.month;
+        targetDueAmt = firstUnpaid.remainingDue;
+      } else {
+        targetM = grpBreakdown?.effectiveCurrentMonth || 0;
+        targetDueAmt = grpBreakdown?.memberInstallment || 10000;
+      }
+    }
+
+    setModalTargetMonth(targetM !== undefined ? targetM : 0);
+    setQuickPaymentAmount(targetDueAmt !== undefined && targetDueAmt > 0 ? String(targetDueAmt) : '10000');
     setPaymentWalletType('cash_in_hand');
     setPaymentDateType('today');
     setCustomPaymentDate(new Date().toISOString().split('T')[0]);
-    setPaymentNote('');
+    setPaymentNote(`Month ${targetM !== undefined ? targetM : 0} installment`);
     setPaymentReceiptUrl('');
     setReceiptFileToUpload(null);
     setIsPaymentModalOpen(true);
@@ -444,8 +620,11 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       } else {
         // Record new payment
         const targetEnroll = memberEnrollments.find(e => e.group_id === modalTargetGroupId) || memberEnrollments[0];
-        const defaultNote = `Collection payment - Ticket #${targetEnroll?.ticket_number || 1} (${memberProfile?.full_name})`;
-        const finalNote = paymentNote.trim() ? `${defaultNote} — Note: ${paymentNote.trim()}` : defaultNote;
+        const monthTag = modalTargetMonth !== undefined ? `Month ${modalTargetMonth}` : '';
+        const defaultNote = `Collection payment - Ticket #${targetEnroll?.ticket_number || 1} (${memberProfile?.full_name})${monthTag ? ` - ${monthTag}` : ''}`;
+        const finalNote = paymentNote.trim() 
+          ? (monthTag && !paymentNote.toLowerCase().includes('month') ? `${paymentNote.trim()} (${monthTag})` : paymentNote.trim())
+          : defaultNote;
 
         const { error: insertErr } = await supabase
           .from('transactions')
@@ -584,7 +763,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         onAddAuditLog(`PAIRED Passbook QR [${scannedToken.slice(0, 8)}...] to ${memberName}`);
       }
     } catch (err: any) {
-      alert(`Pairing Failed: ${err.message}`);
+      throw err;
     }
   };
 
@@ -662,128 +841,219 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
       </div>
 
       {/* Main Profile Header Card */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-7 shadow-2xs space-y-6">
+      <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-2xs space-y-4 sm:space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-extrabold text-2xl flex items-center justify-center shadow-md">
+          <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 min-w-0">
+            <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-extrabold text-xl sm:text-2xl flex items-center justify-center shadow-md shrink-0 aspect-square">
               {memberInitial}
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-snug">{memberName}</h2>
-                <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full">
+            <div className="space-y-1 min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-900 leading-snug truncate">{memberName}</h2>
+                <span className="text-[10px] sm:text-xs font-semibold bg-gray-100 text-gray-700 px-2 sm:px-2.5 py-0.5 rounded-full shrink-0">
                   {memberEnrollments.length} {memberEnrollments.length === 1 ? 'active chit' : 'active chits'}
                 </span>
-                <span className="text-xs font-bold bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full border border-indigo-100">
+              </div>
+              <p className="text-xs text-gray-500 flex items-center gap-1.5 font-medium">
+                <Phone size={12} className="text-gray-400 shrink-0" />
+                <span>{memberProfile?.phone_number || 'No phone recorded'}</span>
+              </p>
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[10px] sm:text-xs font-bold bg-indigo-50 text-indigo-700 px-2 sm:px-2.5 py-0.5 rounded-full border border-indigo-100 shrink-0">
                   +{formatCurrency(totalPaidIn)} paid in
                 </span>
-                <span className="text-xs font-semibold bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full">
+                <span className="text-[10px] sm:text-xs font-semibold bg-gray-100 text-gray-500 px-2 sm:px-2.5 py-0.5 rounded-full shrink-0">
                   Portal · {memberProfile?.role === 'subscriber' ? 'Active' : 'Admin'}
                 </span>
                 {memberProfile?.passbook_token ? (
-                  <span className="text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                    <CheckCircle2 size={12} /> QR Linked
+                  <span className="text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 sm:px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                    <CheckCircle2 size={11} /> QR Linked
                   </span>
                 ) : (
-                  <span className="text-xs font-semibold bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full">
+                  <span className="text-[10px] sm:text-xs font-semibold bg-gray-100 text-gray-500 px-2 sm:px-2.5 py-0.5 rounded-full shrink-0">
                     QR Unlinked
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 flex items-center gap-2 font-medium">
-                <Phone size={13} className="text-gray-400" />
-                <span>{memberProfile?.phone_number || 'No phone recorded'}</span>
-              </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* Action Buttons: clean 2-column grid on mobile, inline row on desktop */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto shrink-0">
             <button
               type="button"
               onClick={() => setIsPairingModalOpen(true)}
-              className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+              className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center"
             >
-              <QrCode size={14} className="text-indigo-600" />
-              <span>{memberProfile?.passbook_token ? 'Re-Pair QR' : 'Pair Passbook QR'}</span>
+              <QrCode size={14} className="text-indigo-600 shrink-0" />
+              <span>{memberProfile?.passbook_token ? 'Re-Pair QR' : 'Pair QR'}</span>
             </button>
 
             {memberProfile?.passbook_token && (
               <button
                 type="button"
                 onClick={handlePrintMemberStickers}
-                className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+                className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center"
               >
-                <Printer size={14} className="text-indigo-600" />
-                <span>Print Sticker ({Math.max(1, memberEnrollments.length)})</span>
+                <Printer size={14} className="text-indigo-600 shrink-0" />
+                <span>Print ({Math.max(1, memberEnrollments.length)})</span>
               </button>
             )}
 
             <button
               type="button"
               onClick={handleSharePassbookWhatsApp}
-              className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+              className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center"
             >
-              <Share2 size={14} />
+              <Share2 size={14} className="shrink-0" />
               <span>WhatsApp Card</span>
             </button>
 
             <button
+              type="button"
               onClick={() => handleOpenRecordPayment()}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95"
+              className="col-span-2 sm:col-span-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 active:scale-95"
             >
-              <Plus size={15} />
+              <Plus size={15} className="shrink-0" />
               <span>Record Payment</span>
             </button>
           </div>
         </div>
 
-        {/* Status / Settlement Banner */}
-        <div className={`p-4 rounded-2xl border flex items-center justify-between text-xs font-semibold ${
+        {/* Status / Settlement Banner with Detailed Breakdown */}
+        <div className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all shadow-xs ${
           allSettled 
-            ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' 
-            : 'bg-amber-50/80 border-amber-200 text-amber-900'
+            ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-emerald-200 text-emerald-950' 
+            : 'bg-gradient-to-r from-amber-50/90 via-orange-50/90 to-amber-50/90 border-amber-300 text-amber-950'
         }`}>
-          <div className="flex items-center gap-2">
-            {allSettled ? <CheckCircle2 size={16} className="text-emerald-600 shrink-0" /> : <AlertCircle size={16} className="text-amber-600 shrink-0" />}
-            <span className="leading-normal">
-              {allSettled 
-                ? 'All settled for current cycle · nothing due' 
-                : 'Outstanding dues pending collection for active chit cycles'}
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 ${
+                allSettled ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {allSettled ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm sm:text-base font-extrabold text-gray-900 leading-tight">
+                    {allSettled 
+                      ? 'All dues settled for current cycle · ₹0 Pending' 
+                      : `Outstanding Dues: ${formatCurrency(totalPendingCurrentDues)} Pending`}
+                  </h4>
+                  {!allSettled && (
+                    <span className="text-[10px] font-extrabold bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-md uppercase tracking-wider border border-rose-200 shrink-0">
+                      Payment Required
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-600 mt-1 sm:mt-0.5 leading-normal">
+                  {allSettled
+                    ? 'All active chit groups are completely paid up to the current active month.'
+                    : `Uncollected balance across ${groupsWithDues.length} chit ${groupsWithDues.length === 1 ? 'group' : 'groups'}. Click any month below to record.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-1 sm:pt-0">
+              {!allSettled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const firstUnpaidGrp = groupsWithDues[0];
+                    const firstUnpaidMonth = firstUnpaidGrp?.unpaidMonths[0];
+                    handleOpenRecordPayment(
+                      firstUnpaidGrp?.groupId,
+                      firstUnpaidMonth?.month,
+                      firstUnpaidMonth?.remainingDue
+                    );
+                  }}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 shrink-0"
+                >
+                  <Plus size={14} />
+                  <span>Collect Due</span>
+                </button>
+              )}
+              <span className={`text-xs font-mono font-bold px-2.5 py-1.5 rounded-lg border shrink-0 ${
+                allSettled 
+                  ? 'bg-emerald-100/80 border-emerald-300 text-emerald-900' 
+                  : 'bg-amber-200/70 border-amber-300 text-amber-900'
+              }`}>
+                {allSettled ? '0 DUE' : `${formatCurrency(totalPendingCurrentDues)} PENDING`}
+              </span>
+            </div>
           </div>
-          <span className="text-xs font-mono font-bold tracking-wider">
-            {allSettled ? '0 DUE' : 'PAYMENT REQUIRED'}
-          </span>
+
+          {/* Detailed Breakdown Chips for Unpaid Months */}
+          {!allSettled && groupsWithDues.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-amber-200/80 space-y-2">
+              <div className="text-[10px] sm:text-[11px] font-bold text-amber-900 uppercase tracking-wider">
+                Pending Dues Breakdown:
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {groupsWithDues.map((grp: any) => (
+                  <div key={grp.groupId} className="bg-white/80 border border-amber-200 rounded-xl p-2.5 flex flex-col justify-between gap-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-gray-900 truncate">
+                        {grp.groupName} <span className="text-gray-500 font-mono text-[11px]">(Ticket #{grp.ticketNumber})</span>
+                      </span>
+                      <span className="text-xs font-extrabold text-amber-800 shrink-0">
+                        {formatCurrency(grp.outstandingBalance)} due
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {grp.unpaidMonths.map((m: any) => (
+                        <button
+                          key={m.month}
+                          type="button"
+                          onClick={() => handleOpenRecordPayment(grp.groupId, m.month, m.remainingDue)}
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 transition-all hover:scale-105 active:scale-95 ${
+                            m.status === 'partial'
+                              ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                              : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                          }`}
+                          title={`Click to record ${m.label} payment of ${formatCurrency(m.remainingDue)}`}
+                        >
+                          <span>{m.month === 0 ? 'M0 (Launch)' : `M${m.month}`}:</span>
+                          <span className="font-extrabold">{formatCurrency(m.remainingDue)}</span>
+                          <span className="text-[9px] uppercase opacity-75">({m.status})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 3 Metric Stat Boxes */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4.5 space-y-1">
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              <ArrowDownLeft size={14} className="text-emerald-600" />
-              <span>Paid In</span>
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-1">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-4.5 space-y-0.5 sm:space-y-1">
+            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+              <ArrowDownLeft size={12} className="text-emerald-600 shrink-0" />
+              <span className="truncate">Paid In</span>
             </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-emerald-700 leading-none">
+            <div className="text-sm sm:text-2xl font-extrabold text-emerald-700 leading-none truncate">
               {formatCurrency(totalPaidIn)}
             </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4.5 space-y-1">
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              <ArrowUpRight size={14} className="text-amber-600" />
-              <span>Paid Out</span>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-4.5 space-y-0.5 sm:space-y-1">
+            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+              <ArrowUpRight size={12} className="text-amber-600 shrink-0" />
+              <span className="truncate">Paid Out</span>
             </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-amber-700 leading-none">
+            <div className="text-sm sm:text-2xl font-extrabold text-amber-700 leading-none truncate">
               {formatCurrency(totalPaidOut)}
             </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4.5 space-y-1">
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              <Clock size={14} className="text-slate-500" />
-              <span>To Go</span>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-4.5 space-y-0.5 sm:space-y-1">
+            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+              <Clock size={12} className="text-slate-500 shrink-0" />
+              <span className="truncate">To Go</span>
             </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-none">
+            <div className="text-sm sm:text-2xl font-extrabold text-slate-900 leading-none truncate">
               {formatCurrency(totalRemainingToGo)}
             </div>
           </div>
@@ -807,7 +1077,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
       </div>
 
       {/* 4 Interactive Subtabs Bar (Chits | Payments | Prizes | Activity) */}
-      <div className="flex items-center bg-gray-200/80 p-1.5 rounded-2xl border border-gray-300/60 max-w-md">
+      <div className="flex items-center bg-gray-200/80 p-1 sm:p-1.5 rounded-2xl border border-gray-300/60 w-full sm:max-w-md">
         {[
           { id: 'chits', label: 'Chits', count: memberEnrollments.length },
           { id: 'payments', label: 'Payments', count: memberTransactions.length },
@@ -851,63 +1121,180 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {memberEnrollments.map((enroll) => {
-                const g = Array.isArray(enroll.chit_groups) ? enroll.chit_groups[0] : enroll.chit_groups;
-                if (!g) return null;
-
-                const duration = Number(g.duration_months) || 20;
-                const totalVal = Number(g.total_value) || 200000;
-                const baseInst = Math.round(totalVal / duration);
-                const memberInst = enroll.custom_installment !== null ? Number(enroll.custom_installment) : baseInst;
-
-                // Group transactions
-                const groupTxs = memberTransactions.filter(t => t.group_id === g.id);
-                const groupPaid = groupTxs.filter(t => t.type === 'collection').reduce((s, t) => s + Number(t.amount || 0), 0);
-                const groupWonPrize = prizesWon.find(p => p.groupId === g.id);
+              {(groupDuesBreakdowns || []).map((grpDues: any) => {
+                const groupWonPrize = prizesWon.find((p: any) => p.groupId === grpDues.groupId);
 
                 return (
-                  <div key={enroll.id} className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+                  <div key={grpDues.enrollmentId} className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-base font-bold text-gray-900 leading-snug">{g.name}</h3>
+                          <h3 className="text-base font-bold text-gray-900 leading-snug">{grpDues.groupName}</h3>
                           <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg border border-indigo-100">
-                            Ticket #{enroll.ticket_number}
+                            Ticket #{grpDues.ticketNumber}
                           </span>
-                          <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg border border-emerald-200">
-                            On track
-                          </span>
+                          {grpDues.isSettled ? (
+                            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg border border-emerald-200 flex items-center gap-1">
+                              <Check size={11} /> Settled
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-lg border border-amber-300 flex items-center gap-1">
+                              <AlertCircle size={11} className="text-amber-600" />
+                              {formatCurrency(grpDues.outstandingBalance)} Due
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1 leading-normal">
-                          {formatCurrency(totalVal)} total value · {duration} months duration · Monthly: {formatCurrency(memberInst)}
+                          {formatCurrency(grpDues.totalValue)} total value · {grpDues.durationMonths} months duration · Monthly: {formatCurrency(grpDues.memberInstallment)}
                         </p>
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {!grpDues.isSettled && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const firstUnpaid = grpDues.unpaidMonths?.[0];
+                              handleOpenRecordPayment(grpDues.groupId, firstUnpaid?.month, firstUnpaid?.remainingDue);
+                            }}
+                            className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 py-1.5 px-3 rounded-xl shadow-xs transition-colors"
+                          >
+                            <Plus size={13} />
+                            <span>Record Payment</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             setActiveSubtab('payments');
-                            setSelectedChitFilter(g.id);
+                            setSelectedChitFilter(grpDues.groupId);
                           }}
-                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 py-1 px-2.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 py-1.5 px-2.5 rounded-xl hover:bg-indigo-50 transition-colors"
                         >
-                          <span>View payments</span>
+                          <span>View ledger</span>
                           <ChevronRight size={14} />
                         </button>
                       </div>
                     </div>
 
-                    {/* Group Monthly Progress */}
-                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 flex justify-between items-center text-xs">
-                      <div>
-                        <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">Total Paid for Group</span>
-                        <span className="text-base font-bold text-emerald-900 mt-0.5 block">{formatCurrency(groupPaid)}</span>
+                    {/* Interactive Month-by-Month Status Matrix */}
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                          Cycle Payment Status (M0 to Active Month)
+                        </span>
+                        <span className={`text-[11px] font-extrabold ${grpDues.isSettled ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {grpDues.isSettled ? 'All active cycles settled' : `${formatCurrency(grpDues.outstandingBalance)} Pending Due`}
+                        </span>
                       </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                        {grpDues.monthDues.map((m: any) => {
+                          const isFree = m.status === 'free_laaba';
+                          const isPaid = m.status === 'paid';
+                          const isPartial = m.status === 'partial';
+                          const isUnpaid = m.status === 'unpaid';
+
+                          return (
+                            <button
+                              key={m.month}
+                              type="button"
+                              onClick={() => {
+                                if (m.remainingDue > 0) {
+                                  handleOpenRecordPayment(grpDues.groupId, m.month, m.remainingDue);
+                                }
+                              }}
+                              className={`p-2.5 rounded-2xl border transition-all text-left flex flex-col justify-between ${
+                                m.remainingDue > 0 
+                                  ? 'cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-98' 
+                                  : 'cursor-default'
+                              } ${
+                                isPaid
+                                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                                  : isFree
+                                  ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900'
+                                  : isPartial
+                                  ? 'bg-amber-50/90 border-amber-300 text-amber-950 ring-1 ring-amber-300'
+                                  : 'bg-rose-50/90 border-rose-300 text-rose-950 ring-1 ring-rose-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span className="text-[11px] font-extrabold">
+                                  {m.month === 0 ? 'M0 (Launch)' : `Month ${m.month}`}
+                                </span>
+                                {m.isCurrentCycle && (
+                                  <span className="text-[8px] font-extrabold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-sm uppercase tracking-wider">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="mt-1.5 space-y-0.5">
+                                {isPaid && (
+                                  <div>
+                                    <span className="text-[9px] font-bold text-emerald-700 uppercase block">Paid Full</span>
+                                    <span className="text-xs font-extrabold text-emerald-900">{formatCurrency(m.paidAmount)}</span>
+                                  </div>
+                                )}
+                                {isFree && (
+                                  <div>
+                                    <span className="text-[9px] font-bold text-indigo-700 uppercase block">Free Month</span>
+                                    <span className="text-xs font-extrabold text-indigo-900">₹0 (Laaba Seetu)</span>
+                                  </div>
+                                )}
+                                {isPartial && (
+                                  <div>
+                                    <span className="text-[9px] font-bold text-amber-700 uppercase block">
+                                      Paid {formatCurrency(m.paidAmount)} / {formatCurrency(m.expectedDue)}
+                                    </span>
+                                    <span className="text-xs font-extrabold text-amber-900">Due: {formatCurrency(m.remainingDue)}</span>
+                                  </div>
+                                )}
+                                {isUnpaid && (
+                                  <div>
+                                    <span className="text-[9px] font-bold text-rose-700 uppercase block">Unpaid</span>
+                                    <span className="text-xs font-extrabold text-rose-900">Due: {formatCurrency(m.remainingDue)}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {m.remainingDue > 0 && (
+                                <div className="mt-2 pt-1.5 border-t border-current/10 flex items-center justify-between text-[10px] font-bold text-amber-900">
+                                  <span>Pay month</span>
+                                  <ChevronRight size={12} />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Group Financial Summary & Prize Strip */}
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <div>
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Total Paid in Group</span>
+                          <span className="text-sm font-extrabold text-emerald-700 mt-0.5 block">{formatCurrency(grpDues.totalPaidForGroup)}</span>
+                        </div>
+                        <div className="h-7 w-[1px] bg-slate-200 hidden sm:block" />
+                        <div>
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Active Cycles Due</span>
+                          <span className={`text-sm font-extrabold mt-0.5 block ${grpDues.isSettled ? 'text-slate-700' : 'text-amber-700'}`}>
+                            {formatCurrency(grpDues.outstandingBalance)}
+                          </span>
+                        </div>
+                        <div className="h-7 w-[1px] bg-slate-200 hidden sm:block" />
+                        <div>
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Lifetime Commitment To Go</span>
+                          <span className="text-sm font-extrabold text-slate-900 mt-0.5 block">{formatCurrency(grpDues.lifetimeRemainingToGo)}</span>
+                        </div>
+                      </div>
+
                       {groupWonPrize && (
-                        <div className="text-right">
-                          <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider block">Auction Winner</span>
-                          <span className="font-bold text-amber-800 flex items-center gap-1 mt-0.5">
-                            <Trophy size={14} className="text-amber-600" />
+                        <div className="bg-amber-100/70 border border-amber-300 rounded-xl px-3 py-1.5 text-right shrink-0">
+                          <span className="text-[9px] text-amber-800 font-bold uppercase tracking-wider block">Auction Winner</span>
+                          <span className="font-extrabold text-amber-950 flex items-center gap-1 text-xs">
+                            <Trophy size={13} className="text-amber-600" />
                             Won prize ({formatCurrency(groupWonPrize.netPayout)})
                           </span>
                         </div>
@@ -1169,10 +1556,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
       {/* ── Modal: Record / Edit Payment ────────────────────────────────────────── */}
       {isPaymentModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <form
             onSubmit={handleSaveModalPayment}
-            className="bg-white rounded-2xl border border-gray-200 p-6 w-full max-w-md space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
+            className="bg-white rounded-3xl border border-gray-200 p-4 sm:p-6 w-full max-w-md space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto"
           >
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2.5">
@@ -1189,11 +1576,99 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               <button
                 type="button"
                 onClick={() => setIsPaymentModalOpen(false)}
-                className="text-gray-400 hover:text-gray-700 p-1 rounded-lg"
+                className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 <X size={16} />
               </button>
             </div>
+
+            {/* Target Chit Group Selector (for new payments) */}
+            {!editingTransaction && memberEnrollments.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Chit Group</label>
+                {memberEnrollments.length === 1 ? (
+                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs">
+                    <span className="font-bold text-gray-900">
+                      {(groupDuesBreakdowns[0]?.groupName) || 'Chit Group'}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-100">
+                      Ticket #{groupDuesBreakdowns[0]?.ticketNumber}
+                    </span>
+                  </div>
+                ) : (
+                  <select
+                    value={modalTargetGroupId}
+                    onChange={(e) => {
+                      const newGid = e.target.value;
+                      setModalTargetGroupId(newGid);
+                      const grp = (groupDuesBreakdowns || []).find((b: any) => b.groupId === newGid);
+                      const firstUnpaid = grp?.unpaidMonths?.[0];
+                      const targetM = firstUnpaid ? firstUnpaid.month : (grp?.effectiveCurrentMonth || 0);
+                      const dueAmt = firstUnpaid ? firstUnpaid.remainingDue : (grp?.memberInstallment || 10000);
+                      setModalTargetMonth(targetM);
+                      setQuickPaymentAmount(dueAmt > 0 ? String(dueAmt) : '10000');
+                      setPaymentNote(`Month ${targetM} installment`);
+                    }}
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                  >
+                    {memberEnrollments.map((enroll) => {
+                      const g = Array.isArray(enroll.chit_groups) ? enroll.chit_groups[0] : enroll.chit_groups;
+                      if (!g) return null;
+                      return (
+                        <option key={g.id} value={g.id}>
+                          {g.name} (Ticket #{enroll.ticket_number})
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {/* Target Month Selector */}
+            {!editingTransaction && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Target Month Cycle</label>
+                <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full">
+                  {(() => {
+                    const currentGrp = (groupDuesBreakdowns || []).find((b: any) => b.groupId === (modalTargetGroupId || memberEnrollments[0]?.group_id));
+                    const maxM = Math.max(currentGrp?.effectiveCurrentMonth || 0, modalTargetMonth || 0);
+                    const monthButtons = [];
+                    for (let m = 0; m <= maxM; m++) {
+                      const mDueInfo = currentGrp?.monthDues?.find((d: any) => d.month === m);
+                      const isSelected = modalTargetMonth === m;
+                      const hasDue = mDueInfo && mDueInfo.remainingDue > 0;
+                      monthButtons.push(
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => {
+                            setModalTargetMonth(m);
+                            if (mDueInfo && mDueInfo.remainingDue > 0) {
+                              setQuickPaymentAmount(String(mDueInfo.remainingDue));
+                            } else if (currentGrp) {
+                              setQuickPaymentAmount(String(currentGrp.memberInstallment));
+                            }
+                            setPaymentNote(`Month ${m} installment`);
+                          }}
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold shrink-0 transition-all ${
+                            isSelected
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                              : hasDue
+                              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          <span>{m === 0 ? 'M0 (Launch)' : `M${m}`}</span>
+                          {hasDue && <span className="ml-1 text-[9px] text-rose-600 font-extrabold">• Due</span>}
+                        </button>
+                      );
+                    }
+                    return monthButtons;
+                  })()}
+                </div>
+              </div>
+            )}
 
             {/* Amount */}
             <div className="space-y-1.5">
@@ -1216,21 +1691,21 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               <button
                 type="button"
                 onClick={() => setQuickPaymentAmount('10000')}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-1.5 rounded-lg border border-gray-200"
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-2 rounded-lg border border-gray-200 active:scale-95"
               >
                 ₹10,000
               </button>
               <button
                 type="button"
                 onClick={() => setQuickPaymentAmount('20000')}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-1.5 rounded-lg border border-gray-200"
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-2 rounded-lg border border-gray-200 active:scale-95"
               >
                 ₹20,000
               </button>
               <button
                 type="button"
                 onClick={() => setQuickPaymentAmount('')}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200"
+                className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-3 py-2 rounded-lg border border-gray-200 active:scale-95"
               >
                 Clear
               </button>
@@ -1353,30 +1828,30 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             </div>
 
             {/* Buttons */}
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5 pt-2">
               {editingTransaction ? (
                 <button
                   type="button"
                   onClick={() => handleDeletePayment(editingTransaction)}
-                  className="text-rose-600 hover:text-rose-700 text-xs font-bold flex items-center gap-1"
+                  className="w-full sm:w-auto text-rose-600 hover:text-rose-700 hover:bg-rose-50 p-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-colors"
                 >
                   <Trash2 size={13} />
                   <span>Delete</span>
                 </button>
-              ) : <div />}
+              ) : <div className="hidden sm:block" />}
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setIsPaymentModalOpen(false)}
-                  className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl"
+                  className="flex-1 sm:flex-initial border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isProcessingPayment}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2 rounded-xl shadow-sm flex items-center gap-1.5"
+                  className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
                 >
                   <Check size={14} />
                   <span>{isProcessingPayment ? 'Saving...' : 'Save changes'}</span>

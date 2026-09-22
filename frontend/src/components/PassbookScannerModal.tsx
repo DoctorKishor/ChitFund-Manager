@@ -68,6 +68,8 @@ export default function PassbookScannerModal({
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const readerElementId = 'passbook-qr-reader';
 
+  const qrCodeSuccessCallbackRef = useRef<((decodedText: string) => Promise<void>) | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -103,14 +105,10 @@ export default function PassbookScannerModal({
             return;
           }
 
-          // Valid passbook QR token detected! Trigger success haptic
-          triggerHapticFeedback('success');
-          setScannerWarning(null);
-          setHasScanned(true);
           setIsProcessing(true);
 
           try {
-            // Stop camera once valid passbook is scanned
+            // Stop camera once scan is detected
             if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
               await html5QrCodeRef.current.stop();
             }
@@ -120,12 +118,19 @@ export default function PassbookScannerModal({
 
           try {
             await onScanSuccess(validation.token);
+            // Successful pair/login: trigger success haptic
+            triggerHapticFeedback('success');
+            setHasScanned(true);
           } catch (err: any) {
+            // Rejection or already-linked error: trigger error/warning haptic!
+            triggerHapticFeedback('error');
             setScannerError(err.message || 'Failed to process scanned QR code.');
             setIsProcessing(false);
             setHasScanned(false);
           }
         };
+
+        qrCodeSuccessCallbackRef.current = qrCodeSuccessCallback;
 
         const config = {
           fps: 15,
@@ -164,6 +169,34 @@ export default function PassbookScannerModal({
 
   if (!isOpen) return null;
 
+  const handleRetryScan = async () => {
+    setScannerError(null);
+    setScannerWarning(null);
+    setIsProcessing(false);
+    setHasScanned(false);
+
+    try {
+      if (html5QrCodeRef.current && qrCodeSuccessCallbackRef.current) {
+        if (html5QrCodeRef.current.isScanning) {
+          await html5QrCodeRef.current.stop();
+        }
+        const config = {
+          fps: 15,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        };
+        await html5QrCodeRef.current.start(
+          { facingMode: 'environment' },
+          config,
+          qrCodeSuccessCallbackRef.current,
+          () => {}
+        );
+      }
+    } catch (err) {
+      console.warn('Retry scan camera start note:', err);
+    }
+  };
+
   const handleClose = async () => {
     if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
     if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
@@ -177,17 +210,17 @@ export default function PassbookScannerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md max-h-[90dvh] overflow-hidden shadow-2xl relative flex flex-col my-auto">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
               <Camera size={20} />
             </div>
-            <div>
-              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">{title}</h3>
-              <p className="text-[11px] text-slate-400">
+            <div className="min-w-0">
+              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">{title}</h3>
+              <p className="text-[11px] text-slate-400 truncate">
                 {targetMemberName ? `Pairing to ${targetMemberName}` : subtitle}
               </p>
             </div>
@@ -195,7 +228,7 @@ export default function PassbookScannerModal({
           <button
             type="button"
             onClick={handleClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
           >
             <X size={18} />
           </button>
@@ -241,9 +274,25 @@ export default function PassbookScannerModal({
           )}
 
           {scannerError ? (
-            <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-start gap-2 max-w-sm text-left">
-              <AlertCircle size={16} className="shrink-0 mt-0.5" />
-              <span>{scannerError}</span>
+            <div className="mt-4 p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex flex-col items-start gap-2.5 max-w-sm text-left animate-in fade-in duration-200">
+              <div className="flex items-start gap-2 w-full">
+                <AlertCircle size={18} className="shrink-0 mt-0.5 text-rose-400" />
+                <div>
+                  <span className="font-bold text-white block">Cannot Link QR Code</span>
+                  <span className="text-[11px] text-rose-200 leading-relaxed block mt-0.5">
+                    {scannerError}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRetryScan}
+                className="w-full mt-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-700 shadow-sm"
+              >
+                <RefreshCw size={13} />
+                <span>Scan Another Passbook Sticker</span>
+              </button>
             </div>
           ) : !scannerWarning && (
             <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-400">

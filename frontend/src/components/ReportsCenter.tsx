@@ -3594,13 +3594,13 @@ export default function ReportsCenter() {
 
       {/* ── MODAL: DOCUMENT PREVIEW & PRINT ── */}
       {showPreviewModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 z-50 animate-in fade-in duration-150">
-          <div className="bg-white w-full max-w-4xl h-[92vh] max-h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 z-50 animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl h-[92dvh] max-h-[92dvh] rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden my-auto">
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-gray-200 flex items-center justify-between bg-slate-50 shrink-0">
-              <div className="flex items-center gap-2">
-                <FileText size={18} className="text-indigo-600" />
-                <h3 className="text-sm sm:text-base font-bold text-gray-900">
+            <div className="p-3.5 sm:p-5 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText size={18} className="text-indigo-600 shrink-0" />
+                <h3 className="text-xs sm:text-base font-bold text-gray-900 truncate">
                   {activeSubtab === 'reliability'
                     ? `${selectedGroup?.name || 'Group'} Reliability Report PDF Preview`
                     : activeSubtab === 'member'
@@ -3615,23 +3615,26 @@ export default function ReportsCenter() {
                   }
                 </h3>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                 <button
+                  type="button"
                   onClick={handlePrintPDF}
-                  className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Printer size={14} /> Print
                 </button>
                 <button
+                  type="button"
                   onClick={handleDownloadPDF}
                   disabled={isGeneratingPDF}
-                  className="px-4 py-1.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
+                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   <Download size={14} /> Download PDF
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowPreviewModal(false)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 rounded-xl transition-colors cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 rounded-xl transition-colors cursor-pointer hover:bg-gray-200"
                 >
                   <X size={18} />
                 </button>

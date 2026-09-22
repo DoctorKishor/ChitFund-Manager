@@ -10,16 +10,31 @@ create extension if not exists "uuid-ossp";
 -- 1. Tables and Integrity Constraints
 -- ==========================================
 
+-- custom_roles: Dynamic Discord-style roles & granular permissions
+create table public.custom_roles (
+  id text primary key,
+  name text not null,
+  description text default '',
+  color text default '#6366F1',
+  is_system boolean not null default false,
+  allowed_tabs text[] default '{}',
+  allowed_actions text[] default '{}',
+  created_at timestamp with time zone not null default timezone('utc'::text, now()),
+  updated_at timestamp with time zone not null default timezone('utc'::text, now())
+);
+
 -- profiles: User profiles extending Supabase auth.users
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   phone_number text not null unique,
   full_name text not null,
-  role text not null default 'subscriber' check (role in ('admin', 'manager', 'subscriber')),
+  role text not null default 'subscriber' references public.custom_roles(id) on update cascade on delete set default,
   passbook_token uuid default null unique,
   passbook_issued_at timestamp with time zone default null,
   passbook_last_scanned_at timestamp with time zone,
   mpin varchar(6) default '1234',
+  is_blocked boolean not null default false,
+  reschedule_acknowledgments jsonb default '{}'::jsonb,
   created_at timestamp with time zone not null default timezone('utc'::text, now())
 );
 
@@ -35,6 +50,15 @@ create table public.chit_groups (
   laaba_seetu_rules jsonb not null default '{}'::jsonb,
   status text not null default 'active' check (status in ('draft', 'active', 'completed')),
   start_date date default current_date,
+  auction_day_of_month integer default 10,
+  auction_time text default '19:00',
+  next_auction_date date default null,
+  next_auction_time text default '19:00',
+  last_rescheduled_at timestamp with time zone default null,
+  reschedule_reason text default null,
+  is_live_auction_active boolean not null default false,
+  live_auction_started_at timestamp with time zone default null,
+  live_bid_stream jsonb default '[]'::jsonb,
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   constraint check_member_count_eq_duration check (member_count = duration_months)
 );
@@ -384,7 +408,9 @@ create or replace function public.pair_passbook_qr(p_token uuid, p_profile_id uu
 returns jsonb as $$
 declare
   v_profile record;
+  v_existing_profile record;
 begin
+  -- 1. Check target member profile
   select id, full_name, phone_number, role
   into v_profile
   from public.profiles
@@ -394,6 +420,52 @@ begin
     return jsonb_build_object('success', false, 'error', 'Member profile not found.');
   end if;
 
+  -- 2. Check if this token is already linked to ANOTHER user profile
+  select id, full_name, phone_number
+  into v_existing_profile
+  from public.profiles
+  where passbook_token = p_token
+    and id != p_profile_id;
+
+  if found then
+    return jsonb_build_object(
+      'success', false,
+      'already_linked', true,
+      'linked_to_name', v_existing_profile.full_name,
+      'linked_to_phone', v_existing_profile.phone_number,
+      'error', 'This QR code is already linked to subscriber ' || v_existing_profile.full_name || ' (' || coalesce(v_existing_profile.phone_number, 'no phone') || '). Please use an unassigned passbook sticker.'
+    );
+  end if;
+
+  -- 3. Check if this token in passbook_inventory is assigned to someone else
+  select pi.assigned_to_profile_id, p.full_name, p.phone_number
+  into v_existing_profile
+  from public.passbook_inventory pi
+  left join public.profiles p on p.id = pi.assigned_to_profile_id
+  where pi.token = p_token
+    and pi.is_assigned = true
+    and pi.assigned_to_profile_id is not null
+    and pi.assigned_to_profile_id != p_profile_id;
+
+  if found then
+    return jsonb_build_object(
+      'success', false,
+      'already_linked', true,
+      'linked_to_name', coalesce(v_existing_profile.full_name, 'another member'),
+      'linked_to_phone', v_existing_profile.phone_number,
+      'error', 'This QR code is already assigned in inventory to ' || coalesce(v_existing_profile.full_name, 'another subscriber') || '. Please scan an unassigned passbook sticker.'
+    );
+  end if;
+
+  -- 4. Unassign any prior token assigned to this profile in inventory (clean replacement)
+  update public.passbook_inventory
+  set is_assigned = false,
+      assigned_to_profile_id = null,
+      assigned_at = null
+  where assigned_to_profile_id = p_profile_id
+    and token != p_token;
+
+  -- 5. Pair new token
   insert into public.passbook_inventory (token, batch_code, is_assigned, assigned_to_profile_id, assigned_at)
   values (p_token, 'MANUAL_PAIR', true, p_profile_id, now())
   on conflict (token) do update
@@ -409,7 +481,7 @@ begin
   insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
   values (
     auth.uid(),
-    'PAIRED PASSBOOK QR: ' || p_token::text || ' to subscriber ' || v_profile.full_name || ' (' || v_profile.phone_number || ')',
+    'PAIRED / RE-LINKED PASSBOOK QR: ' || p_token::text || ' to subscriber ' || v_profile.full_name || ' (' || coalesce(v_profile.phone_number, '') || ')',
     'profiles',
     now()
   );
@@ -587,7 +659,8 @@ begin
     'phoneNumber', p.phone_number,
     'role', p.role,
     'passbookToken', p.passbook_token,
-    'passbookIssuedAt', p.passbook_issued_at
+    'passbookIssuedAt', p.passbook_issued_at,
+    'rescheduleAcknowledgments', coalesce(p.reschedule_acknowledgments, '{}'::jsonb)
   )
   into v_profile
   from public.profiles p
@@ -610,8 +683,29 @@ begin
     'startDate', cg.start_date,
     'ticketNumber', gm.ticket_number,
     'hasWonRegular', gm.has_won_regular,
-    'physicalBookSynced', gm.physical_book_synced,
-    'monthlyInstallment', (cg.total_value / cg.member_count)
+    'physicalBookSynced', coalesce(gm.physical_book_synced, false),
+    'monthlyInstallment', (cg.total_value / cg.member_count),
+    'auctionDayOfMonth', cg.auction_day_of_month,
+    'auctionTime', cg.auction_time,
+    'nextAuctionDate', cg.next_auction_date,
+    'nextAuctionTime', cg.next_auction_time,
+    'lastRescheduledAt', cg.last_rescheduled_at,
+    'rescheduleReason', cg.reschedule_reason,
+    'isLiveAuctionActive', coalesce(cg.is_live_auction_active, false),
+    'liveAuctionStartedAt', cg.live_auction_started_at,
+    'liveBidStream', coalesce(cg.live_bid_stream, '[]'::jsonb),
+    'members', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'id', gm2.id,
+        'profileId', gm2.profile_id,
+        'fullName', coalesce(p2.full_name, 'Ticket #' || gm2.ticket_number),
+        'ticketNumber', gm2.ticket_number,
+        'hasWonRegular', gm2.has_won_regular
+      ) order by gm2.ticket_number), '[]'::jsonb)
+      from public.group_members gm2
+      left join public.profiles p2 on p2.id = gm2.profile_id
+      where gm2.group_id = cg.id
+    )
   ) order by cg.created_at desc), '[]'::jsonb)
   into v_groups
   from public.group_members gm
@@ -633,7 +727,8 @@ begin
   into v_transactions
   from public.transactions t
   left join public.chit_groups cg on cg.id = t.group_id
-  where t.profile_id = p_profile_id;
+  where t.profile_id = p_profile_id
+     or t.group_member_id in (select id from public.group_members where profile_id = p_profile_id);
 
   -- 4. Fetch Auction Logs for the Subscriber's Chit Groups
   select coalesce(jsonb_agg(jsonb_build_object(
@@ -666,4 +761,37 @@ begin
   );
 end;
 $$ language plpgsql security definer set search_path = public;
+
+-- Enable Realtime publication for all core tables
+alter table public.chit_groups replica identity full;
+alter table public.group_members replica identity full;
+alter table public.profiles replica identity full;
+alter table public.transactions replica identity full;
+alter table public.auction_logs replica identity full;
+alter table public.global_treasury replica identity full;
+
+do $$
+begin
+  begin alter publication supabase_realtime add table public.chit_groups; exception when duplicate_object then null; end;
+  begin alter publication supabase_realtime add table public.group_members; exception when duplicate_object then null; end;
+  begin alter publication supabase_realtime add table public.profiles; exception when duplicate_object then null; end;
+  begin alter publication supabase_realtime add table public.transactions; exception when duplicate_object then null; end;
+  begin alter publication supabase_realtime add table public.auction_logs; exception when duplicate_object then null; end;
+  begin alter publication supabase_realtime add table public.global_treasury; exception when duplicate_object then null; end;
+end $$;
+
+-- ==========================================
+-- 8. Global System Settings (Maintenance Mode)
+-- ==========================================
+create table if not exists public.system_settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamp with time zone not null default timezone('utc'::text, now()),
+  updated_by uuid references public.profiles(id)
+);
+
+insert into public.system_settings (key, value)
+values ('maintenance_mode', '{"enabled": false, "message": "Scheduled upgrades in progress."}'::jsonb)
+on conflict (key) do nothing;
+
 

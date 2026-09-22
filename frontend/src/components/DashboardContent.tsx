@@ -8,6 +8,14 @@ import MemberMatrix from './MemberMatrix';
 import CommunicationBroadcastCenter from './CommunicationBroadcastCenter';
 import ReportsCenter from './ReportsCenter';
 import UserAccessManager from './UserAccessManager';
+import SettingsManager from './SettingsManager';
+import AuctionCountdownBanner from './AuctionCountdownBanner';
+import AuctionScheduleModal from './AuctionScheduleModal';
+import QuickMemberCollectModal, { CollectableMember } from './QuickMemberCollectModal';
+import QuickPersonalDrawModal from './QuickPersonalDrawModal';
+import QuickAtmWithdrawalModal from './QuickAtmWithdrawalModal';
+import { triggerHapticFeedback } from '../utils/haptics';
+import { computeNextAuctionDateTime, formatTime12h, getFirstSundayOnOrAfterDay } from '../utils/auctionSchedule';
 import { 
   DollarSign, 
   Users, 
@@ -30,6 +38,7 @@ import {
   RefreshCw,
   Plus,
   Minus,
+  MinusCircle,
   UserPlus,
   Phone,
   User,
@@ -61,7 +70,9 @@ import {
   Bell,
   MessageSquare,
   Copy,
-  ExternalLink
+  ExternalLink,
+  QrCode,
+  Zap
 } from 'lucide-react';
 
 // ── Utility: First Sunday on-or-after the 10th of a given month ──────────────
@@ -238,6 +249,10 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
             status: g.status || 'active',
             startDate: g.start_date || '',
             active: g.status !== 'completed',
+            auctionDayOfMonth: g.auction_day_of_month !== undefined && g.auction_day_of_month !== null ? Number(g.auction_day_of_month) : 10,
+            auctionTime: g.auction_time || '19:00',
+            nextAuctionDate: g.next_auction_date || null,
+            nextAuctionTime: g.next_auction_time || g.auction_time || '19:00',
           }))
         );
       }
@@ -329,31 +344,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     }
   };
 
-  const handleToggleWorkspaceBookSync = async (memberId: string, currentSync: boolean) => {
-    const nextSync = !currentSync;
-    setWorkspaceMembers(prev => prev.map(m => m.id === memberId ? { ...m, bookSynced: nextSync } : m));
 
-    try {
-      await supabase
-        .from('group_members')
-        .update({ physical_book_synced: nextSync })
-        .eq('id', memberId);
-
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'group_members',
-          desc: `UPDATE physical book sync state to [${nextSync ? 'YES' : 'NO'}] for ticket`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
-    } catch (err) {
-      console.error('Error updating sync state:', err);
-    }
-  };
 
   const openEditGroupModal = async (g: any) => {
     setEditingGroup(g);
@@ -850,35 +841,31 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     fetchProfiles();
   }, []);
 
-  // Auction Date Reschedule Override State: { [groupId]: ISO date string }
-  const [auctionDateOverrides, setAuctionDateOverrides] = useState<Record<string, string>>({});
-  const [rescheduleGroupId, setRescheduleGroupId] = useState<string | null>(null);
-  const [rescheduleInputVal, setRescheduleInputVal] = useState<string>('');
+  // Auction Schedule Configuration Modal state for Chits Directory cards
+  const [scheduleModalGroup, setScheduleModalGroup] = useState<any | null>(null);
 
-  // Compute canonical auction date for a group (uses today's month/year as calendar anchor or group.startDate)
+  // Compute canonical auction date for a group (uses computeNextAuctionDateTime for 100% unified math)
   const getGroupAuctionDate = (groupId: string, monthNum: number = 1): { display: string; isOverride: boolean; isOrientation?: boolean } => {
     if (monthNum === 0) {
       return { display: 'Orientation Collection Session (No Auction)', isOverride: false, isOrientation: true };
     }
-    if (auctionDateOverrides[groupId]) {
-      const parts = auctionDateOverrides[groupId].split('-');
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      return { display: formatAuctionDate(d) + ' (Override)', isOverride: true };
-    }
     const group = localGroups.find(g => g.id === groupId);
-    let baseDate = new Date();
-    if (group?.startDate) {
-      const parsed = new Date(group.startDate);
-      if (!isNaN(parsed.getTime())) {
-        baseDate = parsed;
-      }
+    if (group?.nextAuctionDate) {
+      const parts = group.nextAuctionDate.split('-');
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      const timeDisplay = group?.nextAuctionTime || group?.auctionTime ? ` · ${formatTime12h(group?.nextAuctionTime || group?.auctionTime)}` : '';
+      return { display: formatAuctionDate(d) + timeDisplay + ' (Override)', isOverride: true };
     }
-    // M0 is baseDate + 0 (Launch/Orientation Month)
-    // M1 is baseDate + 1 (1st Auction Month)
-    // M2 is baseDate + 2, etc.
-    const targetMonthDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + monthNum, 1);
-    const canonical = getFirstSundayOnOrAfter10th(targetMonthDate.getFullYear(), targetMonthDate.getMonth());
-    return { display: formatAuctionDate(canonical), isOverride: false };
+    const targetDate = computeNextAuctionDateTime({
+      auction_day_of_month: group?.auctionDayOfMonth,
+      auction_time: group?.auctionTime,
+      next_auction_date: null,
+      next_auction_time: null,
+      start_date: group?.startDate,
+      current_month: monthNum,
+    });
+    const timeDisplay = group?.auctionTime ? ` · ${formatTime12h(group.auctionTime)}` : '';
+    return { display: formatAuctionDate(targetDate) + timeDisplay, isOverride: false };
   };
 
   // Reports Center Natural Language States
@@ -935,6 +922,7 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [isMarkingAllPaid, setIsMarkingAllPaid] = useState<boolean>(false);
   const [isClosingMonth, setIsClosingMonth] = useState<boolean>(false);
+  const [showKaiIruppuBreakdown, setShowKaiIruppuBreakdown] = useState<boolean>(false);
 
   // Winner Prize Payout Disbursal Hub States
   const [showDisbursePayoutModal, setShowDisbursePayoutModal] = useState<boolean>(false);
@@ -981,6 +969,47 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
     }, 60);
     return () => clearTimeout(timer);
   }, [activeDashboardGroupId]);
+
+  // ── Floating Action Button (FAB) Speed-Dial States ───────────────────────────
+  const [isFabOpen, setIsFabOpen] = useState<boolean>(false);
+  const [showQuickCollectModal, setShowQuickCollectModal] = useState<boolean>(false);
+  const [showQuickPersonalDrawModal, setShowQuickPersonalDrawModal] = useState<boolean>(false);
+  const [showQuickAtmModal, setShowQuickAtmModal] = useState<boolean>(false);
+
+  // Handler for member selected from Quick Collect Modal (either via search or Passbook QR scan)
+  const handleQuickMemberSelected = (member: CollectableMember) => {
+    // 1. Switch to member's chit group & month if different
+    if (member.groupId !== activeDashboardGroupId) {
+      setActiveDashboardGroupId(member.groupId);
+      setSelectedDashboardMonth(member.currentMonth !== undefined && member.currentMonth !== null ? member.currentMonth : 0);
+    }
+
+    // 2. Open existing recordingPaymentMember modal
+    setRecordingPaymentMember({
+      id: member.id,
+      ticket: member.ticket,
+      name: member.name,
+      phone: member.phone,
+      profileId: member.profileId,
+      customInstallment: member.customInstallment,
+      effectiveDue: member.effectiveDue,
+      remaining: member.remainingThisMonth,
+      totalPendingToday: member.totalPendingToday,
+    });
+    setEditingTransaction(null);
+    const defaultAmount = member.totalPendingToday > 0 
+      ? member.totalPendingToday 
+      : (member.remainingThisMonth > 0 ? member.remainingThisMonth : 20000);
+    setQuickPaymentAmount(defaultAmount.toString());
+    setPaymentWalletType('cash_in_hand');
+    setPaymentAllocationMode('auto');
+    setPaymentCustomMonths([member.currentMonth]);
+    setPaymentDateType('today');
+    setCustomPaymentDate(new Date().toISOString().split('T')[0]);
+    setPaymentNote('');
+    setPaymentReceiptUrl('');
+    setIsFabOpen(false);
+  };
 
   // ── Remind All Modal States & Handlers (ChitBase Style) ─────────────────────────
   const [showRemindModal, setShowRemindModal] = useState<boolean>(false);
@@ -2660,6 +2689,16 @@ Thank you for your prompt payment! 🙏`;
           t.type === 'collection' && (t.notes?.includes(`Month ${selectedDashboardMonth}`) || !t.notes)
         );
 
+        // Kai Iruppu (கை இருப்பு) Accumulated Pool & Laaba Seetu Metrics
+        const activeKaiIruppuPool = Number(activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0);
+        const laabaGoalPct = totalChitVal > 0 ? Math.min(100, Math.round((activeKaiIruppuPool / totalChitVal) * 100)) : 0;
+        const remainingToLaaba = Math.max(0, totalChitVal - activeKaiIruppuPool);
+        const isLaabaActive = activeKaiIruppuPool >= totalChitVal;
+        const completedGroupAuctions = dashboardAuctionLogs
+          .filter(l => Number(l.winning_discount ?? l.winning_bid ?? 0) > 0)
+          .sort((a, b) => Number(a.month) - Number(b.month));
+        const totalDiscountsRecorded = completedGroupAuctions.reduce((sum, l) => sum + Number(l.winning_discount ?? l.winning_bid ?? 0), 0);
+
         return (
           <div className="space-y-4 sm:space-y-6">
             {/* Top Chit Groups Pill Switcher Bar */}
@@ -2707,6 +2746,13 @@ Thank you for your prompt payment! 🙏`;
                         }`}>
                           {formatCurrency(group.totalValue)}
                         </span>
+                        {(group.kaiIruppuPool || 0) > 0 && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold flex items-center gap-1 ${
+                            isSelected ? 'bg-amber-400 text-amber-950 shadow-2xs' : 'bg-amber-50 text-amber-800 border border-amber-200'
+                          }`} title={`Kai Iruppu Pool: ${formatCurrency(group.kaiIruppuPool)}`}>
+                            <span>💰 {formatCurrency(group.kaiIruppuPool)}</span>
+                          </span>
+                        )}
                       </button>
                     );
                   })
@@ -2790,6 +2836,95 @@ Thank you for your prompt payment! 🙏`;
                 >
                   <ChevronRight size={16} />
                 </button>
+              </div>
+            )}
+
+            {/* ── Compact Kai Iruppu (கை இருப்பு) Auction Accumulated Pool Ribbon ── */}
+            {activeGroup && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-3 sm:px-4 sm:py-3 shadow-2xs space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  {/* Left: Pool Amount & Label */}
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+                      <Coins size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                          கை இருப்பு · Kai Iruppu Pool
+                        </span>
+                        {isLaabaActive && (
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded flex items-center gap-1">
+                            <Sparkles size={10} /> Laaba Seetu Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-baseline gap-1.5 mt-0.5">
+                        <span className="text-base sm:text-lg font-black text-gray-900 font-mono tracking-tight">
+                          {formatCurrency(activeKaiIruppuPool)}
+                        </span>
+                        <span className="text-xs text-gray-400 font-mono">
+                          / {formatCurrency(totalChitVal)}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-medium hidden md:inline">
+                          ({isLaabaActive ? 'Threshold Reached!' : `${formatCurrency(remainingToLaaba)} to free month`})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Middle / Right: Slim Progress & Breakdown Button */}
+                  <div className="flex items-center gap-3 sm:gap-4 shrink-0 justify-between sm:justify-end">
+                    <div className="flex items-center gap-2 min-w-[140px] sm:min-w-[180px]">
+                      <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden border border-gray-200">
+                        <div
+                          className="bg-gradient-to-r from-amber-500 to-emerald-500 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.max(activeKaiIruppuPool > 0 ? 5 : 0, laabaGoalPct)}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-bold font-mono text-gray-600 shrink-0">
+                        {laabaGoalPct}%
+                      </span>
+                    </div>
+
+                    {completedGroupAuctions.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowKaiIruppuBreakdown(prev => !prev)}
+                        className="flex items-center gap-1 text-[11px] font-bold text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-2.5 py-1.5 rounded-xl transition-all shrink-0 active:scale-95 cursor-pointer"
+                        title="Toggle monthly auction discounts history"
+                      >
+                        <span>History ({completedGroupAuctions.length})</span>
+                        {showKaiIruppuBreakdown ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Compact Expandable Discount History */}
+                {showKaiIruppuBreakdown && (
+                  <div className="pt-2 border-t border-gray-100 space-y-2 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between text-[11px] text-gray-500">
+                      <span className="font-bold text-gray-700">Monthly Auction Discount Contributions:</span>
+                      <span>Total: <strong className="text-gray-900 font-mono">{formatCurrency(totalDiscountsRecorded)}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-nowrap scrollbar-none">
+                      {completedGroupAuctions.map((log) => {
+                        const disc = Number(log.winning_discount ?? log.winning_bid ?? 0);
+                        return (
+                          <div
+                            key={log.id || log.month}
+                            className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 shrink-0 flex items-center gap-2 text-xs"
+                          >
+                            <span className="font-extrabold text-indigo-700">M{log.month}</span>
+                            <span className="text-gray-600 font-medium truncate max-w-[120px]">{log.winner_name || 'Subscriber'}</span>
+                            <span className="font-black font-mono text-emerald-600">+{formatCurrency(disc)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3082,7 +3217,10 @@ Thank you for your prompt payment! 🙏`;
                           <span className="text-sm sm:text-base font-extrabold text-indigo-700 font-mono">
                             {formatCurrency(winningBid)}
                           </span>
-                          <span className="text-[9px] text-gray-400 block mt-0.5">Pooled to Kai Iruppu</span>
+                          <span className="text-[9px] text-emerald-700 font-bold block mt-0.5 flex items-center gap-1">
+                            <Sparkles size={10} className="text-amber-500 shrink-0" />
+                            <span>Pooled to Kai Iruppu</span>
+                          </span>
                         </div>
 
                         <div className="bg-white/90 border border-gray-200/80 rounded-xl p-3 shadow-2xs">
@@ -3476,10 +3614,10 @@ Thank you for your prompt payment! 🙏`;
 
             {/* Unified Quick Record & Edit Payment Modal */}
             {(recordingPaymentMember || editingTransaction) && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
                 <form
                   onSubmit={editingTransaction ? handleSavePaymentEdit : handleRecordQuickPayment}
-                  className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 w-full max-w-md space-y-3.5 sm:space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
+                  className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 w-full max-w-md space-y-3.5 sm:space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto"
                 >
                   {/* Modal Header */}
                   <div className="flex justify-between items-center border-b border-gray-100 pb-3">
@@ -3787,34 +3925,34 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center justify-between pt-2">
+                  <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
                     {editingTransaction ? (
                       <button
                         type="button"
                         onClick={() => handleDeletePayment(editingTransaction)}
                         disabled={isProcessingPayment}
-                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                        className="w-full sm:w-auto text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
                       >
                         <Trash2 size={13} />
                         <span>Delete</span>
                       </button>
-                    ) : <div />}
+                    ) : <div className="hidden sm:block" />}
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={() => {
                           setRecordingPaymentMember(null);
                           setEditingTransaction(null);
                         }}
-                        className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-all"
+                        className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-all text-center"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={isProcessingPayment}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                        className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
                       >
                         <Check size={14} />
                         <span>
@@ -3924,7 +4062,27 @@ Thank you for your prompt payment! 🙏`;
       return <ReportsCenter />;
 
     case 'users':
-      return <UserAccessManager />;
+      return (
+        <MemberMatrix 
+          defaultSubtab="roles"
+          onAddAuditLog={(desc) => {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            setAuditLogs(prev => [
+              {
+                timestamp: `Today, ${timeStr}`,
+                table: 'profiles',
+                desc,
+                executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
+              },
+              ...prev
+            ]);
+          }} 
+        />
+      );
+
+    case 'settings':
+      return <SettingsManager />;
 
     case 'chits':
       const selectedWorkspaceGroup = localGroups.find(g => g.id === selectedWorkspaceGroupId);
@@ -4020,19 +4178,16 @@ Thank you for your prompt payment! 🙏`;
                   </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setRescheduleGroupId(selectedWorkspaceGroup.id);
-                      setRescheduleInputVal(auctionDateOverrides[selectedWorkspaceGroup.id] || '');
-                    }}
-                    className="text-[9px] font-bold text-indigo-600 hover:underline mt-0.5 block"
+                    onClick={() => setScheduleModalGroup(selectedWorkspaceGroup)}
+                    className="text-[9px] font-bold text-indigo-600 hover:underline mt-0.5 block cursor-pointer"
                   >
-                    Reschedule Date →
+                    Configure Schedule →
                   </button>
                 </div>
               </div>
 
               {/* Month 0 / Launch Status Banner */}
-              {selectedWorkspaceGroup.currentMonth === 0 ? (
+              {selectedWorkspaceGroup.currentMonth === 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
@@ -4069,19 +4224,22 @@ Thank you for your prompt payment! 🙏`;
                     <Rocket size={14} /> Confirm Launch &amp; Roll to M1
                   </button>
                 </div>
-              ) : (
-                <div className="bg-indigo-50/60 border border-indigo-150 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
-                  <div className="space-y-0.5">
-                    <h4 className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                      <Coins size={14} className="text-indigo-600" />
-                      Month {selectedWorkspaceGroup.currentMonth} Auction Cycle Active
-                    </h4>
-                    <p className="text-xs text-indigo-800">
-                      Eligible subscribers can place live discount bids. Maximum prize pot: <strong>{formatCurrency(selectedWorkspaceGroup.totalValue)}</strong>.
-                    </p>
-                  </div>
-                </div>
               )}
+
+              {/* Live Auction Countdown & Schedule Banner */}
+              <AuctionCountdownBanner
+                groupId={selectedWorkspaceGroup.id}
+                groupName={selectedWorkspaceGroup.name}
+                currentMonth={selectedWorkspaceGroup.currentMonth}
+                durationMonths={selectedWorkspaceGroup.duration}
+                auctionDayOfMonth={selectedWorkspaceGroup.auctionDayOfMonth}
+                auctionTime={selectedWorkspaceGroup.auctionTime}
+                nextAuctionDate={selectedWorkspaceGroup.nextAuctionDate}
+                nextAuctionTime={selectedWorkspaceGroup.nextAuctionTime}
+                allowConfigure={true}
+                onScheduleUpdated={fetchGroups}
+                compact={false}
+              />
 
               {/* Enrolled Member Ticket Roster Matrix */}
               <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-5 space-y-3 sm:space-y-4 shadow-2xs">
@@ -4089,10 +4247,10 @@ Thank you for your prompt payment! 🙏`;
                   <div>
                     <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Users size={16} className="text-indigo-600" />
-                      Enrolled Ticket Matrix &amp; Physical Book Sync
+                      Enrolled Ticket Matrix
                     </h4>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Live status of assigned tickets, winning eligibility, and pocket book sync
+                      Live status of assigned tickets and auction winning eligibility
                     </p>
                   </div>
                   <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-full w-fit">
@@ -4113,19 +4271,19 @@ Thank you for your prompt payment! 🙏`;
                     {workspaceMembers.map((member) => (
                       <div 
                         key={member.id} 
-                        className={`p-3 sm:p-3.5 rounded-2xl border transition-all space-y-2.5 ${
+                        className={`p-3 sm:p-3.5 rounded-2xl border transition-all space-y-2 ${
                           member.hasWon
                             ? 'bg-gray-50/80 border-gray-200 opacity-80'
                             : 'bg-white border-gray-200 shadow-2xs hover:border-gray-300'
                         }`}
                       >
-                        <div className="flex justify-between items-start">
+                        <div className="flex justify-between items-center">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="text-xs font-bold w-7 h-7 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-150 flex items-center justify-center shrink-0">
                               #{member.ticket}
                             </span>
                             <div className="min-w-0">
-                              <strong className="text-xs text-gray-900 block truncate max-w-[130px] sm:max-w-[160px]">{member.name}</strong>
+                              <strong className="text-xs text-gray-900 block truncate max-w-[140px] sm:max-w-[170px]">{member.name}</strong>
                               <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5 truncate">
                                 <Phone size={10} className="shrink-0" /> {member.phone || 'No phone'}
                               </span>
@@ -4133,38 +4291,14 @@ Thank you for your prompt payment! 🙏`;
                           </div>
 
                           {member.hasWon ? (
-                            <span className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">
+                            <span className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-0.5 rounded-full shrink-0">
                               Won
                             </span>
                           ) : (
-                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
+                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full shrink-0">
                               Eligible
                             </span>
                           )}
-                        </div>
-
-                        {/* Pocket Book Sync Toggle */}
-                        <div className="pt-2 border-t border-gray-100 flex justify-between items-center text-[10px]">
-                          <span className="text-gray-500 font-medium">Physical Pocket Book:</span>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleWorkspaceBookSync(member.id, member.bookSynced)}
-                            className={`font-bold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 active:scale-95 ${
-                              member.bookSynced
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                                : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                            }`}
-                          >
-                            {member.bookSynced ? (
-                              <>
-                                <Check size={11} /> Synced
-                              </>
-                            ) : (
-                              <>
-                                <AlertCircle size={11} /> Pending Sync
-                              </>
-                            )}
-                          </button>
                         </div>
                       </div>
                     ))}
@@ -4371,8 +4505,8 @@ Thank you for your prompt payment! 🙏`;
                                   <div className="flex items-center gap-1">
                                     <strong className={isOverride ? 'text-amber-600' : 'text-gray-700'}>{display}</strong>
                                     <button
-                                      onClick={() => { setRescheduleGroupId(g.id); setRescheduleInputVal(auctionDateOverrides[g.id] || ''); }}
-                                      className="text-[8px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded hover:bg-indigo-100 transition-colors"
+                                      onClick={() => setScheduleModalGroup(g)}
+                                      className="text-[8px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded hover:bg-indigo-100 transition-colors cursor-pointer"
                                     >
                                       Edit
                                     </button>
@@ -5842,8 +5976,8 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 1. SUB-MODAL: SPLIT INTO A POOL (Screenshot 3) ──────── */}
       {splitModalTicket && (
-        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
             <div className="flex justify-between items-start border-b border-gray-100 pb-3">
               <div>
                 <h4 className="text-sm font-bold text-gray-900">Split {splitModalTicket.name}&apos;s share</h4>
@@ -5924,11 +6058,11 @@ Thank you for your prompt payment! 🙏`;
               Target ticket due: {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}/mo.
             </p>
 
-            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => setSplitModalTicket(null)}
-                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+                className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
               >
                 Cancel
               </button>
@@ -5936,7 +6070,7 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   type="button"
                   onClick={() => handleSaveSplit(splitModalTicket.id, [])}
-                  className="border border-red-200 text-red-700 hover:bg-red-50 font-bold text-xs px-3 py-2 rounded-xl transition-colors"
+                  className="w-full sm:w-auto border border-red-200 text-red-700 hover:bg-red-50 font-bold text-xs px-3 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
                 >
                   Clear Split
                 </button>
@@ -5944,7 +6078,7 @@ Thank you for your prompt payment! 🙏`;
               <button
                 type="button"
                 onClick={() => handleSaveSplit(splitModalTicket.id, splitPayers)}
-                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2 rounded-xl transition-colors shadow-sm"
+                className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
               >
                 Save split
               </button>
@@ -5955,8 +6089,8 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 2. SUB-MODAL: MEMBER LEAVES THE CHIT (Screenshot 4) ──────── */}
       {exitModalTicket && (
-        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
             <div className="flex justify-between items-start border-b border-gray-100 pb-3">
               <div>
                 <h4 className="text-sm font-bold text-gray-900">Member leaves the chit</h4>
@@ -6022,18 +6156,18 @@ Thank you for your prompt payment! 🙏`;
               They pay up to the month before. Payments and wins stay on record; nothing is deleted.
             </p>
 
-            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => setExitModalTicket(null)}
-                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+                className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => handleSaveExit(exitModalTicket.id, exitMonthVal)}
-                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2 rounded-xl transition-colors shadow-sm"
+                className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
               >
                 End shares
               </button>
@@ -6044,8 +6178,8 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 3. SUB-MODAL: TRANSFER SHARES ──────── */}
       {transferModalTicket && (
-        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
             <div className="flex justify-between items-start border-b border-gray-100 pb-3">
               <div>
                 <h4 className="text-sm font-bold text-gray-900">Transfer Ticket #{transferModalTicket.ticket}</h4>
@@ -6100,11 +6234,11 @@ Thank you for your prompt payment! 🙏`;
               <p>• Dues and live bidding rights from Month {transferMonthVal} transfer to the new subscriber.</p>
             </div>
 
-            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => setTransferModalTicket(null)}
-                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+                className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
               >
                 Cancel
               </button>
@@ -6112,7 +6246,7 @@ Thank you for your prompt payment! 🙏`;
                 type="button"
                 disabled={!transferRecipientId}
                 onClick={() => handleSaveTransfer(transferModalTicket.id, transferRecipientId, transferMonthVal)}
-                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2 rounded-xl transition-colors shadow-sm disabled:opacity-50"
+                className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm disabled:opacity-50 text-center"
               >
                 Confirm Transfer
               </button>
@@ -6123,8 +6257,8 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 4. SUB-MODAL: CUSTOM AMOUNT ──────── */}
       {customAmountModalTicket && (
-        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
             <div className="flex justify-between items-start border-b border-gray-100 pb-3">
               <div>
                 <h4 className="text-sm font-bold text-gray-900">Custom Monthly Due</h4>
@@ -6157,11 +6291,11 @@ Thank you for your prompt payment! 🙏`;
               </p>
             </div>
 
-            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => setCustomAmountModalTicket(null)}
-                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+                className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
               >
                 Cancel
               </button>
@@ -6169,7 +6303,7 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   type="button"
                   onClick={() => handleSaveCustomAmount(customAmountModalTicket.id, null)}
-                  className="border border-red-200 text-red-700 hover:bg-red-50 font-bold text-xs px-3 py-2 rounded-xl transition-colors"
+                  className="w-full sm:w-auto border border-red-200 text-red-700 hover:bg-red-50 font-bold text-xs px-3 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
                 >
                   Clear Custom
                 </button>
@@ -6177,7 +6311,7 @@ Thank you for your prompt payment! 🙏`;
               <button
                 type="button"
                 onClick={() => handleSaveCustomAmount(customAmountModalTicket.id, customAmountVal > 0 ? customAmountVal : null)}
-                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2 rounded-xl transition-colors shadow-sm"
+                className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
               >
                 Save Custom Amount
               </button>
@@ -6196,8 +6330,8 @@ Thank you for your prompt payment! 🙏`;
         const isSliderReady = isPhraseMatched && deleteSliderVal >= 98;
 
         return (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
-            <div className="bg-white border-2 border-red-200 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative">
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+            <div className="bg-white border-2 border-red-200 rounded-2xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
               
               {/* Danger Header */}
               <div className="flex justify-between items-start border-b border-red-100 pb-3">
@@ -6307,11 +6441,11 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* Action Controls Footer */}
-              <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setDeletingGroup(null)}
-                  className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-lg transition-colors"
+                  className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
                 >
                   Cancel &amp; Keep Group
                 </button>
@@ -6319,7 +6453,7 @@ Thank you for your prompt payment! 🙏`;
                   type="button"
                   disabled={!isSliderReady || isDeletingGroup}
                   onClick={handleExecuteDeleteGroup}
-                  className={`font-bold text-xs px-5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 ${
+                  className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center ${
                     isSliderReady && !isDeletingGroup
                       ? 'bg-red-600 hover:bg-red-700 text-white'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
@@ -6342,68 +6476,42 @@ Thank you for your prompt payment! 🙏`;
         );
       })()}
 
-      {/* Global Reschedule Date Override Popover (accessible on Dashboard, Chits directory, and Workspace) */}
-      {rescheduleGroupId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-xs space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-              <h4 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                <CalendarDays size={14} className="text-indigo-600" />
-                Reschedule Auction Date
-              </h4>
-              <button onClick={() => setRescheduleGroupId(null)} className="text-gray-400 hover:text-gray-600 p-1">
-                <X size={14} />
-              </button>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Select New Date</label>
-              <input
-                type="date"
-                value={rescheduleInputVal}
-                onChange={(e) => setRescheduleInputVal(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
-                autoFocus
-              />
-              <p className="text-[10px] text-gray-500 mt-1">
-                Canonical (auto): {formatAuctionDate(getFirstSundayOnOrAfter10th(new Date().getFullYear(), new Date().getMonth()))}
-              </p>
-            </div>
-            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
-              {auctionDateOverrides[rescheduleGroupId] && (
-                <button
-                  type="button"
-                  onClick={() => { 
-                    setAuctionDateOverrides(prev => { 
-                      const n = {...prev}; 
-                      delete n[rescheduleGroupId!]; 
-                      return n; 
-                    }); 
-                    setRescheduleGroupId(null); 
-                  }}
-                  className="text-[10px] font-bold text-red-650 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                >
-                  Clear Override
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  if (rescheduleInputVal) setAuctionDateOverrides(prev => ({ ...prev, [rescheduleGroupId!]: rescheduleInputVal }));
-                  setRescheduleGroupId(null);
-                }}
-                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors shadow-sm"
-              >
-                Save Override
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Global Auction Schedule Configuration Modal (accessible across Chits directory, Dashboard, and Workspace) */}
+      {scheduleModalGroup && (
+        <AuctionScheduleModal
+          isOpen={!!scheduleModalGroup}
+          onClose={() => setScheduleModalGroup(null)}
+          groupId={scheduleModalGroup.id}
+          groupName={scheduleModalGroup.name}
+          currentMonth={scheduleModalGroup.currentMonth}
+          startDate={scheduleModalGroup.startDate}
+          auctionDayOfMonth={scheduleModalGroup.auctionDayOfMonth}
+          auctionTime={scheduleModalGroup.auctionTime}
+          nextAuctionDate={scheduleModalGroup.nextAuctionDate}
+          nextAuctionTime={scheduleModalGroup.nextAuctionTime}
+          onScheduleUpdated={(updated) => {
+            setLocalGroups(prev =>
+              prev.map(g =>
+                g.id === scheduleModalGroup.id
+                  ? {
+                      ...g,
+                      auctionDayOfMonth: updated.auctionDayOfMonth,
+                      auctionTime: updated.auctionTime,
+                      nextAuctionDate: updated.nextAuctionDate,
+                      nextAuctionTime: updated.nextAuctionTime,
+                    }
+                  : g
+              )
+            );
+            setScheduleModalGroup(null);
+          }}
+        />
       )}
 
       {/* Global Create / Register Subscriber Modal Popup */}
       {showCreateMemberModal && (
-        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
@@ -6559,18 +6667,18 @@ Thank you for your prompt payment! 🙏`;
                 )}
               </div>
 
-              <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setShowCreateMemberModal(false)}
-                  className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-lg transition-colors"
+                  className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isCreatingMember || !newMemberName.trim() || !newMemberPhone.trim() || duplicatePhoneSubscriber !== null}
-                  className={`font-bold text-xs px-5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 ${
+                  className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center ${
                     duplicatePhoneSubscriber !== null
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
                       : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50'
@@ -6634,7 +6742,7 @@ Thank you for your prompt payment! 🙏`;
             .reduce((sum, t) => sum + Number(t.amount || 0), 0);
         };
 
-        const isLaabaMonth = (activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && selectedDashboardMonth > 0;
+        const isLaabaMonth = (activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && selectedDashboardMonth > 0;
         const currentExpectedDue = isLaabaMonth ? 0 : winnerInst;
         const currentMonthPaid = getWinnerPaidForMonth(selectedDashboardMonth);
         const currentMonthUnpaid = Math.max(0, currentExpectedDue - currentMonthPaid);
@@ -6643,7 +6751,7 @@ Thank you for your prompt payment! 🙏`;
         const arrearCandidates: { month: number; unpaid: number; expected: number; paid: number }[] = [];
         for (let m = 0; m < selectedDashboardMonth; m++) {
           const paid = getWinnerPaidForMonth(m);
-          const exp = (activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && m > 0 ? 0 : winnerInst;
+          const exp = (activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && m > 0 ? 0 : winnerInst;
           const unpaid = Math.max(0, exp - paid);
           arrearCandidates.push({ month: m, unpaid, expected: exp, paid });
         }
@@ -6666,7 +6774,7 @@ Thank you for your prompt payment! 🙏`;
         }
         disburseDeductArrearMonths.forEach(m => {
           const paid = getWinnerPaidForMonth(m);
-          const exp = (activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && m > 0 ? 0 : winnerInst;
+          const exp = (activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && m > 0 ? 0 : winnerInst;
           const unpaid = Math.max(0, exp - paid);
           if (unpaid > 0) {
             activeDeductionsList.push({
@@ -6759,7 +6867,7 @@ Thank you for your prompt payment! 🙏`;
 
         return (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-            <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-lg space-y-3.5 shadow-2xl my-auto animate-in zoom-in-95 duration-150 max-h-[94vh] overflow-y-auto">
+            <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-lg space-y-3.5 shadow-2xl my-auto animate-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto">
               {/* Modal Header */}
               <div className="flex justify-between items-center border-b border-gray-100 pb-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -7143,18 +7251,18 @@ Thank you for your prompt payment! 🙏`;
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="flex gap-2.5 pt-2 border-t border-gray-100">
+                <div className="flex flex-col-reverse sm:flex-row gap-2.5 pt-2 border-t border-gray-100">
                   <button
                     type="button"
                     onClick={() => setShowDisbursePayoutModal(false)}
-                    className="flex-1 py-3 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs rounded-xl transition-colors"
+                    className="w-full sm:flex-1 py-3 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs rounded-xl transition-colors text-center"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isProcessingDisbursal || (amountNum <= 0 && totalDeductionsAmount <= 0)}
-                    className="flex-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95"
+                    className="w-full sm:flex-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95 text-center"
                   >
                     {isProcessingDisbursal ? (
                       <>
@@ -7201,8 +7309,8 @@ Thank you for your prompt payment! 🙏`;
         const groupBroadcastMsg = generateGroupBroadcastText(pendingMembersList, activeGroup, selectedDashboardMonth);
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
-            <div className="bg-white rounded-3xl max-w-md sm:max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in overflow-y-auto">
+            <div className="bg-white rounded-3xl max-w-md sm:max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto my-auto">
               {/* Header */}
               <div className="flex justify-between items-start">
                 <div>
@@ -7371,7 +7479,7 @@ Thank you for your prompt payment! 🙏`;
                     </pre>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -7401,6 +7509,151 @@ Thank you for your prompt payment! 🙏`;
           </div>
         );
       })()}
+
+      {/* ── FLOATING ACTION BUTTON (FAB) & SPEED-DIAL MENU ──────────────────── */}
+      {activeTab === 'dashboard' && (
+        <>
+          {/* Backdrop Blur Overlay when FAB is Open */}
+          {isFabOpen && (
+            <div
+              onClick={() => setIsFabOpen(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-2xs z-40 animate-in fade-in duration-150"
+            />
+          )}
+
+          <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 flex flex-col items-end gap-2.5 select-none">
+            {/* Speed Dial Menu Items */}
+            {isFabOpen && (
+              <div className="flex flex-col items-end gap-2 animate-in slide-in-from-bottom-3 duration-200">
+                
+                {/* 1. Quick Collect Payment (Primary Action) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setIsFabOpen(false);
+                    setShowQuickCollectModal(true);
+                  }}
+                  className="flex items-center gap-2.5 bg-white hover:bg-emerald-50 text-gray-900 border border-gray-200 px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                >
+                  <span className="text-xs font-black tracking-tight text-gray-900">
+                    Quick Collect Payment
+                  </span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                    <Coins size={16} />
+                  </div>
+                </button>
+
+                {/* 2. Log Cash Spend / Personal Draw */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setIsFabOpen(false);
+                    setShowQuickPersonalDrawModal(true);
+                  }}
+                  className="flex items-center gap-2.5 bg-white hover:bg-rose-50 text-gray-900 border border-gray-200 px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                >
+                  <span className="text-xs font-black tracking-tight text-gray-900">
+                    Log Cash Spend (Draw)
+                  </span>
+                  <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                    <MinusCircle size={16} />
+                  </div>
+                </button>
+
+                {/* 3. Send Dues Reminder */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setIsFabOpen(false);
+                    setRemindModalTab('individual');
+                    setShowRemindModal(true);
+                  }}
+                  className="flex items-center gap-2.5 bg-white hover:bg-emerald-50 text-gray-900 border border-gray-200 px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                >
+                  <span className="text-xs font-black tracking-tight text-gray-900">
+                    Send Dues Reminder
+                  </span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                    <Send size={15} />
+                  </div>
+                </button>
+
+                {/* 4. ATM Cash Withdrawal */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setIsFabOpen(false);
+                    setShowQuickAtmModal(true);
+                  }}
+                  className="flex items-center gap-2.5 bg-white hover:bg-indigo-50 text-gray-900 border border-gray-200 px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                >
+                  <span className="text-xs font-black tracking-tight text-gray-900">
+                    ATM Cash Withdrawal
+                  </span>
+                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                    <Landmark size={15} />
+                  </div>
+                </button>
+
+              </div>
+            )}
+
+            {/* Main Primary FAB Trigger Button */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHapticFeedback('light');
+                setIsFabOpen(prev => !prev);
+              }}
+              className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 cursor-pointer ${
+                isFabOpen
+                  ? 'bg-gray-900 text-white rotate-45 ring-4 ring-gray-900/20'
+                  : 'bg-gradient-to-tr from-emerald-600 via-teal-600 to-indigo-600 text-white ring-4 ring-emerald-500/30 hover:scale-105 shadow-emerald-900/30'
+              }`}
+              title="Quick Actions &amp; Collect"
+            >
+              <Plus size={26} className={`stroke-[2.5] transition-transform duration-200 ${isFabOpen ? 'rotate-90' : ''}`} />
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ── QUICK ACTION MODALS ──────────────────────────────────────────────── */}
+      
+      {/* 1. Quick Member Collect Modal (Search + Passbook QR Scanner) */}
+      <QuickMemberCollectModal
+        isOpen={showQuickCollectModal}
+        onClose={() => setShowQuickCollectModal(false)}
+        onSelectMember={handleQuickMemberSelected}
+        activeGroupId={activeDashboardGroupId}
+        activeMonth={selectedDashboardMonth}
+      />
+
+      {/* 2. Quick Personal Draw / Spend Modal */}
+      <QuickPersonalDrawModal
+        isOpen={showQuickPersonalDrawModal}
+        onClose={() => setShowQuickPersonalDrawModal(false)}
+        onSuccess={() => {
+          if (activeDashboardGroupId) {
+            fetchDashboardData(activeDashboardGroupId);
+          }
+        }}
+      />
+
+      {/* 3. Quick ATM Cash Withdrawal Modal */}
+      <QuickAtmWithdrawalModal
+        isOpen={showQuickAtmModal}
+        onClose={() => setShowQuickAtmModal(false)}
+        onSuccess={() => {
+          if (activeDashboardGroupId) {
+            fetchDashboardData(activeDashboardGroupId);
+          }
+        }}
+      />
     </>
   );
 }

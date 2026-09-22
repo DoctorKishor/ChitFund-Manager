@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "@/context/WalletContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { MaintenanceProvider } from "@/context/MaintenanceContext";
 import ServiceWorkerCleanup from "@/components/ServiceWorkerCleanup";
 import NetworkStatusBanner from "@/components/NetworkStatusBanner";
 
@@ -35,9 +36,11 @@ export default function RootLayout({
         <ServiceWorkerCleanup />
         <NetworkStatusBanner />
         <AuthProvider>
-          <WalletProvider>
-            {children}
-          </WalletProvider>
+          <MaintenanceProvider>
+            <WalletProvider>
+              {children}
+            </WalletProvider>
+          </MaintenanceProvider>
         </AuthProvider>
       </body>
     </html>

@@ -12,6 +12,7 @@ export interface StickerItem {
   phone?: string;
   groupName?: string;
   ticketNumber?: number;
+  isBlank?: boolean;
 }
 
 interface PassbookSheetGeneratorModalProps {
@@ -124,8 +125,16 @@ export default function PassbookSheetGeneratorModal({
               margin: 0,
             });
 
-            // 3. Layout calculation based on sticker aspect ratio
-            if (preset === '2x2') {
+            // 3. Layout calculation based on whether sticker is Blank or Assigned
+            const isBlankSticker = item.isBlank || !item.name || item.name.startsWith('BLANK PASSBOOK');
+
+            if (isBlankSticker) {
+              // PURE MINIMAL BLANK STICKER: Clean, centered, maximized QR code for easy physical scanning
+              const qrSize = Math.min(stickerWidthMm - 3, stickerHeightMm - 3);
+              const qrX = x + (stickerWidthMm - qrSize) / 2;
+              const qrY = y + (stickerHeightMm - qrSize) / 2;
+              doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+            } else if (preset === '2x2') {
               // Compact Square: QR centered, 1-line name at bottom
               const qrSize = stickerWidthMm - 4;
               doc.addImage(qrDataUrl, 'PNG', x + 2, y + 1.5, qrSize, qrSize);
@@ -160,7 +169,7 @@ export default function PassbookSheetGeneratorModal({
               const ticketTag = item.ticketNumber ? `Ticket #${item.ticketNumber}` : 'MEMBER KEY';
               doc.text(ticketTag, x + stickerWidthMm / 2, y + stickerHeightMm - 1.5, { align: 'center' });
             } else {
-              // Standard Rectangular (2x3cm / 30mm x 20mm) - Horizontal layout
+              // Standard Rectangular (2x3cm / 30mm x 20mm) - Horizontal layout for Assigned Members
               const qrSize = 16;
               doc.addImage(qrDataUrl, 'PNG', x + 1.5, y + (stickerHeightMm - qrSize) / 2, qrSize, qrSize);
 
@@ -213,17 +222,17 @@ export default function PassbookSheetGeneratorModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg max-h-[90dvh] overflow-hidden shadow-2xl relative flex flex-col my-auto">
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
               <FileText size={20} />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-white tracking-tight">{defaultTitle}</h3>
-              <p className="text-xs text-slate-400">
+            <div className="min-w-0">
+              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">{defaultTitle}</h3>
+              <p className="text-[11px] sm:text-xs text-slate-400 truncate">
                 {items.length} sticker{items.length !== 1 ? 's' : ''} ready for A4 grid printing
               </p>
             </div>
@@ -231,14 +240,14 @@ export default function PassbookSheetGeneratorModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Content & Options */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto flex-1">
           {/* Dimension Presets */}
           <div>
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2.5">
@@ -284,7 +293,7 @@ export default function PassbookSheetGeneratorModal({
                   max={100}
                   value={customWidthMm}
                   onChange={(e) => setCustomWidthMm(Number(e.target.value))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono"
                 />
               </div>
               <div className="flex-1">
@@ -295,7 +304,7 @@ export default function PassbookSheetGeneratorModal({
                   max={100}
                   value={customHeightMm}
                   onChange={(e) => setCustomHeightMm(Number(e.target.value))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono"
                 />
               </div>
             </div>
@@ -330,12 +339,12 @@ export default function PassbookSheetGeneratorModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-5 border-t border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row justify-end gap-3">
+        <div className="p-4 sm:p-5 border-t border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row justify-end gap-2.5 sm:gap-3 shrink-0">
           <button
             type="button"
             onClick={onClose}
             disabled={isGenerating}
-            className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-center"
           >
             Cancel
           </button>
@@ -344,16 +353,16 @@ export default function PassbookSheetGeneratorModal({
             type="button"
             onClick={() => handleGeneratePdf('print')}
             disabled={isGenerating || items.length === 0}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all"
           >
-            <Printer size={15} /> Preview & Print
+            <Printer size={15} /> Preview &amp; Print
           </button>
 
           <button
             type="button"
             onClick={() => handleGeneratePdf('download')}
             disabled={isGenerating || items.length === 0}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/25"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/25"
           >
             <Download size={15} /> Download A4 PDF
           </button>

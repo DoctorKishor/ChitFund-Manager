@@ -13,6 +13,7 @@ import {
   Calendar, 
   Sparkles, 
   ArrowRight, 
+  ArrowLeft,
   X, 
   Lock, 
   Zap, 
@@ -27,8 +28,27 @@ import {
   History,
   Clock,
   Trophy,
-  Send
+  Send,
+  CalendarClock,
+  Radio,
+  Flame,
+  Play,
+  Maximize2,
+  Eye,
+  CheckCheck,
+  Download,
+  Share2,
+  FileText,
+  ChevronRight,
+  Printer
 } from 'lucide-react';
+import AuctionCountdownBanner from '@/components/AuctionCountdownBanner';
+import AuctionScheduleModal from '@/components/AuctionScheduleModal';
+import { computeNextAuctionDateTime } from '@/utils/auctionSchedule';
+import { triggerHapticFeedback } from '@/utils/haptics';
+import { useAuth } from '@/context/AuthContext';
+import { exportAuctionReportPdf } from '@/utils/auctionPdfExporter';
+import AuctionReportDocument, { AuctionReportData } from '@/components/AuctionReportDocument';
 
 interface Member {
   id: string;
@@ -55,6 +75,30 @@ interface ChitGroup {
   currentMonth: number;
   durationMonths: number;
   kai_iruppu_pool: number;
+  startDate?: string | null;
+  auction_day_of_month?: number | null;
+  auction_time?: string | null;
+  next_auction_date?: string | null;
+  next_auction_time?: string | null;
+  is_live_auction_active?: boolean;
+  live_auction_started_at?: string | null;
+}
+
+export interface HistoricalAuctionLog {
+  id: string;
+  groupId: string;
+  month: number;
+  winningBidderId: string;
+  winningBidderName: string;
+  ticketNumber?: number | null;
+  winningDiscount: number;
+  netPayout: number;
+  totalDisbursed: number;
+  remainingPrizeDue: number;
+  disbursalStatus: 'fully_disbursed' | 'partially_disbursed' | 'pending';
+  isLaabaSeetu: boolean;
+  bidStream?: Bid[];
+  createdAt: string;
 }
 
 // ── Utility: First Sunday on-or-after the 10th ──────────────────────────────
@@ -68,12 +112,26 @@ function fmtDate(d: Date): string {
 }
 
 export default function LiveAuctionEngine() {
+  const { profile } = useAuth();
+
   // 1. Initial State Data (Loaded from Supabase)
   const [allGroups, setAllGroups] = useState<ChitGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [group, setGroup] = useState<ChitGroup | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [historicalAuctionLogs, setHistoricalAuctionLogs] = useState<HistoricalAuctionLog[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Selected Historical Log for full detailed view
+  const [selectedHistoricalLog, setSelectedHistoricalLog] = useState<HistoricalAuctionLog | null>(null);
+  const [isGeneratingReportPdf, setIsGeneratingReportPdf] = useState<boolean>(false);
+
+  // Concluded Auction Full View / Screen state
+  const [showConcludedReportScreen, setShowConcludedReportScreen] = useState<boolean>(false);
+  const [concludedReportData, setConcludedReportData] = useState<AuctionReportData | null>(null);
+
+  const printableReportRef = useRef<HTMLDivElement>(null);
+  const historicalPrintableRef = useRef<HTMLDivElement>(null);
 
   // Roll call attendance state (IDs of members participating today)
   const [attendingMemberIds, setAttendingMemberIds] = useState<string[]>([]);
@@ -120,8 +178,14 @@ export default function LiveAuctionEngine() {
     isLaaba: boolean;
   } | null>(null);
 
-  // Auction date override
+  // Stage state (Stage 1: Overview, Stage 2: Live Studio Workspace)
+  const [stage, setStage] = useState<'overview' | 'studio'>('overview');
+  const [isStartingLiveSession, setIsStartingLiveSession] = useState<boolean>(false);
+  const [liveViewerCount, setLiveViewerCount] = useState<number>(0);
+
+  // Auction date override & schedule modal
   const [auctionDateOverride, setAuctionDateOverride] = useState<string | null>(null);
+  const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
 
   // Fetch active groups list from Supabase
   const fetchGroupsList = async () => {
@@ -142,6 +206,13 @@ export default function LiveAuctionEngine() {
           currentMonth: (g.current_month !== undefined && g.current_month !== null) ? Number(g.current_month) : 0,
           durationMonths: g.duration_months,
           kai_iruppu_pool: Number(g.kai_iruppu_pool) || 0,
+          startDate: g.start_date || null,
+          auction_day_of_month: g.auction_day_of_month !== undefined && g.auction_day_of_month !== null ? Number(g.auction_day_of_month) : 10,
+          auction_time: g.auction_time || '19:00',
+          next_auction_date: g.next_auction_date || null,
+          next_auction_time: g.next_auction_time || g.auction_time || '19:00',
+          is_live_auction_active: !!g.is_live_auction_active,
+          live_auction_started_at: g.live_auction_started_at || null,
         }));
         setAllGroups(parsedGroups);
         
@@ -161,29 +232,40 @@ export default function LiveAuctionEngine() {
     }
   };
 
-  // Fetch specific selected group and its enrolled members
+  // Fetch specific selected group and its enrolled members (always queries fresh from Supabase)
   const fetchGroupDetails = async (groupId: string) => {
     try {
-      const selected = allGroups.find(g => g.id === groupId);
-      if (selected) {
-        setGroup(selected);
-      } else {
-        const { data: groupData } = await supabase
-          .from('chit_groups')
-          .select('*')
-          .eq('id', groupId)
-          .maybeSingle();
+      const { data: groupData, error } = await supabase
+        .from('chit_groups')
+        .select('*')
+        .eq('id', groupId)
+        .maybeSingle();
 
-        if (groupData) {
-          setGroup({
-            id: groupData.id,
-            name: groupData.name,
-            totalValue: Number(groupData.total_value),
-            memberCount: groupData.member_count,
-            currentMonth: (groupData.current_month !== undefined && groupData.current_month !== null) ? Number(groupData.current_month) : 0,
-            durationMonths: groupData.duration_months,
-            kai_iruppu_pool: Number(groupData.kai_iruppu_pool) || 0,
-          });
+      if (groupData) {
+        const updatedGroup: ChitGroup = {
+          id: groupData.id,
+          name: groupData.name,
+          totalValue: Number(groupData.total_value),
+          memberCount: groupData.member_count,
+          currentMonth: (groupData.current_month !== undefined && groupData.current_month !== null) ? Number(groupData.current_month) : 0,
+          durationMonths: groupData.duration_months,
+          kai_iruppu_pool: Number(groupData.kai_iruppu_pool) || 0,
+          startDate: groupData.start_date || null,
+          auction_day_of_month: groupData.auction_day_of_month !== undefined && groupData.auction_day_of_month !== null ? Number(groupData.auction_day_of_month) : 10,
+          auction_time: groupData.auction_time || '19:00',
+          next_auction_date: groupData.next_auction_date || null,
+          next_auction_time: groupData.next_auction_time || groupData.auction_time || '19:00',
+          is_live_auction_active: !!groupData.is_live_auction_active,
+          live_auction_started_at: groupData.live_auction_started_at || null,
+        };
+        setGroup(updatedGroup);
+        setAllGroups(prev => prev.map(g => g.id === groupId ? updatedGroup : g));
+
+        if (groupData.live_bid_stream && Array.isArray(groupData.live_bid_stream)) {
+          setGroupBidsMap(prev => ({
+            ...prev,
+            [groupId]: groupData.live_bid_stream,
+          }));
         }
       }
 
@@ -223,7 +305,7 @@ export default function LiveAuctionEngine() {
           setSelectedContenderId(eligibleIds[0]);
         }
       } else {
-        const memberCount = selected?.memberCount || 10;
+        const memberCount = groupData?.member_count || 10;
         const fallbackMembers = Array.from({ length: memberCount }, (_, i) => ({
           id: `slot-${i + 1}`,
           fullName: `Ticket Slot #${i + 1}`,
@@ -234,8 +316,83 @@ export default function LiveAuctionEngine() {
         setAttendingMemberIds(fallbackMembers.map(m => m.id));
         setSelectedContenderId(fallbackMembers[0]?.id || null);
       }
+
+      // Fetch historical auction logs for this group
+      const { data: logsData } = await supabase
+        .from('auction_logs')
+        .select(`
+          id,
+          group_id,
+          month,
+          bid_stream,
+          winning_bidder_id,
+          winning_discount,
+          is_laaba_seetu,
+          created_at,
+          profiles:winning_bidder_id (
+            id,
+            full_name
+          )
+        `)
+        .eq('group_id', groupId)
+        .order('month', { ascending: false });
+
+      // Fetch payout transactions for this group to accurately compute disbursal status
+      const { data: payoutTxs } = await supabase
+        .from('transactions')
+        .select('id, profile_id, group_member_id, amount, notes, type')
+        .eq('group_id', groupId)
+        .eq('type', 'payout');
+
+      if (logsData && logsData.length > 0) {
+        const parsedLogs: HistoricalAuctionLog[] = logsData.map((l: any) => {
+          const prof = Array.isArray(l.profiles) ? l.profiles[0] : l.profiles;
+          const discount = Number(l.winning_discount) || 0;
+          const totalVal = Number(groupData?.total_value) || 0;
+          const netPayout = Math.max(0, totalVal - discount);
+          const matchingMember = memberRows?.find((m: any) => m.profile_id === l.winning_bidder_id);
+
+          const monthNum = Number(l.month);
+          const monthPattern = new RegExp(`\\bMonth\\s+${monthNum}\\b|\\bM${monthNum}\\b|\\bM\\s*${monthNum}\\b`, 'i');
+          const monthPayouts = (payoutTxs || []).filter((t: any) =>
+            (t.notes && monthPattern.test(t.notes)) ||
+            (l.winning_bidder_id && (t.profile_id === l.winning_bidder_id || t.group_member_id === l.winning_bidder_id)) ||
+            (matchingMember && (t.group_member_id === matchingMember.id || t.profile_id === matchingMember.profile_id))
+          );
+
+          const totalDisbursed = monthPayouts.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
+          const remainingPrizeDue = Math.max(0, netPayout - totalDisbursed);
+          const isSettled = remainingPrizeDue === 0 && (totalDisbursed > 0 || netPayout === 0);
+          const isPartial = totalDisbursed > 0 && remainingPrizeDue > 0;
+          const disbursalStatus: 'fully_disbursed' | 'partially_disbursed' | 'pending' = isSettled
+            ? 'fully_disbursed'
+            : isPartial
+            ? 'partially_disbursed'
+            : 'pending';
+
+          return {
+            id: l.id,
+            groupId: l.group_id,
+            month: monthNum,
+            winningBidderId: l.winning_bidder_id,
+            winningBidderName: prof?.full_name || 'Winning Subscriber',
+            ticketNumber: matchingMember ? matchingMember.ticket_number : null,
+            winningDiscount: discount,
+            netPayout,
+            totalDisbursed,
+            remainingPrizeDue,
+            disbursalStatus,
+            isLaabaSeetu: !!l.is_laaba_seetu,
+            bidStream: Array.isArray(l.bid_stream) ? l.bid_stream : [],
+            createdAt: l.created_at,
+          };
+        });
+        setHistoricalAuctionLogs(parsedLogs);
+      } else {
+        setHistoricalAuctionLogs([]);
+      }
     } catch (err) {
-      console.error('Error fetching group members:', err);
+      console.error('Error fetching group members & auction logs:', err);
     }
   };
 
@@ -248,6 +405,49 @@ export default function LiveAuctionEngine() {
       fetchGroupDetails(selectedGroupId);
     }
   }, [selectedGroupId]);
+
+  // Real-time live presence subscription to track how many subscribers are watching
+  useEffect(() => {
+    if (!selectedGroupId || stage !== 'studio') {
+      setLiveViewerCount(0);
+      return;
+    }
+
+    const presenceChannel = supabase.channel(`live_auction_presence_${selectedGroupId}`, {
+      config: {
+        presence: {
+          key: `admin_${selectedGroupId}`,
+        },
+      },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        let subscriberViewers = 0;
+        Object.keys(state).forEach((key) => {
+          const presences = (state[key] || []) as any[];
+          // Exclude admin key
+          const isSubscriber = presences.some((p) => p.role !== 'admin' && !key.startsWith('admin_'));
+          if (isSubscriber) {
+            subscriberViewers += 1;
+          }
+        });
+        setLiveViewerCount(subscriberViewers);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            role: 'admin',
+            joined_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [selectedGroupId, stage]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -384,10 +584,62 @@ export default function LiveAuctionEngine() {
     return Math.round(num);
   }, [customBidInput]);
 
+  // Compute canonical target date for next auction of the selected group
+  const targetAuctionDate = useMemo(() => {
+    if (!group) return null;
+    return computeNextAuctionDateTime({
+      auction_day_of_month: group.auction_day_of_month,
+      auction_time: group.auction_time,
+      next_auction_date: group.next_auction_date,
+      next_auction_time: group.next_auction_time,
+      start_date: group.startDate,
+      current_month: group.currentMonth,
+    });
+  }, [group]);
+
+  // Is the scheduled auction date today? (Temporarily bypassed for testing)
+  const isAuctionDateToday = useMemo(() => {
+    // TEMPORARY: Date restriction bypassed for testing as requested
+    return true;
+    /*
+    if (!targetAuctionDate) return true;
+    const today = new Date();
+    return (
+      today.getFullYear() === targetAuctionDate.getFullYear() &&
+      today.getMonth() === targetAuctionDate.getMonth() &&
+      today.getDate() === targetAuctionDate.getDate()
+    );
+    */
+  }, [targetAuctionDate]);
+
+  const formattedTargetAuctionDate = useMemo(() => {
+    if (!targetAuctionDate) return '';
+    return targetAuctionDate.toLocaleDateString('en-IN', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  }, [targetAuctionDate]);
+
+  const formattedTargetAuctionTime = useMemo(() => {
+    if (!targetAuctionDate) return '';
+    const hours = targetAuctionDate.getHours();
+    const minutes = targetAuctionDate.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const h12 = hours % 12 === 0 ? 12 : hours % 12;
+    return `${h12 < 10 ? '0' + h12 : h12}:${minutes < 10 ? '0' + minutes : minutes} ${ampm}`;
+  }, [targetAuctionDate]);
+
   // Open Pop-up Bidding Modal for a Member
   const handleOpenBidModal = (memberId: string) => {
     if (group?.currentMonth === 0) {
       alert("No live auction takes place in Month 0 (Launch Phase). Advance to Month 1 to begin live auctions.");
+      return;
+    }
+    if (!isAuctionDateToday && (group?.currentMonth || 0) > 0) {
+      alert(`Live Auction is LOCKED for today. It is scheduled for ${formattedTargetAuctionDate} at ${formattedTargetAuctionTime}.\n\nPlease click "Reschedule to Conduct Today" if you wish to conduct it today.`);
+      setShowScheduleModal(true);
       return;
     }
     const member = members.find(m => m.id === memberId);
@@ -402,6 +654,12 @@ export default function LiveAuctionEngine() {
   const recordBid = (amount: number, targetMemberId?: string) => {
     if (group?.currentMonth === 0) {
       alert("No live auction takes place in Month 0 (Launch Phase). Advance to Month 1 to begin live auctions.");
+      return;
+    }
+
+    if (!isAuctionDateToday && (group?.currentMonth || 0) > 0) {
+      alert(`Live Auction is LOCKED for today. It is scheduled for ${formattedTargetAuctionDate} at ${formattedTargetAuctionTime}.\n\nPlease reschedule the auction to today before logging bids.`);
+      setShowScheduleModal(true);
       return;
     }
 
@@ -443,6 +701,15 @@ export default function LiveAuctionEngine() {
           console.error('Error saving bids to localStorage:', err);
         }
       }
+      // Broadcast live bid stream to Supabase for all subscribers in real time
+      supabase
+        .from('chit_groups')
+        .update({ live_bid_stream: updated[selectedGroupId] })
+        .eq('id', selectedGroupId)
+        .then(({ error }) => {
+          if (error) console.error('Error syncing live_bid_stream:', error);
+        });
+
       return updated;
     });
 
@@ -461,9 +728,10 @@ export default function LiveAuctionEngine() {
     if (!selectedGroupId || bids.length === 0) return;
     setGroupBidsMap(prev => {
       const currentGroupBids = prev[selectedGroupId] || [];
+      const updatedStream = currentGroupBids.slice(1);
       const updated = {
         ...prev,
-        [selectedGroupId]: currentGroupBids.slice(1)
+        [selectedGroupId]: updatedStream
       };
       if (typeof window !== 'undefined') {
         try {
@@ -472,6 +740,15 @@ export default function LiveAuctionEngine() {
           console.error('Error saving bids to localStorage:', err);
         }
       }
+      // Broadcast undo to Supabase
+      supabase
+        .from('chit_groups')
+        .update({ live_bid_stream: updatedStream })
+        .eq('id', selectedGroupId)
+        .then(({ error }) => {
+          if (error) console.error('Error syncing undo to live_bid_stream:', error);
+        });
+
       return updated;
     });
   };
@@ -512,6 +789,55 @@ export default function LiveAuctionEngine() {
     }
   };
 
+  const handleDownloadAuctionPdf = async (containerEl: HTMLElement | null, groupName: string, month: number) => {
+    if (!containerEl) {
+      console.error('Printable container element not found.');
+      return;
+    }
+    try {
+      setIsGeneratingReportPdf(true);
+      triggerHapticFeedback('light');
+      const organizerCompanyName = profile?.fullName 
+        ? `${profile.fullName}'s Chit Funds` 
+        : "Chit Funds Manager";
+      await exportAuctionReportPdf({
+        container: containerEl,
+        groupName,
+        month,
+        organizerName: organizerCompanyName,
+      });
+      triggerHapticFeedback('success');
+    } catch (err) {
+      console.error('Error generating PDF report:', err);
+      alert('Failed to generate PDF report. Please try again.');
+    } finally {
+      setIsGeneratingReportPdf(false);
+    }
+  };
+
+  const historicalReportData: AuctionReportData | null = useMemo(() => {
+    if (!selectedHistoricalLog || !group) return null;
+    return {
+      groupName: group.name,
+      month: selectedHistoricalLog.month,
+      durationMonths: group.durationMonths,
+      totalValue: group.totalValue,
+      winnerName: selectedHistoricalLog.winningBidderName,
+      winnerTicket: selectedHistoricalLog.ticketNumber,
+      winningDiscount: selectedHistoricalLog.winningDiscount,
+      netPayout: selectedHistoricalLog.netPayout,
+      disbursalStatus: selectedHistoricalLog.disbursalStatus,
+      totalDisbursed: selectedHistoricalLog.totalDisbursed,
+      remainingPrizeDue: selectedHistoricalLog.remainingPrizeDue,
+      newPool: group.kai_iruppu_pool,
+      isLaabaSeetuThisMonth: selectedHistoricalLog.isLaabaSeetu,
+      isNextMonthLaabaSeetu: false,
+      concludedAt: selectedHistoricalLog.createdAt,
+      organizerName: profile?.fullName ? `${profile.fullName}'s Chit Funds` : "Chit Funds Manager",
+      bidStream: selectedHistoricalLog.bidStream || [],
+    };
+  }, [selectedHistoricalLog, group, profile]);
+
   const handleConfirmClose = async () => {
     if (!group || bids.length === 0) return;
     setIsRecording(true);
@@ -536,13 +862,43 @@ export default function LiveAuctionEngine() {
     };
     setRecordedWinnerSummary(summaryData);
 
+    // Prepare full rich concluded report data
+    const concludedReport: AuctionReportData = {
+      groupName: group.name,
+      month: recordedMonth,
+      durationMonths: group.durationMonths,
+      totalValue: group.totalValue,
+      winnerName: winnerName,
+      winnerTicket: winnerTicket,
+      winningDiscount: highestBid,
+      netPayout: netPayout,
+      disbursalStatus: 'pending',
+      totalDisbursed: 0,
+      remainingPrizeDue: netPayout,
+      previousPool: group.kai_iruppu_pool,
+      newPool: nextPool,
+      isLaabaSeetuThisMonth: isLaabaSeetuActive,
+      isNextMonthLaabaSeetu: nextPool >= group.totalValue,
+      concludedAt: new Date().toISOString(),
+      organizerName: profile?.fullName ? `${profile.fullName}'s Chit Funds` : "Chit Funds Manager",
+      attendingMembers: members.map(m => ({
+        ticketNumber: m.ticketNumber,
+        fullName: m.fullName,
+        attended: attendingMemberIds.includes(m.id),
+      })),
+      bidStream: [...bids],
+    };
+
     try {
-      // 1. Update chit group month, pool, and status in Supabase
+      // 1. Update chit group month, pool, status, and reset live broadcast in Supabase
       if (group.id) {
         await supabase.from('chit_groups').update({
           current_month: nextMonth,
           kai_iruppu_pool: nextPool,
           status: isCompleting ? 'completed' : 'active',
+          is_live_auction_active: false,
+          live_auction_started_at: null,
+          live_bid_stream: [],
         }).eq('id', group.id);
 
         // 2. Mark winning ticket as won in group_members
@@ -599,13 +955,103 @@ export default function LiveAuctionEngine() {
         });
       }
 
+      if (group.id) {
+        await fetchGroupDetails(group.id);
+      }
+
+      setConcludedReportData(concludedReport);
+      setShowConcludedReportScreen(true);
+      setShowCloseModal(false);
       setShowConfetti(true);
+      triggerHapticFeedback('success');
     } catch (err: any) {
       console.error('Error updating chit group in Supabase:', err);
       alert('Error updating auction in database: ' + err.message);
     } finally {
       setIsRecording(false);
     }
+  };
+
+  const handleBeginLiveAuction = async () => {
+    if (!group) return;
+    if (group.currentMonth === 0) {
+      alert("Month 0 is the launch phase (Organizer Profit). No live bidding takes place in Month 0.");
+      return;
+    }
+    try {
+      setIsStartingLiveSession(true);
+      triggerHapticFeedback('success');
+
+      const currentSessionBids = (group.id && groupBidsMap[group.id]) || [];
+
+      const { error } = await supabase
+        .from('chit_groups')
+        .update({
+          is_live_auction_active: true,
+          live_auction_started_at: new Date().toISOString(),
+          live_bid_stream: currentSessionBids,
+        })
+        .eq('id', group.id);
+
+      if (error) {
+        alert('Failed to start live auction broadcast: ' + error.message);
+        return;
+      }
+
+      await supabase.from('security_audit_logs').insert({
+        action_description: `LIVE AUCTION BEGUN: "${group.name}" Month ${group.currentMonth} live session started by admin. Realtime notification broadcasted to enrolled subscribers.`,
+        target_table: 'chit_groups',
+      });
+
+      const startedAt = new Date().toISOString();
+      setGroup(prev => prev ? ({ ...prev, is_live_auction_active: true, live_auction_started_at: startedAt }) : null);
+      setAllGroups(prev => prev.map(g => g.id === group.id ? { ...g, is_live_auction_active: true, live_auction_started_at: startedAt } : g));
+    } catch (err: any) {
+      console.error('Error starting live auction:', err);
+    } finally {
+      setIsStartingLiveSession(false);
+    }
+  };
+
+  const handleEndLiveAuctionSession = async () => {
+    if (!group) return;
+    const confirmStop = window.confirm(
+      `End the live broadcasting session for "${group.name}" without recording a winner?\n\nSubscribers will no longer see the live broadcast alert, but logged bids will be saved.`
+    );
+    if (!confirmStop) return;
+
+    try {
+      setIsStartingLiveSession(true);
+      await supabase
+        .from('chit_groups')
+        .update({
+          is_live_auction_active: false,
+          live_auction_started_at: null,
+        })
+        .eq('id', group.id);
+
+      setGroup(prev => prev ? ({ ...prev, is_live_auction_active: false, live_auction_started_at: null }) : null);
+      setAllGroups(prev => prev.map(g => g.id === group.id ? { ...g, is_live_auction_active: false, live_auction_started_at: null } : g));
+    } catch (err: any) {
+      console.error('Error ending live session:', err);
+    } finally {
+      setIsStartingLiveSession(false);
+    }
+  };
+
+  const handleEnterStudio = () => {
+    triggerHapticFeedback('light');
+    setStage('studio');
+  };
+
+  const handleExitStudio = () => {
+    if (bids.length > 0) {
+      const confirmExit = window.confirm(
+        'You have active bids recorded for this live session. Are you sure you want to return to the Overview screen?'
+      );
+      if (!confirmExit) return;
+    }
+    setStage('overview');
   };
 
   const toggleAttendingMember = (memberId: string) => {
@@ -656,18 +1102,30 @@ export default function LiveAuctionEngine() {
 
   const eligibleCount = members.filter(m => !m.hasWonRegular).length;
 
-  return (
-    <div className="min-h-[calc(100vh-140px)] lg:h-[calc(100vh-140px)] flex flex-col space-y-2.5 sm:space-y-3 animate-in fade-in duration-200">
-      
-      {/* ── STREAMLINED COMPACT REAL-TIME HUD & CONTROLS ─────────────────────── */}
-      <div className="shrink-0 bg-white border border-gray-200 rounded-2xl p-3 sm:p-3.5 shadow-sm space-y-2.5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Chit Group:</span>
+  // ── STAGE 1: AUCTION OVERVIEW & SCHEDULE HUB ─────────────────────────────
+  if (stage === 'overview') {
+    return (
+      <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-200">
+        {/* Top Header Chit Selector */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+              <Gavel size={20} />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Live Auction Hub</span>
+              <h2 className="text-sm sm:text-base font-black text-gray-900 leading-tight">
+                {group.name}
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Chit Group:</span>
             <select
               value={selectedGroupId}
               onChange={(e) => setSelectedGroupId(e.target.value)}
-              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-1 text-xs font-bold text-gray-900 focus:outline-none cursor-pointer transition-colors shadow-2xs"
+              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none cursor-pointer transition-colors shadow-2xs"
             >
               {allGroups.map((g) => (
                 <option key={g.id} value={g.id}>
@@ -676,8 +1134,429 @@ export default function LiveAuctionEngine() {
               ))}
             </select>
           </div>
+        </div>
 
+        {/* ── COUNTDOWN & SCHEDULE BANNER ──── */}
+        <AuctionCountdownBanner
+          groupId={group.id}
+          groupName={group.name}
+          currentMonth={group.currentMonth}
+          durationMonths={group.durationMonths}
+          auctionDayOfMonth={group.auction_day_of_month}
+          auctionTime={group.auction_time}
+          nextAuctionDate={group.next_auction_date}
+          nextAuctionTime={group.next_auction_time}
+          startDate={group.startDate}
+          allowConfigure={true}
+          onScheduleUpdated={() => {
+            fetchGroupsList();
+            if (selectedGroupId) {
+              fetchGroupDetails(selectedGroupId);
+            }
+          }}
+          compact={false}
+        />
+
+        {/* ── GROUP SNAPSHOT KEY METRICS ──── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Total Chit Pot</span>
+            <span className="text-base sm:text-lg font-black text-gray-900 mt-0.5 block">
+              {formatCurrency(group.totalValue)}
+            </span>
+            <span className="text-[10px] text-indigo-600 font-semibold mt-0.5 block">
+              {formatCurrency(group.totalValue / group.durationMonths)} / member
+            </span>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Current Cycle</span>
+            <span className="text-base sm:text-lg font-black text-gray-900 mt-0.5 block">
+              Month {group.currentMonth} <span className="text-xs text-gray-400 font-medium">of {group.durationMonths}</span>
+            </span>
+            <span className="text-[10px] text-gray-500 font-semibold mt-0.5 block">
+              {group.durationMonths - group.currentMonth} months remaining
+            </span>
+          </div>
+
+          <div className="bg-white border border-amber-200/80 bg-amber-50/20 rounded-2xl p-4 shadow-2xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">Kai Iruppu Pool</span>
+            <span className="text-base sm:text-lg font-black text-amber-900 mt-0.5 block">
+              {formatCurrency(group.kai_iruppu_pool)}
+            </span>
+            <span className="text-[10px] text-amber-700 font-semibold mt-0.5 block">
+              {isLaabaSeetuActive ? '🎉 Laaba Seetu Active' : `${Math.round((group.kai_iruppu_pool / group.totalValue) * 100)}% toward Laaba Seetu`}
+            </span>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Eligible Bidders</span>
+            <span className="text-base sm:text-lg font-black text-gray-900 mt-0.5 block">
+              {eligibleCount} <span className="text-xs text-gray-400 font-medium">/ {members.length}</span>
+            </span>
+            <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 block">
+              {members.length - eligibleCount} already won
+            </span>
+          </div>
+        </div>
+
+        {/* ── STAGE 1 STATUS & STUDIO ENTRY ACTION CARD ──── */}
+        {group.currentMonth === 0 ? (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-3 bg-amber-500 text-white rounded-2xl shrink-0 shadow-sm">
+                <Crown size={22} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-amber-950">Month 0: Launch Phase (Organizer Profit)</h3>
+                  <span className="text-[9px] font-black uppercase bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md">
+                    No Live Auction
+                  </span>
+                </div>
+                <p className="text-xs text-amber-900/80 mt-1 leading-relaxed max-w-2xl">
+                  In Month 0, all {group.memberCount} member installments ({formatCurrency(group.totalValue)}) are allocated to the Organizer as Organizer Profit. Once launch collections are secured, advance to Month 1 to begin monthly live auctions.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAdvanceMonth0}
+              disabled={isRecording}
+              className="bg-amber-600 hover:bg-amber-700 active:scale-98 text-white font-extrabold text-xs px-5 py-3 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+            >
+              {isRecording ? (
+                <>
+                  <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Advancing to Month 1...</span>
+                </>
+              ) : (
+                <>
+                  <Rocket size={16} />
+                  <span>Confirm Launch &amp; Advance to Month 1</span>
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className={`p-3 rounded-2xl text-white shrink-0 shadow-sm ${
+                  isAuctionDateToday ? 'bg-emerald-600' : 'bg-amber-500'
+                }`}>
+                  {isAuctionDateToday ? <Flame size={24} className="animate-pulse" /> : <Lock size={24} />}
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-black text-gray-900">
+                      {isAuctionDateToday ? 'Live Auction Ready to Commence' : 'Live Auction Locked for Today'}
+                    </h3>
+                    <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                      isAuctionDateToday 
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                        : 'bg-amber-100 text-amber-900 border border-amber-200'
+                    }`}>
+                      Scheduled: {formattedTargetAuctionDate} ({formattedTargetAuctionTime})
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-1 max-w-2xl leading-relaxed">
+                    {isAuctionDateToday 
+                      ? 'The live auction is scheduled for today. Enter the dedicated auction studio to conduct roll call, trigger member notifications, and record live shouted bids.'
+                      : 'Live bidding is restricted to the scheduled date to prevent unscheduled bids and keep all members synchronized. To conduct this auction today, please reschedule the date below.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+                {!isAuctionDateToday && (
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(true)}
+                    className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs rounded-2xl transition-all flex items-center justify-center gap-2 border border-gray-300 cursor-pointer"
+                  >
+                    <CalendarClock size={15} className="text-indigo-600" />
+                    <span>Reschedule Date</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleEnterStudio}
+                  className={`px-6 py-3 font-black text-xs sm:text-sm rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-98 cursor-pointer ${
+                    isAuctionDateToday
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/20 ring-2 ring-emerald-500/30'
+                      : 'bg-slate-900 hover:bg-black text-white shadow-slate-900/20'
+                  }`}
+                >
+                  <Maximize2 size={16} />
+                  <span>Enter Auction Studio</span>
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── 5. HISTORICAL AUCTION WINNING DETAILS LIST ─────────────────── */}
+        <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center justify-center shrink-0">
+                <Trophy size={16} />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-gray-900">
+                  Historical Auction Winning Records
+                </h3>
+                <p className="text-[11px] text-gray-400">
+                  Concluded monthly auction rounds, winning subscriber declarations, and net payouts.
+                </p>
+              </div>
+            </div>
+
+            <span className="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold font-mono self-start sm:self-auto">
+              {historicalAuctionLogs.length} {historicalAuctionLogs.length === 1 ? 'Round' : 'Rounds'} Completed
+            </span>
+          </div>
+
+          {historicalAuctionLogs.length === 0 ? (
+            <div className="text-center py-10 px-4 bg-gray-50/70 border border-dashed border-gray-200 rounded-2xl space-y-2">
+              <Trophy className="mx-auto h-9 w-9 text-gray-300" />
+              <h4 className="text-xs sm:text-sm font-bold text-gray-700">No Auction Rounds Completed Yet</h4>
+              <p className="text-[11px] text-gray-400 max-w-sm mx-auto leading-relaxed">
+                Starting from Month 1, each finalized auction round will automatically be cataloged here with the winner ticket, discount forfeited, and net take-home payout.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {historicalAuctionLogs.map((log) => (
+                <div
+                  key={log.id}
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setSelectedHistoricalLog(log);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  className="rounded-2xl p-4 sm:p-5 border border-gray-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/20 transition-all shadow-2xs space-y-3 cursor-pointer group hover:shadow-md active:scale-[0.99]"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold font-mono group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        Month {log.month} Auction
+                      </span>
+
+                      {log.isLaabaSeetu && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-[10px] font-bold">
+                          🎉 Laaba Seetu (Free Due)
+                        </span>
+                      )}
+
+                      <span className="text-[11px] text-gray-400">
+                        Conducted on{' '}
+                        <strong className="text-gray-600 font-semibold">
+                          {new Date(log.createdAt).toLocaleDateString('en-IN', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </strong>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {log.disbursalStatus === 'fully_disbursed' ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full shadow-2xs">
+                          <CheckCheck size={13} className="text-emerald-600" />
+                          <span>Closed &amp; Disbursed</span>
+                        </span>
+                      ) : log.disbursalStatus === 'partially_disbursed' ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-2xs">
+                          <AlertCircle size={13} className="text-amber-600" />
+                          <span>Partially Disbursed (₹{log.totalDisbursed.toLocaleString('en-IN')})</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full shadow-2xs animate-pulse">
+                          <AlertCircle size={13} className="text-rose-600" />
+                          <span>Disbursal Pending</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3-Column Financial Winner Breakdown */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-gray-50/90 group-hover:bg-white border border-gray-100 group-hover:border-indigo-100 rounded-xl p-3 transition-colors">
+                    {/* Winner Info */}
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                        Auction Winner
+                      </span>
+                      <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-gray-900 truncate">
+                        <Trophy size={14} className="text-amber-500 shrink-0" />
+                        <span className="truncate">{log.winningBidderName}</span>
+                        {log.ticketNumber && (
+                          <span className="text-[10px] font-mono text-indigo-600 font-bold">
+                            (Ticket #{log.ticketNumber})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Winning Discount */}
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                        Winning Discount Surrendered
+                      </span>
+                      <span className="text-xs sm:text-sm font-mono font-black text-rose-600">
+                        -₹{log.winningDiscount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    {/* Net Winner Payout */}
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                        Net Winner Take-Home Payout
+                      </span>
+                      <span className="text-xs sm:text-sm font-mono font-black text-emerald-600">
+                        ₹{log.netPayout.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Interactive Action Hint Strip */}
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-[11px] text-indigo-600 font-bold group-hover:text-indigo-800 transition-colors">
+                    <span className="flex items-center gap-1.5">
+                      <FileText size={13} />
+                      <span>Click to view full auction details, live bidding timeline &amp; PDF report</span>
+                    </span>
+                    <span className="flex items-center gap-0.5 text-xs">
+                      <span>View Details</span>
+                      <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Schedule Modal */}
+        <AuctionScheduleModal
+          isOpen={showScheduleModal}
+          onClose={() => setShowScheduleModal(false)}
+          groupId={group.id}
+          groupName={group.name}
+          currentMonth={group.currentMonth}
+          startDate={group.startDate}
+          auctionDayOfMonth={group.auction_day_of_month}
+          auctionTime={group.auction_time}
+          nextAuctionDate={group.next_auction_date}
+          nextAuctionTime={group.next_auction_time}
+          onScheduleUpdated={() => {
+            fetchGroupsList();
+            if (selectedGroupId) {
+              fetchGroupDetails(selectedGroupId);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ── STAGE 2: FULL-SCREEN LIVE AUCTION STUDIO WORKSPACE ───────────────────
+  return (
+    <div className="min-h-[calc(100vh-140px)] lg:h-[calc(100vh-140px)] flex flex-col space-y-2.5 sm:space-y-3 animate-in fade-in duration-200">
+      
+      {/* ── TOP STUDIO CONTROL & BROADCAST BAR ──────────────────────────────── */}
+      <div className="shrink-0 bg-white border border-gray-200 rounded-2xl p-3 sm:p-3.5 shadow-sm space-y-2.5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+          {/* Studio Title & Back Button */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={handleExitStudio}
+              className="p-1.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
+              title="Return to Overview"
+            >
+              <ArrowLeft size={14} />
+              <span className="hidden sm:inline">Overview</span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              <span className="font-black text-xs sm:text-sm text-gray-900">
+                {group.name}
+              </span>
+              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                Month {group.currentMonth} Live Studio
+              </span>
+
+              {group.is_live_auction_active ? (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-rose-500 text-white flex items-center gap-1 shadow-xs animate-pulse">
+                    <Flame size={11} /> Live Broadcast Active
+                  </span>
+
+                  {/* Real-Time Live Viewer Counter Badge */}
+                  <span 
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border transition-all ${
+                      liveViewerCount > 0 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-xs' 
+                        : 'bg-gray-100 text-gray-500 border-gray-200'
+                    }`}
+                    title={`${liveViewerCount} active subscriber${liveViewerCount === 1 ? '' : 's'} viewing this live auction`}
+                  >
+                    <span className="relative flex h-2 w-2">
+                      {liveViewerCount > 0 && (
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      )}
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${liveViewerCount > 0 ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                    </span>
+                    <Eye size={12} className={liveViewerCount > 0 ? 'text-emerald-600' : 'text-gray-400'} />
+                    <span className="font-mono">{liveViewerCount}</span>
+                    <span className="font-bold">
+                      {liveViewerCount === 1 ? 'Viewer' : 'Viewers'}
+                    </span>
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                  Standby
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Broadcast Trigger & Live Action Tools */}
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Begin Live Auction Button (Broadcast Trigger to Subscribers) */}
+            {group.currentMonth > 0 && !group.is_live_auction_active && (
+              <button
+                type="button"
+                onClick={handleBeginLiveAuction}
+                disabled={isStartingLiveSession}
+                className="flex items-center gap-1.5 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 active:scale-98 text-white text-xs font-black px-3.5 py-1.5 rounded-xl transition-all shadow-md shadow-rose-900/20 cursor-pointer disabled:opacity-50"
+              >
+                <Radio size={13} className="animate-pulse" />
+                <span>{isStartingLiveSession ? 'Broadcasting...' : 'Begin Live Auction'}</span>
+              </button>
+            )}
+
+            {group.currentMonth > 0 && group.is_live_auction_active && (
+              <button
+                type="button"
+                onClick={handleEndLiveAuctionSession}
+                disabled={isStartingLiveSession}
+                className="flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
+              >
+                <span>End Broadcast</span>
+              </button>
+            )}
+
             {/* Roll Call Button */}
             <button
               onClick={() => setShowRollCallModal(true)}
@@ -725,8 +1604,8 @@ export default function LiveAuctionEngine() {
           </div>
         </div>
 
-        {/* Compact 4-Card Real-Time Status Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-gray-100">
+        {/* Compact 3-Card Real-Time Status Bar */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-gray-100">
           {/* 1. Live Leader */}
           <div className={`px-3 py-2 rounded-xl border transition-all flex items-center justify-between gap-2 ${
             bids.length > 0 
@@ -757,20 +1636,7 @@ export default function LiveAuctionEngine() {
             </span>
           </div>
 
-          {/* 3. Monthly Member Due */}
-          <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">Member Due</span>
-              <span className="text-[10px] text-slate-500 font-medium block truncate">
-                {isLaabaSeetuActive ? 'Laaba Seetu Free' : 'per member ticket'}
-              </span>
-            </div>
-            <span className="text-xs font-black text-slate-900 shrink-0">
-              {isLaabaSeetuActive ? '₹0 (FREE)' : formatCurrency(group.totalValue / group.durationMonths)}
-            </span>
-          </div>
-
-          {/* 4. Accumulated Kai Iruppu Pool */}
+          {/* 3. Accumulated Kai Iruppu Pool */}
           <div className="px-3 py-2 bg-amber-50/70 border border-amber-200 rounded-xl flex items-center justify-between gap-2">
             <div className="min-w-0">
               <span className="text-[9px] font-bold uppercase tracking-wider text-amber-800 block">Kai Iruppu Pool</span>
@@ -784,47 +1650,6 @@ export default function LiveAuctionEngine() {
           </div>
         </div>
       </div>
-
-      {/* ── MONTH 0 LAUNCH BANNER (ORGANIZER PROFIT PHASE) ────────────────────── */}
-      {group.currentMonth === 0 && (
-        <div className="shrink-0 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300/80 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm animate-in fade-in">
-          <div className="flex items-start space-x-2.5">
-            <div className="p-2 bg-amber-500 text-white rounded-xl shrink-0 mt-0.5 shadow-xs">
-              <Crown size={16} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-xs sm:text-sm font-bold text-amber-950">Month 0: Launch Month — Organizer Profit Phase</h4>
-                <span className="text-[9px] font-black uppercase bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded-md">
-                  No Auction
-                </span>
-              </div>
-              <p className="text-[11px] text-amber-900/80 mt-0.5 max-w-2xl leading-relaxed">
-                All {group.memberCount} member installments are pooled ({formatCurrency(group.totalValue)}) and allocated directly to the Organizer as <strong>Organizer Profit</strong>. Once launch collections are in hand, advance the group to <strong>Month 1</strong>.
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleAdvanceMonth0}
-            disabled={isRecording}
-            className="bg-amber-600 hover:bg-amber-700 active:scale-98 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
-          >
-            {isRecording ? (
-              <>
-                <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                <span>Advancing...</span>
-              </>
-            ) : (
-              <>
-                <Rocket size={14} />
-                <span>Confirm Launch &amp; Advance</span>
-              </>
-            )}
-          </button>
-        </div>
-      )}
 
       {/* ── FULL CANVAS DYNAMIC AUTOSCALING MEMBER GRID ────────────────────────── */}
       <div className="flex-1 min-h-0 bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col space-y-2.5">
@@ -987,28 +1812,29 @@ export default function LiveAuctionEngine() {
 
       {/* ── POP-UP MODAL: CANDIDATE TARGET PRICES BIDDING DIALOG ──────────────── */}
       {showBidModal && activeContender && (
-        <div className="fixed inset-0 bg-black/60 flex items-center sm:items-center justify-center z-50 p-4 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-lg p-5 sm:p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-lg p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl relative max-h-[90dvh] overflow-y-auto animate-in zoom-in-95 duration-150 my-auto">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
-              <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center space-x-3 min-w-0">
                 <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white font-extrabold flex items-center justify-center text-sm shadow-sm shrink-0">
                   #{activeContender.ticketNumber}
                 </div>
-                <div>
-                  <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block truncate">
                     Logging Live Bid For
                   </span>
-                  <h3 className="text-sm sm:text-base font-extrabold text-gray-900 truncate max-w-[240px] sm:max-w-[320px]">
+                  <h3 className="text-sm sm:text-base font-extrabold text-gray-900 truncate">
                     {activeContender.fullName}
                   </h3>
                 </div>
               </div>
 
               <button 
+                type="button"
                 onClick={() => setShowBidModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
               >
                 <X size={20} />
               </button>
@@ -1043,7 +1869,7 @@ export default function LiveAuctionEngine() {
                       key={price}
                       type="button"
                       onClick={() => recordBid(price, activeContender.id)}
-                      className="p-3.5 bg-white hover:bg-indigo-600 hover:text-white active:bg-indigo-700 border border-gray-200 hover:border-indigo-600 rounded-xl text-center transition-all shadow-2xs group cursor-pointer"
+                      className="p-3 bg-white hover:bg-indigo-600 hover:text-white active:bg-indigo-700 border border-gray-200 hover:border-indigo-600 rounded-xl text-center transition-all shadow-2xs group cursor-pointer"
                     >
                       <span className="text-xs sm:text-sm font-black text-gray-900 group-hover:text-white block">
                         {formatCurrency(price)}
@@ -1100,7 +1926,7 @@ export default function LiveAuctionEngine() {
       {/* ── SLIDE-OVER DRAWER: LIVE BIDDING TIMELINE ──────────────────────────── */}
       {showTimelineDrawer && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-end z-50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white border-l border-gray-200 w-full max-w-md h-full p-5 space-y-4 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-200">
+          <div className="bg-white border-l border-gray-200 w-full max-w-md h-full p-4 sm:p-5 space-y-4 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-200">
             
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -1109,6 +1935,7 @@ export default function LiveAuctionEngine() {
                   <h3 className="text-sm font-bold text-gray-900">Live Bidding Timeline ({bids.length})</h3>
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setShowTimelineDrawer(false)}
                   className="text-gray-400 hover:text-gray-600 p-1.5 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
                 >
@@ -1158,8 +1985,9 @@ export default function LiveAuctionEngine() {
             </div>
 
             {/* Bottom Undo Action */}
-            <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
+            <div className="border-t border-gray-100 pt-3 flex items-center justify-between gap-2">
               <button
+                type="button"
                 onClick={handleUndo}
                 disabled={bids.length === 0}
                 className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer"
@@ -1169,6 +1997,7 @@ export default function LiveAuctionEngine() {
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowTimelineDrawer(false)}
                 className="bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors cursor-pointer"
               >
@@ -1182,8 +2011,8 @@ export default function LiveAuctionEngine() {
 
       {/* ── MODAL 1: PRE-AUCTION ROLL CALL (ATTENDANCE CHECK-IN) ─────────────── */}
       {showRollCallModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-5 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-5 space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center space-x-2">
                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
@@ -1195,8 +2024,9 @@ export default function LiveAuctionEngine() {
                 </div>
               </div>
               <button 
+                type="button"
                 onClick={() => setShowRollCallModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer"
+                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1263,7 +2093,7 @@ export default function LiveAuctionEngine() {
             <button
               type="button"
               onClick={() => setShowRollCallModal(false)}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl shadow-xs transition-all active:scale-[0.98] cursor-pointer"
             >
               Done &amp; Begin Live Bidding ({attendingMemberIds.length} Bidders)
             </button>
@@ -1273,8 +2103,8 @@ export default function LiveAuctionEngine() {
 
       {/* ── MODAL 2: HAMMER DOWN & CONFIRM CLOSE ─────────────────────────────── */}
       {showCloseModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-2xl relative overflow-hidden max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-lg p-4 sm:p-6 shadow-2xl relative overflow-hidden max-h-[90dvh] overflow-y-auto my-auto">
             
             {showConfetti ? (() => {
               const summary = recordedWinnerSummary || {
@@ -1360,7 +2190,7 @@ Congratulations to the winner! 🎉`
                 </div>
               );
             })() : (
-              <div className="space-y-5">
+              <div className="space-y-4 sm:space-y-5">
                 <div className="border-b border-gray-100 pb-3 flex justify-between items-center">
                   <div className="flex items-center space-x-2.5">
                     <Gavel className="text-indigo-600" size={20} />
@@ -1369,8 +2199,9 @@ Congratulations to the winner! 🎉`
                     </h3>
                   </div>
                   <button 
+                    type="button"
                     onClick={() => !isRecording && setShowCloseModal(false)}
-                    className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer"
+                    className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
                   >
                     <X size={18} />
                   </button>
@@ -1427,7 +2258,7 @@ Congratulations to the winner! 🎉`
                     type="button"
                     onClick={() => setShowCloseModal(false)}
                     disabled={isRecording}
-                    className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors text-center cursor-pointer"
+                    className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors text-center cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -1435,7 +2266,7 @@ Congratulations to the winner! 🎉`
                     type="button"
                     onClick={handleConfirmClose}
                     disabled={isRecording}
-                    className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                    className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-[0.98]"
                   >
                     {isRecording ? (
                       <>
@@ -1449,6 +2280,253 @@ Congratulations to the winner! 🎉`
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── AUCTION SCHEDULE & RESCHEDULING MODAL ────────────────────────────── */}
+      {group && (
+        <AuctionScheduleModal
+          isOpen={showScheduleModal}
+          onClose={() => setShowScheduleModal(false)}
+          groupId={group.id}
+          groupName={group.name}
+          currentMonth={group.currentMonth}
+          startDate={group.startDate}
+          auctionDayOfMonth={group.auction_day_of_month}
+          auctionTime={group.auction_time}
+          nextAuctionDate={group.next_auction_date}
+          nextAuctionTime={group.next_auction_time}
+          onScheduleUpdated={() => {
+            fetchGroupsList();
+            if (selectedGroupId) {
+              fetchGroupDetails(selectedGroupId);
+            }
+          }}
+        />
+      )}
+
+      {/* ── CONCLUDED AUCTION FULL SCREEN CELEBRATION & AUDIT REPORT ────────── */}
+      {showConcludedReportScreen && concludedReportData && (
+        <div className="fixed inset-0 bg-black/75 flex flex-col z-50 p-2 sm:p-4 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-slate-100 border border-slate-300 rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[96dvh]">
+            
+            {/* Sticky Action Header Bar */}
+            <div className="bg-slate-900 text-white px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0">
+                  <Trophy size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                      Live Auction Concluded &amp; Sealed
+                    </span>
+                    {concludedReportData.isNextMonthLaabaSeetu && (
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-amber-500/30 text-amber-300 border border-amber-400/40 animate-pulse">
+                        🎉 Next Month: Laaba Seetu
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black text-white mt-0.5">
+                    {concludedReportData.groupName} — Month {concludedReportData.month} Auction Audit Report
+                  </h2>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  disabled={isGeneratingReportPdf}
+                  onClick={() => handleDownloadAuctionPdf(printableReportRef.current, concludedReportData.groupName, concludedReportData.month)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isGeneratingReportPdf ? (
+                    <>
+                      <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Generating PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={14} />
+                      <span>Download PDF Report</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextMonthBonus = concludedReportData.isNextMonthLaabaSeetu 
+                      ? `\n🎉 *BONUS:* Next Month (Month ${concludedReportData.month + 1}) is *LAABA SEETU (லாப சீட்டு)*! All subscribers pay *₹0 Due*!` 
+                      : '';
+                    const text = encodeURIComponent(
+`🏆 *OFFICIAL AUCTION CONCLUDED REPORT*
+───────────────────────
+🏢 *Group:* ${concludedReportData.groupName}
+🗓️ *Month Cycle:* Month ${concludedReportData.month} of ${concludedReportData.durationMonths}
+👤 *Winning Subscriber:* ${concludedReportData.winnerName} ${concludedReportData.winnerTicket ? `(Ticket #${concludedReportData.winnerTicket})` : ''}
+💰 *Total Chit Value:* ${formatCurrency(concludedReportData.totalValue)}
+📉 *Winning Discount Bid:* -${formatCurrency(concludedReportData.winningDiscount)}
+💵 *Net Take-Home Prize Pot:* ${formatCurrency(concludedReportData.netPayout)}
+🏦 *New Kai Iruppu Pool:* ${formatCurrency(concludedReportData.newPool)}${nextMonthBonus}
+───────────────────────
+Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`
+                    );
+                    window.open(`https://wa.me/?text=${text}`, '_blank');
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send size={13} />
+                  <span>WhatsApp Alert</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConcludedReportScreen(false);
+                    setStage('overview');
+                  }}
+                  className="px-3.5 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <X size={15} />
+                  <span>Close &amp; Return</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Report Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto bg-slate-100 flex-1">
+              <div ref={printableReportRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <AuctionReportDocument data={concludedReportData} id="live-concluded-report-doc" />
+              </div>
+            </div>
+
+            {/* Bottom Bar */}
+            <div className="p-3 bg-white border-t border-gray-200 flex items-center justify-between gap-3 text-xs shrink-0">
+              <span className="text-gray-500 font-medium">
+                Record saved immutably to PostgreSQL ledger.
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConcludedReportScreen(false);
+                  setStage('overview');
+                }}
+                className="px-5 py-2 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-xs transition-all active:scale-95 cursor-pointer"
+              >
+                Done &amp; Return to Auction Hub
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── HISTORICAL AUCTION RECORD DETAILS MODAL ─────────────────────────── */}
+      {selectedHistoricalLog && historicalReportData && (
+        <div className="fixed inset-0 bg-black/70 flex flex-col z-50 p-2 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-slate-100 border border-slate-300 rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[96dvh]">
+            
+            {/* Header Bar */}
+            <div className="bg-slate-900 text-white px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-400 flex items-center justify-center shrink-0">
+                  <History size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 font-mono">
+                      Historical Auction Log
+                    </span>
+                    {selectedHistoricalLog.isLaabaSeetu && (
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-purple-500/30 text-purple-300 border border-purple-400/40">
+                        🎉 Laaba Seetu Month
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black text-white mt-0.5">
+                    {group.name} — Month {selectedHistoricalLog.month} Concluded Record
+                  </h2>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  disabled={isGeneratingReportPdf}
+                  onClick={() => handleDownloadAuctionPdf(historicalPrintableRef.current, group.name, selectedHistoricalLog.month)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isGeneratingReportPdf ? (
+                    <>
+                      <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Generating PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={14} />
+                      <span>Download PDF Report</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const text = encodeURIComponent(
+`🏆 *HISTORICAL AUCTION CERTIFICATE*
+───────────────────────
+🏢 *Group:* ${group.name}
+🗓️ *Month Cycle:* Month ${selectedHistoricalLog.month} of ${group.durationMonths}
+👤 *Winner:* ${selectedHistoricalLog.winningBidderName} ${selectedHistoricalLog.ticketNumber ? `(Ticket #${selectedHistoricalLog.ticketNumber})` : ''}
+💰 *Total Chit Value:* ${formatCurrency(group.totalValue)}
+📉 *Winning Discount Bid:* -${formatCurrency(selectedHistoricalLog.winningDiscount)}
+💵 *Net Take-Home Prize Pot:* ${formatCurrency(selectedHistoricalLog.netPayout)}
+📊 *Disbursal Status:* ${selectedHistoricalLog.disbursalStatus === 'fully_disbursed' ? 'Closed & Disbursed' : selectedHistoricalLog.disbursalStatus === 'partially_disbursed' ? `Partially Disbursed (${formatCurrency(selectedHistoricalLog.totalDisbursed)})` : 'Pending Disbursal'}
+───────────────────────
+Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en-IN')}`
+                    );
+                    window.open(`https://wa.me/?text=${text}`, '_blank');
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send size={13} />
+                  <span>WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedHistoricalLog(null)}
+                  className="px-3.5 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <X size={15} />
+                  <span>Close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Document Container */}
+            <div className="p-4 sm:p-6 overflow-y-auto bg-slate-100 flex-1">
+              <div ref={historicalPrintableRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <AuctionReportDocument data={historicalReportData} id="historical-auction-report-doc" />
+              </div>
+            </div>
+
+            {/* Modal Bottom Footer */}
+            <div className="p-3 bg-white border-t border-gray-200 flex items-center justify-between gap-3 text-xs shrink-0">
+              <span className="text-gray-500 font-mono text-[11px]">
+                Audit ID: {selectedHistoricalLog.id}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedHistoricalLog(null)}
+                className="px-5 py-2 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-xs transition-all active:scale-95 cursor-pointer"
+              >
+                Close View
+              </button>
+            </div>
+
           </div>
         </div>
       )}
