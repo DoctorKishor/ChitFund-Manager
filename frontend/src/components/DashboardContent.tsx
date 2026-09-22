@@ -224,6 +224,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   // High-Security Delete Group Modal States
   const [deletingGroup, setDeletingGroup] = useState<any | null>(null);
+  const [deleteMode, setDeleteMode] = useState<'soft' | 'permanent'>('soft');
   const [deletePhraseInput, setDeletePhraseInput] = useState('');
   const [deleteSliderVal, setDeleteSliderVal] = useState(0);
   const [isDeletingGroup, setIsDeletingGroup] = useState(false);
@@ -934,39 +935,56 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     }
   };
 
-  // ── Move Chit Group to Recycle Bin (Soft Delete) ───────────────────────────
-  const handleMoveToRecycleBin = async (group: any) => {
-    const confirmMove = window.confirm(
-      `Move "${group.name}" to Recycle Bin?\n\nThis group will be hidden from the active chits list and operational dashboard. You can restore it anytime from the Recycle Bin tab.`
-    );
-    if (!confirmMove) return;
+  const openSoftDeleteModal = (group: any) => {
+    setDeletingGroup(group);
+    setDeleteMode('soft');
+    setDeletePhraseInput('');
+    setDeleteSliderVal(0);
+  };
 
+  const openPermanentDeleteModal = (group: any) => {
+    setDeletingGroup(group);
+    setDeleteMode('permanent');
+    setDeletePhraseInput('');
+    setDeleteSliderVal(0);
+  };
+
+  // ── Move Chit Group to Recycle Bin (Soft Delete Execution) ─────────────────
+  const handleExecuteSoftDeleteGroup = async () => {
+    if (!deletingGroup) return;
     try {
+      setIsDeletingGroup(true);
       triggerHapticFeedback('light');
+
       const { error } = await supabase
         .from('chit_groups')
         .update({
           status: 'deleted',
           deleted_at: new Date().toISOString(),
         })
-        .eq('id', group.id);
+        .eq('id', deletingGroup.id);
 
       if (error) throw error;
 
       await supabase.from('security_audit_logs').insert({
-        action_description: `GROUP MOVED TO RECYCLE BIN: "${group.name}" (${group.id}) marked as deleted.`,
+        action_description: `GROUP MOVED TO RECYCLE BIN: "${deletingGroup.name}" (${deletingGroup.id}) marked as deleted.`,
         target_table: 'chit_groups',
       });
 
       triggerHapticFeedback('success');
-      if (selectedWorkspaceGroupId === group.id) {
+      if (selectedWorkspaceGroupId === deletingGroup.id) {
         setSelectedWorkspaceGroupId(null);
       }
+      setDeletingGroup(null);
+      setDeletePhraseInput('');
+      setDeleteSliderVal(0);
       await fetchGroups();
-      alert(`🗑️ "${group.name}" moved to Recycle Bin.`);
+      alert(`🗑️ "${deletingGroup.name}" moved to Recycle Bin.`);
     } catch (err: any) {
       console.error('Error moving group to recycle bin:', err);
       alert('Failed to move group to recycle bin: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsDeletingGroup(false);
     }
   };
 
@@ -1002,8 +1020,8 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     }
   };
 
-  // ── Permanent Deletion / Purge from Supabase ──────────────────────────────
-  const handleExecuteDeleteGroup = async () => {
+  // ── Permanent Deletion / Purge from Supabase Execution ───────────────────
+  const handleExecutePermanentDeleteGroup = async () => {
     if (!deletingGroup) return;
     try {
       setIsDeletingGroup(true);
@@ -1029,6 +1047,11 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       // 5. Audit log
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      await supabase.from('security_audit_logs').insert({
+        action_description: `PERMANENTLY PURGED CHIT GROUP: "${deletingGroup.name}" (Pool ₹${deletingGroup.totalValue?.toLocaleString('en-IN')}) with all enrolled tickets and logs`,
+        target_table: 'chit_groups',
+      });
+
       setAuditLogs(prev => [
         {
           timestamp: `Today, ${timeStr}`,
@@ -1052,6 +1075,14 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       alert(`Error purging group: ${err.message}`);
     } finally {
       setIsDeletingGroup(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteMode === 'soft') {
+      await handleExecuteSoftDeleteGroup();
+    } else {
+      await handleExecutePermanentDeleteGroup();
     }
   };
 
@@ -4462,7 +4493,7 @@ Thank you for your prompt payment! 🙏`;
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleMoveToRecycleBin(selectedWorkspaceGroup)}
+                    onClick={() => openSoftDeleteModal(selectedWorkspaceGroup)}
                     className="border border-red-200 bg-red-50/60 hover:bg-red-100 text-red-700 font-bold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs active:scale-95"
                     title="Move group to Recycle Bin"
                   >
@@ -4718,7 +4749,7 @@ Thank you for your prompt payment! 🙏`;
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-rose-950 flex items-center gap-2">
-                          Recycle Bin (குப்பைத் தொட்டி)
+                          Recycle Bin
                           <span className="text-[10px] font-extrabold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
                             {localGroups.filter(g => g.status === 'deleted').length} Groups
                           </span>
@@ -4798,11 +4829,7 @@ Thank you for your prompt payment! 🙏`;
                               </button>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setDeletingGroup(g);
-                                  setDeletePhraseInput('');
-                                  setDeleteSliderVal(0);
-                                }}
+                                onClick={() => openPermanentDeleteModal(g)}
                                 className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                               >
                                 <Trash2 size={13} />
@@ -4891,7 +4918,7 @@ Thank you for your prompt payment! 🙏`;
                                 <button
                                   type="button"
                                   title="Move to Recycle Bin"
-                                  onClick={() => handleMoveToRecycleBin(g)}
+                                  onClick={() => openSoftDeleteModal(g)}
                                   className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors active:scale-95"
                                 >
                                   <Trash2 size={14} />
@@ -6764,30 +6791,40 @@ Thank you for your prompt payment! 🙏`;
         </div>
       )}
 
-      {/* HIGH-SECURITY MULTI-STEP DANGER DELETE CONFIRMATION MODAL */}
+      {/* HIGH-SECURITY MULTI-STEP CONFIRMATION MODAL (SOFT & PERMANENT DELETE) */}
       {deletingGroup && (() => {
+        const isSoft = deleteMode === 'soft';
         const requiredPhrase = `DELETE ${deletingGroup.name}`;
         const isPhraseMatched = 
           deletePhraseInput.trim().toUpperCase() === requiredPhrase.toUpperCase() ||
           deletePhraseInput.trim().toUpperCase() === 'DELETE' ||
           deletePhraseInput.trim().toLowerCase() === deletingGroup.name.toLowerCase();
-        const isSliderReady = isPhraseMatched && deleteSliderVal >= 98;
 
         return (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-            <div className="bg-white border-2 border-red-200 rounded-2xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className={`bg-white border-2 rounded-2xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto ${
+              isSoft ? 'border-amber-200' : 'border-red-200'
+            }`}>
               
-              {/* Danger Header */}
-              <div className="flex justify-between items-start border-b border-red-100 pb-3">
+              {/* Header */}
+              <div className={`flex justify-between items-start border-b pb-3 ${
+                isSoft ? 'border-amber-100' : 'border-red-100'
+              }`}>
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-red-100 text-red-700 rounded-xl">
+                  <div className={`p-2.5 rounded-xl ${
+                    isSoft ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                  }`}>
                     <AlertTriangle size={22} />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-red-900">
-                      Permanent Deletion Warning
+                    <h4 className={`text-sm font-bold ${
+                      isSoft ? 'text-amber-950' : 'text-red-900'
+                    }`}>
+                      {isSoft ? 'Move Chit Group to Recycle Bin' : 'Permanent Deletion Warning'}
                     </h4>
-                    <p className="text-xs text-red-700 font-semibold mt-0.5">
+                    <p className={`text-xs font-semibold mt-0.5 ${
+                      isSoft ? 'text-amber-700' : 'text-red-700'
+                    }`}>
                       &quot;{deletingGroup.name}&quot; ({formatCurrency(deletingGroup.totalValue)})
                     </p>
                   </div>
@@ -6795,29 +6832,47 @@ Thank you for your prompt payment! 🙏`;
                 <button 
                   type="button" 
                   onClick={() => setDeletingGroup(null)}
-                  className="text-gray-400 hover:text-gray-600 p-1"
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <X size={16} />
                 </button>
               </div>
 
               {/* Warning Description Box */}
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 space-y-2 text-xs text-red-900">
-                <p className="font-bold flex items-center gap-1.5">
-                  <AlertCircle size={14} className="text-red-600 shrink-0" />
-                  This action is permanent and completely irreversible!
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-[11px] text-red-800 pl-1">
-                  <li>All {deletingGroup.duration} enrolled subscriber tickets will be unlinked.</li>
-                  <li>All historical auction bidding logs and discount pool records will be purged.</li>
-                  <li>The group configuration will be permanently removed from Supabase.</li>
-                </ul>
-              </div>
+              {isSoft ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 space-y-2 text-xs text-amber-900">
+                  <p className="font-bold flex items-center gap-1.5 text-amber-800">
+                    <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                    This group will be moved to the Recycle Bin.
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-800 pl-1">
+                    <li>The group will be hidden from active lists and dashboard calculations.</li>
+                    <li>All subscriber assignments, tickets, and logs remain safely preserved.</li>
+                    <li>You can restore this group back to active status at any time from the Recycle Bin tab.</li>
+                  </ul>
+                </div>
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 space-y-2 text-xs text-red-900">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <AlertCircle size={14} className="text-red-600 shrink-0" />
+                    This action is permanent and completely irreversible!
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-[11px] text-red-800 pl-1">
+                    <li>All {deletingGroup.duration} enrolled subscriber tickets will be unlinked.</li>
+                    <li>All historical auction bidding logs and discount pool records will be purged.</li>
+                    <li>The group configuration will be permanently removed from Supabase.</li>
+                  </ul>
+                </div>
+              )}
 
               {/* Safety Verification Step 1: Type Required Phrase */}
               <div className="space-y-1.5 pt-1">
                 <label className="text-[11px] text-gray-700 font-bold block">
-                  Step 1: Type <span className="font-mono bg-red-100 text-red-800 px-1.5 py-0.5 rounded select-all font-bold">DELETE {deletingGroup.name}</span> (or <span className="font-mono bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">DELETE</span>) below:
+                  Step 1: Type <span className={`font-mono px-1.5 py-0.5 rounded select-all font-bold ${
+                    isSoft ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                  }`}>DELETE {deletingGroup.name}</span> (or <span className={`font-mono px-1.5 py-0.5 rounded font-bold ${
+                    isSoft ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                  }`}>DELETE</span>) below:
                 </label>
                 <div className="relative">
                   <input
@@ -6828,7 +6883,7 @@ Thank you for your prompt payment! 🙏`;
                     className={`w-full bg-gray-50 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-gray-900 focus:outline-none transition-colors ${
                       isPhraseMatched
                         ? 'border-emerald-500 bg-emerald-50/40 text-emerald-900'
-                        : 'border-gray-300 focus:border-red-400'
+                        : isSoft ? 'border-gray-300 focus:border-amber-400' : 'border-gray-300 focus:border-red-400'
                     }`}
                     autoFocus
                   />
@@ -6849,7 +6904,7 @@ Thank you for your prompt payment! 🙏`;
                     ) : (
                       <Lock size={13} className="text-gray-400" />
                     )}
-                    Step 2: Slide to confirm deletion
+                    Step 2: {isSoft ? 'Slide to move to Recycle Bin' : 'Slide to confirm permanent deletion'}
                   </span>
                   {isPhraseMatched && (
                     <span className="text-[10px] font-bold text-emerald-600">
@@ -6860,18 +6915,18 @@ Thank you for your prompt payment! 🙏`;
 
                 <SlideToConfirm
                   disabled={!isPhraseMatched || isDeletingGroup}
-                  onConfirm={handleExecuteDeleteGroup}
-                  label="Slide to confirm deletion"
-                  confirmedLabel="Confirmed! Deleting Group..."
-                  loadingLabel="Purging from Supabase..."
+                  onConfirm={handleConfirmDelete}
+                  label={isSoft ? "Slide to move to Recycle Bin" : "Slide to confirm deletion"}
+                  confirmedLabel={isSoft ? "Moving to Recycle Bin..." : "Confirmed! Deleting Group..."}
+                  loadingLabel={isSoft ? "Updating Supabase..." : "Purging from Supabase..."}
                   isLoading={isDeletingGroup}
-                  colorVariant="red"
+                  colorVariant={isSoft ? "amber" : "red"}
                 />
 
                 <p className="text-[10px] text-gray-400 text-center">
                   {!isPhraseMatched
                     ? '🔒 Complete Step 1 above to unlock the confirmation slider'
-                    : '👉 Drag the circular button to the right to confirm deletion'}
+                    : isSoft ? '👉 Drag the circular button to the right to move to Recycle Bin' : '👉 Drag the circular button to the right to confirm deletion'}
                 </p>
               </div>
 
@@ -6887,20 +6942,22 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   type="button"
                   disabled={!isPhraseMatched || isDeletingGroup}
-                  onClick={handleExecuteDeleteGroup}
+                  onClick={handleConfirmDelete}
                   className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center ${
                     isPhraseMatched && !isDeletingGroup
-                      ? 'bg-red-600 hover:bg-red-700 text-white cursor-pointer'
+                      ? isSoft
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white cursor-pointer'
+                        : 'bg-red-600 hover:bg-red-700 text-white cursor-pointer'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
                   }`}
                 >
                   {isDeletingGroup ? (
                     <>
-                      <RefreshCw size={13} className="animate-spin" /> Purging from Supabase...
+                      <RefreshCw size={13} className="animate-spin" /> {isSoft ? 'Moving to Bin...' : 'Purging from Supabase...'}
                     </>
                   ) : (
                     <>
-                      <Trash2 size={13} /> Delete Group Permanently
+                      <Trash2 size={13} /> {isSoft ? 'Move to Recycle Bin' : 'Delete Group Permanently'}
                     </>
                   )}
                 </button>

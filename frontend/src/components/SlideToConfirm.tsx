@@ -11,7 +11,7 @@ interface SlideToConfirmProps {
   confirmedLabel?: string;
   loadingLabel?: string;
   isLoading?: boolean;
-  colorVariant?: 'red' | 'green' | 'indigo' | 'slate';
+  colorVariant?: 'red' | 'green' | 'indigo' | 'slate' | 'amber';
   className?: string;
 }
 
@@ -39,6 +39,13 @@ export default function SlideToConfirm({
       fillBg: 'bg-red-500/20',
       thumbActiveText: 'text-red-600',
       glow: 'shadow-red-500/20',
+    },
+    amber: {
+      activeBg: 'bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600',
+      activeText: 'text-white',
+      fillBg: 'bg-amber-500/20',
+      thumbActiveText: 'text-amber-600',
+      glow: 'shadow-amber-500/20',
     },
     green: {
       activeBg: 'bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-600',
