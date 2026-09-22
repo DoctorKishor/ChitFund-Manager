@@ -1643,113 +1643,113 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
       
       {/* ── TOP STUDIO CONTROL & BROADCAST BAR ──────────────────────────────── */}
       <div className="shrink-0 bg-white border border-gray-200 rounded-2xl p-2.5 sm:p-3.5 shadow-xs space-y-2 sm:space-y-2.5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-          {/* Studio Title & Back Button */}
-          <div className="flex items-center gap-1.5 sm:gap-2 justify-between md:justify-start">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <button
-                type="button"
-                onClick={handleExitStudio}
-                className="p-1 sm:p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer shrink-0"
-                title="Return to Overview"
-              >
-                <ArrowLeft size={13} />
-                <span className="hidden sm:inline">Overview</span>
-              </button>
+        {/* Row 1: Studio Title, Cycle & Live Status */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={handleExitStudio}
+              className="p-1 sm:p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer shrink-0"
+              title="Return to Overview"
+            >
+              <ArrowLeft size={13} />
+              <span className="hidden sm:inline">Overview</span>
+            </button>
 
-              <span className="font-black text-xs sm:text-sm text-gray-900 truncate max-w-[130px] sm:max-w-none">
-                {group.name}
-              </span>
-              <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
-                M{group.currentMonth}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1 shrink-0">
-              {group.is_live_auction_active ? (
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-500 text-white flex items-center gap-1 shadow-xs animate-pulse">
-                    <Flame size={10} /> Live
-                  </span>
-
-                  {/* Real-Time Live Viewer Counter Badge */}
-                  <span 
-                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold border transition-all ${
-                      liveViewerCount > 0 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-xs' 
-                        : 'bg-gray-100 text-gray-500 border-gray-200'
-                    }`}
-                    title={`${liveViewerCount} active subscriber${liveViewerCount === 1 ? '' : 's'} viewing this live auction`}
-                  >
-                    <Eye size={11} className={liveViewerCount > 0 ? 'text-emerald-600' : 'text-gray-400'} />
-                    <span className="font-mono">{liveViewerCount}</span>
-                  </span>
-                </div>
-              ) : (
-                <span className="text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
-                  Standby
-                </span>
-              )}
-            </div>
+            <span className="font-black text-xs sm:text-sm text-gray-900 truncate">
+              {group.name}
+            </span>
+            <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+              M{group.currentMonth}
+            </span>
           </div>
 
-          {/* Broadcast Trigger & Live Action Tools */}
-          <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-0.5 md:pb-0">
-            {/* Begin Live Auction Button (Broadcast Trigger to Subscribers) */}
-            {group.currentMonth > 0 && !group.is_live_auction_active && (
-              <button
-                type="button"
-                onClick={handleBeginLiveAuction}
-                disabled={isStartingLiveSession}
-                className="flex items-center gap-1 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 active:scale-98 text-white text-[11px] sm:text-xs font-black px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl transition-all shadow-xs cursor-pointer disabled:opacity-50 shrink-0"
-              >
-                <Radio size={12} className="animate-pulse" />
-                <span>{isStartingLiveSession ? '...' : 'Begin Live'}</span>
-              </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {group.is_live_auction_active ? (
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-500 text-white flex items-center gap-1 shadow-xs animate-pulse">
+                  <Flame size={10} /> Live
+                </span>
+
+                {/* Real-Time Live Viewer Counter Badge */}
+                <span 
+                  className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold border transition-all ${
+                    liveViewerCount > 0 
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-xs' 
+                      : 'bg-gray-100 text-gray-500 border-gray-200'
+                  }`}
+                  title={`${liveViewerCount} active subscriber${liveViewerCount === 1 ? '' : 's'} viewing this live auction`}
+                >
+                  <Eye size={11} className={liveViewerCount > 0 ? 'text-emerald-600' : 'text-gray-400'} />
+                  <span className="font-mono">{liveViewerCount}</span>
+                </span>
+              </div>
+            ) : (
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-mono">
+                Standby
+              </span>
             )}
+          </div>
+        </div>
 
-            {group.currentMonth > 0 && group.is_live_auction_active && (
-              <button
-                type="button"
-                onClick={handleEndLiveAuctionSession}
-                disabled={isStartingLiveSession}
-                className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl transition-colors cursor-pointer shrink-0"
-              >
-                <span>End Live</span>
-              </button>
-            )}
-
-            {/* Roll Call Button */}
+        {/* Row 2: Action Control Buttons - Clean 2x2 Grid on Mobile, 4-Column Bar on Desktop */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2">
+          {/* 1. Broadcast Trigger */}
+          {group.currentMonth > 0 && !group.is_live_auction_active ? (
             <button
-              onClick={() => setShowRollCallModal(true)}
-              className="flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 active:scale-98 text-indigo-700 border border-indigo-200 text-[11px] sm:text-xs font-bold px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer shrink-0"
+              type="button"
+              onClick={handleBeginLiveAuction}
+              disabled={isStartingLiveSession}
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 active:scale-98 text-white text-[11px] sm:text-xs font-black py-1.5 px-2.5 rounded-xl transition-all shadow-xs cursor-pointer disabled:opacity-50"
             >
-              <Users size={12} />
-              <span>Roll Call ({attendingMemberIds.length}/{eligibleCount})</span>
+              <Radio size={12} className="animate-pulse" />
+              <span>{isStartingLiveSession ? 'Starting...' : 'Begin Live'}</span>
             </button>
-
-            {/* Live Timeline Toggle Button */}
+          ) : (
             <button
-              onClick={() => setShowTimelineDrawer(true)}
-              className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-800 text-[11px] sm:text-xs font-bold px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer shrink-0"
+              type="button"
+              onClick={handleEndLiveAuctionSession}
+              disabled={isStartingLiveSession}
+              className="flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 py-1.5 px-2.5 rounded-xl transition-colors cursor-pointer"
             >
-              <History size={12} className="text-indigo-600" />
-              <span>Timeline ({bids.length})</span>
+              <span>End Live</span>
             </button>
+          )}
 
-            {/* Quick Undo Button */}
+          {/* 2. Roll Call */}
+          <button
+            type="button"
+            onClick={() => setShowRollCallModal(true)}
+            className="flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-98 text-indigo-700 border border-indigo-200 text-[11px] sm:text-xs font-bold py-1.5 px-2 rounded-xl transition-all shadow-2xs cursor-pointer"
+          >
+            <Users size={12} />
+            <span>Roll Call ({attendingMemberIds.length}/{eligibleCount})</span>
+          </button>
+
+          {/* 3. Live Timeline */}
+          <button
+            type="button"
+            onClick={() => setShowTimelineDrawer(true)}
+            className="flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-800 text-[11px] sm:text-xs font-bold py-1.5 px-2 rounded-xl transition-all shadow-2xs cursor-pointer"
+          >
+            <History size={12} className="text-indigo-600" />
+            <span>Timeline ({bids.length})</span>
+          </button>
+
+          {/* 4. Quick Undo & Hammer Down / Close */}
+          <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={handleUndo}
               disabled={bids.length === 0}
               title="Undo last recorded bid"
-              className="flex items-center justify-center p-1 sm:px-2 sm:py-1.5 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed border border-gray-200 text-gray-700 text-[11px] sm:text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0"
+              className="p-1.5 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed border border-gray-200 text-gray-700 text-[11px] sm:text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
             >
               <Undo2 size={12} />
-              <span className="hidden sm:inline sm:ml-1">Undo</span>
             </button>
 
-            {/* Hammer Down & Sold Button */}
             <button
+              type="button"
               onClick={() => {
                 if (bids.length === 0) {
                   alert("Cannot close auction without any bids recorded.");
@@ -1758,11 +1758,10 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 setShowCloseModal(true);
               }}
               disabled={group.currentMonth === 0 || bids.length === 0}
-              className="font-bold text-[11px] sm:text-xs px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl flex items-center justify-center gap-1 shadow-xs transition-all bg-gray-900 hover:bg-black active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed text-white cursor-pointer shrink-0 ml-auto md:ml-0"
+              className="flex-1 font-bold text-[11px] sm:text-xs py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 shadow-xs transition-all bg-gray-900 hover:bg-black active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed text-white cursor-pointer"
             >
               <Gavel size={12} />
-              <span className="hidden sm:inline">{isLaabaSeetuActive ? 'Close Laaba Seetu' : 'Hammer Down & Sold'}</span>
-              <span className="sm:hidden">{isLaabaSeetuActive ? 'Close' : 'Hammer'}</span>
+              <span>{isLaabaSeetuActive ? 'Close Laaba' : 'Close Auction'}</span>
             </button>
           </div>
         </div>
