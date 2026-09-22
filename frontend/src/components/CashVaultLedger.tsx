@@ -26,7 +26,14 @@ import {
   ArrowRight,
   TrendingDown,
   TrendingUp,
-  Plus
+  Plus,
+  Share2,
+  MessageSquare,
+  BookOpen,
+  Users,
+  CheckCircle2,
+  ExternalLink,
+  Send
 } from 'lucide-react';
 
 export type CashHandlingSubtab = 
@@ -407,6 +414,12 @@ export default function CashVaultLedger() {
       });
   }, [recentTransactions]);
 
+  // Khatabook Navigation & Filter State
+  const [khatabookTab, setKhatabookTab] = useState<'floats' | 'draws'>('floats');
+  const [khatabookPersonFilter, setKhatabookPersonFilter] = useState<string>('all');
+  const [showSettledDraws, setShowSettledDraws] = useState<boolean>(false);
+  const [showRecoveredFloats, setShowRecoveredFloats] = useState<boolean>(false);
+
   // Outstanding Personal Draws
   const outstandingPersonalDraws = useMemo(() => {
     return computedPersonalDraws.filter(d => d.status === 'outstanding');
@@ -460,6 +473,94 @@ export default function CashVaultLedger() {
   const activeFloatingDeposits = useMemo(() => {
     return computedFloatingDeposits.filter(f => f.status === 'active');
   }, [computedFloatingDeposits]);
+
+  // Float Stats Per Person
+  const floatStats = useMemo(() => {
+    const active = computedFloatingDeposits.filter(f => f.status === 'active');
+    const total = active.reduce((sum, f) => sum + f.amount, 0);
+
+    const dad = active
+      .filter(f => f.depositedBy.toLowerCase().includes('dad') || f.depositedBy.toLowerCase().includes('anbazhakan'))
+      .reduce((sum, f) => sum + f.amount, 0);
+
+    const mom = active
+      .filter(f => f.depositedBy.toLowerCase().includes('mom') || f.depositedBy.toLowerCase().includes('parimalam'))
+      .reduce((sum, f) => sum + f.amount, 0);
+
+    const kishor = active
+      .filter(f => f.depositedBy.toLowerCase().includes('kishor'))
+      .reduce((sum, f) => sum + f.amount, 0);
+
+    const other = active
+      .filter(f => !f.depositedBy.toLowerCase().includes('dad') && !f.depositedBy.toLowerCase().includes('anbazhakan') && !f.depositedBy.toLowerCase().includes('mom') && !f.depositedBy.toLowerCase().includes('parimalam') && !f.depositedBy.toLowerCase().includes('kishor'))
+      .reduce((sum, f) => sum + f.amount, 0);
+
+    return { total, dad, mom, kishor, other, activeCount: active.length };
+  }, [computedFloatingDeposits]);
+
+  // Personal Draws Stats Per Person
+  const personalDrawStats = useMemo(() => {
+    const active = computedPersonalDraws.filter(d => d.status === 'outstanding');
+    const total = active.reduce((sum, d) => sum + d.amount, 0);
+
+    const dad = active
+      .filter(d => d.takenBy.toLowerCase().includes('dad') || d.takenBy.toLowerCase().includes('anbazhakan'))
+      .reduce((sum, d) => sum + d.amount, 0);
+
+    const mom = active
+      .filter(d => d.takenBy.toLowerCase().includes('mom') || d.takenBy.toLowerCase().includes('parimalam'))
+      .reduce((sum, d) => sum + d.amount, 0);
+
+    const kishor = active
+      .filter(d => d.takenBy.toLowerCase().includes('kishor'))
+      .reduce((sum, d) => sum + d.amount, 0);
+
+    const other = active
+      .filter(d => !d.takenBy.toLowerCase().includes('dad') && !d.takenBy.toLowerCase().includes('anbazhakan') && !d.takenBy.toLowerCase().includes('mom') && !d.takenBy.toLowerCase().includes('parimalam') && !d.takenBy.toLowerCase().includes('kishor'))
+      .reduce((sum, d) => sum + d.amount, 0);
+
+    return { total, dad, mom, kishor, other, activeCount: active.length };
+  }, [computedPersonalDraws]);
+
+  // WhatsApp Reminder Link Generator for Personal Draws
+  const generateDrawWhatsAppReminder = (personFilter: string) => {
+    const draws = personFilter === 'all'
+      ? outstandingPersonalDraws
+      : outstandingPersonalDraws.filter(d => d.takenBy.toLowerCase().includes(personFilter.toLowerCase()));
+    const total = draws.reduce((sum, d) => sum + d.amount, 0);
+    const itemsList = draws.map(d => `• ₹${d.amount.toLocaleString('en-IN')} — ${d.tag} (${d.description || 'Cash Draw'}) taken on ${new Date(d.created_at).toLocaleDateString('en-IN')}`).join('\n');
+    
+    const personLabel = personFilter === 'dad' ? 'Dad (Anbazhakan)' : personFilter === 'mom' ? 'Mom (Parimalam)' : personFilter === 'kishor' ? 'Dr. Kishor' : 'Family Member';
+
+    const msg = `*CHIT FUND — PERSONAL CASH DRAW REMINDER*\n\n` +
+      `Hello ${personLabel},\n` +
+      `Here is the record of pending personal cash draws from the Chit Fund Box:\n\n` +
+      `${itemsList}\n\n` +
+      `*Total to Settle / Put Back: ₹${total.toLocaleString('en-IN')}*\n\n` +
+      `Please deposit into the Cash Box or Bank when convenient. Thank you!`;
+
+    return `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+  };
+
+  // WhatsApp Summary Link Generator for Floating Capital
+  const generateFloatWhatsAppSummary = (personFilter: string) => {
+    const floats = personFilter === 'all'
+      ? activeFloatingDeposits
+      : activeFloatingDeposits.filter(f => f.depositedBy.toLowerCase().includes(personFilter.toLowerCase()));
+    const total = floats.reduce((sum, f) => sum + f.amount, 0);
+    const itemsList = floats.map(f => `• ₹${f.amount.toLocaleString('en-IN')} — ${f.tag} (${f.notes || 'Float Inflow'}) deposited on ${new Date(f.created_at).toLocaleDateString('en-IN')}`).join('\n');
+    
+    const personLabel = personFilter === 'dad' ? 'Dad (Anbazhakan)' : personFilter === 'mom' ? 'Mom (Parimalam)' : personFilter === 'kishor' ? 'Dr. Kishor' : 'Family Member';
+
+    const msg = `*CHIT FUND — FLOATING CAPITAL RESERVE RECORD*\n\n` +
+      `Hello ${personLabel},\n` +
+      `Here is your floating capital deposit record for Chit Fund payouts:\n\n` +
+      `${itemsList}\n\n` +
+      `*Total Float Available to Take Back / Recover: ₹${total.toLocaleString('en-IN')}*\n\n` +
+      `You can recover this amount back into your bank account or cash box anytime.`;
+
+    return `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+  };
 
   // Master Transaction Feed filtered by active wallet and type
   const filteredTransactions = useMemo(() => {
@@ -1049,86 +1150,506 @@ export default function CashVaultLedger() {
         </div>
       </div>
 
-      {/* ── 4. ATTENTION REQUIRED: PENDING ATM & OUTSTANDING SPENDS ─────────── */}
-      {(pendingRelocations.length > 0 || outstandingPersonalDraws.length > 0 || activeFloatingDeposits.length > 0) && (
-        <div className="space-y-3">
-          {/* Pending ATM Relocation Banner */}
-          {pendingRelocations.length > 0 && (
-            <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-3 sm:p-4 space-y-2.5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs sm:text-sm font-black text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
-                  <AlertCircle size={15} className="text-amber-600 animate-pulse" />
-                  Pending Physical Cash Box Verification ({pendingRelocations.length})
-                </h4>
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full">
-                  Step 2
+      {/* ── 4. ATTENTION REQUIRED & FAMILY KHATABOOK ───────────────────────── */}
+      <div className="space-y-4">
+        {/* Pending ATM Relocation Banner */}
+        {pendingRelocations.length > 0 && (
+          <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-3 sm:p-4 space-y-2.5 shadow-xs animate-in fade-in duration-150">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs sm:text-sm font-black text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                <AlertCircle size={15} className="text-amber-600 animate-pulse" />
+                Pending Physical Cash Box Verification ({pendingRelocations.length})
+              </h4>
+              <span className="text-[10px] font-bold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full">
+                Step 2 Pending
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-900/80 font-medium">
+              Currency was debited from bank. Click below once notes are physically placed inside the Cash Box:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {pendingRelocations.map((reloc) => {
+                const isVerifying = isVerifyingAtmId === reloc.id;
+                return (
+                  <div key={reloc.id} className="bg-white border border-amber-200 p-3 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase block truncate">From: {WALLET_META[reloc.source]?.name}</span>
+                      <span className="text-sm sm:text-base font-black text-gray-900 font-mono mt-0.5 block">{formatCurrency(reloc.amount)}</span>
+                      <span className="text-[9px] text-gray-400 font-mono">{reloc.createdAt}</span>
+                    </div>
+                    <button
+                      onClick={() => handleVerifyATM(reloc.id, reloc.amount, reloc.source, reloc.notes)}
+                      disabled={isVerifying}
+                      className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      {isVerifying ? <RefreshCw size={12} className="animate-spin" /> : <Check size={13} />}
+                      <span>Confirm Inflow</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── FAMILY KHATABOOK (FLOATS & PERSONAL DRAWS) ── */}
+        <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-4">
+          {/* Khatabook Header & Tab Selector */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100 pb-3.5">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <BookOpen size={16} />
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-gray-900">
+                  Family Khatabook · Capital &amp; Spends
+                </h3>
+                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full hidden sm:inline-block">
+                  குடும்ப கணக்கு
                 </span>
               </div>
-              <p className="text-[11px] text-amber-900/80 font-medium">
-                Currency was debited from bank. Click below once notes are physically placed inside the Cash Box:
+              <p className="text-xs text-gray-500 mt-0.5">
+                Track float capital provided by Dad, Mom, or Kishor to recover, &amp; personal cash draws to be repaid
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {pendingRelocations.map((reloc) => {
-                  const isVerifying = isVerifyingAtmId === reloc.id;
+            </div>
+
+            {/* Tab Switcher: Floating Capital vs Personal Draws */}
+            <div className="flex items-center bg-gray-100 p-1 rounded-2xl gap-1 shrink-0 self-start md:self-auto">
+              <button
+                type="button"
+                onClick={() => { setKhatabookTab('floats'); triggerHapticFeedback('light'); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  khatabookTab === 'floats'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <Plus size={13} />
+                <span>Floating Capital</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  khatabookTab === 'floats' ? 'bg-emerald-700 text-emerald-100' : 'bg-gray-200 text-gray-700'
+                }`}>
+                  {floatStats.activeCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setKhatabookTab('draws'); triggerHapticFeedback('light'); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  khatabookTab === 'draws'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <Coins size={13} />
+                <span>Personal Draws</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  khatabookTab === 'draws' ? 'bg-rose-700 text-rose-100' : 'bg-gray-200 text-gray-700'
+                }`}>
+                  {personalDrawStats.activeCount}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Per-Person Stat Cards (Dad, Mom, Kishor, Total) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {/* Dad */}
+            <div 
+              onClick={() => setKhatabookPersonFilter(prev => prev === 'dad' ? 'all' : 'dad')}
+              className={`p-3 rounded-2xl border transition-all cursor-pointer ${
+                khatabookPersonFilter === 'dad' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
+              }`}
+            >
+              <span className="text-[10px] font-bold text-gray-500 uppercase block">Dad (Anbazhakan)</span>
+              <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
+                khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
+              }`}>
+                {formatCurrency(khatabookTab === 'floats' ? floatStats.dad : personalDrawStats.dad)}
+              </span>
+              <span className="text-[9px] text-gray-400 font-medium block mt-0.5">
+                {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
+              </span>
+            </div>
+
+            {/* Mom */}
+            <div 
+              onClick={() => setKhatabookPersonFilter(prev => prev === 'mom' ? 'all' : 'mom')}
+              className={`p-3 rounded-2xl border transition-all cursor-pointer ${
+                khatabookPersonFilter === 'mom' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
+              }`}
+            >
+              <span className="text-[10px] font-bold text-gray-500 uppercase block">Mom (Parimalam)</span>
+              <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
+                khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
+              }`}>
+                {formatCurrency(khatabookTab === 'floats' ? floatStats.mom : personalDrawStats.mom)}
+              </span>
+              <span className="text-[9px] text-gray-400 font-medium block mt-0.5">
+                {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
+              </span>
+            </div>
+
+            {/* Dr. Kishor */}
+            <div 
+              onClick={() => setKhatabookPersonFilter(prev => prev === 'kishor' ? 'all' : 'kishor')}
+              className={`p-3 rounded-2xl border transition-all cursor-pointer ${
+                khatabookPersonFilter === 'kishor' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
+              }`}
+            >
+              <span className="text-[10px] font-bold text-gray-500 uppercase block">Dr. Kishor</span>
+              <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
+                khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
+              }`}>
+                {formatCurrency(khatabookTab === 'floats' ? floatStats.kishor : personalDrawStats.kishor)}
+              </span>
+              <span className="text-[9px] text-gray-400 font-medium block mt-0.5">
+                {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
+              </span>
+            </div>
+
+            {/* Total Pool */}
+            <div 
+              onClick={() => setKhatabookPersonFilter('all')}
+              className={`p-3 rounded-2xl border transition-all cursor-pointer ${
+                khatabookTab === 'floats' ? 'bg-emerald-50/80 border-emerald-300' : 'bg-rose-50/80 border-rose-300'
+              } ${khatabookPersonFilter === 'all' ? 'ring-2 ring-slate-800' : ''}`}
+            >
+              <span className={`text-[10px] font-black uppercase block ${
+                khatabookTab === 'floats' ? 'text-emerald-800' : 'text-rose-800'
+              }`}>
+                {khatabookTab === 'floats' ? 'Total Active Float' : 'Total Debt to Settle'}
+              </span>
+              <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
+                khatabookTab === 'floats' ? 'text-emerald-900' : 'text-rose-900'
+              }`}>
+                {formatCurrency(khatabookTab === 'floats' ? floatStats.total : personalDrawStats.total)}
+              </span>
+              <span className={`text-[9px] font-medium block mt-0.5 ${
+                khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
+              }`}>
+                {khatabookTab === 'floats' ? `${floatStats.activeCount} active items` : `${personalDrawStats.activeCount} active items`}
+              </span>
+            </div>
+          </div>
+
+          {/* Filter Row & WhatsApp Action Button */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-nowrap">
+              {[
+                { id: 'all', label: 'All Members' },
+                { id: 'dad', label: 'Dad (Anbazhakan)' },
+                { id: 'mom', label: 'Mom (Parimalam)' },
+                { id: 'kishor', label: 'Dr. Kishor' },
+              ].map((p) => {
+                const isSelected = khatabookPersonFilter === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setKhatabookPersonFilter(p.id)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
+                        : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Direct WhatsApp Share / Reminder Button */}
+            {khatabookTab === 'floats' ? (
+              <a
+                href={generateFloatWhatsAppSummary(khatabookPersonFilter)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black px-3.5 py-2 rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
+              >
+                <Share2 size={13} />
+                <span>Share Float Record (WhatsApp)</span>
+              </a>
+            ) : (
+              <a
+                href={generateDrawWhatsAppReminder(khatabookPersonFilter)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-black px-3.5 py-2 rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
+              >
+                <Send size={13} />
+                <span>Send WhatsApp Reminder</span>
+              </a>
+            )}
+          </div>
+
+          {/* Tab 1: Floating Capital Items */}
+          {khatabookTab === 'floats' && (
+            <div className="space-y-3 pt-1">
+              {(() => {
+                const filteredFloats = computedFloatingDeposits
+                  .filter(f => showRecoveredFloats ? true : f.status === 'active')
+                  .filter(f => khatabookPersonFilter === 'all' ? true : f.depositedBy.toLowerCase().includes(khatabookPersonFilter.toLowerCase()));
+
+                const recoveredCount = computedFloatingDeposits.filter(f => f.status === 'recovered').length;
+
+                if (filteredFloats.length === 0) {
                   return (
-                    <div key={reloc.id} className="bg-white border border-amber-200 p-3 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
-                      <div className="min-w-0">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase block truncate">From: {WALLET_META[reloc.source]?.name}</span>
-                        <span className="text-sm sm:text-base font-black text-gray-900 font-mono mt-0.5 block">{formatCurrency(reloc.amount)}</span>
-                        <span className="text-[9px] text-gray-400 font-mono">{reloc.createdAt}</span>
-                      </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center space-y-2">
+                      <p className="text-xs font-bold text-gray-500">
+                        No {khatabookPersonFilter !== 'all' ? `${khatabookPersonFilter} ` : ''}active floating capital deposits found.
+                      </p>
                       <button
-                        onClick={() => handleVerifyATM(reloc.id, reloc.amount, reloc.source, reloc.notes)}
-                        disabled={isVerifying}
-                        className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                        onClick={() => setActiveModal('deposit')}
+                        className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-xs"
                       >
-                        {isVerifying ? <RefreshCw size={12} className="animate-spin" /> : <Check size={13} />}
-                        <span>Confirm Inflow</span>
+                        <Plus size={14} />
+                        <span>Deposit New Float</span>
                       </button>
                     </div>
                   );
-                })}
-              </div>
+                }
+
+                return (
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {filteredFloats.map((f) => {
+                        const isRecovered = f.status === 'recovered';
+                        const singleWhatsAppUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
+                          `*CHIT FUND — FLOATING CAPITAL RECORD*\n\n` +
+                          `• Depositor: ${f.depositedBy}\n` +
+                          `• Amount: ₹${f.amount.toLocaleString('en-IN')}\n` +
+                          `• Purpose: ${f.tag} (${f.notes})\n` +
+                          `• Vault: ${WALLET_META[f.walletType]?.name || f.walletType}\n` +
+                          `• Date: ${new Date(f.created_at).toLocaleDateString('en-IN')}\n` +
+                          `• Status: ${isRecovered ? 'Recovered' : 'Available to Take Back'}\n\n` +
+                          `Recorded in Chit Fund Manager.`
+                        )}`;
+
+                        return (
+                          <div 
+                            key={f.id} 
+                            className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                              isRecovered 
+                                ? 'bg-gray-50/60 border-gray-200 opacity-60' 
+                                : 'bg-emerald-50/40 border-emerald-200 hover:border-emerald-300 shadow-2xs'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[10px] font-black uppercase text-emerald-900 bg-emerald-100/90 px-2 py-0.5 rounded-md">
+                                    {f.depositedBy}
+                                  </span>
+                                  <span className="text-[9px] font-mono text-gray-400">
+                                    {new Date(f.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                  </span>
+                                  {isRecovered && (
+                                    <span className="text-[9px] font-black text-gray-500 bg-gray-200 px-1.5 py-0.2 rounded">
+                                      Recovered
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-base sm:text-lg font-black text-emerald-900 font-mono mt-1">
+                                  {formatCurrency(f.amount)}
+                                </div>
+                                <p className="text-xs font-semibold text-gray-700 leading-snug mt-0.5">
+                                  {f.notes || f.tag}
+                                </p>
+                                <span className="text-[10px] text-gray-400 font-medium block mt-1">
+                                  Deposited into: {WALLET_META[f.walletType]?.name || f.walletType}
+                                </span>
+                              </div>
+
+                              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                {!isRecovered ? (
+                                  <button
+                                    onClick={() => {
+                                      setRecoveringFloat(f);
+                                      setRecoverAmount(String(f.amount));
+                                      setRecoverSourceWallet(f.walletType);
+                                      setActiveModal('recover');
+                                    }}
+                                    className="bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-black text-xs px-3 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer"
+                                  >
+                                    Take Back Float
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-gray-500 bg-gray-200/80 px-2 py-1 rounded-lg">
+                                    ✓ Settled
+                                  </span>
+                                )}
+
+                                <a
+                                  href={singleWhatsAppUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Share2 size={11} />
+                                  <span>WhatsApp</span>
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {recoveredCount > 0 && (
+                      <div className="text-center pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowRecoveredFloats(!showRecoveredFloats)}
+                          className="text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+                        >
+                          {showRecoveredFloats ? 'Hide Recovered Floats' : `Show ${recoveredCount} Recovered Floats`}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
-          {/* Outstanding Personal Debt / Spends Banner */}
-          {outstandingPersonalDraws.length > 0 && (
-            <div className="bg-rose-50/80 border-2 border-rose-200 rounded-2xl p-3 sm:p-4 space-y-2.5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs sm:text-sm font-black text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
-                  <Coins size={15} className="text-rose-600" />
-                  Active Personal Draws ({formatCurrency(totalOutstandingDebt)})
-                </h4>
-                <span className="text-[10px] font-bold text-rose-700 bg-rose-200 px-2 py-0.5 rounded-full">
-                  {outstandingPersonalDraws.length} Active
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {outstandingPersonalDraws.slice(0, 6).map((draw) => (
-                  <div key={draw.id} className="bg-white border border-rose-200 p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
-                    <div className="min-w-0">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase block truncate">{draw.takenBy} · {draw.tag}</span>
-                      <span className="text-sm font-black text-rose-900 font-mono block">{formatCurrency(draw.amount)}</span>
-                      <span className="text-[10px] text-gray-400 font-medium block truncate">{draw.description}</span>
+          {/* Tab 2: Personal Draws Items */}
+          {khatabookTab === 'draws' && (
+            <div className="space-y-3 pt-1">
+              {(() => {
+                const filteredDraws = computedPersonalDraws
+                  .filter(d => showSettledDraws ? true : d.status === 'outstanding')
+                  .filter(d => khatabookPersonFilter === 'all' ? true : d.takenBy.toLowerCase().includes(khatabookPersonFilter.toLowerCase()));
+
+                const settledCount = computedPersonalDraws.filter(d => d.status === 'settled').length;
+
+                if (filteredDraws.length === 0) {
+                  return (
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center space-y-2">
+                      <p className="text-xs font-bold text-gray-500">
+                        No {khatabookPersonFilter !== 'all' ? `${khatabookPersonFilter} ` : ''}outstanding personal draws recorded.
+                      </p>
+                      <button
+                        onClick={() => setActiveModal('spend')}
+                        className="inline-flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-xs"
+                      >
+                        <Plus size={14} />
+                        <span>Log Personal Spend</span>
+                      </button>
                     </div>
-                    <button
-                      onClick={() => {
-                        setSettlingDraw(draw);
-                        setSettleAmount(String(draw.amount));
-                        setActiveModal('settle');
-                      }}
-                      className="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-[11px] px-2.5 py-1.5 rounded-lg transition-all shrink-0 cursor-pointer shadow-2xs"
-                    >
-                      Put Back
-                    </button>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {filteredDraws.map((d) => {
+                        const isSettled = d.status === 'settled';
+                        const singleWhatsAppUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
+                          `*CHIT FUND — PERSONAL DRAW REMINDER*\n\n` +
+                          `• Taken By: ${d.takenBy}\n` +
+                          `• Amount: ₹${d.amount.toLocaleString('en-IN')}\n` +
+                          `• Category: ${d.tag}\n` +
+                          `• Description: ${d.description}\n` +
+                          `• Taken From: ${WALLET_META[d.walletType]?.name || d.walletType}\n` +
+                          `• Date: ${new Date(d.created_at).toLocaleDateString('en-IN')}\n` +
+                          `• Status: ${isSettled ? 'Settled' : 'To Settle / Put Back'}\n\n` +
+                          `Please put back the cash into the Chit Fund Box or Bank when convenient.`
+                        )}`;
+
+                        return (
+                          <div 
+                            key={d.id} 
+                            className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                              isSettled 
+                                ? 'bg-gray-50/60 border-gray-200 opacity-60' 
+                                : 'bg-rose-50/40 border-rose-200 hover:border-rose-300 shadow-2xs'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[10px] font-black uppercase text-rose-900 bg-rose-100/90 px-2 py-0.5 rounded-md">
+                                    {d.takenBy}
+                                  </span>
+                                  <span className="text-[9px] font-bold text-gray-500 bg-gray-200/80 px-1.5 py-0.2 rounded">
+                                    {d.tag}
+                                  </span>
+                                  <span className="text-[9px] font-mono text-gray-400">
+                                    {new Date(d.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                  </span>
+                                  {isSettled && (
+                                    <span className="text-[9px] font-black text-gray-500 bg-gray-200 px-1.5 py-0.2 rounded">
+                                      Settled
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-base sm:text-lg font-black text-rose-900 font-mono mt-1">
+                                  {formatCurrency(d.amount)}
+                                </div>
+                                <p className="text-xs font-semibold text-gray-700 leading-snug mt-0.5">
+                                  {d.description || d.tag}
+                                </p>
+                                <span className="text-[10px] text-gray-400 font-medium block mt-1">
+                                  Taken from: {WALLET_META[d.walletType]?.name || d.walletType}
+                                </span>
+                              </div>
+
+                              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                {!isSettled ? (
+                                  <button
+                                    onClick={() => {
+                                      setSettlingDraw(d);
+                                      setSettleAmount(String(d.amount));
+                                      setSettleDestWallet(d.walletType);
+                                      setActiveModal('settle');
+                                    }}
+                                    className="bg-rose-700 hover:bg-rose-800 active:scale-95 text-white font-black text-xs px-3 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer"
+                                  >
+                                    Put Back Cash
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-gray-500 bg-gray-200/80 px-2 py-1 rounded-lg">
+                                    ✓ Settled
+                                  </span>
+                                )}
+
+                                <a
+                                  href={singleWhatsAppUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] font-bold text-rose-700 hover:text-rose-900 flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Send size={11} />
+                                  <span>WhatsApp</span>
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {settledCount > 0 && (
+                      <div className="text-center pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowSettledDraws(!showSettledDraws)}
+                          className="text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+                        >
+                          {showSettledDraws ? 'Hide Settled Draws' : `Show ${settledCount} Settled Draws`}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* ── 5. UNIFIED STATEMENT & ACTIVITY TIMELINE ────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xs">
@@ -1723,6 +2244,72 @@ export default function CashVaultLedger() {
                 Done Counting
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 7: RECOVER FLOATING CAPITAL MODAL ────────────────────────── */}
+      {activeModal === 'recover' && recoveringFloat && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <Banknote size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Take Back / Recover Float</h3>
+                  <p className="text-[11px] text-gray-500">{recoveringFloat.depositedBy} · {recoveringFloat.tag}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setRecoveringFloat(null); setActiveModal('none'); }} 
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmRecoverFloat} className="space-y-3.5">
+              <div className="space-y-1 text-center">
+                <label className="text-[11px] font-extrabold uppercase text-gray-500">Recovery Amount (₹)</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={recoveringFloat.amount}
+                  value={recoverAmount}
+                  onChange={(e) => setRecoverAmount(e.target.value)}
+                  className="w-full text-center text-3xl font-black font-mono py-2.5 border-2 border-gray-200 focus:border-indigo-600 rounded-2xl focus:outline-none"
+                  autoFocus
+                />
+                <span className="text-[10px] text-gray-400 font-medium">
+                  Total float available to take back: {formatCurrency(recoveringFloat.amount)}
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Withdraw money from which account?</label>
+                <select
+                  value={recoverSourceWallet}
+                  onChange={(e) => setRecoverSourceWallet(e.target.value as any)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                >
+                  <option value="cash_in_hand">Physical Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
+                  <option value="kishor_bank">Kishor Bank (UPI) ({formatCurrency(balances.kishor_bank)})</option>
+                  <option value="dad_bank">Dad's Bank ({formatCurrency(balances.dad_bank)})</option>
+                  <option value="mom_bank">Mom's Bank ({formatCurrency(balances.mom_bank)})</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isProcessingRecover || Number(recoverAmount) <= 0}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isProcessingRecover ? 'Recovering...' : `Confirm Float Recovery (${formatCurrency(Number(recoverAmount) || 0)})`}
+              </button>
+            </form>
           </div>
         </div>
       )}
