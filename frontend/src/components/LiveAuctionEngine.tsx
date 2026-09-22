@@ -1642,58 +1642,51 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
     <div className="min-h-[calc(100vh-140px)] lg:h-[calc(100vh-140px)] flex flex-col space-y-2.5 sm:space-y-3 animate-in fade-in duration-200">
       
       {/* ── TOP STUDIO CONTROL & BROADCAST BAR ──────────────────────────────── */}
-      <div className="shrink-0 bg-white border border-gray-200 rounded-2xl p-3 sm:p-3.5 shadow-sm space-y-2.5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+      <div className="shrink-0 bg-white border border-gray-200 rounded-2xl p-2.5 sm:p-3.5 shadow-xs space-y-2 sm:space-y-2.5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           {/* Studio Title & Back Button */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <button
-              type="button"
-              onClick={handleExitStudio}
-              className="p-1.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
-              title="Return to Overview"
-            >
-              <ArrowLeft size={14} />
-              <span className="hidden sm:inline">Overview</span>
-            </button>
+          <div className="flex items-center gap-1.5 sm:gap-2 justify-between md:justify-start">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <button
+                type="button"
+                onClick={handleExitStudio}
+                className="p-1 sm:p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer shrink-0"
+                title="Return to Overview"
+              >
+                <ArrowLeft size={13} />
+                <span className="hidden sm:inline">Overview</span>
+              </button>
 
-            <div className="flex items-center gap-2">
-              <span className="font-black text-xs sm:text-sm text-gray-900">
+              <span className="font-black text-xs sm:text-sm text-gray-900 truncate max-w-[130px] sm:max-w-none">
                 {group.name}
               </span>
-              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
-                Month {group.currentMonth} Live Studio
+              <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                M{group.currentMonth}
               </span>
+            </div>
 
+            <div className="flex items-center gap-1 shrink-0">
               {group.is_live_auction_active ? (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-rose-500 text-white flex items-center gap-1 shadow-xs animate-pulse">
-                    <Flame size={11} /> Live Broadcast Active
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-500 text-white flex items-center gap-1 shadow-xs animate-pulse">
+                    <Flame size={10} /> Live
                   </span>
 
                   {/* Real-Time Live Viewer Counter Badge */}
                   <span 
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border transition-all ${
+                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold border transition-all ${
                       liveViewerCount > 0 
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-xs' 
                         : 'bg-gray-100 text-gray-500 border-gray-200'
                     }`}
                     title={`${liveViewerCount} active subscriber${liveViewerCount === 1 ? '' : 's'} viewing this live auction`}
                   >
-                    <span className="relative flex h-2 w-2">
-                      {liveViewerCount > 0 && (
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      )}
-                      <span className={`relative inline-flex rounded-full h-2 w-2 ${liveViewerCount > 0 ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                    </span>
-                    <Eye size={12} className={liveViewerCount > 0 ? 'text-emerald-600' : 'text-gray-400'} />
+                    <Eye size={11} className={liveViewerCount > 0 ? 'text-emerald-600' : 'text-gray-400'} />
                     <span className="font-mono">{liveViewerCount}</span>
-                    <span className="font-bold">
-                      {liveViewerCount === 1 ? 'Viewer' : 'Viewers'}
-                    </span>
                   </span>
                 </div>
               ) : (
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
                   Standby
                 </span>
               )}
@@ -1701,17 +1694,17 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
           </div>
 
           {/* Broadcast Trigger & Live Action Tools */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-0.5 md:pb-0">
             {/* Begin Live Auction Button (Broadcast Trigger to Subscribers) */}
             {group.currentMonth > 0 && !group.is_live_auction_active && (
               <button
                 type="button"
                 onClick={handleBeginLiveAuction}
                 disabled={isStartingLiveSession}
-                className="flex items-center gap-1.5 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 active:scale-98 text-white text-xs font-black px-3.5 py-1.5 rounded-xl transition-all shadow-md shadow-rose-900/20 cursor-pointer disabled:opacity-50"
+                className="flex items-center gap-1 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 active:scale-98 text-white text-[11px] sm:text-xs font-black px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl transition-all shadow-xs cursor-pointer disabled:opacity-50 shrink-0"
               >
-                <Radio size={13} className="animate-pulse" />
-                <span>{isStartingLiveSession ? 'Broadcasting...' : 'Begin Live Auction'}</span>
+                <Radio size={12} className="animate-pulse" />
+                <span>{isStartingLiveSession ? '...' : 'Begin Live'}</span>
               </button>
             )}
 
@@ -1720,27 +1713,27 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 type="button"
                 onClick={handleEndLiveAuctionSession}
                 disabled={isStartingLiveSession}
-                className="flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
+                className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl transition-colors cursor-pointer shrink-0"
               >
-                <span>End Broadcast</span>
+                <span>End Live</span>
               </button>
             )}
 
             {/* Roll Call Button */}
             <button
               onClick={() => setShowRollCallModal(true)}
-              className="flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-98 text-indigo-700 border border-indigo-200 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer"
+              className="flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 active:scale-98 text-indigo-700 border border-indigo-200 text-[11px] sm:text-xs font-bold px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer shrink-0"
             >
-              <Users size={13} />
+              <Users size={12} />
               <span>Roll Call ({attendingMemberIds.length}/{eligibleCount})</span>
             </button>
 
             {/* Live Timeline Toggle Button */}
             <button
               onClick={() => setShowTimelineDrawer(true)}
-              className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-800 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer"
+              className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-800 text-[11px] sm:text-xs font-bold px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer shrink-0"
             >
-              <History size={13} className="text-indigo-600" />
+              <History size={12} className="text-indigo-600" />
               <span>Timeline ({bids.length})</span>
             </button>
 
@@ -1749,10 +1742,10 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               onClick={handleUndo}
               disabled={bids.length === 0}
               title="Undo last recorded bid"
-              className="flex items-center gap-1 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed border border-gray-200 text-gray-700 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer"
+              className="flex items-center justify-center p-1 sm:px-2 sm:py-1.5 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed border border-gray-200 text-gray-700 text-[11px] sm:text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0"
             >
-              <Undo2 size={13} />
-              <span className="hidden sm:inline">Undo</span>
+              <Undo2 size={12} />
+              <span className="hidden sm:inline sm:ml-1">Undo</span>
             </button>
 
             {/* Hammer Down & Sold Button */}
@@ -1765,86 +1758,103 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 setShowCloseModal(true);
               }}
               disabled={group.currentMonth === 0 || bids.length === 0}
-              className="font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all bg-gray-900 hover:bg-black active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed text-white cursor-pointer"
+              className="font-bold text-[11px] sm:text-xs px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl flex items-center justify-center gap-1 shadow-xs transition-all bg-gray-900 hover:bg-black active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed text-white cursor-pointer shrink-0 ml-auto md:ml-0"
             >
-              <Gavel size={13} />
-              <span>{isLaabaSeetuActive ? 'Close Laaba Seetu' : 'Hammer Down & Sold'}</span>
+              <Gavel size={12} />
+              <span className="hidden sm:inline">{isLaabaSeetuActive ? 'Close Laaba Seetu' : 'Hammer Down & Sold'}</span>
+              <span className="sm:hidden">{isLaabaSeetuActive ? 'Close' : 'Hammer'}</span>
             </button>
           </div>
         </div>
 
-        {/* Compact 3-Card Real-Time Status Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-gray-100">
-          {/* 1. Live Leader */}
-          <div className={`px-3 py-2 rounded-xl border transition-all flex items-center justify-between gap-2 ${
+        {/* Compact 3-Card Real-Time Status Bar in a single horizontal grid on mobile */}
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-1.5 border-t border-gray-100">
+          {/* 1. Live Leader / Starting Bid */}
+          <div className={`p-1.5 sm:p-2.5 rounded-xl border transition-all flex flex-col justify-between ${
             bids.length > 0 
-              ? 'bg-gradient-to-r from-indigo-50 to-indigo-100/70 border-indigo-300 text-indigo-950 shadow-2xs' 
+              ? 'bg-gradient-to-br from-indigo-50 to-indigo-100/70 border-indigo-300 text-indigo-950 shadow-2xs' 
               : 'bg-slate-50 border-slate-200 text-slate-800'
           }`}>
-            <div className="min-w-0">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-700 block">
-                {bids.length > 0 ? '👑 Live Leader' : 'Starting Bid'}
+            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-indigo-700 truncate block">
+              {bids.length > 0 ? '👑 Leader' : 'Opening Bid'}
+            </span>
+            <div className="flex items-baseline justify-between gap-1 mt-0.5">
+              <span className="text-[10px] sm:text-xs font-extrabold truncate text-gray-900">
+                {bids.length > 0 ? winnerName.split(' ')[0] : 'Min'}
               </span>
-              <span className="text-xs font-extrabold block truncate">
-                {bids.length > 0 ? `${winnerName} (#${winnerTicket})` : 'Awaiting 1st Bid'}
+              <span className="text-[11px] sm:text-xs font-black text-indigo-700 shrink-0 font-mono">
+                {bids.length > 0 ? formatCurrency(highestBid) : formatCurrency(startingBaselineBid)}
               </span>
             </div>
-            <span className="text-xs font-black text-indigo-700 shrink-0">
-              {bids.length > 0 ? formatCurrency(highestBid) : formatCurrency(startingBaselineBid)}
-            </span>
           </div>
 
           {/* 2. Winner Net Cash Payout */}
-          <div className="px-3 py-2 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 block">Net Payout</span>
-              <span className="text-[10px] text-emerald-700 font-semibold block truncate">Pot: {formatCurrency(group.totalValue)}</span>
+          <div className="p-1.5 sm:p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-emerald-800 truncate block">
+                Net Payout
+              </span>
+              <span className="text-[8px] sm:text-[9px] text-emerald-600 font-mono hidden sm:inline">
+                Pot: {formatCurrency(group.totalValue)}
+              </span>
             </div>
-            <span className="text-xs font-black text-emerald-900 shrink-0">
-              {formatCurrency(netPayout)}
-            </span>
+            <div className="flex items-baseline justify-between gap-1 mt-0.5">
+              <span className="text-[9px] sm:text-[10px] text-emerald-700 font-semibold truncate sm:hidden">
+                Pot: {formatCurrency(group.totalValue)}
+              </span>
+              <span className="text-[11px] sm:text-xs font-black text-emerald-900 shrink-0 font-mono ml-auto">
+                {formatCurrency(netPayout)}
+              </span>
+            </div>
           </div>
 
           {/* 3. Accumulated Kai Iruppu Pool */}
-          <div className="px-3 py-2 bg-amber-50/70 border border-amber-200 rounded-xl flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-800 block">Kai Iruppu Pool</span>
-              <span className="text-[10px] text-amber-700 font-medium block truncate">
-                +{formatCurrency(highestBid)} on close
+          <div className="p-1.5 sm:p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-amber-800 truncate block">
+                Kai Iruppu
+              </span>
+              <span className="text-[8px] sm:text-[9px] text-amber-600 font-mono hidden sm:inline">
+                +{formatCurrency(highestBid)}
               </span>
             </div>
-            <span className="text-xs font-black text-amber-800 shrink-0">
-              {formatCurrency(group.kai_iruppu_pool)}
-            </span>
+            <div className="flex items-baseline justify-between gap-1 mt-0.5">
+              <span className="text-[9px] sm:text-[10px] text-amber-700 font-medium truncate sm:hidden">
+                +{formatCurrency(highestBid)}
+              </span>
+              <span className="text-[11px] sm:text-xs font-black text-amber-800 shrink-0 font-mono ml-auto">
+                {formatCurrency(group.kai_iruppu_pool)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── FULL CANVAS DYNAMIC AUTOSCALING MEMBER GRID ────────────────────────── */}
-      <div className="flex-1 min-h-0 bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col space-y-2.5">
+      <div className="flex-1 min-h-0 bg-white border border-gray-200 rounded-2xl p-2.5 sm:p-4 shadow-sm flex flex-col space-y-2">
         
         {/* Workspace Toolbar Header */}
-        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2">
-          <div className="flex items-center gap-2">
-            <Users size={15} className="text-indigo-600 shrink-0" />
-            <span className="text-xs font-bold text-gray-900">
-              Active Bidders Grid ({visibleContenders.length} eligible)
+        <div className="shrink-0 flex items-center justify-between gap-2 border-b border-gray-100 pb-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Users size={14} className="text-indigo-600 shrink-0" />
+            <span className="text-xs font-bold text-gray-900 truncate">
+              Active Bidders ({visibleContenders.length})
             </span>
-            <span className="text-[10px] text-gray-400 hidden sm:inline">
-              — Tap any member card to log their shouted bid
+            <span className="text-[10px] text-gray-400 hidden sm:inline truncate">
+              — Tap card to log bid
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={() => setShowOnlyAttending(v => !v)}
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all border cursor-pointer ${
+              className={`text-[10px] sm:text-[11px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg transition-all border cursor-pointer ${
                 showOnlyAttending 
                   ? 'bg-indigo-50 border-indigo-200 text-indigo-700' 
                   : 'bg-gray-100 border-gray-200 text-gray-700'
               }`}
             >
-              {showOnlyAttending ? `Attending Only (${attendingMemberIds.length})` : `Show All (${members.length})`}
+              {showOnlyAttending ? `Attending (${attendingMemberIds.length})` : `All (${members.length})`}
             </button>
           </div>
         </div>
