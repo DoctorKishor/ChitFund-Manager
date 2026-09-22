@@ -14,6 +14,7 @@ import AuctionScheduleModal from './AuctionScheduleModal';
 import QuickMemberCollectModal, { CollectableMember } from './QuickMemberCollectModal';
 import QuickPersonalDrawModal from './QuickPersonalDrawModal';
 import QuickAtmWithdrawalModal from './QuickAtmWithdrawalModal';
+import SlideToConfirm from './SlideToConfirm';
 import { HelpTooltip } from './HelpTooltip';
 import { triggerHapticFeedback } from '../utils/haptics';
 import { computeNextAuctionDateTime, formatTime12h, getFirstSundayOnOrAfterDay } from '../utils/auctionSchedule';
@@ -6574,44 +6575,35 @@ Thank you for your prompt payment! 🙏`;
               {/* Safety Verification Step 2: Slide to Confirm Slider */}
               <div className="space-y-2 pt-2 border-t border-gray-100">
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="font-bold text-gray-700 flex items-center gap-1">
+                  <span className="font-bold text-gray-700 flex items-center gap-1.5">
                     {isPhraseMatched ? (
                       <Unlock size={13} className="text-emerald-600" />
                     ) : (
                       <Lock size={13} className="text-gray-400" />
                     )}
-                    Step 2: Slide all the way to confirm deletion
+                    Step 2: Slide to confirm deletion
                   </span>
-                  <span className={`font-bold ${isSliderReady ? 'text-red-600' : 'text-gray-400'}`}>
-                    {deleteSliderVal}%
-                  </span>
+                  {isPhraseMatched && (
+                    <span className="text-[10px] font-bold text-emerald-600">
+                      Unlocked
+                    </span>
+                  )}
                 </div>
 
-                <div className="relative flex items-center">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={deleteSliderVal}
-                    disabled={!isPhraseMatched || isDeletingGroup}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setDeleteSliderVal(val);
-                      if (val >= 100 && isPhraseMatched) {
-                        handleExecuteDeleteGroup();
-                      }
-                    }}
-                    className={`w-full h-8 rounded-xl appearance-none cursor-pointer transition-all ${
-                      !isPhraseMatched
-                        ? 'bg-gray-100 opacity-50 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-red-100 via-red-300 to-red-600 accent-red-600'
-                    }`}
-                  />
-                </div>
+                <SlideToConfirm
+                  disabled={!isPhraseMatched || isDeletingGroup}
+                  onConfirm={handleExecuteDeleteGroup}
+                  label="Slide to confirm deletion"
+                  confirmedLabel="Confirmed! Deleting Group..."
+                  loadingLabel="Purging from Supabase..."
+                  isLoading={isDeletingGroup}
+                  colorVariant="red"
+                />
+
                 <p className="text-[10px] text-gray-400 text-center">
                   {!isPhraseMatched
                     ? '🔒 Complete Step 1 above to unlock the confirmation slider'
-                    : '👉 Drag the slider to 100% to trigger permanent deletion'}
+                    : '👉 Drag the circular button to the right to confirm deletion'}
                 </p>
               </div>
 
@@ -6626,11 +6618,11 @@ Thank you for your prompt payment! 🙏`;
                 </button>
                 <button
                   type="button"
-                  disabled={!isSliderReady || isDeletingGroup}
+                  disabled={!isPhraseMatched || isDeletingGroup}
                   onClick={handleExecuteDeleteGroup}
                   className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center ${
-                    isSliderReady && !isDeletingGroup
-                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                    isPhraseMatched && !isDeletingGroup
+                      ? 'bg-red-600 hover:bg-red-700 text-white cursor-pointer'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
                   }`}
                 >
