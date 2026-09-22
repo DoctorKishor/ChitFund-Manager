@@ -5138,14 +5138,14 @@ Thank you for your prompt payment! 🙏`;
             </div>
           ) : (
             /* 3. UPGRADED CHIT SETUP WIZARD VIEW */
-            <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
+            <div className="space-y-3.5 sm:space-y-5 animate-in fade-in duration-200">
               
               {/* Setup Wizard Progress Navigation Bar */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                <div className="flex items-center justify-between sm:justify-start space-x-3">
+              <div className="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 sm:gap-3">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
-                      <Sparkles size={16} />
+                      <Sparkles size={15} />
                     </div>
                     <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider">Chit Setup Wizard</h3>
                   </div>
@@ -5154,14 +5154,14 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setShowWizard(false);
                     }}
-                    className="text-[11px] text-gray-400 hover:text-gray-700 underline font-semibold transition-colors"
+                    className="text-[11px] text-gray-400 hover:text-gray-700 underline font-semibold transition-colors py-1 px-1.5"
                   >
                     Exit Wizard
                   </button>
                 </div>
 
                 {/* Step Indicators */}
-                <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-5 w-full sm:w-auto">
+                <div className="flex items-center justify-between gap-1 sm:gap-3 w-full sm:w-auto">
                   
                   {/* Step 1 Pill */}
                   <button
@@ -5170,13 +5170,13 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setWizardStep(1);
                     }}
-                    className={`flex items-center space-x-2 px-2.5 py-1 rounded-xl transition-all ${
+                    className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl transition-all ${
                       wizardStep === 1 
                         ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200' 
                         : 'hover:bg-gray-50 text-gray-500'
                     }`}
                   >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                       wizardStep === 1 
                         ? 'bg-indigo-600 text-white shadow-xs' 
                         : wizardStep > 1 
@@ -5185,10 +5185,12 @@ Thank you for your prompt payment! 🙏`;
                     }`}>
                       {wizardStep > 1 ? <Check size={11} /> : '1'}
                     </span>
-                    <span className={`text-xs ${wizardStep === 1 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>1. Basic &amp; Schedule</span>
+                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 1 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>
+                      <span className="hidden sm:inline">1. </span>Basic<span className="hidden md:inline"> & Schedule</span>
+                    </span>
                   </button>
                   
-                  <div className="flex-1 sm:flex-none sm:w-6 h-px bg-gray-200"></div>
+                  <div className="flex-1 sm:w-4 h-px bg-gray-200"></div>
 
                   {/* Step 2 Pill */}
                   <button
@@ -5198,13 +5200,13 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setWizardStep(2);
                     }}
-                    className={`flex items-center space-x-2 px-2.5 py-1 rounded-xl transition-all ${
+                    className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl transition-all ${
                       wizardStep === 2 
                         ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200' 
                         : 'hover:bg-gray-50 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed'
                     }`}
                   >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                       wizardStep === 2 
                         ? 'bg-indigo-600 text-white shadow-xs' 
                         : wizardStep > 2 
@@ -5213,10 +5215,12 @@ Thank you for your prompt payment! 🙏`;
                     }`}>
                       {wizardStep > 2 ? <Check size={11} /> : '2'}
                     </span>
-                    <span className={`text-xs ${wizardStep === 2 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>2. Members</span>
+                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 2 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>
+                      <span className="hidden sm:inline">2. </span>Members
+                    </span>
                   </button>
 
-                  <div className="flex-1 sm:flex-none sm:w-6 h-px bg-gray-200"></div>
+                  <div className="flex-1 sm:w-4 h-px bg-gray-200"></div>
 
                   {/* Step 3 Pill */}
                   <button
@@ -5226,60 +5230,57 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setWizardStep(3);
                     }}
-                    className={`flex items-center space-x-2 px-2.5 py-1 rounded-xl transition-all ${
+                    className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl transition-all ${
                       wizardStep === 3 
                         ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200' 
                         : 'hover:bg-gray-50 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed'
                     }`}
                   >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                       wizardStep === 3 
                         ? 'bg-indigo-600 text-white shadow-xs' 
                         : 'bg-gray-200 text-gray-500'
                     }`}>
                       3
                     </span>
-                    <span className={`text-xs ${wizardStep === 3 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>3. Review &amp; Launch</span>
+                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 3 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>
+                      <span className="hidden sm:inline">3. </span>Review<span className="hidden md:inline"> & Launch</span>
+                    </span>
                   </button>
                 </div>
               </div>
 
               {/* ── STEP 1: BASIC INFO & SCHEDULE ── */}
               {wizardStep === 1 && (
-                <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-150">
+                <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-150">
                   
                   {/* Step 1 Main Form Card */}
-                  <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 shadow-2xs">
-                    <div className="border-b border-gray-150 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                          <span>Step 1: Chit Parameters &amp; Auction Schedule</span>
-                        </h4>
-                        <p className="text-xs text-gray-500 mt-0.5">Configure pool targets, group duration, start date, and recurring monthly auction timing</p>
-                      </div>
+                  <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs">
+                    <div className="border-b border-gray-150 pb-3 flex items-center justify-between gap-2">
+                      <h4 className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-2">
+                        <span>Step 1: Chit Parameters &amp; Schedule</span>
+                      </h4>
                       <button
                         type="button"
                         onClick={handleAutoGenerateName}
-                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors w-fit active:scale-95"
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shrink-0 active:scale-95"
                       >
-                        <Sparkles size={12} /> Auto-Generate Name
+                        <Sparkles size={12} /> Auto-Name
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5">
                       
                       {/* 1. Group Name */}
                       <div className="space-y-1.5">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                            Group Name <span className="text-rose-500">*</span>
-                          </label>
-                        </div>
+                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                          Group Name <span className="text-rose-500">*</span>
+                        </label>
                         <div className="relative">
                           <input
                             type="text"
                             required
-                            placeholder="e.g. G-1L-20M-OCT26"
+                            placeholder="e.g. G-2L-10M-OCT26"
                             value={newGroupName}
                             onChange={(e) => setNewGroupName(e.target.value)}
                             className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none transition-colors"
@@ -5294,7 +5295,6 @@ Thank you for your prompt payment! 🙏`;
                             </button>
                           )}
                         </div>
-                        <span className="text-[10px] text-gray-400 block">Identifier for reports, passbooks, and WhatsApp alerts</span>
                       </div>
 
                       {/* 2. Total Pool Value */}
@@ -5388,12 +5388,12 @@ Thank you for your prompt payment! 🙏`;
                     </div>
 
                     {/* Schedule Row */}
-                    <div className="border-t border-gray-150 pt-4 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                    <div className="border-t border-gray-150 pt-3.5 grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5">
                       
                       {/* Launch Date */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                          Launch Date / Month 0 Start <span className="text-rose-500">*</span>
+                          Launch Date (Month 0) <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
                           <input
@@ -5404,21 +5404,12 @@ Thank you for your prompt payment! 🙏`;
                             className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none font-semibold"
                           />
                         </div>
-                        <span className="text-[10px] text-gray-400 block">
-                          {(() => {
-                            const d = new Date(newGroupStartDate + 'T00:00:00');
-                            const formatted = !isNaN(d.getTime()) 
-                              ? d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-                              : '';
-                            return `Orientation & Launch Session (${formatted})`;
-                          })()}
-                        </span>
                       </div>
 
-                      {/* Recurring Auction Rule Dropdown (First Sunday on or after X) */}
+                      {/* Recurring Auction Rule Dropdown */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                          Recurring Auction Rule
+                          Monthly Auction Rule
                         </label>
                         <select
                           value={newGroupAuctionDay}
@@ -5432,13 +5423,10 @@ Thank you for your prompt payment! 🙏`;
                         >
                           {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
                             <option key={day} value={day}>
-                              1st Sunday on/after {day}th of every month {day === 10 ? '(Default)' : ''}
+                              1st Sunday on/after {day}th {day === 10 ? '(Default)' : ''}
                             </option>
                           ))}
                         </select>
-                        <span className="text-[10px] text-indigo-600 font-medium block">
-                          ⚡ Changing rule auto-snaps Launch Date to this Sunday
-                        </span>
                       </div>
 
                       {/* Recurring Auction Time */}
@@ -5446,15 +5434,12 @@ Thank you for your prompt payment! 🙏`;
                         <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
                           Auction Bidding Time
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="time"
-                            value={newGroupAuctionTime}
-                            onChange={(e) => setNewGroupAuctionTime(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-semibold focus:outline-none"
-                          />
-                        </div>
-                        <span className="text-[10px] text-gray-400 block">Default evening bidding session time</span>
+                        <input
+                          type="time"
+                          value={newGroupAuctionTime}
+                          onChange={(e) => setNewGroupAuctionTime(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-semibold focus:outline-none"
+                        />
                       </div>
 
                     </div>
@@ -5462,43 +5447,43 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* Dynamic Real-time Chit Math Breakdown Card */}
                   {Number(newGroupValue) > 0 && Number(newGroupDuration) > 0 && (
-                    <div className="bg-gradient-to-br from-indigo-50/70 via-indigo-50/30 to-purple-50/50 border border-indigo-150 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3">
+                    <div className="bg-gradient-to-br from-indigo-50/70 via-indigo-50/30 to-purple-50/50 border border-indigo-150 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-2.5">
                       <div className="flex items-center justify-between">
                         <h5 className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
                           <Coins size={14} className="text-indigo-600" />
-                          Live Financial Projections
+                          Financial Projections
                         </h5>
-                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-md">
-                          Rule: Duration = Member Count ({newGroupDuration} Tickets)
+                        <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-100/60 px-2 py-0.5 rounded-md">
+                          {newGroupDuration} Tickets
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Monthly Due / Member</span>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
+                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-2.5 sm:p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Monthly Due</span>
                           <strong className="text-sm sm:text-base font-extrabold text-indigo-700 mt-0.5 block">
                             {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}
                           </strong>
-                          <span className="text-[10px] text-gray-500">Per subscriber per month</span>
+                          <span className="text-[10px] text-gray-500">per member / mo</span>
                         </div>
 
-                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Month 0 Launch Pool</span>
+                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-2.5 sm:p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Month 0 Launch</span>
                           <strong className="text-sm sm:text-base font-extrabold text-amber-700 mt-0.5 block">
                             {formatCurrency(Number(newGroupValue))}
                           </strong>
-                          <span className="text-[10px] text-amber-600 font-semibold">Organizer Profit pool</span>
+                          <span className="text-[10px] text-amber-600 font-semibold">Organizer Profit</span>
                         </div>
 
-                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Total Chit Lifecycle</span>
+                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-2.5 sm:p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Total Lifecycle</span>
                           <strong className="text-sm sm:text-base font-extrabold text-gray-900 mt-0.5 block">
-                            {Number(newGroupDuration) + 1} Months ({newGroupDuration} Tickets)
+                            {Number(newGroupDuration) + 1} Months
                           </strong>
-                          <span className="text-[10px] text-gray-500">Month 0 (Launch) to Month {newGroupDuration}</span>
+                          <span className="text-[10px] text-gray-500">M0 to M{newGroupDuration}</span>
                         </div>
 
-                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
+                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-2.5 sm:p-3">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">1st Live Auction (M1)</span>
                           <strong className="text-xs sm:text-sm font-extrabold text-gray-900 mt-0.5 block truncate">
                             {(() => {
@@ -5510,17 +5495,17 @@ Thank you for your prompt payment! 🙏`;
                                 start_date: newGroupStartDate,
                                 current_month: 0,
                               });
-                              return targetDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                              return targetDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
                             })()}
                           </strong>
-                          <span className="text-[10px] text-indigo-600 font-semibold">{formatTime12h(newGroupAuctionTime)} (1st Sun on/after {newGroupAuctionDay}th)</span>
+                          <span className="text-[10px] text-gray-500">{formatTime12h(newGroupAuctionTime)}</span>
                         </div>
                       </div>
                     </div>
                   )}
 
                   {/* Navigation Step 1 Footer */}
-                  <div className="flex justify-end pt-2">
+                  <div className="flex justify-end pt-1">
                     <button
                       type="button"
                       disabled={!newGroupName.trim() || !newGroupValue || !newGroupDuration}
@@ -5539,35 +5524,34 @@ Thank you for your prompt payment! 🙏`;
 
               {/* ── STEP 2: ASSIGN GROUP MEMBERS ── */}
               {wizardStep === 2 && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-6 shadow-2xs animate-in fade-in duration-150">
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs animate-in fade-in duration-150">
                   
                   {/* Step 2 Header & Quick Actions Bar */}
-                  <div className="border-b border-gray-150 pb-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                        <span>Step 2: Assign Group Subscribers ({enrollments.filter(e => e.name !== '').length} of {newGroupDuration})</span>
-                        {enrollments.every(e => e.name !== '') ? (
-                          <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <Check size={11} /> 100% Enrolled
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
-                            {enrollments.filter(e => !e.name).length} Open Slot(s)
-                          </span>
-                        )}
+                  <div className="border-b border-gray-150 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-xs sm:text-sm font-bold text-gray-900">
+                        Step 2: Assign Subscribers ({enrollments.filter(e => e.name !== '').length}/{newGroupDuration})
                       </h4>
-                      <p className="text-xs text-gray-500 mt-0.5">Assign subscribers to tickets or register new members</p>
+                      {enrollments.every(e => e.name !== '') ? (
+                        <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Check size={11} /> 100% Enrolled
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                          {enrollments.filter(e => !e.name).length} Open
+                        </span>
+                      )}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2">
                       {enrollments.some(e => e.name) && (
                         <button
                           type="button"
                           onClick={handleClearAllSlots}
-                          className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors active:scale-95"
+                          className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 font-bold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors active:scale-95"
                         >
                           <RotateCcw size={12} />
-                          <span>Clear All</span>
+                          <span>Clear</span>
                         </button>
                       )}
 
@@ -5579,19 +5563,19 @@ Thank you for your prompt payment! 🙏`;
                           setNewMemberPhone('');
                           setShowCreateMemberModal(true);
                         }}
-                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-xs active:scale-95"
+                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-xs active:scale-95"
                       >
                         <UserPlus size={13} />
-                        <span>+ Register Member</span>
+                        <span>+ Register</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Fast Search & Auto-Suggest Combobox */}
-                  <div className="bg-gray-50/90 border border-gray-200 rounded-2xl p-3 sm:p-3.5 space-y-2">
+                  <div className="bg-gray-50/90 border border-gray-200 rounded-2xl p-2.5 sm:p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block flex items-center gap-1">
-                        <Search size={12} /> Search &amp; Assign to {targetSlotForAssign !== null ? `Ticket #${targetSlotForAssign + 1}` : 'Next Open Slot'}
+                        <Search size={11} /> Search &amp; Assign {targetSlotForAssign !== null ? `(Slot #${targetSlotForAssign + 1})` : ''}
                       </label>
                       {targetSlotForAssign !== null && (
                         <button
@@ -5599,7 +5583,7 @@ Thank you for your prompt payment! 🙏`;
                           onClick={() => setTargetSlotForAssign(null)}
                           className="text-[10px] text-gray-500 hover:text-gray-900 underline font-semibold"
                         >
-                          Cancel Slot #{targetSlotForAssign + 1} Target
+                          Cancel Slot #{targetSlotForAssign + 1}
                         </button>
                       )}
                     </div>
@@ -5612,12 +5596,12 @@ Thank you for your prompt payment! 🙏`;
 
                       return (
                         <div className="relative">
-                          <span className="absolute left-3.5 top-2.5 text-gray-400">
-                            <Search size={14} />
+                          <span className="absolute left-3 top-2.5 text-gray-400">
+                            <Search size={13} />
                           </span>
                           <input
                             type="text"
-                            placeholder={targetSlotForAssign !== null ? `Type name to assign to Ticket #${targetSlotForAssign + 1}...` : "Type subscriber name or phone to search..."}
+                            placeholder={targetSlotForAssign !== null ? `Type name for Slot #${targetSlotForAssign + 1}...` : "Search subscriber name or phone..."}
                             value={memberSearchQuery}
                             onFocus={() => {
                               setIsSearchDropdownOpen(true);
@@ -5664,7 +5648,7 @@ Thank you for your prompt payment! 🙏`;
                                 setIsSearchDropdownOpen(false);
                               }
                             }}
-                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 rounded-xl pl-9 pr-20 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none shadow-2xs"
+                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-10 py-2 text-xs font-semibold text-gray-900 focus:outline-none shadow-2xs"
                           />
                           {memberSearchQuery && (
                             <button
@@ -5673,9 +5657,9 @@ Thank you for your prompt payment! 🙏`;
                                 setMemberSearchQuery('');
                                 setIsSearchDropdownOpen(false);
                               }}
-                              className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 p-1"
+                              className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 p-1"
                             >
-                              <X size={14} />
+                              <X size={13} />
                             </button>
                           )}
 
@@ -5698,7 +5682,7 @@ Thank you for your prompt payment! 🙏`;
                               >
                                 <span className="flex items-center gap-1.5">
                                   <UserPlus size={14} />
-                                  Create &amp; Assign &quot;{memberSearchQuery}&quot;
+                                  Create &quot;{memberSearchQuery}&quot;
                                 </span>
                                 <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded font-semibold flex items-center gap-1">
                                   {dropdownHighlightedIndex === 0 && <span>↵</span>} + New
@@ -5759,20 +5743,20 @@ Thank you for your prompt payment! 🙏`;
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                        Enrolled Tickets ({enrollments.filter(e => e.name !== '').length} of {newGroupDuration})
+                        Enrolled Tickets ({enrollments.filter(e => e.name !== '').length}/{newGroupDuration})
                       </h5>
                       <span className="text-[10px] text-gray-400">
-                        {enrollments.some(e => e.name === '') ? 'Tap an empty slot to search & assign' : '✓ All tickets assigned!'}
+                        {enrollments.some(e => e.name === '') ? 'Tap slot to assign' : '✓ All tickets assigned'}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[280px] overflow-y-auto pr-1">
                       {enrollments.map((slot, index) => {
                         const isTargeted = targetSlotForAssign === index;
                         return (
                           <div 
                             key={index} 
-                            className={`flex gap-2.5 items-center p-3 rounded-2xl border transition-all ${
+                            className={`flex gap-2 items-center p-2.5 rounded-xl border transition-all ${
                               slot.name 
                                 ? 'bg-white border-gray-200 shadow-2xs hover:border-gray-300' 
                                 : isTargeted
@@ -5787,22 +5771,22 @@ Thank you for your prompt payment! 🙏`;
                               }
                             }}
                           >
-                            <span className={`text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                            <span className={`text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
                               slot.name
                                 ? 'bg-indigo-50 text-indigo-700 border border-indigo-150'
                                 : isTargeted
                                   ? 'bg-indigo-600 text-white'
                                   : 'bg-gray-200 text-gray-500'
                             }`}>
-                              #{index + 1}
+                              {index + 1}
                             </span>
 
                             {slot.name ? (
                               <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                                 <div className="truncate">
                                   <span className="text-xs font-bold text-gray-900 block truncate">{slot.name}</span>
-                                  <span className="text-[10px] text-gray-500 mt-0.5 block truncate flex items-center gap-1">
-                                    <Phone size={10} className="text-gray-400 shrink-0" />
+                                  <span className="text-[10px] text-gray-500 block truncate flex items-center gap-1">
+                                    <Phone size={9} className="text-gray-400 shrink-0" />
                                     {slot.phone}
                                   </span>
                                 </div>
@@ -5813,18 +5797,18 @@ Thank you for your prompt payment! 🙏`;
                                     triggerHapticFeedback('light');
                                     handleClearSlot(index);
                                   }}
-                                  title="Unassign member from this slot"
-                                  className="text-red-600 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-red-200 shrink-0 bg-red-50/50 hover:bg-red-50 transition-colors flex items-center gap-1 active:scale-95"
+                                  title="Unassign member"
+                                  className="text-red-600 hover:text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-lg border border-red-200 shrink-0 bg-red-50/50 hover:bg-red-50 transition-colors flex items-center gap-0.5 active:scale-95"
                                 >
-                                  <Trash2 size={11} /> Clear
+                                  <Trash2 size={10} /> Clear
                                 </button>
                               </div>
                             ) : (
                               <div className="flex-1 min-w-0 flex items-center justify-between">
-                                <span className={`text-xs font-semibold ${isTargeted ? 'text-indigo-700' : 'text-gray-400'}`}>
-                                  {isTargeted ? 'Targeting Slot...' : 'Click to Assign Slot'}
+                                <span className={`text-xs font-semibold truncate ${isTargeted ? 'text-indigo-700' : 'text-gray-400'}`}>
+                                  {isTargeted ? 'Selected' : 'Open Slot'}
                                 </span>
-                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
+                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg shrink-0">
                                   + Fill
                                 </span>
                               </div>
@@ -5836,20 +5820,15 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Master Member Directory */}
-                  <div className="space-y-3 border-t border-gray-150 pt-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <h5 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                          Master Subscriber Directory ({masterDirectory.length})
-                        </h5>
-                        <p className="text-[11px] text-gray-500">Click any subscriber to assign to next open slot</p>
-                      </div>
-                    </div>
+                  <div className="space-y-2 border-t border-gray-150 pt-3">
+                    <h5 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                      Master Directory ({masterDirectory.length})
+                    </h5>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-2.5 max-h-[160px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[140px] overflow-y-auto pr-1">
                       {masterDirectory.length === 0 ? (
-                        <div className="col-span-full py-6 text-center text-xs text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                          No subscribers found in database. Tap <strong>&quot;+ Register Member&quot;</strong> to add one.
+                        <div className="col-span-full py-4 text-center text-xs text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                          No subscribers found. Tap <strong>&quot;+ Register&quot;</strong> to add one.
                         </div>
                       ) : (
                         masterDirectory.map((member, i) => {
@@ -5861,7 +5840,7 @@ Thank you for your prompt payment! 🙏`;
                               type="button"
                               disabled={isAlreadyAdded}
                               onClick={() => handleAssignExistingMember(member)}
-                              className={`p-2.5 rounded-xl border text-left transition-all relative active:scale-95 ${
+                              className={`p-2 rounded-xl border text-left transition-all relative active:scale-95 ${
                                 isAlreadyAdded 
                                   ? 'bg-gray-50 border-gray-200 opacity-50 cursor-not-allowed' 
                                   : 'bg-white hover:bg-indigo-50/50 border-gray-200 hover:border-indigo-300 shadow-2xs'
@@ -5875,7 +5854,7 @@ Thank you for your prompt payment! 🙏`;
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] text-gray-500 mt-0.5 block truncate">{member.phone}</span>
+                              <span className="text-[10px] text-gray-500 block truncate">{member.phone}</span>
                             </button>
                           );
                         })
@@ -5884,7 +5863,7 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Navigation Step 2 Buttons */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-4 border-t border-gray-150">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-gray-150">
                     <button
                       type="button"
                       onClick={() => {
@@ -5893,14 +5872,14 @@ Thank you for your prompt payment! 🙏`;
                       }}
                       className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
                     >
-                      <ArrowLeft size={13} className="inline mr-1" /> Back to Parameters
+                      <ArrowLeft size={13} className="inline mr-1" /> Back
                     </button>
 
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                       <span className="text-[11px] text-gray-500 font-medium text-center sm:text-right">
-                        <strong>{enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration}</strong> tickets assigned
+                        <strong>{enrollments.filter(e => e.name && e.name.trim() !== '').length}/{newGroupDuration}</strong> tickets
                         {enrollments.some(e => !e.name || e.name.trim() === '') && (
-                          <span className="text-amber-600 font-bold ml-1.5 block sm:inline">(Will create as Draft)</span>
+                          <span className="text-amber-600 font-bold ml-1.5">(Draft)</span>
                         )}
                       </span>
                       <button
@@ -5911,7 +5890,7 @@ Thank you for your prompt payment! 🙏`;
                         }}
                         className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
                       >
-                        <span>Proceed to Step 3: Review</span>
+                        <span>Proceed to Review</span>
                         <ArrowRight size={14} />
                       </button>
                     </div>
@@ -5921,89 +5900,80 @@ Thank you for your prompt payment! 🙏`;
 
               {/* ── STEP 3: REVIEW & LAUNCH PLAN ── */}
               {wizardStep === 3 && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 shadow-2xs animate-in fade-in duration-150">
-                  <div className="border-b border-gray-150 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <h4 className="text-sm font-bold text-gray-900">Step 3: Verify Chit Plan &amp; Launch Schedule</h4>
-                      <p className="text-xs text-gray-500 mt-0.5">Review group parameters, member matrix, and timeline before creating in Supabase</p>
-                    </div>
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs animate-in fade-in duration-150">
+                  <div className="border-b border-gray-150 pb-3 flex items-center justify-between gap-2">
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-900">Step 3: Review &amp; Launch</h4>
                     <div>
                       {enrollments.every(e => e.name !== '') ? (
                         <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                          <CheckCircle2 size={12} /> Ready for Active Launch
+                          <CheckCircle2 size={12} /> Active Launch
                         </span>
                       ) : (
                         <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                          Draft Mode ({enrollments.filter(e => !e.name).length} Open Slots)
+                          Draft ({enrollments.filter(e => !e.name).length} Open)
                         </span>
                       )}
                     </div>
                   </div>
 
                   {/* Summary Metric Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Group Name</span>
-                      <strong className="text-gray-900 mt-0.5 block truncate text-sm font-bold">{newGroupName}</strong>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 sm:p-3">
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Group</span>
+                      <strong className="text-gray-900 mt-0.5 block truncate text-xs sm:text-sm font-bold">{newGroupName}</strong>
                     </div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Chit Value (Pool)</span>
-                      <strong className="text-indigo-600 mt-0.5 block truncate text-sm font-extrabold">{formatCurrency(Number(newGroupValue))}</strong>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 sm:p-3">
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Pool Value</span>
+                      <strong className="text-indigo-600 mt-0.5 block truncate text-xs sm:text-sm font-extrabold">{formatCurrency(Number(newGroupValue))}</strong>
                     </div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Total Lifecycle</span>
-                      <strong className="text-gray-900 mt-0.5 block truncate text-sm font-bold">{Number(newGroupDuration) + 1} Months (M0 to M{newGroupDuration})</strong>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 sm:p-3">
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Lifecycle</span>
+                      <strong className="text-gray-900 mt-0.5 block truncate text-xs sm:text-sm font-bold">{Number(newGroupDuration) + 1} Months (M0-M{newGroupDuration})</strong>
                     </div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 sm:p-3">
                       <span className="text-gray-400 block text-[10px] uppercase font-bold">Monthly Due</span>
-                      <strong className="text-emerald-700 mt-0.5 block truncate text-sm font-extrabold">
+                      <strong className="text-emerald-700 mt-0.5 block truncate text-xs sm:text-sm font-extrabold">
                         {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))} / member
                       </strong>
                     </div>
                   </div>
 
                   {/* Operational Timeline Preview Box */}
-                  <div className="bg-gradient-to-br from-gray-50 via-indigo-50/20 to-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
+                  <div className="bg-gradient-to-br from-gray-50 via-indigo-50/20 to-gray-50 border border-gray-200 rounded-2xl p-3 sm:p-4 space-y-2.5">
                     <h5 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                       <CalendarDays size={14} className="text-indigo-600" />
-                      Chit Lifecycle &amp; Auction Timeline
+                      Timeline
                     </h5>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
                       
                       {/* Month 0 Card */}
-                      <div className="bg-white border border-amber-200 rounded-xl p-3 space-y-1">
+                      <div className="bg-white border border-amber-200 rounded-xl p-2.5 sm:p-3 space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="font-extrabold text-amber-900 flex items-center gap-1">
-                            <Rocket size={12} className="text-amber-600" /> Month 0: Launch Month
+                            <Rocket size={12} className="text-amber-600" /> Month 0: Launch
                           </span>
                           <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
                             Organizer Profit
                           </span>
                         </div>
                         <p className="text-[11px] text-gray-600">
-                          Starts on <strong>{newGroupStartDate}</strong>. All {newGroupDuration} subscribers pay their first installment (₹{Math.round(Number(newGroupValue) / Number(newGroupDuration)).toLocaleString('en-IN')}).
-                        </p>
-                        <p className="text-[11px] text-amber-700 font-semibold">
-                          Total ₹{Number(newGroupValue).toLocaleString('en-IN')} allocated directly as Organizer Profit (No auction held).
+                          {newGroupStartDate} · All {newGroupDuration} members pay first installment ({formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}). No auction held.
                         </p>
                       </div>
 
                       {/* Month 1 Card */}
-                      <div className="bg-white border border-indigo-200 rounded-xl p-3 space-y-1">
+                      <div className="bg-white border border-indigo-200 rounded-xl p-2.5 sm:p-3 space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="font-extrabold text-indigo-950 flex items-center gap-1">
-                            <Trophy size={12} className="text-indigo-600" /> Month 1: 1st Live Auction
+                            <Trophy size={12} className="text-indigo-600" /> Month 1: 1st Auction
                           </span>
                           <span className="text-[9px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
                             Live Bidding
                           </span>
                         </div>
                         <p className="text-[11px] text-gray-600">
-                          Scheduled on <strong>{newGroupAuctionDay}th of next month · {formatTime12h(newGroupAuctionTime)}</strong>.
-                        </p>
-                        <p className="text-[11px] text-indigo-700 font-semibold">
-                          Winning discount accumulates into the group Discount Pool (<code>kai_iruppu_pool</code>) towards future Laaba Seetu.
+                          {newGroupAuctionDay}th of next month · {formatTime12h(newGroupAuctionTime)}. Winning discount accumulates to <code>kai_iruppu_pool</code>.
                         </p>
                       </div>
 
@@ -6011,20 +5981,18 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Enrolled Subscribers Grid */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                        Enrolled Subscribers Matrix ({enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration})
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1">
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                      Enrolled Subscribers ({enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration})
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
                       {enrollments.map((slot, index) => (
-                        <span key={index} className={`border text-[11px] px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-1.5 ${
+                        <span key={index} className={`border text-[11px] px-2.5 py-1 rounded-lg shadow-2xs flex items-center gap-1.5 ${
                           slot.name 
                             ? 'bg-white border-gray-200 text-gray-800 font-semibold' 
                             : 'bg-amber-50/50 border-amber-200 text-amber-700 italic'
                         }`}>
-                          <span className="w-4 h-4 rounded-full bg-gray-100 text-gray-600 text-[9px] font-bold flex items-center justify-center">
+                          <span className="w-3.5 h-3.5 rounded-full bg-gray-100 text-gray-600 text-[8px] font-bold flex items-center justify-center">
                             {index + 1}
                           </span>
                           <span>{slot.name || 'Open Slot'}</span>
@@ -6035,7 +6003,7 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Navigation Step 3 Buttons */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-4 border-t border-gray-150">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-gray-150">
                     <button
                       type="button"
                       onClick={() => {
