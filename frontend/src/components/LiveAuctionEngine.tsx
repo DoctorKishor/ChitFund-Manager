@@ -1302,37 +1302,37 @@ export default function LiveAuctionEngine() {
         )}
 
         {/* ── 5. HISTORICAL AUCTION WINNING DETAILS LIST ─────────────────── */}
-        <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3.5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center justify-center shrink-0">
-                <Trophy size={16} />
+        <div className="bg-white border border-gray-200 rounded-3xl p-3.5 sm:p-6 shadow-sm space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-3">
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center justify-center shrink-0">
+                <Trophy size={15} />
               </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-black text-gray-900">
-                  Historical Auction Winning Records
+              <div className="min-w-0">
+                <h3 className="text-xs sm:text-base font-black text-gray-900 truncate">
+                  Historical Auction Records
                 </h3>
-                <p className="text-[11px] text-gray-400">
-                  Concluded monthly auction rounds, winning subscriber declarations, and net payouts.
+                <p className="text-[10px] sm:text-[11px] text-gray-400 truncate sm:whitespace-normal">
+                  Concluded rounds, winners &amp; net payouts.
                 </p>
               </div>
             </div>
 
-            <span className="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold font-mono self-start sm:self-auto">
-              {historicalAuctionLogs.length} {historicalAuctionLogs.length === 1 ? 'Round' : 'Rounds'} Completed
+            <span className="px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] sm:text-xs font-bold font-mono shrink-0">
+              {historicalAuctionLogs.length} {historicalAuctionLogs.length === 1 ? 'Round' : 'Rounds'}
             </span>
           </div>
 
           {historicalAuctionLogs.length === 0 ? (
-            <div className="text-center py-10 px-4 bg-gray-50/70 border border-dashed border-gray-200 rounded-2xl space-y-2">
-              <Trophy className="mx-auto h-9 w-9 text-gray-300" />
+            <div className="text-center py-8 sm:py-10 px-3 sm:px-4 bg-gray-50/70 border border-dashed border-gray-200 rounded-2xl space-y-2">
+              <Trophy className="mx-auto h-8 w-8 text-gray-300" />
               <h4 className="text-xs sm:text-sm font-bold text-gray-700">No Auction Rounds Completed Yet</h4>
-              <p className="text-[11px] text-gray-400 max-w-sm mx-auto leading-relaxed">
+              <p className="text-[10px] sm:text-[11px] text-gray-400 max-w-sm mx-auto leading-relaxed">
                 Starting from Month 1, each finalized auction round will automatically be cataloged here with the winner ticket, discount forfeited, and net take-home payout.
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5 sm:space-y-3">
               {historicalAuctionLogs.map((log) => (
                 <div
                   key={log.id}
@@ -1342,75 +1342,72 @@ export default function LiveAuctionEngine() {
                   }}
                   role="button"
                   tabIndex={0}
-                  className="rounded-2xl p-4 sm:p-5 border border-gray-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/20 transition-all shadow-2xs space-y-3 cursor-pointer group hover:shadow-md active:scale-[0.99]"
+                  className="rounded-2xl p-3 sm:p-4 border border-gray-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/20 transition-all shadow-2xs space-y-2.5 cursor-pointer group hover:shadow-md active:scale-[0.99]"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold font-mono group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  {/* Top Badges & Timestamp Row */}
+                  <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] sm:text-[11px] font-bold font-mono group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                         Month {log.month} Auction
                       </span>
 
                       {log.isLaabaSeetu && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-[10px] font-bold">
-                          🎉 Laaba Seetu (Free Due)
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-[9px] sm:text-[10px] font-bold">
+                          🎉 Laaba Seetu
                         </span>
                       )}
 
-                      <span className="text-[11px] text-gray-400">
-                        Conducted on{' '}
-                        <strong className="text-gray-600 font-semibold">
-                          {new Date(log.createdAt).toLocaleDateString('en-IN', {
-                            weekday: 'short',
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </strong>
+                      <span className="text-[10px] sm:text-[11px] text-gray-400">
+                        {new Date(log.createdAt).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="shrink-0">
                       {log.disbursalStatus === 'fully_disbursed' ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full shadow-2xs">
-                          <CheckCheck size={13} className="text-emerald-600" />
-                          <span>Closed &amp; Disbursed</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shadow-2xs">
+                          <CheckCheck size={12} className="text-emerald-600" />
+                          <span>Disbursed</span>
                         </span>
                       ) : log.disbursalStatus === 'partially_disbursed' ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-2xs">
-                          <AlertCircle size={13} className="text-amber-600" />
-                          <span>Partially Disbursed (₹{log.totalDisbursed.toLocaleString('en-IN')})</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-full shadow-2xs">
+                          <AlertCircle size={12} className="text-amber-600" />
+                          <span>Partial (₹{log.totalDisbursed.toLocaleString('en-IN')})</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full shadow-2xs animate-pulse">
-                          <AlertCircle size={13} className="text-rose-600" />
-                          <span>Disbursal Pending</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full shadow-2xs animate-pulse">
+                          <AlertCircle size={12} className="text-rose-600" />
+                          <span>Pending</span>
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* 3-Column Financial Winner Breakdown */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-gray-50/90 group-hover:bg-white border border-gray-100 group-hover:border-indigo-100 rounded-xl p-3 transition-colors">
+                  {/* Financial Breakdown (Receipt Row format on mobile, 3-col on desktop) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2.5 bg-gray-50/90 group-hover:bg-indigo-50/30 border border-gray-100 group-hover:border-indigo-100 rounded-xl p-2.5 sm:p-3 transition-colors">
                     {/* Winner Info */}
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                    <div className="flex sm:flex-col justify-between sm:justify-start items-center sm:items-start gap-1 pb-1 sm:pb-0 border-b sm:border-b-0 border-gray-200/60">
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-400">
                         Auction Winner
                       </span>
                       <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-gray-900 truncate">
-                        <Trophy size={14} className="text-amber-500 shrink-0" />
+                        <Trophy size={13} className="text-amber-500 shrink-0" />
                         <span className="truncate">{log.winningBidderName}</span>
                         {log.ticketNumber && (
-                          <span className="text-[10px] font-mono text-indigo-600 font-bold">
-                            (Ticket #{log.ticketNumber})
+                          <span className="text-[10px] font-mono text-indigo-600 font-bold bg-indigo-50 border border-indigo-100 px-1 rounded">
+                            #{log.ticketNumber}
                           </span>
                         )}
                       </div>
                     </div>
 
                     {/* Winning Discount */}
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
-                        Winning Discount Surrendered
+                    <div className="flex sm:flex-col justify-between sm:justify-start items-center sm:items-start gap-1 pb-1 sm:pb-0 border-b sm:border-b-0 border-gray-200/60">
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        Discount Surrendered
                       </span>
                       <span className="text-xs sm:text-sm font-mono font-black text-rose-600">
                         -₹{log.winningDiscount.toLocaleString('en-IN')}
@@ -1418,9 +1415,9 @@ export default function LiveAuctionEngine() {
                     </div>
 
                     {/* Net Winner Payout */}
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
-                        Net Winner Take-Home Payout
+                    <div className="flex sm:flex-col justify-between sm:justify-start items-center sm:items-start gap-1">
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        Net Winner Payout
                       </span>
                       <span className="text-xs sm:text-sm font-mono font-black text-emerald-600">
                         ₹{log.netPayout.toLocaleString('en-IN')}
@@ -1429,14 +1426,14 @@ export default function LiveAuctionEngine() {
                   </div>
 
                   {/* Interactive Action Hint Strip */}
-                  <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-[11px] text-indigo-600 font-bold group-hover:text-indigo-800 transition-colors">
-                    <span className="flex items-center gap-1.5">
-                      <FileText size={13} />
-                      <span>Click to view full auction details, live bidding timeline &amp; PDF report</span>
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-[10px] sm:text-[11px] text-indigo-600 font-bold group-hover:text-indigo-800 transition-colors">
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <FileText size={12} className="shrink-0" />
+                      <span className="truncate">View timeline, timestamps &amp; PDF</span>
                     </span>
-                    <span className="flex items-center gap-0.5 text-xs">
-                      <span>View Details</span>
-                      <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                    <span className="flex items-center gap-0.5 text-[10px] sm:text-xs shrink-0 ml-2">
+                      <span>Details</span>
+                      <ChevronRight size={13} className="group-hover:translate-x-1 transition-transform" />
                     </span>
                   </div>
                 </div>
@@ -2308,48 +2305,49 @@ Congratulations to the winner! 🎉`
 
       {/* ── CONCLUDED AUCTION FULL SCREEN CELEBRATION & AUDIT REPORT ────────── */}
       {showConcludedReportScreen && concludedReportData && (
-        <div className="fixed inset-0 bg-black/75 flex flex-col z-50 p-2 sm:p-4 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-slate-100 border border-slate-300 rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[96dvh]">
+        <div className="fixed inset-0 bg-black/75 flex flex-col z-50 p-1 sm:p-4 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-slate-100 border border-slate-300 rounded-2xl sm:rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[98dvh] sm:max-h-[96dvh]">
             
             {/* Sticky Action Header Bar */}
-            <div className="bg-slate-900 text-white px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0">
-                  <Trophy size={20} />
+            <div className="bg-slate-900 text-white px-3.5 py-3 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0">
+                  <Trophy size={17} />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                      Live Auction Concluded &amp; Sealed
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                      Live Concluded &amp; Sealed
                     </span>
                     {concludedReportData.isNextMonthLaabaSeetu && (
-                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-amber-500/30 text-amber-300 border border-amber-400/40 animate-pulse">
-                        🎉 Next Month: Laaba Seetu
+                      <span className="text-[9px] sm:text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-amber-500/30 text-amber-300 border border-amber-400/40 animate-pulse">
+                        🎉 Laaba Seetu Next
                       </span>
                     )}
                   </div>
-                  <h2 className="text-base sm:text-lg font-black text-white mt-0.5">
-                    {concludedReportData.groupName} — Month {concludedReportData.month} Auction Audit Report
+                  <h2 className="text-xs sm:text-lg font-black text-white mt-0.5 truncate">
+                    {concludedReportData.groupName} — Month {concludedReportData.month} Report
                   </h2>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-between sm:justify-end">
                 <button
                   type="button"
                   disabled={isGeneratingReportPdf}
                   onClick={() => handleDownloadAuctionPdf(printableReportRef.current, concludedReportData.groupName, concludedReportData.month)}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-initial px-2.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[11px] sm:text-xs font-black rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isGeneratingReportPdf ? (
                     <>
                       <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Generating PDF...</span>
+                      <span>PDF...</span>
                     </>
                   ) : (
                     <>
-                      <Download size={14} />
-                      <span>Download PDF Report</span>
+                      <Download size={13} />
+                      <span className="hidden sm:inline">Download PDF Report</span>
+                      <span className="sm:hidden">PDF Report</span>
                     </>
                   )}
                 </button>
@@ -2375,10 +2373,11 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`
                     );
                     window.open(`https://wa.me/?text=${text}`, '_blank');
                   }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  className="flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Send size={13} />
-                  <span>WhatsApp Alert</span>
+                  <Send size={12} />
+                  <span className="hidden sm:inline">WhatsApp Alert</span>
+                  <span className="sm:hidden">WhatsApp</span>
                 </button>
 
                 <button
@@ -2387,25 +2386,25 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`
                     setShowConcludedReportScreen(false);
                     setStage('overview');
                   }}
-                  className="px-3.5 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 sm:px-3.5 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer"
                 >
-                  <X size={15} />
-                  <span>Close &amp; Return</span>
+                  <X size={14} />
+                  <span className="hidden sm:inline">Close</span>
                 </button>
               </div>
             </div>
 
             {/* Scrollable Report Body */}
-            <div className="p-4 sm:p-6 overflow-y-auto bg-slate-100 flex-1">
-              <div ref={printableReportRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-2 sm:p-6 overflow-y-auto bg-slate-100 flex-1">
+              <div ref={printableReportRef} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                 <AuctionReportDocument data={concludedReportData} id="live-concluded-report-doc" />
               </div>
             </div>
 
             {/* Bottom Bar */}
-            <div className="p-3 bg-white border-t border-gray-200 flex items-center justify-between gap-3 text-xs shrink-0">
-              <span className="text-gray-500 font-medium">
-                Record saved immutably to PostgreSQL ledger.
+            <div className="p-2.5 sm:p-3 bg-white border-t border-gray-200 flex items-center justify-between gap-2 text-xs shrink-0">
+              <span className="text-gray-500 text-[10px] sm:text-xs font-medium truncate">
+                Saved to immutable ledger.
               </span>
               <button
                 type="button"
@@ -2413,9 +2412,9 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`
                   setShowConcludedReportScreen(false);
                   setStage('overview');
                 }}
-                className="px-5 py-2 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-xs transition-all active:scale-95 cursor-pointer"
+                className="px-4 py-1.5 sm:px-5 sm:py-2 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-[11px] sm:text-xs transition-all active:scale-95 cursor-pointer shrink-0"
               >
-                Done &amp; Return to Auction Hub
+                Done
               </button>
             </div>
 
@@ -2425,48 +2424,49 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`
 
       {/* ── HISTORICAL AUCTION RECORD DETAILS MODAL ─────────────────────────── */}
       {selectedHistoricalLog && historicalReportData && (
-        <div className="fixed inset-0 bg-black/70 flex flex-col z-50 p-2 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-slate-100 border border-slate-300 rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[96dvh]">
+        <div className="fixed inset-0 bg-black/70 flex flex-col z-50 p-1 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-slate-100 border border-slate-300 rounded-2xl sm:rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[98dvh] sm:max-h-[96dvh]">
             
             {/* Header Bar */}
-            <div className="bg-slate-900 text-white px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-400 flex items-center justify-center shrink-0">
-                  <History size={20} />
+            <div className="bg-slate-900 text-white px-3.5 py-3 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-400 flex items-center justify-center shrink-0">
+                  <History size={17} />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 font-mono">
-                      Historical Auction Log
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 font-mono">
+                      Historical Log
                     </span>
                     {selectedHistoricalLog.isLaabaSeetu && (
-                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-purple-500/30 text-purple-300 border border-purple-400/40">
+                      <span className="text-[9px] sm:text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-purple-500/30 text-purple-300 border border-purple-400/40">
                         🎉 Laaba Seetu Month
                       </span>
                     )}
                   </div>
-                  <h2 className="text-base sm:text-lg font-black text-white mt-0.5">
+                  <h2 className="text-xs sm:text-lg font-black text-white mt-0.5 truncate">
                     {group.name} — Month {selectedHistoricalLog.month} Concluded Record
                   </h2>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-between sm:justify-end">
                 <button
                   type="button"
                   disabled={isGeneratingReportPdf}
                   onClick={() => handleDownloadAuctionPdf(historicalPrintableRef.current, group.name, selectedHistoricalLog.month)}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-initial px-2.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[11px] sm:text-xs font-black rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isGeneratingReportPdf ? (
                     <>
                       <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Generating PDF...</span>
+                      <span>PDF...</span>
                     </>
                   ) : (
                     <>
-                      <Download size={14} />
-                      <span>Download PDF Report</span>
+                      <Download size={13} />
+                      <span className="hidden sm:inline">Download PDF Report</span>
+                      <span className="sm:hidden">PDF Report</span>
                     </>
                   )}
                 </button>
@@ -2489,39 +2489,40 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     );
                     window.open(`https://wa.me/?text=${text}`, '_blank');
                   }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  className="flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Send size={13} />
-                  <span>WhatsApp</span>
+                  <Send size={12} />
+                  <span className="hidden sm:inline">WhatsApp Alert</span>
+                  <span className="sm:hidden">WhatsApp</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setSelectedHistoricalLog(null)}
-                  className="px-3.5 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 sm:px-3.5 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer"
                 >
-                  <X size={15} />
-                  <span>Close</span>
+                  <X size={14} />
+                  <span className="hidden sm:inline">Close</span>
                 </button>
               </div>
             </div>
 
             {/* Scrollable Document Container */}
-            <div className="p-4 sm:p-6 overflow-y-auto bg-slate-100 flex-1">
-              <div ref={historicalPrintableRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-2 sm:p-6 overflow-y-auto bg-slate-100 flex-1">
+              <div ref={historicalPrintableRef} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                 <AuctionReportDocument data={historicalReportData} id="historical-auction-report-doc" />
               </div>
             </div>
 
             {/* Modal Bottom Footer */}
-            <div className="p-3 bg-white border-t border-gray-200 flex items-center justify-between gap-3 text-xs shrink-0">
-              <span className="text-gray-500 font-mono text-[11px]">
+            <div className="p-2.5 sm:p-3 bg-white border-t border-gray-200 flex items-center justify-between gap-2 text-xs shrink-0">
+              <span className="text-gray-500 font-mono text-[10px] sm:text-[11px] truncate">
                 Audit ID: {selectedHistoricalLog.id}
               </span>
               <button
                 type="button"
                 onClick={() => setSelectedHistoricalLog(null)}
-                className="px-5 py-2 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-xs transition-all active:scale-95 cursor-pointer"
+                className="px-4 py-1.5 sm:px-5 sm:py-2 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-[11px] sm:text-xs transition-all active:scale-95 cursor-pointer shrink-0"
               >
                 Close View
               </button>
