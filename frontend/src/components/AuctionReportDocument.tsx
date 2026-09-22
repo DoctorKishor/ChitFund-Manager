@@ -112,25 +112,25 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
   return (
     <div id={id} className="bg-white text-gray-900 p-3.5 sm:p-8 space-y-4 sm:space-y-6 max-w-4xl mx-auto font-sans" style={{ backgroundColor: '#ffffff', color: '#111827' }}>
       
-      {/* ── SECTION 1: OFFICIAL REPORT HEADER BANNER (Matching dark slate palette) ────────────────────── */}
+      {/* ── SECTION 1: OFFICIAL REPORT HEADER BANNER (Light themed certificate header) ─── */}
       <div 
-        className="pdf-section rounded-2xl p-4 sm:p-6 text-white shadow-md space-y-3 sm:space-y-4"
-        style={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', color: '#ffffff' }}
+        className="pdf-section rounded-2xl p-4 sm:p-6 shadow-xs space-y-3 sm:space-y-4"
+        style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a' }}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 pb-3 sm:pb-4" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.12)' }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 pb-3 sm:pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
               <span 
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm shrink-0"
-                style={{ backgroundColor: 'rgba(245, 158, 11, 0.25)', border: '1px solid rgba(251, 191, 36, 0.5)', color: '#fbbf24' }}
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm shrink-0 shadow-2xs"
+                style={{ backgroundColor: '#fef3c7', border: '1px solid #fde68a', color: '#b45309' }}
               >
                 CF
               </span>
               <div className="min-w-0">
-                <h1 className="text-base sm:text-xl font-black tracking-tight truncate" style={{ color: '#ffffff' }}>
+                <h1 className="text-base sm:text-xl font-black tracking-tight truncate" style={{ color: '#0f172a' }}>
                   {data.organizerName}
                 </h1>
-                <p className="text-[10px] sm:text-[11px] font-medium truncate" style={{ color: '#cbd5e1' }}>
+                <p className="text-[10px] sm:text-[11px] font-semibold truncate" style={{ color: '#64748b' }}>
                   Official Live Auction Audit Certificate &amp; Settlement Statement
                 </p>
               </div>
@@ -140,11 +140,11 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
           <div className="flex sm:flex-col justify-between sm:justify-start items-center sm:items-end gap-1">
             <span 
               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold font-mono"
-              style={{ backgroundColor: 'rgba(16, 185, 129, 0.25)', border: '1px solid rgba(52, 211, 153, 0.5)', color: '#6ee7b7' }}
+              style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857' }}
             >
               <CheckCircle2 size={11} /> Concluded &amp; Sealed
             </span>
-            <p className="text-[10px] sm:text-[11px] font-mono" style={{ color: '#94a3b8' }}>
+            <p className="text-[10px] sm:text-[11px] font-mono" style={{ color: '#64748b' }}>
               {formattedDate} {formattedTime ? `• ${formattedTime}` : ''}
             </p>
           </div>
@@ -152,25 +152,25 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
 
         {/* Group Context Banner */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 pt-0.5 text-xs">
-          <div className="rounded-xl p-2.5 sm:p-3" style={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}>
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#94a3b8' }}>Chit Group</span>
-            <span className="font-extrabold text-xs sm:text-sm mt-0.5 block truncate" style={{ color: '#ffffff' }}>{data.groupName}</span>
+          <div className="rounded-xl p-2.5 sm:p-3 shadow-2xs" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#64748b' }}>Chit Group</span>
+            <span className="font-extrabold text-xs sm:text-sm mt-0.5 block truncate" style={{ color: '#0f172a' }}>{data.groupName}</span>
           </div>
-          <div className="rounded-xl p-2.5 sm:p-3" style={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}>
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#94a3b8' }}>Auction Cycle</span>
-            <span className="font-extrabold text-xs sm:text-sm mt-0.5 block" style={{ color: '#ffffff' }}>
+          <div className="rounded-xl p-2.5 sm:p-3 shadow-2xs" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#64748b' }}>Auction Cycle</span>
+            <span className="font-extrabold text-xs sm:text-sm mt-0.5 block" style={{ color: '#0f172a' }}>
               Month {data.month} of {data.durationMonths}
             </span>
           </div>
-          <div className="rounded-xl p-2.5 sm:p-3" style={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}>
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#94a3b8' }}>Total Chit Pot</span>
-            <span className="font-extrabold font-mono text-xs sm:text-sm mt-0.5 block" style={{ color: '#fcd34d' }}>
+          <div className="rounded-xl p-2.5 sm:p-3 shadow-2xs" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#64748b' }}>Total Chit Pot</span>
+            <span className="font-extrabold font-mono text-xs sm:text-sm mt-0.5 block" style={{ color: '#b45309' }}>
               {formatCurrency(data.totalValue)}
             </span>
           </div>
-          <div className="rounded-xl p-2.5 sm:p-3" style={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}>
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#94a3b8' }}>Base Installment</span>
-            <span className="font-extrabold font-mono text-xs sm:text-sm mt-0.5 block" style={{ color: '#ffffff' }}>
+          <div className="rounded-xl p-2.5 sm:p-3 shadow-2xs" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#64748b' }}>Base Installment</span>
+            <span className="font-extrabold font-mono text-xs sm:text-sm mt-0.5 block" style={{ color: '#0f172a' }}>
               {formatCurrency(monthlyInstallment)} / member
             </span>
           </div>
