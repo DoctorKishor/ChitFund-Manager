@@ -46,6 +46,9 @@ import {
   User,
   Trash2,
   ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
   Edit3,
   AlertTriangle,
   Lock,
@@ -231,6 +234,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [customAmountVal, setCustomAmountVal] = useState<number>(0);
 
   const [expandedTimingTicketIds, setExpandedTimingTicketIds] = useState<number[]>([]);
+  const [expandedEditTicketIds, setExpandedEditTicketIds] = useState<number[]>([]);
+  const [draggedTicketNum, setDraggedTicketNum] = useState<number | null>(null);
+  const [dragOverTicketNum, setDragOverTicketNum] = useState<number | null>(null);
 
   // High-Security Delete Group Modal States
   const [deletingGroup, setDeletingGroup] = useState<any | null>(null);
@@ -881,6 +887,52 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     }
   };
 
+
+  const handleSwapTicketSlots = (fromTicket: number, toTicket: number) => {
+    if (fromTicket === toTicket || fromTicket < 1 || toTicket < 1 || toTicket > editGroupMemberCount) return;
+    triggerHapticFeedback('light');
+
+    setEditGroupMembers(prev => {
+      const fromMember = prev.find(m => m.ticket === fromTicket);
+      const toMember = prev.find(m => m.ticket === toTicket);
+
+      return prev.map(m => {
+        if (m.ticket === fromTicket) {
+          return {
+            ...m,
+            id: toMember?.id || m.id,
+            profileId: toMember?.profileId,
+            name: toMember?.name || '',
+            phone: toMember?.phone || '',
+            hasWon: toMember?.hasWon ?? false,
+            bookSynced: toMember?.bookSynced ?? true,
+            splitPool: toMember?.splitPool || null,
+            customInstallment: toMember?.customInstallment || null,
+            exitMonth: toMember?.exitMonth || null,
+            transferredFrom: toMember?.transferredFrom || null,
+            transferEffectiveMonth: toMember?.transferEffectiveMonth || null,
+          };
+        }
+        if (m.ticket === toTicket) {
+          return {
+            ...m,
+            id: fromMember?.id || m.id,
+            profileId: fromMember?.profileId,
+            name: fromMember?.name || '',
+            phone: fromMember?.phone || '',
+            hasWon: fromMember?.hasWon ?? false,
+            bookSynced: fromMember?.bookSynced ?? true,
+            splitPool: fromMember?.splitPool || null,
+            customInstallment: fromMember?.customInstallment || null,
+            exitMonth: fromMember?.exitMonth || null,
+            transferredFrom: fromMember?.transferredFrom || null,
+            transferEffectiveMonth: fromMember?.transferEffectiveMonth || null,
+          };
+        }
+        return m;
+      });
+    });
+  };
 
   // ── Duplicate Chit Group & Clone All Enrolled Tickets (Supabase Persistent) ──
   const handleDuplicateGroup = async (sourceGroup: any) => {
@@ -6537,27 +6589,49 @@ Thank you for your prompt payment! 🙏`;
                 </form>
               ) : (
                 /* TAB 2: MEMBERS MANAGEMENT (ChitBase Architecture) */
-                <div className="space-y-4">
+                <div className="space-y-3.5">
                   {/* Top Members Header */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-gray-150">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pb-3 border-b border-gray-150">
                     <div>
-                      <h4 className="text-sm font-bold text-gray-900">Members</h4>
-                      <p className="text-[11px] text-gray-500">
-                        {editGroupMembers.filter(m => m.profileId).length} members · {editGroupMembers.filter(m => m.profileId).length}/{editGroupMemberCount} shares filled
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-gray-900">Members &amp; Tickets</h4>
+                        <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-150 px-2 py-0.5 rounded-full">
+                          {editGroupMembers.filter(m => m.profileId).length}/{editGroupMemberCount} Assigned
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        ↕️ Drag cards or use arrows to reorder ticket slots
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Expand / Collapse All Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHapticFeedback('light');
+                          if (expandedEditTicketIds.length > 0) {
+                            setExpandedEditTicketIds([]);
+                          } else {
+                            setExpandedEditTicketIds(Array.from({ length: editGroupMemberCount }, (_, i) => i + 1));
+                          }
+                        }}
+                        className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-semibold text-[11px] px-2.5 py-1.5 rounded-xl transition-colors shrink-0"
+                      >
+                        {expandedEditTicketIds.length > 0 ? 'Collapse All' : 'Expand All'}
+                      </button>
+
                       <div className="relative">
                         <Search size={12} className="absolute left-2.5 top-2.5 text-gray-400" />
                         <input
                           type="text"
-                          placeholder="Filter members..."
+                          placeholder="Filter..."
                           value={editMemberSearchQuery}
                           onChange={(e) => setEditMemberSearchQuery(e.target.value)}
-                          className="bg-gray-50 border border-gray-200 rounded-xl pl-7 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none"
+                          className="bg-gray-50 border border-gray-200 rounded-xl pl-7 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none w-28 sm:w-36"
                         />
                       </div>
+
                       <button
                         type="button"
                         onClick={() => {
@@ -6565,31 +6639,27 @@ Thank you for your prompt payment! 🙏`;
                           setNewMemberPhone('');
                           setShowCreateMemberModal(true);
                         }}
-                        className="bg-gray-900 hover:bg-black text-white font-bold text-[11px] px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
+                        className="bg-gray-900 hover:bg-black text-white font-bold text-[11px] px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-sm shrink-0"
                       >
-                        <UserPlus size={13} /> + Add Member
+                        <UserPlus size={13} /> + Member
                       </button>
                     </div>
                   </div>
 
-                  {/* Informational Timing Banner */}
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-600 space-y-0.5">
-                    <p className="font-semibold text-gray-800">
-                      Months 1–{editingGroup?.currentMonth || 1} are already collected and stay exactly as they are.
-                    </p>
-                    <p className="text-[11px] text-gray-500">
-                      Share changes and adjustments apply from <strong>month {(editingGroup?.currentMonth || 1) + 1}</strong> onward.
-                    </p>
-                  </div>
-
                   {/* Member Tickets Roster List */}
-                  <div className="space-y-3">
+                  <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
                     {Array.from({ length: editGroupMemberCount }).map((_, idx) => {
                       const ticketNum = idx + 1;
                       const member = editGroupMembers.find(m => m.ticket === ticketNum);
                       const standardDue = Math.round(editGroupValue / (editGroupMemberCount || 1));
                       const effectiveDue = member?.customInstallment || standardDue;
+                      const isExpanded = expandedEditTicketIds.includes(ticketNum);
                       const isTimingExpanded = expandedTimingTicketIds.includes(ticketNum);
+                      const isBeingDragged = draggedTicketNum === ticketNum;
+                      const isDragOver = dragOverTicketNum === ticketNum;
+                      const totalShares = member?.profileId
+                        ? editGroupMembers.filter(m => m.profileId === member.profileId).length
+                        : 0;
 
                       if (editMemberSearchQuery && member?.name && !member.name.toLowerCase().includes(editMemberSearchQuery.toLowerCase())) {
                         return null;
@@ -6598,247 +6668,364 @@ Thank you for your prompt payment! 🙏`;
                       return (
                         <div
                           key={ticketNum}
-                          className={`p-4 rounded-2xl border transition-all space-y-3 ${
-                            member?.profileId 
-                              ? 'bg-white border-gray-200 shadow-sm hover:border-gray-300' 
-                              : 'border-dashed border-gray-300 bg-gray-50/60'
+                          draggable={true}
+                          onDragStart={(e) => {
+                            setDraggedTicketNum(ticketNum);
+                            e.dataTransfer.setData('text/plain', String(ticketNum));
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            if (dragOverTicketNum !== ticketNum) {
+                              setDragOverTicketNum(ticketNum);
+                            }
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverTicketNum === ticketNum) {
+                              setDragOverTicketNum(null);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (draggedTicketNum !== null && draggedTicketNum !== ticketNum) {
+                              handleSwapTicketSlots(draggedTicketNum, ticketNum);
+                            }
+                            setDraggedTicketNum(null);
+                            setDragOverTicketNum(null);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedTicketNum(null);
+                            setDragOverTicketNum(null);
+                          }}
+                          className={`rounded-2xl border transition-all ${
+                            isDragOver
+                              ? 'border-indigo-500 ring-2 ring-indigo-300 bg-indigo-50/50 scale-[1.01]'
+                              : isBeingDragged
+                                ? 'opacity-40 border-dashed border-indigo-400 bg-gray-50'
+                                : member?.profileId 
+                                  ? 'bg-white border-gray-200 shadow-2xs hover:border-gray-300' 
+                                  : 'border-dashed border-gray-300 bg-gray-50/60'
                           }`}
                         >
-                          {/* Card Header Line */}
-                          <div className="flex justify-between items-start">
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-150 text-[11px] font-bold flex items-center justify-center shrink-0">
-                                  #{ticketNum}
-                                </span>
-                                <h5 className="text-sm font-bold text-gray-900">
-                                  {member?.name || (member?.profileId ? 'Subscriber' : 'Unassigned Ticket')}
-                                </h5>
-                                {member?.phone && (
-                                  <span className="text-[10px] text-gray-400 font-medium">({member.phone})</span>
-                                )}
-                              </div>
-                              <p className="text-xs text-gray-500 font-medium pl-8">
-                                Pays <strong className="text-emerald-700">≈ {formatCurrency(effectiveDue)}/mo</strong> · wins up to <strong className="text-gray-900">{formatCurrency(editGroupValue)}</strong>
-                              </p>
-                            </div>
-
-                            {/* Unassign / Remove Button */}
-                            {member?.profileId && (
-                              <button
-                                type="button"
-                                title="Unassign ticket"
-                                onClick={() => handleUnassignTicket(member.id, ticketNum)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-colors"
+                          {/* ── CARD HEADER (Always visible & Clickable to Expand) ── */}
+                          <div
+                            onClick={() => {
+                              triggerHapticFeedback('light');
+                              setExpandedEditTicketIds(prev =>
+                                isExpanded ? prev.filter(id => id !== ticketNum) : [...prev, ticketNum]
+                              );
+                            }}
+                            className="p-3 sm:p-3.5 flex items-center justify-between gap-2 cursor-pointer select-none"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              {/* Drag Handle */}
+                              <div
+                                title="Drag to reorder"
+                                onClick={(e) => e.stopPropagation()}
+                                className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-600 shrink-0 hidden sm:block"
                               >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                          </div>
+                                <GripVertical size={16} />
+                              </div>
 
-                          {/* Stepper & Timing Toggle Line */}
-                          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100">
-                            {/* Shares Stepper */}
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl p-1 shadow-sm">
+                              {/* Mobile Reorder Buttons */}
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex flex-col gap-0.5 shrink-0 sm:hidden"
+                              >
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    if (member?.profileId) {
-                                      // Unassign one extra ticket with this profileId
-                                      const extra = editGroupMembers.filter(m => m.profileId === member.profileId && m.ticket !== ticketNum);
-                                      if (extra.length > 0) {
-                                        handleUnassignTicket(extra[extra.length - 1].id, extra[extra.length - 1].ticket);
-                                      }
-                                    }
-                                  }}
-                                  className="w-6 h-6 rounded-lg hover:bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs"
+                                  disabled={ticketNum === 1}
+                                  onClick={() => handleSwapTicketSlots(ticketNum, ticketNum - 1)}
+                                  className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20"
                                 >
-                                  <Minus size={11} />
+                                  <ArrowUp size={11} />
                                 </button>
-                                <span className="w-8 text-center font-bold text-xs text-gray-900">
-                                  {member?.profileId ? `${editGroupMembers.filter(m => m.profileId === member.profileId).length}x` : '0x'}
-                                </span>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    if (member?.profileId) {
-                                      // Assign next empty ticket with this profileId
-                                      const emptySlot = editGroupMembers.find(m => !m.profileId && m.ticket !== ticketNum);
-                                      if (emptySlot) {
-                                        handleReassignTicketMember(emptySlot.ticket, emptySlot.id, member.profileId, member.name, member.phone);
-                                      } else {
-                                        alert('All ticket slots are currently filled.');
-                                      }
-                                    }
-                                  }}
-                                  className="w-6 h-6 rounded-lg hover:bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs"
+                                  disabled={ticketNum === editGroupMemberCount}
+                                  onClick={() => handleSwapTicketSlots(ticketNum, ticketNum + 1)}
+                                  className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20"
                                 >
-                                  <Plus size={11} />
+                                  <ArrowDown size={11} />
                                 </button>
                               </div>
-                            </div>
 
-                            {/* Share timing dropdown toggle */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setExpandedTimingTicketIds(prev =>
-                                  isTimingExpanded ? prev.filter(id => id !== ticketNum) : [...prev, ticketNum]
-                                );
-                              }}
-                              className="text-xs font-semibold text-gray-500 hover:text-gray-900 flex items-center gap-1 transition-colors"
-                            >
-                              Share timing {isTimingExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                            </button>
-                          </div>
+                              {/* Ticket Badge */}
+                              <span className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                                member?.profileId
+                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-150'
+                                  : 'bg-gray-200 text-gray-500'
+                              }`}>
+                                #{ticketNum}
+                              </span>
 
-                          <p className="text-[10px] text-gray-400 italic">
-                            Adding starts a new split from month {(editingGroup?.currentMonth || 1) + 1} — months already collected stay unchanged.
-                          </p>
-
-                          {/* 4 Action Buttons Row (ChitBase inspired) */}
-                          <div className="flex flex-wrap gap-2 pt-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!member?.profileId) return;
-                                setCustomAmountModalTicket(member);
-                                setCustomAmountVal(member?.customInstallment || standardDue);
-                              }}
-                              disabled={!member?.profileId}
-                              className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                                member?.profileId && member?.customInstallment
-                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
-                              }`}
-                            >
-                              {member?.profileId && member?.customInstallment ? `Custom: ₹${member.customInstallment.toLocaleString('en-IN')}` : 'Set a custom amount'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!member?.profileId) return;
-                                setSplitModalTicket(member);
-                                setSplitPayers(member?.splitPool || [
-                                  { name: member?.name || 'Person 1', part: Math.round(standardDue / 2) },
-                                  { name: 'Person 2', part: Math.round(standardDue / 2) }
-                                ]);
-                              }}
-                              disabled={!member?.profileId}
-                              className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                                member?.profileId && member?.splitPool
-                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
-                              }`}
-                            >
-                              {member?.profileId && member?.splitPool ? `Pool (${member.splitPool.length} payers)` : 'Split into a pool'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!member?.profileId) return;
-                                setExitModalTicket(member);
-                                setExitMonthVal(member?.exitMonth || (editingGroup?.currentMonth || 1) + 1);
-                              }}
-                              disabled={!member?.profileId}
-                              className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                                member?.profileId && member?.exitMonth
-                                  ? 'bg-red-50 text-red-700 border-red-200'
-                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
-                              }`}
-                            >
-                              {member?.profileId && member?.exitMonth ? `Exits M${member.exitMonth}` : 'Member leaves the chit...'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!member?.profileId) return;
-                                setTransferModalTicket(member);
-                                setTransferRecipientId('');
-                                setTransferMonthVal((editingGroup?.currentMonth || 1) + 1);
-                              }}
-                              disabled={!member?.profileId}
-                              className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                                member?.profileId && member?.transferredFrom
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
-                              }`}
-                            >
-                              {member?.profileId && member?.transferredFrom ? 'Transferred' : 'Transfer shares...'}
-                            </button>
-                          </div>
-
-                          {/* Expanded Share Timing Details */}
-                          {isTimingExpanded && (
-                            <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2 text-xs animate-in fade-in duration-150">
-                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Share Timeline Breakdown</span>
-                              <div className="space-y-1 text-[11px]">
-                                <div className="flex justify-between py-1 border-b border-gray-200">
-                                  <span>Month 1 (Launch / Historical)</span>
-                                  <span className="text-gray-500 font-semibold">1x · Locked (collected)</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-200">
-                                  <span>Month 2 onward</span>
-                                  <span className="text-indigo-600 font-semibold">
-                                    {member?.profileId ? `${editGroupMembers.filter(m => m.profileId === member.profileId).length}x active` : 'Unassigned'}
+                              {/* Member Identity & Details */}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className={`text-xs sm:text-sm font-bold truncate ${member?.profileId ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                                    {member?.name || (member?.profileId ? 'Subscriber' : 'Unassigned Ticket')}
                                   </span>
+                                  {member?.phone && (
+                                    <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
+                                      ({member.phone})
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-gray-500 font-medium truncate flex items-center gap-1.5 mt-0.5">
+                                  <span>Pays <strong className="text-emerald-700">≈ {formatCurrency(effectiveDue)}/mo</strong></span>
+                                  {totalShares > 1 && (
+                                    <span className="text-indigo-600 font-bold bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded text-[9px]">
+                                      {totalShares}x shares
+                                    </span>
+                                  )}
+                                  {member?.profileId && member?.splitPool && (
+                                    <span className="text-purple-700 font-bold bg-purple-50 border border-purple-100 px-1.5 py-0.2 rounded text-[9px]">
+                                      👥 Pool
+                                    </span>
+                                  )}
+                                  {member?.profileId && member?.exitMonth && (
+                                    <span className="text-red-700 font-bold bg-red-50 border border-red-100 px-1.5 py-0.2 rounded text-[9px]">
+                                      ⚠️ Exits M{member.exitMonth}
+                                    </span>
+                                  )}
+                                  {member?.profileId && member?.transferredFrom && (
+                                    <span className="text-amber-700 font-bold bg-amber-50 border border-amber-100 px-1.5 py-0.2 rounded text-[9px]">
+                                      🔄 Transferred
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
-                          )}
 
-                          {/* Active Split Pool Summary Tag */}
-                          {member?.splitPool && (
-                            <div className="p-2.5 bg-purple-50/70 border border-purple-200 rounded-xl text-xs text-purple-900 space-y-1">
-                              <span className="text-[10px] font-extrabold uppercase tracking-wider block">👥 Joint Split Pool Active:</span>
-                              <div className="flex flex-wrap gap-2 text-[11px]">
-                                {member.splitPool.map((p: any, pIdx: number) => (
-                                  <span key={pIdx} className="bg-white border border-purple-200 px-2 py-0.5 rounded-md font-semibold">
-                                    {p.name}: {formatCurrency(p.part)}
-                                  </span>
-                                ))}
+                            {/* Actions & Chevron */}
+                            <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              {member?.profileId && (
+                                <button
+                                  type="button"
+                                  title="Unassign ticket"
+                                  onClick={() => handleUnassignTicket(member.id, ticketNum)}
+                                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+
+                              <div
+                                onClick={() => {
+                                  triggerHapticFeedback('light');
+                                  setExpandedEditTicketIds(prev =>
+                                    isExpanded ? prev.filter(id => id !== ticketNum) : [...prev, ticketNum]
+                                  );
+                                }}
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                              >
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                               </div>
                             </div>
-                          )}
+                          </div>
 
-                          {/* Active Exit Warning Tag */}
-                          {member?.exitMonth && (
-                            <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 flex justify-between items-center">
-                              <span>⚠️ Member scheduled to stop paying from <strong>Month {member.exitMonth}</strong>.</span>
-                              <button
-                                type="button"
-                                onClick={() => handleSaveExit(member.id, null)}
-                                className="text-[10px] font-bold text-red-700 underline"
-                              >
-                                Re-instate
-                              </button>
+                          {/* ── EXPANDED CONTROLS BODY ── */}
+                          {isExpanded && (
+                            <div className="px-3.5 pb-3.5 pt-1 space-y-3 border-t border-gray-100 animate-in fade-in duration-150 text-xs">
+                              
+                              {/* Shares Stepper & Timing Line */}
+                              <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Shares:</span>
+                                  <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl p-0.5 shadow-2xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (member?.profileId) {
+                                          const extra = editGroupMembers.filter(m => m.profileId === member.profileId && m.ticket !== ticketNum);
+                                          if (extra.length > 0) {
+                                            handleUnassignTicket(extra[extra.length - 1].id, extra[extra.length - 1].ticket);
+                                          }
+                                        }
+                                      }}
+                                      className="w-6 h-6 rounded-lg hover:bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs"
+                                    >
+                                      <Minus size={11} />
+                                    </button>
+                                    <span className="w-7 text-center font-bold text-xs text-gray-900">
+                                      {member?.profileId ? `${totalShares}x` : '0x'}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (member?.profileId) {
+                                          const emptySlot = editGroupMembers.find(m => !m.profileId && m.ticket !== ticketNum);
+                                          if (emptySlot) {
+                                            handleReassignTicketMember(emptySlot.ticket, emptySlot.id, member.profileId, member.name, member.phone);
+                                          } else {
+                                            alert('All ticket slots are currently filled.');
+                                          }
+                                        }
+                                      }}
+                                      className="w-6 h-6 rounded-lg hover:bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs"
+                                    >
+                                      <Plus size={11} />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExpandedTimingTicketIds(prev =>
+                                      isTimingExpanded ? prev.filter(id => id !== ticketNum) : [...prev, ticketNum]
+                                    );
+                                  }}
+                                  className="text-xs font-semibold text-gray-500 hover:text-gray-900 flex items-center gap-1 transition-colors"
+                                >
+                                  Share timing {isTimingExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                </button>
+                              </div>
+
+                              {/* Action Buttons Row */}
+                              <div className="flex flex-wrap gap-1.5 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!member?.profileId) return;
+                                    setCustomAmountModalTicket(member);
+                                    setCustomAmountVal(member?.customInstallment || standardDue);
+                                  }}
+                                  disabled={!member?.profileId}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
+                                    member?.profileId && member?.customInstallment
+                                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                                  }`}
+                                >
+                                  {member?.profileId && member?.customInstallment ? `Custom: ₹${member.customInstallment.toLocaleString('en-IN')}` : 'Set custom amount'}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!member?.profileId) return;
+                                    setSplitModalTicket(member);
+                                    setSplitPayers(member?.splitPool || [
+                                      { name: member?.name || 'Person 1', part: Math.round(standardDue / 2) },
+                                      { name: 'Person 2', part: Math.round(standardDue / 2) }
+                                    ]);
+                                  }}
+                                  disabled={!member?.profileId}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
+                                    member?.profileId && member?.splitPool
+                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                                  }`}
+                                >
+                                  {member?.profileId && member?.splitPool ? `Pool (${member.splitPool.length} payers)` : 'Split into pool'}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!member?.profileId) return;
+                                    setExitModalTicket(member);
+                                    setExitMonthVal(member?.exitMonth || (editingGroup?.currentMonth || 1) + 1);
+                                  }}
+                                  disabled={!member?.profileId}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
+                                    member?.profileId && member?.exitMonth
+                                      ? 'bg-red-50 text-red-700 border-red-200'
+                                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                                  }`}
+                                >
+                                  {member?.profileId && member?.exitMonth ? `Exits M${member.exitMonth}` : 'Member leaves chit...'}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!member?.profileId) return;
+                                    setTransferModalTicket(member);
+                                    setTransferRecipientId('');
+                                    setTransferMonthVal((editingGroup?.currentMonth || 1) + 1);
+                                  }}
+                                  disabled={!member?.profileId}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
+                                    member?.profileId && member?.transferredFrom
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                                  }`}
+                                >
+                                  {member?.profileId && member?.transferredFrom ? 'Transferred' : 'Transfer shares...'}
+                                </button>
+                              </div>
+
+                              {/* Expanded Share Timing Details */}
+                              {isTimingExpanded && (
+                                <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl space-y-1.5 text-xs animate-in fade-in duration-150">
+                                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Share Timeline</span>
+                                  <div className="space-y-1 text-[11px]">
+                                    <div className="flex justify-between py-0.5 border-b border-gray-200">
+                                      <span>Month 1 (Launch)</span>
+                                      <span className="text-gray-500 font-semibold">1x · Collected</span>
+                                    </div>
+                                    <div className="flex justify-between py-0.5">
+                                      <span>Month 2 onward</span>
+                                      <span className="text-indigo-600 font-semibold">
+                                        {member?.profileId ? `${totalShares}x active` : 'Unassigned'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Active Split Pool Summary Tag */}
+                              {member?.profileId && member?.splitPool && (
+                                <div className="p-2 bg-purple-50/70 border border-purple-200 rounded-xl text-xs text-purple-900 space-y-1">
+                                  <span className="text-[10px] font-extrabold uppercase tracking-wider block">👥 Joint Split Pool Active:</span>
+                                  <div className="flex flex-wrap gap-1.5 text-[11px]">
+                                    {member.splitPool.map((p: any, pIdx: number) => (
+                                      <span key={pIdx} className="bg-white border border-purple-200 px-2 py-0.5 rounded-md font-semibold">
+                                        {p.name}: {formatCurrency(p.part)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Active Exit Warning Tag */}
+                              {member?.profileId && member?.exitMonth && (
+                                <div className="p-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 flex justify-between items-center">
+                                  <span>⚠️ Scheduled to exit on <strong>Month {member.exitMonth}</strong></span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveExit(member.id, null)}
+                                    className="text-[10px] font-bold text-red-700 underline"
+                                  >
+                                    Re-instate
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Reassign Subscriber Selector */}
+                              <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2 text-[11px]">
+                                <span className="text-gray-500 font-medium">Reassign Subscriber:</span>
+                                <select
+                                  value={member?.profileId || ''}
+                                  onChange={(e) => {
+                                    const selectedProfileId = e.target.value;
+                                    const targetProfile = masterDirectory.find(p => p.id === selectedProfileId);
+                                    if (targetProfile) {
+                                      handleReassignTicketMember(ticketNum, member?.id, targetProfile.id!, targetProfile.name, targetProfile.phone);
+                                    }
+                                  }}
+                                  className="bg-gray-50 border border-gray-200 text-gray-800 text-[11px] font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 max-w-[200px]"
+                                >
+                                  <option value="" disabled>Select Subscriber</option>
+                                  {masterDirectory.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
+                                  ))}
+                                </select>
+                              </div>
+
                             </div>
                           )}
-
-                          {/* Reassign Subscriber Selector */}
-                          <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2 text-[11px]">
-                            <span className="text-gray-500 font-medium">Reassign Subscriber:</span>
-                            <select
-                              value={member?.profileId || ''}
-                              onChange={(e) => {
-                                const selectedProfileId = e.target.value;
-                                const targetProfile = masterDirectory.find(p => p.id === selectedProfileId);
-                                if (targetProfile) {
-                                  handleReassignTicketMember(ticketNum, member?.id, targetProfile.id!, targetProfile.name, targetProfile.phone);
-                                }
-                              }}
-                              className="bg-gray-50 border border-gray-200 text-gray-800 text-[11px] font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 max-w-[200px]"
-                            >
-                              <option value="" disabled>Select Subscriber</option>
-                              {masterDirectory.map(p => (
-                                <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
-                              ))}
-                            </select>
-                          </div>
 
                         </div>
                       );
