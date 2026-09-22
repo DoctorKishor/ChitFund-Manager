@@ -1103,6 +1103,120 @@ export default function LiveAuctionEngine() {
 
   const eligibleCount = members.filter(m => !m.hasWonRegular).length;
 
+  // ── RENDER HISTORICAL AUCTION RECORD DETAILS MODAL ─────────────────────────
+  const renderHistoricalModal = () => {
+    if (!selectedHistoricalLog || !historicalReportData || !group) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/70 flex flex-col z-50 p-1 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+        <div className="bg-slate-100 border border-slate-300 rounded-2xl sm:rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[98dvh] sm:max-h-[96dvh]">
+          
+          {/* Header Bar */}
+          <div className="bg-slate-900 text-white px-3.5 py-3 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-white/10 shrink-0">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-400 flex items-center justify-center shrink-0">
+                <History size={17} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 font-mono">
+                    Historical Log
+                  </span>
+                  {selectedHistoricalLog.isLaabaSeetu && (
+                    <span className="text-[9px] sm:text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-purple-500/30 text-purple-300 border border-purple-400/40">
+                      🎉 Laaba Seetu Month
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-xs sm:text-lg font-black text-white mt-0.5 truncate">
+                  {group.name} — Month {selectedHistoricalLog.month} Concluded Record
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-between sm:justify-end">
+              <button
+                type="button"
+                disabled={isGeneratingReportPdf}
+                onClick={() => handleDownloadAuctionPdf(historicalPrintableRef.current, group.name, selectedHistoricalLog.month)}
+                className="flex-1 sm:flex-initial px-2.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[11px] sm:text-xs font-black rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isGeneratingReportPdf ? (
+                  <>
+                    <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={13} />
+                    <span className="hidden sm:inline">Download PDF Report</span>
+                    <span className="sm:hidden">PDF Report</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const text = encodeURIComponent(
+`🏆 *HISTORICAL AUCTION CERTIFICATE*
+───────────────────────
+🏢 *Group:* ${group.name}
+🗓️ *Month Cycle:* Month ${selectedHistoricalLog.month} of ${group.durationMonths}
+👤 *Winner:* ${selectedHistoricalLog.winningBidderName} ${selectedHistoricalLog.ticketNumber ? `(Ticket #${selectedHistoricalLog.ticketNumber})` : ''}
+💰 *Total Chit Value:* ${formatCurrency(group.totalValue)}
+📉 *Winning Discount Bid:* -${formatCurrency(selectedHistoricalLog.winningDiscount)}
+💵 *Net Take-Home Prize Pot:* ${formatCurrency(selectedHistoricalLog.netPayout)}
+📊 *Disbursal Status:* ${selectedHistoricalLog.disbursalStatus === 'fully_disbursed' ? 'Closed & Disbursed' : selectedHistoricalLog.disbursalStatus === 'partially_disbursed' ? `Partially Disbursed (${formatCurrency(selectedHistoricalLog.totalDisbursed)})` : 'Pending Disbursal'}
+───────────────────────
+Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en-IN')}`
+                  );
+                  window.open(`https://wa.me/?text=${text}`, '_blank');
+                }}
+                className="flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Send size={12} />
+                <span className="hidden sm:inline">WhatsApp Alert</span>
+                <span className="sm:hidden">WhatsApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedHistoricalLog(null)}
+                className="px-2.5 sm:px-3.5 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <X size={14} />
+                <span className="hidden sm:inline">Close</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Scrollable Document Container */}
+          <div className="p-2 sm:p-6 overflow-y-auto bg-slate-100 flex-1">
+            <div ref={historicalPrintableRef} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <AuctionReportDocument data={historicalReportData} id="historical-auction-report-doc" />
+            </div>
+          </div>
+
+          {/* Modal Bottom Footer */}
+          <div className="p-2.5 sm:p-3 bg-white border-t border-gray-200 flex items-center justify-between gap-2 text-xs shrink-0">
+            <span className="text-gray-500 font-mono text-[10px] sm:text-[11px] truncate">
+              Audit ID: {selectedHistoricalLog.id}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedHistoricalLog(null)}
+              className="px-4 py-1.5 sm:px-5 sm:py-2 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-[11px] sm:text-xs transition-all active:scale-95 cursor-pointer shrink-0"
+            >
+              Close View
+            </button>
+          </div>
+
+        </div>
+      </div>
+    );
+  };
+
   // ── STAGE 1: AUCTION OVERVIEW & SCHEDULE HUB ─────────────────────────────
   if (stage === 'overview') {
     return (
@@ -1473,6 +1587,9 @@ export default function LiveAuctionEngine() {
             }
           }}
         />
+
+        {/* Historical Auction Record Details Modal */}
+        {renderHistoricalModal()}
       </div>
     );
   }
@@ -2435,114 +2552,7 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`
       )}
 
       {/* ── HISTORICAL AUCTION RECORD DETAILS MODAL ─────────────────────────── */}
-      {selectedHistoricalLog && historicalReportData && (
-        <div className="fixed inset-0 bg-black/70 flex flex-col z-50 p-1 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-slate-100 border border-slate-300 rounded-2xl sm:rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[98dvh] sm:max-h-[96dvh]">
-            
-            {/* Header Bar */}
-            <div className="bg-slate-900 text-white px-3.5 py-3 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-white/10 shrink-0">
-              <div className="flex items-center gap-2.5 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-400 flex items-center justify-center shrink-0">
-                  <History size={17} />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 font-mono">
-                      Historical Log
-                    </span>
-                    {selectedHistoricalLog.isLaabaSeetu && (
-                      <span className="text-[9px] sm:text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-purple-500/30 text-purple-300 border border-purple-400/40">
-                        🎉 Laaba Seetu Month
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="text-xs sm:text-lg font-black text-white mt-0.5 truncate">
-                    {group.name} — Month {selectedHistoricalLog.month} Concluded Record
-                  </h2>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                <button
-                  type="button"
-                  disabled={isGeneratingReportPdf}
-                  onClick={() => handleDownloadAuctionPdf(historicalPrintableRef.current, group.name, selectedHistoricalLog.month)}
-                  className="flex-1 sm:flex-initial px-2.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[11px] sm:text-xs font-black rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isGeneratingReportPdf ? (
-                    <>
-                      <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>PDF...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download size={13} />
-                      <span className="hidden sm:inline">Download PDF Report</span>
-                      <span className="sm:hidden">PDF Report</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const text = encodeURIComponent(
-`🏆 *HISTORICAL AUCTION CERTIFICATE*
-───────────────────────
-🏢 *Group:* ${group.name}
-🗓️ *Month Cycle:* Month ${selectedHistoricalLog.month} of ${group.durationMonths}
-👤 *Winner:* ${selectedHistoricalLog.winningBidderName} ${selectedHistoricalLog.ticketNumber ? `(Ticket #${selectedHistoricalLog.ticketNumber})` : ''}
-💰 *Total Chit Value:* ${formatCurrency(group.totalValue)}
-📉 *Winning Discount Bid:* -${formatCurrency(selectedHistoricalLog.winningDiscount)}
-💵 *Net Take-Home Prize Pot:* ${formatCurrency(selectedHistoricalLog.netPayout)}
-📊 *Disbursal Status:* ${selectedHistoricalLog.disbursalStatus === 'fully_disbursed' ? 'Closed & Disbursed' : selectedHistoricalLog.disbursalStatus === 'partially_disbursed' ? `Partially Disbursed (${formatCurrency(selectedHistoricalLog.totalDisbursed)})` : 'Pending Disbursal'}
-───────────────────────
-Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en-IN')}`
-                    );
-                    window.open(`https://wa.me/?text=${text}`, '_blank');
-                  }}
-                  className="flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Send size={12} />
-                  <span className="hidden sm:inline">WhatsApp Alert</span>
-                  <span className="sm:hidden">WhatsApp</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedHistoricalLog(null)}
-                  className="px-2.5 sm:px-3.5 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <X size={14} />
-                  <span className="hidden sm:inline">Close</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Scrollable Document Container */}
-            <div className="p-2 sm:p-6 overflow-y-auto bg-slate-100 flex-1">
-              <div ref={historicalPrintableRef} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                <AuctionReportDocument data={historicalReportData} id="historical-auction-report-doc" />
-              </div>
-            </div>
-
-            {/* Modal Bottom Footer */}
-            <div className="p-2.5 sm:p-3 bg-white border-t border-gray-200 flex items-center justify-between gap-2 text-xs shrink-0">
-              <span className="text-gray-500 font-mono text-[10px] sm:text-[11px] truncate">
-                Audit ID: {selectedHistoricalLog.id}
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedHistoricalLog(null)}
-                className="px-4 py-1.5 sm:px-5 sm:py-2 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-[11px] sm:text-xs transition-all active:scale-95 cursor-pointer shrink-0"
-              >
-                Close View
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
+      {renderHistoricalModal()}
 
     </div>
   );
