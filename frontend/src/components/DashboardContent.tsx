@@ -154,9 +154,16 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupValue, setNewGroupValue] = useState('100000');
   const [newGroupDuration, setNewGroupDuration] = useState('5');
-  const [newGroupStartDate, setNewGroupStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [newGroupAuctionDay, setNewGroupAuctionDay] = useState<number>(10);
   const [newGroupAuctionTime, setNewGroupAuctionTime] = useState<string>('19:00');
+  const [newGroupStartDate, setNewGroupStartDate] = useState(() => {
+    const now = new Date();
+    const sunday = getFirstSundayOnOrAfterDay(now.getFullYear(), now.getMonth(), 10);
+    const yyyy = sunday.getFullYear();
+    const mm = String(sunday.getMonth() + 1).padStart(2, '0');
+    const dd = String(sunday.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
   const [targetSlotForAssign, setTargetSlotForAssign] = useState<number | null>(null);
   const [enrollments, setEnrollments] = useState<{ id?: string; name: string; phone: string }[]>([
     { id: undefined, name: '', phone: '' },
@@ -2611,29 +2618,22 @@ Thank you for your prompt payment! 🙏`;
     triggerHapticFeedback('light');
   };
 
-  // Helper: Auto-fill all open slots with available master directory subscribers
-  const handleAutoFillAllSlots = () => {
-    triggerHapticFeedback('light');
-    const assignedIds = new Set(enrollments.filter(e => e.id).map(e => e.id));
-    const availableMembers = masterDirectory.filter(m => m.id && !assignedIds.has(m.id));
-
-    let availableIndex = 0;
-    const updated = enrollments.map(slot => {
-      if (!slot.name && availableIndex < availableMembers.length) {
-        const member = availableMembers[availableIndex++];
-        return { id: member.id, name: member.name, phone: member.phone };
+  // Helper: Automatically calculate & snap Launch Date (Month 0 Start) to the 1st Sunday on/after the selected cutoff day
+  const updateLaunchDateFromRule = (cutoffDay: number, baseDateStr?: string) => {
+    let year = new Date().getFullYear();
+    let month = new Date().getMonth();
+    if (baseDateStr) {
+      const parts = baseDateStr.split('-');
+      if (parts.length === 3) {
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10) - 1;
       }
-      return slot;
-    });
-
-    setEnrollments(updated);
-    const newlyFilled = availableIndex;
-    if (newlyFilled > 0) {
-      triggerHapticFeedback('success');
-      alert(`⚡ Auto-filled ${newlyFilled} open ticket slot(s) from Master Directory!`);
-    } else {
-      alert("No additional unassigned subscribers available in Master Directory to auto-fill.");
     }
+    const sunday = getFirstSundayOnOrAfterDay(year, month, cutoffDay);
+    const yyyy = sunday.getFullYear();
+    const mm = String(sunday.getMonth() + 1).padStart(2, '0');
+    const dd = String(sunday.getDate()).padStart(2, '0');
+    setNewGroupStartDate(`${yyyy}-${mm}-${dd}`);
   };
 
   // Helper: Clear all slots
@@ -5404,26 +5404,41 @@ Thank you for your prompt payment! 🙏`;
                             className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none font-semibold"
                           />
                         </div>
-                        <span className="text-[10px] text-gray-400 block">Sets Month 0 Launch &amp; baseline cycle origin</span>
+                        <span className="text-[10px] text-gray-400 block">
+                          {(() => {
+                            const d = new Date(newGroupStartDate + 'T00:00:00');
+                            const formatted = !isNaN(d.getTime()) 
+                              ? d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+                              : '';
+                            return `Orientation & Launch Session (${formatted})`;
+                          })()}
+                        </span>
                       </div>
 
-                      {/* Recurring Auction Day of Month */}
+                      {/* Recurring Auction Rule Dropdown (First Sunday on or after X) */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                          Auction Day of Month
+                          Recurring Auction Rule
                         </label>
                         <select
                           value={newGroupAuctionDay}
-                          onChange={(e) => setNewGroupAuctionDay(Number(e.target.value))}
-                          className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-semibold focus:outline-none"
+                          onChange={(e) => {
+                            const day = Number(e.target.value);
+                            setNewGroupAuctionDay(day);
+                            updateLaunchDateFromRule(day, newGroupStartDate);
+                            triggerHapticFeedback('light');
+                          }}
+                          className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3 py-2.5 text-xs text-gray-900 font-semibold focus:outline-none"
                         >
                           {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
                             <option key={day} value={day}>
-                              {day}{day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th'} of every month {day === 10 ? '(Default)' : ''}
+                              1st Sunday on/after {day}th of every month {day === 10 ? '(Default)' : ''}
                             </option>
                           ))}
                         </select>
-                        <span className="text-[10px] text-gray-400 block">Day for Month 1..N regular live auctions</span>
+                        <span className="text-[10px] text-indigo-600 font-medium block">
+                          ⚡ Changing rule auto-snaps Launch Date to this Sunday
+                        </span>
                       </div>
 
                       {/* Recurring Auction Time */}
@@ -5484,11 +5499,21 @@ Thank you for your prompt payment! 🙏`;
                         </div>
 
                         <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Recurring Auction</span>
-                          <strong className="text-xs sm:text-sm font-extrabold text-gray-900 mt-0.5 block">
-                            {newGroupAuctionDay}th · {formatTime12h(newGroupAuctionTime)}
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">1st Live Auction (M1)</span>
+                          <strong className="text-xs sm:text-sm font-extrabold text-gray-900 mt-0.5 block truncate">
+                            {(() => {
+                              const targetDate = computeNextAuctionDateTime({
+                                auction_day_of_month: newGroupAuctionDay,
+                                auction_time: newGroupAuctionTime,
+                                next_auction_date: null,
+                                next_auction_time: newGroupAuctionTime,
+                                start_date: newGroupStartDate,
+                                current_month: 0,
+                              });
+                              return targetDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                            })()}
                           </strong>
-                          <span className="text-[10px] text-gray-500">Month 1 Live Bidding</span>
+                          <span className="text-[10px] text-indigo-600 font-semibold">{formatTime12h(newGroupAuctionTime)} (1st Sun on/after {newGroupAuctionDay}th)</span>
                         </div>
                       </div>
                     </div>
@@ -5531,19 +5556,10 @@ Thank you for your prompt payment! 🙏`;
                           </span>
                         )}
                       </h4>
-                      <p className="text-xs text-gray-500 mt-0.5">Assign existing directory members to tickets, auto-fill open slots, or register new subscribers</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Assign subscribers to tickets or register new members</p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleAutoFillAllSlots}
-                        className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs active:scale-95"
-                      >
-                        <Zap size={13} className="text-indigo-600" />
-                        <span>1-Click Auto-Fill Open Slots</span>
-                      </button>
-
                       {enrollments.some(e => e.name) && (
                         <button
                           type="button"
