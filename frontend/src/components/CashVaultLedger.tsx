@@ -310,7 +310,35 @@ export default function CashVaultLedger() {
 
   // Filtered transactions for active wallet in Subtab 2 (GPay Wallet Page)
   const walletSpecificTxs = useMemo(() => {
-    return recentTransactions.filter(t => t.wallet_type === selectedWalletDetail);
+    return recentTransactions.filter(t => {
+      // 1. Direct wallet_type match (e.g. cash_in_hand or explicit bank)
+      if (t.wallet_type === selectedWalletDetail) return true;
+
+      const notes = (t.notes || t.description || '').toLowerCase();
+
+      // 2. ATM Relocations: check if this bank was the source account debited
+      if (t.type === 'atm_withdrawal') {
+        if (selectedWalletDetail === 'kishor_bank' && (notes.includes('kishor') || (!notes.includes('dad') && !notes.includes('mom')))) {
+          return true;
+        }
+        if (selectedWalletDetail === 'dad_bank' && notes.includes('dad')) {
+          return true;
+        }
+        if (selectedWalletDetail === 'mom_bank' && notes.includes('mom')) {
+          return true;
+        }
+      }
+
+      // 3. Inter-Vault Transfers: check if this wallet is mentioned as source or destination
+      if (t.type === 'transfer') {
+        const wName = (WALLET_META[selectedWalletDetail]?.name || '').toLowerCase();
+        if (notes.includes(selectedWalletDetail) || (wName && notes.includes(wName))) {
+          return true;
+        }
+      }
+
+      return false;
+    });
   }, [recentTransactions, selectedWalletDetail]);
 
   // Helper to accurately classify if a treasury movement is an Inflow/Credit (+) or Outflow/Debit (-)
@@ -349,12 +377,12 @@ export default function CashVaultLedger() {
       return { isCredit: true, badgeLabel: 'DRAW REPAYMENT (+)', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200' };
     }
 
-    // 7. ATM Relocations
+    // 7. ATM Relocations (Bank debit vs Cash Box credit)
     if (type === 'atm_withdrawal') {
-      if (tx.wallet_type === 'cash_in_hand' || notes.includes('into cash box') || notes.includes('into physical cash box')) {
-        return { isCredit: true, badgeLabel: 'ATM INFLOW (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      if (targetWallet === 'cash_in_hand') {
+        return { isCredit: true, badgeLabel: 'ATM CASH INFLOW (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
       }
-      return { isCredit: false, badgeLabel: 'ATM DEBIT (-)', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' };
+      return { isCredit: false, badgeLabel: 'ATM WITHDRAWAL (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' };
     }
 
     // 8. Inter-Vault Transfers
@@ -415,7 +443,21 @@ export default function CashVaultLedger() {
   // Filtered master ledger
   const filteredMasterLedger = useMemo(() => {
     return recentTransactions.filter((tx) => {
-      const matchesWallet = ledgerWalletFilter === 'all' || tx.wallet_type === ledgerWalletFilter;
+      const notes = (tx.notes || tx.description || '').toLowerCase();
+      const matchesWallet = ledgerWalletFilter === 'all' || 
+        tx.wallet_type === ledgerWalletFilter ||
+        (tx.type === 'atm_withdrawal' && (
+          (ledgerWalletFilter === 'kishor_bank' && (notes.includes('kishor') || (!notes.includes('dad') && !notes.includes('mom')))) ||
+          (ledgerWalletFilter === 'dad_bank' && notes.includes('dad')) ||
+          (ledgerWalletFilter === 'mom_bank' && notes.includes('mom'))
+        )) ||
+        (tx.type === 'transfer' && (
+          (ledgerWalletFilter === 'kishor_bank' && notes.includes('kishor')) ||
+          (ledgerWalletFilter === 'dad_bank' && notes.includes('dad')) ||
+          (ledgerWalletFilter === 'mom_bank' && notes.includes('mom')) ||
+          (ledgerWalletFilter === 'cash_in_hand' && notes.includes('cash'))
+        ));
+
       const matchesType = ledgerTypeFilter === 'all' || tx.type === ledgerTypeFilter;
       const q = ledgerSearch.toLowerCase().trim();
       const matchesSearch = !q || 
