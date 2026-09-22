@@ -108,6 +108,7 @@ interface TreasuryTx {
   id: string;
   created_at: string;
   type: string;
+  status?: 'completed' | 'pending_verification' | string;
   amount: number;
   wallet_type: WalletType;
   notes?: string;
@@ -130,7 +131,6 @@ export default function CashVaultLedger() {
   const [recentTransactions, setRecentTransactions] = useState<TreasuryTx[]>([]);
 
   // Operational State
-  const [relocations, setRelocations] = useState<Relocation[]>([]);
   const [personalDraws, setPersonalDraws] = useState<PersonalDraw[]>([]);
 
   // Form State: External Cash Deposit / Float Inflow
@@ -591,6 +591,28 @@ export default function CashVaultLedger() {
       });
   }, [recentTransactions]);
 
+  // ATM Relocations awaiting Physical Cash Box Verification
+  const computedRelocations = useMemo(() => {
+    return recentTransactions
+      .filter(tx => tx.type === 'atm_withdrawal' && tx.status === 'pending_verification')
+      .map(tx => {
+        let source: Exclude<WalletType, 'cash_in_hand'> = 'kishor_bank';
+        const n = (tx.notes || '').toLowerCase();
+        if (n.includes('dad')) source = 'dad_bank';
+        else if (n.includes('mom')) source = 'mom_bank';
+        else if (n.includes('kishor')) source = 'kishor_bank';
+
+        return {
+          id: tx.id,
+          source,
+          amount: Number(tx.amount || 0),
+          status: 'pending_verification' as const,
+          createdAt: new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          notes: tx.notes || '',
+        };
+      });
+  }, [recentTransactions]);
+
   // Floating Capital Stats (Active Floating Deposits per person)
   const floatStats = useMemo(() => {
     const active = computedFloatingDeposits.filter(f => f.status === 'active');
@@ -800,47 +822,94 @@ export default function CashVaultLedger() {
   };
 
   // Action: ATM 2-Step Relocation Trigger
-  const handleTriggerATMRelocation = (e: React.FormEvent) => {
+  const handleTriggerATMRelocation = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(relocateAmount);
 
-    if (isNaN(amount) || amount <= 0 || balances[relocateSource] < amount) {
-      alert(`Insufficient bank balance in ${WALLET_META[relocateSource].name}.`);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid withdrawal amount.");
+      return;
+    }
+    if (balances[relocateSource] < amount) {
+      alert(`Insufficient bank balance in ${WALLET_META[relocateSource].name}. Available: ${formatCurrency(balances[relocateSource])}`);
       return;
     }
 
-    updateBalance(relocateSource, -amount);
+    try {
+      setIsProcessingTransfer(true);
+      // 1. Debit Source Bank Account
+      await updateBalance(relocateSource, -amount);
 
-    const newReloc: Relocation = {
-      id: Math.random().toString(),
-      source: relocateSource,
-      amount,
-      status: 'pending_verification',
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
+      // 2. Insert into transactions table as 'pending_verification'
+      const sourceName = WALLET_META[relocateSource].name;
+      const { error } = await supabase.from('transactions').insert([
+        {
+          wallet_type: 'cash_in_hand',
+          type: 'atm_withdrawal',
+          status: 'pending_verification',
+          amount: amount,
+          notes: `[ATM Relocation] From: ${sourceName} -> Cash Box | Pending Physical Verification`,
+          created_by: profile?.id || null,
+        }
+      ]);
 
-    setRelocations([newReloc, ...relocations]);
-    setRelocateAmount('');
+      if (error) throw error;
+
+      // 3. Security Audit Log
+      await supabase.from('security_audit_logs').insert({
+        action_description: `ATM RELOCATION TRIGGERED: ₹${amount.toLocaleString('en-IN')} debited from ${sourceName}. Pending physical cash box inflow confirmation.`,
+        target_table: 'transactions',
+      });
+
+      setRelocateAmount('');
+      await fetchData();
+      alert(`✓ ATM Withdrawal of ${formatCurrency(amount)} triggered from ${sourceName}!\n\n⚠️ Step 2 Pending: Please confirm inflow once currency notes are placed inside the Physical Cash Box.`);
+    } catch (err: any) {
+      console.error('Error triggering ATM relocation:', err);
+      alert('Error triggering ATM relocation: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsProcessingTransfer(false);
+    }
   };
 
   // Action: ATM 2-Step Verify & Inflow to Cash Box
-  const handleVerifyATMRelocation = async (id: string, amount: number, source: WalletType) => {
-    setRelocations(prev => prev.filter(r => r.id !== id));
-    await updateBalance('cash_in_hand', amount);
+  const handleVerifyATMRelocation = async (id: string, amount: number, source: WalletType, existingNotes?: string) => {
+    try {
+      setIsProcessingTransfer(true);
+      // 1. Credit Cash in Hand
+      await updateBalance('cash_in_hand', amount);
 
-    await supabase.from('transactions').insert([
-      {
-        wallet_type: 'cash_in_hand',
-        type: 'atm_withdrawal',
-        status: 'completed',
-        amount: amount,
-        notes: `ATM Cash Withdrawal verified from ${WALLET_META[source as WalletType].name} into Cash Box`,
-        created_by: profile?.id || null,
-      }
-    ]);
+      // 2. Update transaction status in Supabase to 'completed'
+      const sourceName = WALLET_META[source]?.name || source;
+      const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const updatedNotes = existingNotes
+        ? `${existingNotes} | Verified & Credited to Cash Box on ${dateStr}`
+        : `ATM Cash Withdrawal verified from ${sourceName} into Physical Cash Box on ${dateStr}`;
 
-    await fetchData();
-    alert(`Verified & Credited ${formatCurrency(amount)} into Physical Cash Box!`);
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          status: 'completed',
+          notes: updatedNotes,
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // 3. Security Audit Log
+      await supabase.from('security_audit_logs').insert({
+        action_description: `ATM RELOCATION CONFIRMED: ₹${amount.toLocaleString('en-IN')} verified & credited into Physical Cash Box (Source: ${sourceName}).`,
+        target_table: 'transactions',
+      });
+
+      await fetchData();
+      alert(`✓ Verified & Credited ${formatCurrency(amount)} into Physical Cash Box!`);
+    } catch (err: any) {
+      console.error('Error verifying ATM relocation:', err);
+      alert('Error verifying ATM relocation: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsProcessingTransfer(false);
+    }
   };
 
   // Action: Personal Draw Logger
@@ -1690,15 +1759,15 @@ export default function CashVaultLedger() {
               </form>
 
               {/* Pending Physical Inflow Verification Queue */}
-              {relocations.length > 0 && (
+              {computedRelocations.length > 0 && (
                 <div className="space-y-2.5 pt-3.5 border-t border-gray-100">
                   <h4 className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
                     <AlertCircle size={13} />
-                    Pending Physical Cash Box Verification
+                    Pending Physical Cash Box Verification ({computedRelocations.length})
                   </h4>
                   
                   <div className="space-y-2">
-                    {relocations.map((reloc) => (
+                    {computedRelocations.map((reloc) => (
                       <div key={reloc.id} className="flex justify-between items-center bg-amber-50/70 border border-amber-200 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl gap-2">
                         <div className="min-w-0">
                           <span className="text-[10px] font-bold text-gray-500 uppercase block truncate">From: {WALLET_META[reloc.source]?.name}</span>
@@ -1706,7 +1775,7 @@ export default function CashVaultLedger() {
                           <span className="text-[10px] text-gray-400 font-mono">{reloc.createdAt}</span>
                         </div>
                         <button
-                          onClick={() => handleVerifyATMRelocation(reloc.id, reloc.amount, reloc.source)}
+                          onClick={() => handleVerifyATMRelocation(reloc.id, reloc.amount, reloc.source, reloc.notes)}
                           className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs px-3 sm:px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer shrink-0"
                         >
                           <Check size={13} /> <span className="hidden sm:inline">Confirm</span> Inflow

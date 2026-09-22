@@ -73,7 +73,8 @@ import {
   Copy,
   ExternalLink,
   QrCode,
-  Zap
+  Zap,
+  Clock
 } from 'lucide-react';
 
 // ── Utility: First Sunday on-or-after the 10th of a given month ──────────────
@@ -141,9 +142,10 @@ interface FifoMember {
 
 interface DashboardContentProps {
   activeTab: string;
+  setActiveTab?: (tab: string) => void;
 }
 
-export default function DashboardContent({ activeTab }: DashboardContentProps) {
+export default function DashboardContent({ activeTab, setActiveTab }: DashboardContentProps) {
   const { profile } = useAuth();
   const { balances, updateBalance } = useWallet();
 
@@ -222,6 +224,71 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   const [deletePhraseInput, setDeletePhraseInput] = useState('');
   const [deleteSliderVal, setDeleteSliderVal] = useState(0);
   const [isDeletingGroup, setIsDeletingGroup] = useState(false);
+
+  // Pending ATM Physical Cash Inflow Verification Queue
+  const [pendingAtmRelocations, setPendingAtmRelocations] = useState<any[]>([]);
+  const [isVerifyingAtmId, setIsVerifyingAtmId] = useState<string | null>(null);
+
+  const fetchPendingAtmRelocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('type', 'atm_withdrawal')
+        .eq('status', 'pending_verification')
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        setPendingAtmRelocations(data);
+      }
+    } catch (err) {
+      console.error('Error fetching pending ATM relocations:', err);
+    }
+  };
+
+  const handleConfirmAtmInflowFromDashboard = async (tx: any) => {
+    try {
+      setIsVerifyingAtmId(tx.id);
+      triggerHapticFeedback('light');
+
+      const amount = Number(tx.amount || 0);
+      // 1. Credit Cash in Hand
+      await updateBalance('cash_in_hand', amount);
+
+      // 2. Update transaction status in Supabase to 'completed'
+      const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const updatedNotes = tx.notes
+        ? `${tx.notes} | Verified & Credited to Cash Box on ${dateStr}`
+        : `ATM Cash Withdrawal verified into Physical Cash Box on ${dateStr}`;
+
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          status: 'completed',
+          notes: updatedNotes,
+        })
+        .eq('id', tx.id);
+
+      if (error) throw error;
+
+      // 3. Security Audit Log
+      await supabase.from('security_audit_logs').insert({
+        action_description: `ATM RELOCATION CONFIRMED: ₹${amount.toLocaleString('en-IN')} verified & credited into Physical Cash Box from Dashboard.`,
+        target_table: 'transactions',
+      });
+
+      triggerHapticFeedback('success');
+      await fetchPendingAtmRelocations();
+      if (activeDashboardGroupId) {
+        await fetchDashboardData(activeDashboardGroupId);
+      }
+      alert(`✓ Verified & Credited ₹${amount.toLocaleString('en-IN')} into Physical Cash Box!`);
+    } catch (err: any) {
+      console.error('Error confirming ATM inflow:', err);
+      alert('Error confirming ATM inflow: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsVerifyingAtmId(null);
+    }
+  };
 
   // Fetch real groups from Supabase
   const fetchGroups = async () => {
@@ -840,6 +907,18 @@ export default function DashboardContent({ activeTab }: DashboardContentProps) {
   useEffect(() => {
     fetchGroups();
     fetchProfiles();
+    fetchPendingAtmRelocations();
+
+    const channel = supabase
+      .channel('realtime_atm_dashboard_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        fetchPendingAtmRelocations();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Auction Schedule Configuration Modal state for Chits Directory cards
@@ -2702,6 +2781,98 @@ Thank you for your prompt payment! 🙏`;
 
         return (
           <div className="space-y-4 sm:space-y-6">
+            {/* ⚠️ HIGH-PRIORITY ALERT BANNER: Pending Physical Cash Box Verification */}
+            {pendingAtmRelocations.length > 0 && (
+              <div className="bg-gradient-to-r from-amber-50 via-amber-100/60 to-orange-50 border-2 border-amber-300 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-amber-200/80 pb-3">
+                  <div className="flex items-center gap-2.5 sm:gap-3">
+                    <div className="w-9 h-9 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs animate-pulse">
+                      <AlertCircle size={18} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm sm:text-base font-black text-amber-950 uppercase tracking-tight">
+                          Pending Physical Cash Box Verification
+                        </h3>
+                        <span className="text-[10px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full shadow-2xs">
+                          {pendingAtmRelocations.length} Pending Inflow{pendingAtmRelocations.length > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <p className="text-[11px] sm:text-xs text-amber-900/80 font-medium mt-0.5">
+                        Bank account was debited for ATM cash withdrawal. Confirm once physical currency notes are placed inside the Physical Cash Box.
+                      </p>
+                    </div>
+                  </div>
+
+                  {setActiveTab && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('cash')}
+                      className="text-xs font-bold text-amber-900 hover:text-black bg-white/80 hover:bg-white px-3 py-1.5 rounded-xl border border-amber-300 transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer shadow-2xs"
+                    >
+                      <Banknote size={14} className="text-indigo-600" />
+                      <span>Open Treasury</span>
+                      <ArrowRight size={12} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3">
+                  {pendingAtmRelocations.map((item) => {
+                    let sourceName = 'Kishor Bank (UPI)';
+                    let sourceIcon = '📱';
+                    const n = (item.notes || '').toLowerCase();
+                    if (n.includes('dad')) {
+                      sourceName = "Dad's Bank";
+                      sourceIcon = '🏦';
+                    } else if (n.includes('mom')) {
+                      sourceName = "Mom's Bank";
+                      sourceIcon = '🏛️';
+                    }
+
+                    const isVerifying = isVerifyingAtmId === item.id;
+                    const timeStr = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const dateStr = new Date(item.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="bg-white border border-amber-200 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-xs hover:border-amber-400 transition-colors"
+                      >
+                        <div className="min-w-0 space-y-0.5 sm:space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm">{sourceIcon}</span>
+                            <span className="text-xs font-extrabold text-gray-700 truncate">{sourceName}</span>
+                          </div>
+                          <div className="text-lg sm:text-2xl font-black text-gray-900 font-mono tracking-tight">
+                            ₹{Number(item.amount || 0).toLocaleString('en-IN')}
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-mono flex items-center gap-1">
+                            <Clock size={10} />
+                            <span>Debited on {dateStr} at {timeStr}</span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmAtmInflowFromDashboard(item)}
+                          disabled={isVerifying}
+                          className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition-all shadow-md shrink-0 cursor-pointer disabled:opacity-50"
+                        >
+                          {isVerifying ? (
+                            <RefreshCw size={13} className="animate-spin" />
+                          ) : (
+                            <Check size={14} className="stroke-[3]" />
+                          )}
+                          <span>Confirm Inflow</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Top Chit Groups Pill Switcher Bar */}
             <div className="bg-white border border-gray-200 rounded-2xl p-2.5 sm:p-3 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
               <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none flex-nowrap scroll-smooth">

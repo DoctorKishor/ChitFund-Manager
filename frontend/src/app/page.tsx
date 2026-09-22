@@ -128,7 +128,7 @@ export default function Home() {
         <main className="flex-1 p-3.5 sm:p-6 pb-24 sm:pb-6 space-y-4 sm:space-y-6 overflow-y-auto w-full max-w-[1600px] mx-auto">
           {/* Dynamic Content Panel Board */}
           <div className="w-full">
-            <DashboardContent activeTab={activeTab} />
+            <DashboardContent activeTab={activeTab} setActiveTab={setActiveTab} />
           </div>
         </main>
 
