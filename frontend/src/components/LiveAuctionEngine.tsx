@@ -48,7 +48,7 @@ import AuctionScheduleModal from '@/components/AuctionScheduleModal';
 import { computeNextAuctionDateTime } from '@/utils/auctionSchedule';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import { useAuth } from '@/context/AuthContext';
-import { exportAuctionReportPdf } from '@/utils/auctionPdfExporter';
+import { exportAuctionReportPdf, shareAuctionReportToWhatsApp } from '@/utils/auctionPdfExporter';
 import AuctionReportDocument, { AuctionReportData } from '@/components/AuctionReportDocument';
 
 interface Member {
@@ -126,6 +126,7 @@ export default function LiveAuctionEngine() {
   // Selected Historical Log for full detailed view
   const [selectedHistoricalLog, setSelectedHistoricalLog] = useState<HistoricalAuctionLog | null>(null);
   const [isGeneratingReportPdf, setIsGeneratingReportPdf] = useState<boolean>(false);
+  const [isSharingWhatsApp, setIsSharingWhatsApp] = useState<boolean>(false);
 
   // Concluded Auction Full View / Screen state
   const [showConcludedReportScreen, setShowConcludedReportScreen] = useState<boolean>(false);
@@ -816,6 +817,38 @@ export default function LiveAuctionEngine() {
     }
   };
 
+  const handleShareAuctionWhatsApp = async (
+    containerEl: HTMLElement | null,
+    groupName: string,
+    month: number,
+    messageText: string
+  ) => {
+    if (!containerEl) {
+      console.error('Printable container element not found.');
+      return;
+    }
+    try {
+      setIsSharingWhatsApp(true);
+      triggerHapticFeedback('light');
+      const organizerCompanyName = profile?.fullName 
+        ? `${profile.fullName}'s Chit Funds` 
+        : "Chit Funds Manager";
+      await shareAuctionReportToWhatsApp({
+        container: containerEl,
+        groupName,
+        month,
+        messageText,
+        organizerName: organizerCompanyName,
+      });
+      triggerHapticFeedback('success');
+    } catch (err) {
+      console.error('Error sharing report to WhatsApp:', err);
+      alert('Failed to share to WhatsApp. Please try again.');
+    } finally {
+      setIsSharingWhatsApp(false);
+    }
+  };
+
   const historicalReportData: AuctionReportData | null = useMemo(() => {
     if (!selectedHistoricalLog || !group) return null;
     return {
@@ -1157,8 +1190,9 @@ export default function LiveAuctionEngine() {
 
               <button
                 type="button"
+                disabled={isSharingWhatsApp}
                 onClick={() => {
-                  const text = encodeURIComponent(
+                  const text = 
 `🏆 *HISTORICAL AUCTION CERTIFICATE*
 ───────────────────────
 🏢 *Group:* ${group.name}
@@ -1169,15 +1203,24 @@ export default function LiveAuctionEngine() {
 💵 *Net Take-Home Prize Pot:* ${formatCurrency(selectedHistoricalLog.netPayout)}
 📊 *Disbursal Status:* ${selectedHistoricalLog.disbursalStatus === 'fully_disbursed' ? 'Closed & Disbursed' : selectedHistoricalLog.disbursalStatus === 'partially_disbursed' ? `Partially Disbursed (${formatCurrency(selectedHistoricalLog.totalDisbursed)})` : 'Pending Disbursal'}
 ───────────────────────
-Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en-IN')}`
-                  );
-                  window.open(`https://wa.me/?text=${text}`, '_blank');
+Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en-IN')}`;
+
+                  handleShareAuctionWhatsApp(historicalPrintableRef.current, group.name, selectedHistoricalLog.month, text);
                 }}
-                className="flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
-                <Send size={12} />
-                <span className="hidden sm:inline">WhatsApp Alert</span>
-                <span className="sm:hidden">WhatsApp</span>
+                {isSharingWhatsApp ? (
+                  <>
+                    <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Sharing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={12} />
+                    <span className="hidden sm:inline">WhatsApp Alert</span>
+                    <span className="sm:hidden">WhatsApp</span>
+                  </>
+                )}
               </button>
 
               <button
@@ -2483,11 +2526,12 @@ Congratulations to the winner! 🎉`
 
                 <button
                   type="button"
+                  disabled={isSharingWhatsApp}
                   onClick={() => {
                     const nextMonthBonus = concludedReportData.isNextMonthLaabaSeetu 
                       ? `\n🎉 *BONUS:* Next Month (Month ${concludedReportData.month + 1}) is *LAABA SEETU (லாப சீட்டு)*! All subscribers pay *₹0 Due*!` 
                       : '';
-                    const text = encodeURIComponent(
+                    const text = 
 `🏆 *OFFICIAL AUCTION CONCLUDED REPORT*
 ───────────────────────
 🏢 *Group:* ${concludedReportData.groupName}
@@ -2498,15 +2542,24 @@ Congratulations to the winner! 🎉`
 💵 *Net Take-Home Prize Pot:* ${formatCurrency(concludedReportData.netPayout)}
 🏦 *New Kai Iruppu Pool:* ${formatCurrency(concludedReportData.newPool)}${nextMonthBonus}
 ───────────────────────
-Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`
-                    );
-                    window.open(`https://wa.me/?text=${text}`, '_blank');
+Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
+
+                    handleShareAuctionWhatsApp(printableReportRef.current, concludedReportData.groupName, concludedReportData.month, text);
                   }}
-                  className="flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <Send size={12} />
-                  <span className="hidden sm:inline">WhatsApp Alert</span>
-                  <span className="sm:hidden">WhatsApp</span>
+                  {isSharingWhatsApp ? (
+                    <>
+                      <span className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Sharing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send size={12} />
+                      <span className="hidden sm:inline">WhatsApp Alert</span>
+                      <span className="sm:hidden">WhatsApp</span>
+                    </>
+                  )}
                 </button>
 
                 <button

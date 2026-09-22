@@ -152,3 +152,112 @@ export async function exportAuctionReportPdf({
     }
   }
 }
+
+interface ShareWhatsAppOptions {
+  container: HTMLElement;
+  groupName: string;
+  month: number;
+  messageText: string;
+  organizerName?: string;
+}
+
+export async function shareAuctionReportToWhatsApp({
+  container,
+  groupName,
+  month,
+  messageText,
+  organizerName = "Chit Funds Manager",
+}: ShareWhatsAppOptions): Promise<void> {
+  // Create an offscreen, fixed-width clone for pixel-perfect PNG rendering
+  const offscreenContainer = document.createElement('div');
+  offscreenContainer.style.position = 'fixed';
+  offscreenContainer.style.top = '0';
+  offscreenContainer.style.left = '-9999px';
+  offscreenContainer.style.width = '794px'; // Standard A4 pixel width
+  offscreenContainer.style.maxWidth = '794px';
+  offscreenContainer.style.minWidth = '794px';
+  offscreenContainer.style.backgroundColor = '#ffffff';
+  offscreenContainer.style.zIndex = '-9999';
+  offscreenContainer.style.overflow = 'visible';
+
+  const clone = container.cloneNode(true) as HTMLElement;
+  clone.style.width = '100%';
+  clone.style.maxWidth = 'none';
+  clone.style.overflow = 'visible';
+
+  // Remove any responsive scroll containers in the clone
+  const scrollableElements = clone.querySelectorAll<HTMLElement>('.overflow-x-auto, .overflow-y-auto, [class*="overflow-"]');
+  scrollableElements.forEach((el) => {
+    el.style.overflow = 'visible';
+    el.style.maxWidth = 'none';
+    el.style.width = '100%';
+  });
+
+  const tables = clone.querySelectorAll<HTMLTableElement>('table');
+  tables.forEach((table) => {
+    table.style.width = '100%';
+    table.style.minWidth = '100%';
+    table.style.tableLayout = 'auto';
+  });
+
+  offscreenContainer.appendChild(clone);
+  document.body.appendChild(offscreenContainer);
+
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    // Render entire clone as high-res PNG image
+    const pngDataUrl = await toPng(clone, {
+      quality: 0.98,
+      pixelRatio: 2.5,
+      cacheBust: true,
+      backgroundColor: '#ffffff',
+    });
+
+    const cleanGroupName = (groupName || 'Group').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `${cleanGroupName}_Month_${month}_Auction_Certificate.png`;
+
+    // Convert data URL to Blob & File for Web Share
+    const response = await fetch(pngDataUrl);
+    const blob = await response.blob();
+    const imageFile = new File([blob], fileName, { type: 'image/png' });
+
+    // Check if Web Share API with files is supported (mobile browsers)
+    if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+      try {
+        await navigator.share({
+          title: `${groupName} — Month ${month} Auction Certificate`,
+          text: messageText,
+          files: [imageFile],
+        });
+        return;
+      } catch (shareErr: any) {
+        // If user cancelled the share dialog, return gracefully
+        if (shareErr?.name === 'AbortError') return;
+        console.warn('Native share failed, falling back to download + web:', shareErr);
+      }
+    }
+
+    // Desktop fallback: Download PNG certificate file and open WhatsApp with prefilled message
+    const downloadLink = document.createElement('a');
+    downloadLink.href = pngDataUrl;
+    downloadLink.download = fileName;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+
+    // Copy formatted text to clipboard
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(messageText);
+      }
+    } catch {}
+
+    const encodedText = encodeURIComponent(messageText);
+    window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+  } finally {
+    if (document.body.contains(offscreenContainer)) {
+      document.body.removeChild(offscreenContainer);
+    }
+  }
+}
