@@ -155,6 +155,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [newGroupValue, setNewGroupValue] = useState('100000');
   const [newGroupDuration, setNewGroupDuration] = useState('5');
   const [newGroupStartDate, setNewGroupStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newGroupAuctionDay, setNewGroupAuctionDay] = useState<number>(10);
+  const [newGroupAuctionTime, setNewGroupAuctionTime] = useState<string>('19:00');
+  const [targetSlotForAssign, setTargetSlotForAssign] = useState<number | null>(null);
   const [enrollments, setEnrollments] = useState<{ id?: string; name: string; phone: string }[]>([
     { id: undefined, name: '', phone: '' },
     { id: undefined, name: '', phone: '' },
@@ -2589,21 +2592,79 @@ Thank you for your prompt payment! 🙏`;
     });
   };
 
-  const handleAssignExistingMember = (member: { id?: string; name: string; phone: string }) => {
+  // Helper: Auto-generate clean, readable Chit Group name
+  const handleAutoGenerateName = () => {
+    const val = Number(newGroupValue) || 100000;
+    const dur = Number(newGroupDuration) || 20;
+    const valFormatted = val >= 100000 ? `${val / 100000}L` : `${val / 1000}K`;
+    let dateSuffix = '2026';
+    if (newGroupStartDate) {
+      const d = new Date(newGroupStartDate);
+      if (!isNaN(d.getTime())) {
+        const monthShort = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+        const yearShort = d.getFullYear().toString().slice(-2);
+        dateSuffix = `${monthShort}${yearShort}`;
+      }
+    }
+    const genName = `G-${valFormatted}-${dur}M-${dateSuffix}`;
+    setNewGroupName(genName);
+    triggerHapticFeedback('light');
+  };
+
+  // Helper: Auto-fill all open slots with available master directory subscribers
+  const handleAutoFillAllSlots = () => {
+    triggerHapticFeedback('light');
+    const assignedIds = new Set(enrollments.filter(e => e.id).map(e => e.id));
+    const availableMembers = masterDirectory.filter(m => m.id && !assignedIds.has(m.id));
+
+    let availableIndex = 0;
+    const updated = enrollments.map(slot => {
+      if (!slot.name && availableIndex < availableMembers.length) {
+        const member = availableMembers[availableIndex++];
+        return { id: member.id, name: member.name, phone: member.phone };
+      }
+      return slot;
+    });
+
+    setEnrollments(updated);
+    const newlyFilled = availableIndex;
+    if (newlyFilled > 0) {
+      triggerHapticFeedback('success');
+      alert(`⚡ Auto-filled ${newlyFilled} open ticket slot(s) from Master Directory!`);
+    } else {
+      alert("No additional unassigned subscribers available in Master Directory to auto-fill.");
+    }
+  };
+
+  // Helper: Clear all slots
+  const handleClearAllSlots = () => {
+    triggerHapticFeedback('light');
+    const dur = Number(newGroupDuration) || 5;
+    setEnrollments(Array.from({ length: dur }, () => ({ id: undefined, name: '', phone: '' })));
+  };
+
+  const handleAssignExistingMember = (member: { id?: string; name: string; phone: string }, targetSlotIndex?: number) => {
     const isAlreadyAdded = enrollments.some(e => e.name.toLowerCase() === member.name.toLowerCase());
     if (isAlreadyAdded) {
       alert(`"${member.name}" is already assigned to a ticket in this chit group.`);
       return;
     }
-    const firstEmptyIndex = enrollments.findIndex(e => e.name === '');
-    if (firstEmptyIndex !== -1) {
+    const slotIdx = (targetSlotIndex !== undefined && targetSlotIndex >= 0) 
+      ? targetSlotIndex 
+      : (targetSlotForAssign !== null && targetSlotForAssign >= 0)
+        ? targetSlotForAssign
+        : enrollments.findIndex(e => e.name === '');
+
+    if (slotIdx !== -1 && slotIdx < enrollments.length) {
       setEnrollments(prev => {
         const copy = [...prev];
-        copy[firstEmptyIndex] = member;
+        copy[slotIdx] = member;
         return copy;
       });
       setMemberSearchQuery('');
       setIsSearchDropdownOpen(false);
+      setTargetSlotForAssign(null);
+      triggerHapticFeedback('light');
     } else {
       alert("All spots are fully enrolled! To enroll more, increase group duration in Step 1.");
     }
@@ -2708,12 +2769,15 @@ Thank you for your prompt payment! 🙏`;
         }
       }
 
-      // Assign to the first empty spot in enrollments
-      const firstEmptyIndex = enrollments.findIndex(e => e.name === '');
-      if (firstEmptyIndex !== -1) {
+      // Assign to the targeted spot or first empty spot in enrollments
+      const targetSlot = (targetSlotForAssign !== null && targetSlotForAssign >= 0) 
+        ? targetSlotForAssign 
+        : enrollments.findIndex(e => e.name === '');
+
+      if (targetSlot !== -1 && targetSlot < enrollments.length) {
         setEnrollments(prev => {
           const copy = [...prev];
-          copy[firstEmptyIndex] = newSubscriber;
+          copy[targetSlot] = newSubscriber;
           return copy;
         });
       }
@@ -2721,11 +2785,16 @@ Thank you for your prompt payment! 🙏`;
       // Add audit log
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      await supabase.from('security_audit_logs').insert({
+        action_description: `NEW SUBSCRIBER REGISTERED: "${cleanName}" (${cleanPhone}) — enrolled in Ticket #${targetSlot !== -1 ? targetSlot + 1 : 'N/A'}`,
+        target_table: 'profiles',
+      });
+
       setAuditLogs(prev => [
         {
           timestamp: `Today, ${timeStr}`,
           table: 'profiles',
-          desc: `NEW SUBSCRIBER REGISTERED: "${cleanName}" (${cleanPhone}) — enrolled in Ticket #${firstEmptyIndex !== -1 ? firstEmptyIndex + 1 : 'N/A'}`,
+          desc: `NEW SUBSCRIBER REGISTERED: "${cleanName}" (${cleanPhone}) — enrolled in Ticket #${targetSlot !== -1 ? targetSlot + 1 : 'N/A'}`,
           executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
         },
         ...prev,
@@ -2736,7 +2805,9 @@ Thank you for your prompt payment! 🙏`;
       setNewMemberPhone('');
       setMemberSearchQuery('');
       setIsSearchDropdownOpen(false);
+      setTargetSlotForAssign(null);
       setShowCreateMemberModal(false);
+      triggerHapticFeedback('success');
     } catch (err: any) {
       alert(`Error creating member: ${err.message}`);
     } finally {
@@ -2744,8 +2815,8 @@ Thank you for your prompt payment! 🙏`;
     }
   };
 
-  const handleCreateGroup = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateGroup = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (isCreatingGroup) return;
 
     const duration = Number(newGroupDuration);
@@ -2761,6 +2832,8 @@ Thank you for your prompt payment! 🙏`;
 
     try {
       setIsCreatingGroup(true);
+      triggerHapticFeedback('light');
+
       const { data: groupData, error: groupError } = await supabase.from('chit_groups').insert({
         name: newGroupName.trim(),
         total_value: Number(newGroupValue),
@@ -2770,6 +2843,10 @@ Thank you for your prompt payment! 🙏`;
         kai_iruppu_pool: 0,
         status: groupStatus,
         start_date: newGroupStartDate,
+        auction_day_of_month: Number(newGroupAuctionDay || 10),
+        auction_time: newGroupAuctionTime || '19:00',
+        next_auction_date: null,
+        next_auction_time: newGroupAuctionTime || '19:00',
       }).select().single();
 
       if (groupError) {
@@ -2800,13 +2877,23 @@ Thank you for your prompt payment! 🙏`;
         }
       }
 
-      alert(`Success: Chit Group "${newGroupName}" created in Supabase (Status: ${groupStatus.toUpperCase()})!\n${filledCount} of ${duration} spots assigned.${!isFullyEnrolled ? ' You can assign the remaining slots anytime in the Chits tab.' : ''}`);
+      // Security Audit Log
+      await supabase.from('security_audit_logs').insert({
+        action_description: `NEW CHIT GROUP CREATED: "${newGroupName}" (₹${Number(newGroupValue).toLocaleString('en-IN')}, ${duration} Months, ${filledCount}/${duration} tickets assigned, Status: ${groupStatus.toUpperCase()})`,
+        target_table: 'chit_groups',
+      });
+
+      triggerHapticFeedback('success');
+      alert(`✅ Success: Chit Group "${newGroupName}" created in Supabase (Status: ${groupStatus.toUpperCase()})!\n${filledCount} of ${duration} spots assigned.${!isFullyEnrolled ? ' You can assign the remaining slots anytime in the Chits tab.' : ''}`);
       await fetchGroups();
 
       // Reset form
       setNewGroupName('');
       setNewGroupValue('100000');
       setNewGroupDuration('5');
+      setNewGroupAuctionDay(10);
+      setNewGroupAuctionTime('19:00');
+      setTargetSlotForAssign(null);
       setEnrollments([
         { id: undefined, name: '', phone: '' },
         { id: undefined, name: '', phone: '' },
@@ -5050,199 +5137,455 @@ Thank you for your prompt payment! 🙏`;
               )}
             </div>
           ) : (
-            /* 3. SETUP WIZARD VIEW */
+            /* 3. UPGRADED CHIT SETUP WIZARD VIEW */
             <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
               
-              {/* Setup Wizard Progress Indicator */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                <div className="flex items-center justify-between sm:justify-start space-x-2">
-                  <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider">Chit Setup Wizard</h3>
+              {/* Setup Wizard Progress Navigation Bar */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                <div className="flex items-center justify-between sm:justify-start space-x-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                      <Sparkles size={16} />
+                    </div>
+                    <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider">Chit Setup Wizard</h3>
+                  </div>
                   <button
-                    onClick={() => setShowWizard(false)}
-                    className="text-[10px] text-gray-500 hover:text-gray-900 underline font-semibold ml-2"
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setShowWizard(false);
+                    }}
+                    className="text-[11px] text-gray-400 hover:text-gray-700 underline font-semibold transition-colors"
                   >
-                    Cancel Wizard
+                    Exit Wizard
                   </button>
                 </div>
-                <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-6 w-full sm:w-auto">
-                  <div className="flex items-center space-x-1.5 sm:space-x-2">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      wizardStep === 1 
-                        ? 'bg-gray-900 text-white shadow-xs' 
-                        : wizardStep > 1 
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
-                          : 'bg-gray-100 text-gray-400'
-                    }`}>
-                      {wizardStep > 1 ? <Check size={12} /> : '1'}
-                    </span>
-                    <span className={`text-[11px] sm:text-xs font-semibold ${wizardStep === 1 ? 'text-gray-900 font-bold' : 'text-gray-400'}`}>Basic</span>
-                  </div>
+
+                {/* Step Indicators */}
+                <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-5 w-full sm:w-auto">
                   
-                  <div className="flex-1 sm:flex-none sm:w-8 h-px bg-gray-200"></div>
-
-                  <div className="flex items-center space-x-1.5 sm:space-x-2">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      wizardStep === 2 
-                        ? 'bg-gray-900 text-white shadow-xs' 
-                        : wizardStep > 2 
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
-                          : 'bg-gray-100 text-gray-400'
+                  {/* Step 1 Pill */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setWizardStep(1);
+                    }}
+                    className={`flex items-center space-x-2 px-2.5 py-1 rounded-xl transition-all ${
+                      wizardStep === 1 
+                        ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200' 
+                        : 'hover:bg-gray-50 text-gray-500'
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      wizardStep === 1 
+                        ? 'bg-indigo-600 text-white shadow-xs' 
+                        : wizardStep > 1 
+                          ? 'bg-emerald-500 text-white' 
+                          : 'bg-gray-200 text-gray-500'
                     }`}>
-                      {wizardStep > 2 ? <Check size={12} /> : '2'}
+                      {wizardStep > 1 ? <Check size={11} /> : '1'}
                     </span>
-                    <span className={`text-[11px] sm:text-xs font-semibold ${wizardStep === 2 ? 'text-gray-900 font-bold' : 'text-gray-400'}`}>Members</span>
-                  </div>
+                    <span className={`text-xs ${wizardStep === 1 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>1. Basic &amp; Schedule</span>
+                  </button>
+                  
+                  <div className="flex-1 sm:flex-none sm:w-6 h-px bg-gray-200"></div>
 
-                  <div className="flex-1 sm:flex-none sm:w-8 h-px bg-gray-200"></div>
+                  {/* Step 2 Pill */}
+                  <button
+                    type="button"
+                    disabled={!newGroupName.trim() || !newGroupValue || !newGroupDuration}
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setWizardStep(2);
+                    }}
+                    className={`flex items-center space-x-2 px-2.5 py-1 rounded-xl transition-all ${
+                      wizardStep === 2 
+                        ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200' 
+                        : 'hover:bg-gray-50 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      wizardStep === 2 
+                        ? 'bg-indigo-600 text-white shadow-xs' 
+                        : wizardStep > 2 
+                          ? 'bg-emerald-500 text-white' 
+                          : 'bg-gray-200 text-gray-500'
+                    }`}>
+                      {wizardStep > 2 ? <Check size={11} /> : '2'}
+                    </span>
+                    <span className={`text-xs ${wizardStep === 2 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>2. Members</span>
+                  </button>
 
-                  <div className="flex items-center space-x-1.5 sm:space-x-2">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                  <div className="flex-1 sm:flex-none sm:w-6 h-px bg-gray-200"></div>
+
+                  {/* Step 3 Pill */}
+                  <button
+                    type="button"
+                    disabled={!newGroupName.trim() || !newGroupValue || !newGroupDuration}
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setWizardStep(3);
+                    }}
+                    className={`flex items-center space-x-2 px-2.5 py-1 rounded-xl transition-all ${
                       wizardStep === 3 
-                        ? 'bg-gray-900 text-white shadow-xs' 
-                        : 'bg-gray-100 text-gray-400'
+                        ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200' 
+                        : 'hover:bg-gray-50 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      wizardStep === 3 
+                        ? 'bg-indigo-600 text-white shadow-xs' 
+                        : 'bg-gray-200 text-gray-500'
                     }`}>
                       3
                     </span>
-                    <span className={`text-[11px] sm:text-xs font-semibold ${wizardStep === 3 ? 'text-gray-900 font-bold' : 'text-gray-400'}`}>Plan</span>
-                  </div>
+                    <span className={`text-xs ${wizardStep === 3 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>3. Review &amp; Launch</span>
+                  </button>
                 </div>
               </div>
 
-              {/* STEP 1: BASIC INFO */}
+              {/* ── STEP 1: BASIC INFO & SCHEDULE ── */}
               {wizardStep === 1 && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs">
-                  <div className="border-b border-gray-150 pb-3">
-                    <h4 className="text-sm font-bold text-gray-900">Step 1: Basic Information</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">Define name, monthly pool targets, and chit duration</p>
+                <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-150">
+                  
+                  {/* Step 1 Main Form Card */}
+                  <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 shadow-2xs">
+                    <div className="border-b border-gray-150 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                          <span>Step 1: Chit Parameters &amp; Auction Schedule</span>
+                        </h4>
+                        <p className="text-xs text-gray-500 mt-0.5">Configure pool targets, group duration, start date, and recurring monthly auction timing</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAutoGenerateName}
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors w-fit active:scale-95"
+                      >
+                        <Sparkles size={12} /> Auto-Generate Name
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                      
+                      {/* 1. Group Name */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                            Group Name <span className="text-rose-500">*</span>
+                          </label>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. G-1L-20M-OCT26"
+                            value={newGroupName}
+                            onChange={(e) => setNewGroupName(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none transition-colors"
+                          />
+                          {newGroupName && (
+                            <button
+                              type="button"
+                              onClick={() => setNewGroupName('')}
+                              className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 p-0.5"
+                            >
+                              <X size={13} />
+                            </button>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-gray-400 block">Identifier for reports, passbooks, and WhatsApp alerts</span>
+                      </div>
+
+                      {/* 2. Total Pool Value */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                          Total Pool Value (₹) <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">₹</span>
+                          <input
+                            type="number"
+                            required
+                            placeholder="100000"
+                            value={newGroupValue}
+                            onChange={(e) => setNewGroupValue(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl pl-7 pr-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none transition-colors"
+                          />
+                        </div>
+                        {/* Target Presets */}
+                        <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                          {[
+                            { label: '₹1L', val: 100000 },
+                            { label: '₹2L', val: 200000 },
+                            { label: '₹5L', val: 500000 },
+                            { label: '₹10L', val: 1000000 },
+                          ].map(preset => {
+                            const isSelected = newGroupValue === preset.val.toString();
+                            return (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                onClick={() => {
+                                  triggerHapticFeedback('light');
+                                  setNewGroupValue(preset.val.toString());
+                                }}
+                                className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border ${
+                                  isSelected
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-200'
+                                    : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
+                                }`}
+                              >
+                                {preset.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* 3. Duration & Member Count */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                          Duration / Tickets (Months) <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            required
+                            min={1}
+                            max={50}
+                            placeholder="20"
+                            value={newGroupDuration}
+                            onChange={(e) => handleDurationChange(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none transition-colors"
+                          />
+                        </div>
+                        {/* Duration Presets */}
+                        <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                          {[5, 10, 20, 25].map(val => {
+                            const isSelected = newGroupDuration === val.toString();
+                            return (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => {
+                                  triggerHapticFeedback('light');
+                                  handleDurationChange(val.toString());
+                                }}
+                                className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border ${
+                                  isSelected
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-200'
+                                    : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
+                                }`}
+                              >
+                                {val}m
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Schedule Row */}
+                    <div className="border-t border-gray-150 pt-4 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                      
+                      {/* Launch Date */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                          Launch Date / Month 0 Start <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="date"
+                            required
+                            value={newGroupStartDate}
+                            onChange={(e) => setNewGroupStartDate(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none font-semibold"
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-400 block">Sets Month 0 Launch &amp; baseline cycle origin</span>
+                      </div>
+
+                      {/* Recurring Auction Day of Month */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                          Auction Day of Month
+                        </label>
+                        <select
+                          value={newGroupAuctionDay}
+                          onChange={(e) => setNewGroupAuctionDay(Number(e.target.value))}
+                          className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-semibold focus:outline-none"
+                        >
+                          {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
+                            <option key={day} value={day}>
+                              {day}{day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th'} of every month {day === 10 ? '(Default)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-[10px] text-gray-400 block">Day for Month 1..N regular live auctions</span>
+                      </div>
+
+                      {/* Recurring Auction Time */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                          Auction Bidding Time
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="time"
+                            value={newGroupAuctionTime}
+                            onChange={(e) => setNewGroupAuctionTime(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-semibold focus:outline-none"
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-400 block">Default evening bidding session time</span>
+                      </div>
+
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Group Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. G-Elite-Weekly-301"
-                        value={newGroupName}
-                        onChange={(e) => setNewGroupName(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none"
-                      />
-                    </div>
+                  {/* Dynamic Real-time Chit Math Breakdown Card */}
+                  {Number(newGroupValue) > 0 && Number(newGroupDuration) > 0 && (
+                    <div className="bg-gradient-to-br from-indigo-50/70 via-indigo-50/30 to-purple-50/50 border border-indigo-150 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                          <Coins size={14} className="text-indigo-600" />
+                          Live Financial Projections
+                        </h5>
+                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-md">
+                          Rule: Duration = Member Count ({newGroupDuration} Tickets)
+                        </span>
+                      </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Total Pool Value (₹)</label>
-                      <input
-                        type="number"
-                        required
-                        placeholder="e.g. 100000"
-                        value={newGroupValue}
-                        onChange={(e) => setNewGroupValue(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none"
-                      />
-                      {/* Target Presets */}
-                      <div className="grid grid-cols-4 gap-1.5 mt-1.5">
-                        {[{ label: '₹1L', val: 100000 }, { label: '₹2L', val: 200000 }, { label: '₹5L', val: 500000 }, { label: '₹10L', val: 1000000 }].map(preset => (
-                          <button
-                            key={preset.label}
-                            type="button"
-                            onClick={() => setNewGroupValue(preset.val.toString())}
-                            className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] text-gray-700 font-bold py-1.5 rounded-lg transition-colors text-center active:scale-95"
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Monthly Due / Member</span>
+                          <strong className="text-sm sm:text-base font-extrabold text-indigo-700 mt-0.5 block">
+                            {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}
+                          </strong>
+                          <span className="text-[10px] text-gray-500">Per subscriber per month</span>
+                        </div>
+
+                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Month 0 Launch Pool</span>
+                          <strong className="text-sm sm:text-base font-extrabold text-amber-700 mt-0.5 block">
+                            {formatCurrency(Number(newGroupValue))}
+                          </strong>
+                          <span className="text-[10px] text-amber-600 font-semibold">Organizer Profit pool</span>
+                        </div>
+
+                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Chit Duration</span>
+                          <strong className="text-sm sm:text-base font-extrabold text-gray-900 mt-0.5 block">
+                            {newGroupDuration} Months
+                          </strong>
+                          <span className="text-[10px] text-gray-500">Month 0 to Month {Number(newGroupDuration) - 1}</span>
+                        </div>
+
+                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Recurring Auction</span>
+                          <strong className="text-xs sm:text-sm font-extrabold text-gray-900 mt-0.5 block">
+                            {newGroupAuctionDay}th · {formatTime12h(newGroupAuctionTime)}
+                          </strong>
+                          <span className="text-[10px] text-gray-500">Month 1 Live Bidding</span>
+                        </div>
                       </div>
                     </div>
+                  )}
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Duration / Member Count (Months)</label>
-                      <input
-                        type="number"
-                        required
-                        min={1}
-                        max={50}
-                        placeholder="e.g. 20"
-                        value={newGroupDuration}
-                        onChange={(e) => handleDurationChange(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none"
-                      />
-                      {/* Duration Presets */}
-                      <div className="grid grid-cols-4 gap-1.5 mt-1.5">
-                        {[10, 20, 25, 50].map(val => (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => handleDurationChange(val.toString())}
-                            className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[10px] text-gray-700 font-bold py-1.5 rounded-lg transition-colors text-center active:scale-95"
-                          >
-                            {val}m
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Launch Date / Month 0 Start</label>
-                      <input
-                        type="date"
-                        required
-                        value={newGroupStartDate}
-                        onChange={(e) => setNewGroupStartDate(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none font-semibold"
-                      />
-                      <span className="text-[10px] text-gray-400 block">Sets the start month for Month 0 Launch calculations</span>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-3 sm:pt-4 border-t border-gray-150">
+                  {/* Navigation Step 1 Footer */}
+                  <div className="flex justify-end pt-2">
                     <button
                       type="button"
                       disabled={!newGroupName.trim() || !newGroupValue || !newGroupDuration}
-                      onClick={() => setWizardStep(2)}
-                      className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs active:scale-95 w-full sm:w-auto"
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setWizardStep(2);
+                      }}
+                      className="bg-gray-900 hover:bg-black disabled:bg-gray-300 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all w-full sm:w-auto cursor-pointer disabled:cursor-not-allowed"
                     >
-                      Next: Assign Members <ArrowRight size={14} />
+                      <span>Proceed to Step 2: Assign Members</span>
+                      <ArrowRight size={14} />
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* STEP 2: ASSIGN MEMBERS */}
+              {/* ── STEP 2: ASSIGN GROUP MEMBERS ── */}
               {wizardStep === 2 && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-6 shadow-2xs">
-                  <div className="border-b border-gray-150 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-6 shadow-2xs animate-in fade-in duration-150">
+                  
+                  {/* Step 2 Header & Quick Actions Bar */}
+                  <div className="border-b border-gray-150 pb-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
-                      <h4 className="text-sm font-bold text-gray-900">Step 2: Assign Group Members</h4>
-                      <p className="text-xs text-gray-500 mt-0.5">Search &amp; assign subscribers to each ticket slot or register new members</p>
+                      <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                        <span>Step 2: Assign Group Subscribers ({enrollments.filter(e => e.name !== '').length} of {newGroupDuration})</span>
+                        {enrollments.every(e => e.name !== '') ? (
+                          <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Check size={11} /> 100% Enrolled
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                            {enrollments.filter(e => !e.name).length} Open Slot(s)
+                          </span>
+                        )}
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-0.5">Assign existing directory members to tickets, auto-fill open slots, or register new subscribers</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-colors w-fit ${
-                        enrollments.every(e => e.name !== '')
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-indigo-50 text-indigo-600 border-indigo-150'
-                      }`}>
-                        Enrolled: {enrollments.filter(e => e.name !== '').length} / {newGroupDuration} spots
-                      </span>
-                    </div>
-                  </div>
 
-                  {/* Fast Search & Auto-Suggest Combobox */}
-                  <div className="bg-gray-50/80 border border-gray-200 rounded-2xl p-3 sm:p-3.5 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                        Quick Search &amp; Assign Subscriber
-                      </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAutoFillAllSlots}
+                        className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs active:scale-95"
+                      >
+                        <Zap size={13} className="text-indigo-600" />
+                        <span>1-Click Auto-Fill Open Slots</span>
+                      </button>
+
+                      {enrollments.some(e => e.name) && (
+                        <button
+                          type="button"
+                          onClick={handleClearAllSlots}
+                          className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors active:scale-95"
+                        >
+                          <RotateCcw size={12} />
+                          <span>Clear All</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => {
+                          setTargetSlotForAssign(null);
                           setNewMemberName(memberSearchQuery.trim());
                           setNewMemberPhone('');
                           setShowCreateMemberModal(true);
                         }}
-                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 hover:underline"
+                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-xs active:scale-95"
                       >
-                        <UserPlus size={12} /> + Register New Member
+                        <UserPlus size={13} />
+                        <span>+ Register Member</span>
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Fast Search & Auto-Suggest Combobox */}
+                  <div className="bg-gray-50/90 border border-gray-200 rounded-2xl p-3 sm:p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block flex items-center gap-1">
+                        <Search size={12} /> Search &amp; Assign to {targetSlotForAssign !== null ? `Ticket #${targetSlotForAssign + 1}` : 'Next Open Slot'}
+                      </label>
+                      {targetSlotForAssign !== null && (
+                        <button
+                          type="button"
+                          onClick={() => setTargetSlotForAssign(null)}
+                          className="text-[10px] text-gray-500 hover:text-gray-900 underline font-semibold"
+                        >
+                          Cancel Slot #{targetSlotForAssign + 1} Target
+                        </button>
+                      )}
                     </div>
 
                     {(() => {
@@ -5253,12 +5596,12 @@ Thank you for your prompt payment! 🙏`;
 
                       return (
                         <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-gray-400">
+                          <span className="absolute left-3.5 top-2.5 text-gray-400">
                             <Search size={14} />
                           </span>
                           <input
                             type="text"
-                            placeholder="Type name to search or register..."
+                            placeholder={targetSlotForAssign !== null ? `Type name to assign to Ticket #${targetSlotForAssign + 1}...` : "Type subscriber name or phone to search..."}
                             value={memberSearchQuery}
                             onFocus={() => {
                               setIsSearchDropdownOpen(true);
@@ -5322,7 +5665,7 @@ Thank you for your prompt payment! 🙏`;
 
                           {/* Dropdown Suggestions */}
                           {isSearchDropdownOpen && memberSearchQuery.trim().length > 0 && (
-                            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-gray-100">
+                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-gray-100">
                               {/* Create Option (Index 0) */}
                               <div
                                 onClick={() => {
@@ -5346,7 +5689,7 @@ Thank you for your prompt payment! 🙏`;
                                 </span>
                               </div>
 
-                              {/* Matching Master Directory Members (Index 1..N) */}
+                              {/* Matching Master Directory Members */}
                               {filteredMembers.map((member, idx) => {
                                 const isAlreadyEnrolled = enrollments.some(
                                   e => e.name.toLowerCase() === member.name.toLowerCase()
@@ -5389,12 +5732,6 @@ Thank you for your prompt payment! 🙏`;
                                   </div>
                                 );
                               })}
-
-                              {filteredMembers.length === 0 && (
-                                <div className="p-3 text-center text-xs text-gray-400">
-                                  No existing subscribers matched &quot;{memberSearchQuery}&quot;. Press <strong>Enter</strong> to register this member.
-                                </div>
-                              )}
                             </div>
                           )}
                         </div>
@@ -5402,90 +5739,101 @@ Thank you for your prompt payment! 🙏`;
                     })()}
                   </div>
 
-                  {/* Group Enrollment Spots (Slots Grid) */}
+                  {/* Group Enrollment Slots Grid */}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                         Enrolled Tickets ({enrollments.filter(e => e.name !== '').length} of {newGroupDuration})
                       </h5>
                       <span className="text-[10px] text-gray-400">
-                        {enrollments.some(e => e.name === '') ? 'Fill open slots' : '✓ All tickets assigned!'}
+                        {enrollments.some(e => e.name === '') ? 'Tap an empty slot to search & assign' : '✓ All tickets assigned!'}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 max-h-[260px] overflow-y-auto pr-1">
-                      {enrollments.map((slot, index) => (
-                        <div 
-                          key={index} 
-                          className={`flex gap-2.5 items-center p-2.5 sm:p-3 rounded-2xl border transition-all ${
-                            slot.name 
-                              ? 'bg-white border-gray-200 shadow-2xs' 
-                              : 'border-dashed border-gray-200 bg-gray-50/50'
-                          }`}
-                        >
-                          <span className={`text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                            slot.name
-                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-150'
-                              : 'bg-gray-200 text-gray-500'
-                          }`}>
-                            #{index + 1}
-                          </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+                      {enrollments.map((slot, index) => {
+                        const isTargeted = targetSlotForAssign === index;
+                        return (
+                          <div 
+                            key={index} 
+                            className={`flex gap-2.5 items-center p-3 rounded-2xl border transition-all ${
+                              slot.name 
+                                ? 'bg-white border-gray-200 shadow-2xs hover:border-gray-300' 
+                                : isTargeted
+                                  ? 'border-indigo-500 bg-indigo-50/40 ring-2 ring-indigo-200'
+                                  : 'border-dashed border-gray-250 bg-gray-50/60 hover:bg-gray-100/70 hover:border-indigo-300 cursor-pointer'
+                            }`}
+                            onClick={() => {
+                              if (!slot.name) {
+                                triggerHapticFeedback('light');
+                                setTargetSlotForAssign(index);
+                                setIsSearchDropdownOpen(true);
+                              }
+                            }}
+                          >
+                            <span className={`text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                              slot.name
+                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-150'
+                                : isTargeted
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-gray-200 text-gray-500'
+                            }`}>
+                              #{index + 1}
+                            </span>
 
-                          {slot.name ? (
-                            <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                              <div className="truncate">
-                                <span className="text-xs font-bold text-gray-900 block truncate">{slot.name}</span>
-                                <span className="text-[10px] text-gray-500 mt-0.5 block truncate flex items-center gap-1">
-                                  <Phone size={10} className="text-gray-400 shrink-0" />
-                                  {slot.phone}
+                            {slot.name ? (
+                              <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                                <div className="truncate">
+                                  <span className="text-xs font-bold text-gray-900 block truncate">{slot.name}</span>
+                                  <span className="text-[10px] text-gray-500 mt-0.5 block truncate flex items-center gap-1">
+                                    <Phone size={10} className="text-gray-400 shrink-0" />
+                                    {slot.phone}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    triggerHapticFeedback('light');
+                                    handleClearSlot(index);
+                                  }}
+                                  title="Unassign member from this slot"
+                                  className="text-red-600 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-red-200 shrink-0 bg-red-50/50 hover:bg-red-50 transition-colors flex items-center gap-1 active:scale-95"
+                                >
+                                  <Trash2 size={11} /> Clear
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex-1 min-w-0 flex items-center justify-between">
+                                <span className={`text-xs font-semibold ${isTargeted ? 'text-indigo-700' : 'text-gray-400'}`}>
+                                  {isTargeted ? 'Targeting Slot...' : 'Click to Assign Slot'}
+                                </span>
+                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
+                                  + Fill
                                 </span>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => handleClearSlot(index)}
-                                title="Unassign member from this slot"
-                                className="text-red-600 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-red-200 shrink-0 bg-red-50/50 hover:bg-red-50 transition-colors flex items-center gap-1 active:scale-95"
-                              >
-                                <Trash2 size={11} /> Clear
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400 font-medium italic">Empty ticket slot #{index + 1}</span>
-                          )}
-                        </div>
-                      ))}
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Master Member Directory */}
                   <div className="space-y-3 border-t border-gray-150 pt-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div>
                         <h5 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
                           Master Subscriber Directory ({masterDirectory.length})
                         </h5>
-                        <p className="text-[11px] text-gray-500">Tap any subscriber to assign to next open slot</p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNewMemberName('');
-                            setNewMemberPhone('');
-                            setShowCreateMemberModal(true);
-                          }}
-                          className="bg-gray-900 hover:bg-black text-white font-bold text-[11px] px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs shrink-0 active:scale-95 w-full sm:w-auto justify-center"
-                        >
-                          <UserPlus size={13} /> + Add Member
-                        </button>
+                        <p className="text-[11px] text-gray-500">Click any subscriber to assign to next open slot</p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 max-h-[170px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-2.5 max-h-[160px] overflow-y-auto pr-1">
                       {masterDirectory.length === 0 ? (
                         <div className="col-span-full py-6 text-center text-xs text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                          No subscribers found in database. Tap <strong>&quot;+ Add Member&quot;</strong> to create one.
+                          No subscribers found in database. Tap <strong>&quot;+ Register Member&quot;</strong> to add one.
                         </div>
                       ) : (
                         masterDirectory.map((member, i) => {
@@ -5497,10 +5845,10 @@ Thank you for your prompt payment! 🙏`;
                               type="button"
                               disabled={isAlreadyAdded}
                               onClick={() => handleAssignExistingMember(member)}
-                              className={`p-2.5 sm:p-3 rounded-2xl border text-left transition-all relative active:scale-95 ${
+                              className={`p-2.5 rounded-xl border text-left transition-all relative active:scale-95 ${
                                 isAlreadyAdded 
                                   ? 'bg-gray-50 border-gray-200 opacity-50 cursor-not-allowed' 
-                                  : 'bg-white hover:bg-indigo-50/40 border-gray-200 hover:border-indigo-300 shadow-2xs'
+                                  : 'bg-white hover:bg-indigo-50/50 border-gray-200 hover:border-indigo-300 shadow-2xs'
                               }`}
                             >
                               <div className="flex items-start justify-between gap-1">
@@ -5523,98 +5871,170 @@ Thank you for your prompt payment! 🙏`;
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-4 border-t border-gray-150">
                     <button
                       type="button"
-                      onClick={() => setWizardStep(1)}
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setWizardStep(1);
+                      }}
                       className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
                     >
-                      Back
+                      <ArrowLeft size={13} className="inline mr-1" /> Back to Parameters
                     </button>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
                       <span className="text-[11px] text-gray-500 font-medium text-center sm:text-right">
-                        <strong>{enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration}</strong> assigned
+                        <strong>{enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration}</strong> tickets assigned
                         {enrollments.some(e => !e.name || e.name.trim() === '') && (
-                          <span className="text-amber-600 font-bold ml-1.5 block sm:inline">(Creates in Draft Mode)</span>
+                          <span className="text-amber-600 font-bold ml-1.5 block sm:inline">(Will create as Draft)</span>
                         )}
                       </span>
                       <button
                         type="button"
-                        onClick={() => setWizardStep(3)}
-                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
+                        onClick={() => {
+                          triggerHapticFeedback('light');
+                          setWizardStep(3);
+                        }}
+                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
                       >
-                        Next: Monthly Plan <ArrowRight size={14} />
+                        <span>Proceed to Step 3: Review</span>
+                        <ArrowRight size={14} />
                       </button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* STEP 3: MONTHLY PLAN REVIEW */}
+              {/* ── STEP 3: REVIEW & LAUNCH PLAN ── */}
               {wizardStep === 3 && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-6 shadow-2xs">
-                  <div className="border-b border-gray-150 pb-3">
-                    <h4 className="text-sm font-bold text-gray-900">Step 3: Review Monthly Plan</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">Verify baseline payments and member lists before finalizing</p>
-                  </div>
-
-                  {/* Review Summary Details Card */}
-                  <div className="p-3.5 sm:p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-3 sm:space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 text-xs">
-                      <div>
-                        <span className="text-gray-400 block text-[10px] uppercase font-bold">Group Name</span>
-                        <strong className="text-gray-900 mt-0.5 block truncate">{newGroupName}</strong>
-                      </div>
-                      <div>
-                        <span className="text-gray-400 block text-[10px] uppercase font-bold">Chit Value (Pool)</span>
-                        <strong className="text-indigo-600 mt-0.5 block truncate">{formatCurrency(Number(newGroupValue))}</strong>
-                      </div>
-                      <div>
-                        <span className="text-gray-400 block text-[10px] uppercase font-bold">Duration</span>
-                        <strong className="text-gray-900 mt-0.5 block truncate">{newGroupDuration} months</strong>
-                      </div>
-                      <div>
-                        <span className="text-gray-400 block text-[10px] uppercase font-bold">Monthly Installment</span>
-                        <strong className="text-emerald-700 mt-0.5 block truncate">
-                          {formatCurrency(Number(newGroupValue) / Number(newGroupDuration))}/member
-                        </strong>
-                      </div>
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 shadow-2xs animate-in fade-in duration-150">
+                  <div className="border-b border-gray-150 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900">Step 3: Verify Chit Plan &amp; Launch Schedule</h4>
+                      <p className="text-xs text-gray-500 mt-0.5">Review group parameters, member matrix, and timeline before creating in Supabase</p>
                     </div>
-
-                    <div className="border-t border-gray-200/80 pt-3">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                          Enrolled Subscribers ({enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration})
+                    <div>
+                      {enrollments.every(e => e.name !== '') ? (
+                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                          <CheckCircle2 size={12} /> Ready for Active Launch
                         </span>
-                        {enrollments.some(e => !e.name || e.name.trim() === '') && (
-                          <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                            Draft Mode
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 sm:gap-2 max-h-36 overflow-y-auto">
-                        {enrollments.map((slot, index) => (
-                          <span key={index} className={`border text-[10px] px-2.5 py-1 rounded-lg shadow-2xs ${
-                            slot.name ? 'bg-white border-gray-200 text-gray-800 font-semibold' : 'bg-amber-50/50 border-amber-200 text-amber-700 italic'
-                          }`}>
-                            Ticket #{index + 1}: {slot.name || 'Open Slot'}
-                          </span>
-                        ))}
-                      </div>
+                      ) : (
+                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                          Draft Mode ({enrollments.filter(e => !e.name).length} Open Slots)
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 sm:pt-4 border-t border-gray-150">
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Group Name</span>
+                      <strong className="text-gray-900 mt-0.5 block truncate text-sm font-bold">{newGroupName}</strong>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Chit Value (Pool)</span>
+                      <strong className="text-indigo-600 mt-0.5 block truncate text-sm font-extrabold">{formatCurrency(Number(newGroupValue))}</strong>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Duration</span>
+                      <strong className="text-gray-900 mt-0.5 block truncate text-sm font-bold">{newGroupDuration} Months ({newGroupDuration} Tickets)</strong>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Monthly Due</span>
+                      <strong className="text-emerald-700 mt-0.5 block truncate text-sm font-extrabold">
+                        {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))} / member
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Operational Timeline Preview Box */}
+                  <div className="bg-gradient-to-br from-gray-50 via-indigo-50/20 to-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
+                    <h5 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                      <CalendarDays size={14} className="text-indigo-600" />
+                      Chit Lifecycle &amp; Auction Timeline
+                    </h5>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      
+                      {/* Month 0 Card */}
+                      <div className="bg-white border border-amber-200 rounded-xl p-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-amber-900 flex items-center gap-1">
+                            <Rocket size={12} className="text-amber-600" /> Month 0: Launch Month
+                          </span>
+                          <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                            Organizer Profit
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-600">
+                          Starts on <strong>{newGroupStartDate}</strong>. All {newGroupDuration} subscribers pay their first installment (₹{Math.round(Number(newGroupValue) / Number(newGroupDuration)).toLocaleString('en-IN')}).
+                        </p>
+                        <p className="text-[11px] text-amber-700 font-semibold">
+                          Total ₹{Number(newGroupValue).toLocaleString('en-IN')} allocated directly as Organizer Profit (No auction held).
+                        </p>
+                      </div>
+
+                      {/* Month 1 Card */}
+                      <div className="bg-white border border-indigo-200 rounded-xl p-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-indigo-950 flex items-center gap-1">
+                            <Trophy size={12} className="text-indigo-600" /> Month 1: 1st Live Auction
+                          </span>
+                          <span className="text-[9px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
+                            Live Bidding
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-600">
+                          Scheduled on <strong>{newGroupAuctionDay}th of next month · {formatTime12h(newGroupAuctionTime)}</strong>.
+                        </p>
+                        <p className="text-[11px] text-indigo-700 font-semibold">
+                          Winning discount accumulates into the group Discount Pool (<code>kai_iruppu_pool</code>) towards future Laaba Seetu.
+                        </p>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Enrolled Subscribers Grid */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                        Enrolled Subscribers Matrix ({enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration})
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1">
+                      {enrollments.map((slot, index) => (
+                        <span key={index} className={`border text-[11px] px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-1.5 ${
+                          slot.name 
+                            ? 'bg-white border-gray-200 text-gray-800 font-semibold' 
+                            : 'bg-amber-50/50 border-amber-200 text-amber-700 italic'
+                        }`}>
+                          <span className="w-4 h-4 rounded-full bg-gray-100 text-gray-600 text-[9px] font-bold flex items-center justify-center">
+                            {index + 1}
+                          </span>
+                          <span>{slot.name || 'Open Slot'}</span>
+                          {slot.phone && <span className="text-[10px] text-gray-400">({slot.phone})</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Navigation Step 3 Buttons */}
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pt-4 border-t border-gray-150">
                     <button
                       type="button"
-                      onClick={() => setWizardStep(2)}
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setWizardStep(2);
+                      }}
                       className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
                     >
-                      Back
+                      <ArrowLeft size={13} className="inline mr-1" /> Back to Members
                     </button>
                     <button
                       type="button"
                       disabled={isCreatingGroup}
                       onClick={handleCreateGroup}
-                      className={`font-bold text-xs px-6 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95 ${
+                      className={`font-bold text-xs px-7 py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs active:scale-95 cursor-pointer ${
                         isCreatingGroup
                           ? 'bg-gray-400 text-white cursor-not-allowed'
                           : 'bg-gray-900 hover:bg-black text-white'
@@ -5622,10 +6042,14 @@ Thank you for your prompt payment! 🙏`;
                     >
                       {isCreatingGroup ? (
                         <>
-                          <RefreshCw size={13} className="animate-spin" /> Creating Group in Supabase...
+                          <RefreshCw size={14} className="animate-spin" />
+                          <span>Saving Group in Supabase...</span>
                         </>
                       ) : (
-                        'Create Group & Enroll Slots'
+                        <>
+                          <Rocket size={14} />
+                          <span>Create Chit Group &amp; Enroll Slots</span>
+                        </>
                       )}
                     </button>
                   </div>
