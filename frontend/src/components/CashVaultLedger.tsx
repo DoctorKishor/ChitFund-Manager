@@ -4,40 +4,29 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useWallet, WalletType } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase/client';
-import { canAccessTreasurySubtab } from '@/utils/rbac';
-import { HelpTooltip } from './HelpTooltip';
+import { triggerHapticFeedback } from '@/utils/haptics';
 import { 
   Wallet, 
   Landmark, 
   Coins, 
-  Plus, 
-  Trash2,
-  Banknote,
-  Check,
+  Banknote, 
+  Check, 
   AlertCircle, 
-  Mic, 
   History, 
-  Activity, 
   Calculator, 
   CreditCard, 
   Search, 
-  ChevronRight, 
   RefreshCw, 
   ArrowRightLeft, 
-  PieChart,
-  User,
-  UserCheck,
-  CheckCircle2,
-  Sparkles,
-  Clock,
-  ArrowDownLeft,
-  ArrowUpRight,
-  HelpCircle,
-  X,
-  Layers,
-  ShieldCheck,
-  HandCoins,
-  RotateCcw
+  Clock, 
+  X, 
+  ShieldCheck, 
+  Printer,
+  ChevronDown,
+  ArrowRight,
+  TrendingDown,
+  TrendingUp,
+  Plus
 } from 'lucide-react';
 
 export type CashHandlingSubtab = 
@@ -48,28 +37,18 @@ export type CashHandlingSubtab =
   | 'denominations' 
   | 'ledger';
 
-interface SubtabConfig {
-  id: CashHandlingSubtab;
-  label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  description: string;
-}
-
-const CASH_SUBTABS: SubtabConfig[] = [
-  { id: 'overview', label: 'Overview', icon: PieChart, description: 'High-level treasury summary, vault allocations & quick actions' },
-  { id: 'wallets', label: 'Wallets (GPay)', icon: CreditCard, description: 'Dedicated GPay-style statement cards for each account' },
-  { id: 'transfers', label: 'Move Money', icon: ArrowRightLeft, description: 'Inter-vault transfers, ATM cash withdrawals & deposits' },
-  { id: 'spends', label: 'Personal Draws', icon: Coins, description: 'Personal expense logger, petrol/maintenance & category budgets' },
-  { id: 'denominations', label: 'Denominations', icon: Calculator, description: 'Physical cash box note counter & reconciliation disparity check' },
-  { id: 'ledger', label: 'Audit Ledger', icon: History, description: 'Complete transaction timeline & printable treasury statement' },
-];
-
-interface Relocation {
+interface TreasuryTx {
   id: string;
-  source: Exclude<WalletType, 'cash_in_hand'>;
+  created_at: string;
+  type: string;
+  status?: 'completed' | 'pending_verification' | string;
   amount: number;
-  status: 'pending_verification' | 'completed';
-  createdAt: string;
+  wallet_type: WalletType;
+  notes?: string;
+  description?: string;
+  group_id?: string;
+  profile_id?: string;
+  group_member_id?: string;
 }
 
 interface PersonalDraw {
@@ -104,34 +83,20 @@ interface FloatingDeposit {
   status: 'active' | 'recovered';
 }
 
-interface TreasuryTx {
-  id: string;
-  created_at: string;
-  type: string;
-  status?: 'completed' | 'pending_verification' | string;
-  amount: number;
-  wallet_type: WalletType;
-  notes?: string;
-  description?: string;
-  group_id?: string;
-  profile_id?: string;
-  group_member_id?: string;
-}
-
 export default function CashVaultLedger() {
   const { balances, updateBalance, loading: walletLoading } = useWallet();
   const { profile } = useAuth();
   const activeAdminName = profile?.fullName || 'Admin';
 
-  const [activeSubtab, setActiveSubtab] = useState<CashHandlingSubtab>('overview');
-  const [selectedWalletDetail, setSelectedWalletDetail] = useState<WalletType>('cash_in_hand');
+  // Active filter for account cards & statement
+  const [selectedWalletFilter, setSelectedWalletFilter] = useState<'all' | WalletType>('all');
 
   // Supabase Data State
   const [loading, setLoading] = useState<boolean>(true);
   const [recentTransactions, setRecentTransactions] = useState<TreasuryTx[]>([]);
 
-  // Operational State
-  const [personalDraws, setPersonalDraws] = useState<PersonalDraw[]>([]);
+  // Active Modal Dialog States
+  const [activeModal, setActiveModal] = useState<'none' | 'atm' | 'spend' | 'deposit' | 'transfer' | 'denominations' | 'settle' | 'recover'>('none');
 
   // Form State: External Cash Deposit / Float Inflow
   const [depositDest, setDepositDest] = useState<WalletType>('cash_in_hand');
@@ -152,6 +117,7 @@ export default function CashVaultLedger() {
   // Form State: ATM Relocation
   const [relocateSource, setRelocateSource] = useState<Exclude<WalletType, 'cash_in_hand'>>('kishor_bank');
   const [relocateAmount, setRelocateAmount] = useState<string>('');
+  const [isVerifyingAtmId, setIsVerifyingAtmId] = useState<string | null>(null);
 
   // Form State: Personal Draw
   const [spendAmount, setSpendAmount] = useState<string>('');
@@ -174,11 +140,6 @@ export default function CashVaultLedger() {
   const [recoverAmount, setRecoverAmount] = useState<string>('');
   const [isProcessingRecover, setIsProcessingRecover] = useState<boolean>(false);
 
-  // Personal Draws Filter & Search
-  const [personalDrawStatusFilter, setPersonalDrawStatusFilter] = useState<'all' | 'outstanding' | 'settled'>('all');
-  const [personalDrawPersonFilter, setPersonalDrawPersonFilter] = useState<string>('all');
-  const [personalDrawSearch, setPersonalDrawSearch] = useState<string>('');
-
   // Denomination Counter State
   const [denominations, setDenominations] = useState<{ [key: number]: number }>({
     500: 0,
@@ -190,17 +151,14 @@ export default function CashVaultLedger() {
   });
   const [lastReconciliationNote, setLastReconciliationNote] = useState<string | null>(null);
 
-  // Ledger Filter State
+  // Ledger Filter & Search
   const [ledgerSearch, setLedgerSearch] = useState<string>('');
-  const [ledgerWalletFilter, setLedgerWalletFilter] = useState<string>('all');
   const [ledgerTypeFilter, setLedgerTypeFilter] = useState<string>('all');
 
   // Fetch initial data
   const fetchData = async () => {
     try {
       setLoading(true);
-
-      // Fetch treasury transactions
       const { data: txs } = await supabase
         .from('transactions')
         .select('*')
@@ -218,6 +176,18 @@ export default function CashVaultLedger() {
 
   useEffect(() => {
     fetchData();
+
+    // Subscribe to realtime transaction ledger updates
+    const channel = supabase
+      .channel('realtime_treasury_ledger_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Format INR Currency
@@ -247,9 +217,9 @@ export default function CashVaultLedger() {
       name: 'Physical Cash Box',
       owner: 'On-Premises Locker',
       accountNumber: 'Vault #01',
-      typeLabel: 'Cash Vault · Physical Liquidity',
-      bgGradient: 'from-emerald-50/80 via-teal-50/40 to-white',
-      borderClass: 'border-emerald-200/90 hover:border-emerald-300',
+      typeLabel: 'Cash Vault · Physical Box',
+      bgGradient: 'from-emerald-50 via-teal-50/40 to-white',
+      borderClass: 'border-emerald-300',
       textAccent: 'text-emerald-700',
       dotColor: 'bg-emerald-500',
       badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -257,12 +227,12 @@ export default function CashVaultLedger() {
       icon: Banknote,
     },
     kishor_bank: {
-      name: 'Kishor Bank',
+      name: 'Kishor Bank (UPI)',
       owner: 'Dr. Kishor Anbazhakan',
-      accountNumber: '•••• 8492 · UPI / NetBanking',
+      accountNumber: '•••• 8492 · Primary Digital',
       typeLabel: 'Digital Vault · Primary Inflow',
-      bgGradient: 'from-blue-50/80 via-indigo-50/40 to-white',
-      borderClass: 'border-blue-200/90 hover:border-blue-300',
+      bgGradient: 'from-blue-50 via-indigo-50/40 to-white',
+      borderClass: 'border-blue-300',
       textAccent: 'text-blue-700',
       dotColor: 'bg-blue-500',
       badgeBg: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -270,12 +240,12 @@ export default function CashVaultLedger() {
       icon: Landmark,
     },
     dad_bank: {
-      name: 'Anbazhakan Bank',
+      name: "Dad's Bank (Anbazhakan)",
       owner: 'Anbazhakan (Dad)',
       accountNumber: '•••• 3108 · Primary Banking',
-      typeLabel: 'Disbursement Vault · Primary Channel',
-      bgGradient: 'from-purple-50/80 via-fuchsia-50/40 to-white',
-      borderClass: 'border-purple-200/90 hover:border-purple-300',
+      typeLabel: 'Disbursement Vault · Primary Banking',
+      bgGradient: 'from-purple-50 via-fuchsia-50/40 to-white',
+      borderClass: 'border-purple-300',
       textAccent: 'text-purple-700',
       dotColor: 'bg-purple-500',
       badgeBg: 'bg-purple-100 text-purple-800 border-purple-200',
@@ -283,12 +253,12 @@ export default function CashVaultLedger() {
       icon: CreditCard,
     },
     mom_bank: {
-      name: 'Parimalam Bank',
+      name: "Mom's Bank (Parimalam)",
       owner: 'Parimalam (Mom)',
-      accountNumber: '•••• 5521 · Reserve Channel',
+      accountNumber: '•••• 5521 · Reserve Account',
       typeLabel: 'Reserve Vault · Secondary Channel',
-      bgGradient: 'from-amber-50/80 via-orange-50/40 to-white',
-      borderClass: 'border-amber-200/90 hover:border-amber-300',
+      bgGradient: 'from-amber-50 via-orange-50/40 to-white',
+      borderClass: 'border-amber-300',
       textAccent: 'text-amber-700',
       dotColor: 'bg-amber-500',
       badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -302,50 +272,11 @@ export default function CashVaultLedger() {
     return (balances.cash_in_hand || 0) + (balances.kishor_bank || 0) + (balances.dad_bank || 0) + (balances.mom_bank || 0);
   }, [balances]);
 
-  const physicalCashPercent = totalTreasuryBalance > 0 
-    ? Math.round(((balances.cash_in_hand || 0) / totalTreasuryBalance) * 100) 
-    : 0;
-
-  const digitalBanksPercent = 100 - physicalCashPercent;
-
-  // Filtered transactions for active wallet in Subtab 2 (GPay Wallet Page)
-  const walletSpecificTxs = useMemo(() => {
-    return recentTransactions.filter(t => {
-      // 1. Direct wallet_type match (e.g. cash_in_hand or explicit bank)
-      if (t.wallet_type === selectedWalletDetail) return true;
-
-      const notes = (t.notes || t.description || '').toLowerCase();
-
-      // 2. ATM Relocations: check if this bank was the source account debited
-      if (t.type === 'atm_withdrawal') {
-        if (selectedWalletDetail === 'kishor_bank' && (notes.includes('kishor') || (!notes.includes('dad') && !notes.includes('mom')))) {
-          return true;
-        }
-        if (selectedWalletDetail === 'dad_bank' && notes.includes('dad')) {
-          return true;
-        }
-        if (selectedWalletDetail === 'mom_bank' && notes.includes('mom')) {
-          return true;
-        }
-      }
-
-      // 3. Inter-Vault Transfers: check if this wallet is mentioned as source or destination
-      if (t.type === 'transfer') {
-        const wName = (WALLET_META[selectedWalletDetail]?.name || '').toLowerCase();
-        if (notes.includes(selectedWalletDetail) || (wName && notes.includes(wName))) {
-          return true;
-        }
-      }
-
-      return false;
-    });
-  }, [recentTransactions, selectedWalletDetail]);
-
   // Helper to accurately classify if a treasury movement is an Inflow/Credit (+) or Outflow/Debit (-)
-  const getTxDirection = (tx: TreasuryTx, perspectiveWallet?: WalletType): { isCredit: boolean; badgeLabel: string; badgeColor: string } => {
+  const getTxDirection = (tx: TreasuryTx, perspectiveWallet?: WalletType | 'all'): { isCredit: boolean; badgeLabel: string; badgeColor: string } => {
     const type = tx.type;
     const notes = (tx.notes || tx.description || '').toLowerCase();
-    const targetWallet = perspectiveWallet || tx.wallet_type;
+    const targetWallet = perspectiveWallet && perspectiveWallet !== 'all' ? perspectiveWallet : tx.wallet_type;
 
     // 1. Collections are ALWAYS Inflow/Credit
     if (type === 'collection') {
@@ -406,69 +337,27 @@ export default function CashVaultLedger() {
     return { isCredit: false, badgeLabel: 'OUTFLOW (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' };
   };
 
-  const walletStats = useMemo(() => {
-    const txs = walletSpecificTxs;
-    const totalInflow = txs
-      .filter(t => getTxDirection(t, selectedWalletDetail).isCredit)
-      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  // ATM Relocations awaiting Physical Cash Box Verification
+  const pendingRelocations = useMemo(() => {
+    return recentTransactions
+      .filter(tx => tx.type === 'atm_withdrawal' && tx.status === 'pending_verification')
+      .map(tx => {
+        let source: Exclude<WalletType, 'cash_in_hand'> = 'kishor_bank';
+        const n = (tx.notes || '').toLowerCase();
+        if (n.includes('dad')) source = 'dad_bank';
+        else if (n.includes('mom')) source = 'mom_bank';
+        else if (n.includes('kishor')) source = 'kishor_bank';
 
-    const totalOutflow = txs
-      .filter(t => !getTxDirection(t, selectedWalletDetail).isCredit)
-      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-    const netFlow = totalInflow - totalOutflow;
-
-    return {
-      totalInflow,
-      totalOutflow,
-      netFlow,
-      count: txs.length,
-    };
-  }, [walletSpecificTxs, selectedWalletDetail]);
-
-  // Denomination Calculations
-  const calculatedPhysicalCash = useMemo(() => {
-    return (
-      (denominations[500] || 0) * 500 +
-      (denominations[200] || 0) * 200 +
-      (denominations[100] || 0) * 100 +
-      (denominations[50] || 0) * 50 +
-      (denominations[20] || 0) * 20 +
-      (denominations[10] || 0) * 10
-    );
-  }, [denominations]);
-
-  const cashDisparity = calculatedPhysicalCash - (balances.cash_in_hand || 0);
-
-  // Filtered master ledger
-  const filteredMasterLedger = useMemo(() => {
-    return recentTransactions.filter((tx) => {
-      const notes = (tx.notes || tx.description || '').toLowerCase();
-      const matchesWallet = ledgerWalletFilter === 'all' || 
-        tx.wallet_type === ledgerWalletFilter ||
-        (tx.type === 'atm_withdrawal' && (
-          (ledgerWalletFilter === 'kishor_bank' && (notes.includes('kishor') || (!notes.includes('dad') && !notes.includes('mom')))) ||
-          (ledgerWalletFilter === 'dad_bank' && notes.includes('dad')) ||
-          (ledgerWalletFilter === 'mom_bank' && notes.includes('mom'))
-        )) ||
-        (tx.type === 'transfer' && (
-          (ledgerWalletFilter === 'kishor_bank' && notes.includes('kishor')) ||
-          (ledgerWalletFilter === 'dad_bank' && notes.includes('dad')) ||
-          (ledgerWalletFilter === 'mom_bank' && notes.includes('mom')) ||
-          (ledgerWalletFilter === 'cash_in_hand' && notes.includes('cash'))
-        ));
-
-      const matchesType = ledgerTypeFilter === 'all' || tx.type === ledgerTypeFilter;
-      const q = ledgerSearch.toLowerCase().trim();
-      const matchesSearch = !q || 
-        (tx.notes && tx.notes.toLowerCase().includes(q)) ||
-        (tx.description && tx.description.toLowerCase().includes(q)) ||
-        String(tx.amount).includes(q) ||
-        tx.type.toLowerCase().includes(q);
-
-      return matchesWallet && matchesType && matchesSearch;
-    });
-  }, [recentTransactions, ledgerWalletFilter, ledgerTypeFilter, ledgerSearch]);
+        return {
+          id: tx.id,
+          source,
+          amount: Number(tx.amount || 0),
+          status: 'pending_verification' as const,
+          createdAt: new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          notes: tx.notes || '',
+        };
+      });
+  }, [recentTransactions]);
 
   // Computed Personal Draws from Supabase transactions ledger
   const computedPersonalDraws = useMemo<PersonalDraw[]>(() => {
@@ -477,7 +366,6 @@ export default function CashVaultLedger() {
       .map((tx) => {
         const notes = tx.notes || '';
         
-        // Extract Tag
         let tag: PersonalDraw['tag'] = 'Personal Expense';
         const tagMatch = notes.match(/^\[(.*?)\]/);
         if (tagMatch) {
@@ -487,35 +375,21 @@ export default function CashVaultLedger() {
           }
         }
 
-        // Extract Taken By
+        const isSettled = notes.toLowerCase().includes('status: settled') || notes.toLowerCase().includes('status: repaid');
+        const status: 'outstanding' | 'settled' = isSettled ? 'settled' : 'outstanding';
+
         let takenBy = 'Dad (Anbazhakan)';
         const takenByMatch = notes.match(/Taken By:\s*([^|]+)/i);
         if (takenByMatch) {
           takenBy = takenByMatch[1].trim();
         }
 
-        // Extract Status & Settlement metadata
-        let status: 'outstanding' | 'settled' = 'outstanding';
-        let settlementDetails: PersonalDraw['settlementDetails'] = undefined;
-        
-        if (notes.toLowerCase().includes('status: settled') || notes.toLowerCase().includes('status: repaid')) {
-          status = 'settled';
-          const settledMatch = notes.match(/Status:\s*Settled\s*\(([^)]+)\)/i);
-          const detailStr = settledMatch ? settledMatch[1] : 'Settled';
-          const isVaultRepay = detailStr.toLowerCase().includes('repaid') || detailStr.toLowerCase().includes('cash box') || detailStr.toLowerCase().includes('bank');
-          settlementDetails = {
-            settledAt: new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-            settlementMode: isVaultRepay ? 'vault_repay' : 'member_offset',
-            notes: detailStr
-          };
-        }
-
-        // Clean Description
         const desc = notes
-          .replace(/^\[.*?\]\s*/, '')
+          .replace(/\[.*?\]\s*/, '')
+          .replace(/\|\s*Admin Logged:[^|]+/i, '')
           .replace(/\|\s*Taken By:[^|]+/i, '')
           .replace(/\|\s*Status:[^|]+/i, '')
-          .trim() || `${tag} draw`;
+          .trim() || 'Personal Draw';
 
         return {
           id: tx.id,
@@ -529,75 +403,25 @@ export default function CashVaultLedger() {
           timestamp: new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           created_at: tx.created_at,
           status,
-          settlementDetails
         };
       });
   }, [recentTransactions]);
 
-  // Outstanding Debt Summary per person
-  const personalDrawStats = useMemo(() => {
-    const outstanding = computedPersonalDraws.filter(d => d.status === 'outstanding');
-    const totalOutstanding = outstanding.reduce((sum, d) => sum + d.amount, 0);
-
-    const dadOutstanding = outstanding
-      .filter(d => d.takenBy.toLowerCase().includes('dad') || d.takenBy.toLowerCase().includes('anbazhakan'))
-      .reduce((sum, d) => sum + d.amount, 0);
-
-    const momOutstanding = outstanding
-      .filter(d => d.takenBy.toLowerCase().includes('mom') || d.takenBy.toLowerCase().includes('parimalam'))
-      .reduce((sum, d) => sum + d.amount, 0);
-
-    const kishorOutstanding = outstanding
-      .filter(d => d.takenBy.toLowerCase().includes('kishor'))
-      .reduce((sum, d) => sum + d.amount, 0);
-
-    const othersOutstanding = outstanding
-      .filter(d => !d.takenBy.toLowerCase().includes('dad') && !d.takenBy.toLowerCase().includes('anbazhakan') && !d.takenBy.toLowerCase().includes('mom') && !d.takenBy.toLowerCase().includes('parimalam') && !d.takenBy.toLowerCase().includes('kishor'))
-      .reduce((sum, d) => sum + d.amount, 0);
-
-    const totalSettled = computedPersonalDraws.filter(d => d.status === 'settled').reduce((sum, d) => sum + d.amount, 0);
-
-    return {
-      totalOutstanding,
-      dadOutstanding,
-      momOutstanding,
-      kishorOutstanding,
-      othersOutstanding,
-      totalSettled,
-      outstandingCount: outstanding.length,
-      settledCount: computedPersonalDraws.length - outstanding.length,
-    };
+  // Outstanding Personal Draws
+  const outstandingPersonalDraws = useMemo(() => {
+    return computedPersonalDraws.filter(d => d.status === 'outstanding');
   }, [computedPersonalDraws]);
 
-  // Filtered personal draws for UI
-  const filteredPersonalDraws = useMemo(() => {
-    return computedPersonalDraws.filter((draw) => {
-      if (personalDrawStatusFilter !== 'all' && draw.status !== personalDrawStatusFilter) return false;
-      if (personalDrawPersonFilter === 'dad' && !(draw.takenBy.toLowerCase().includes('dad') || draw.takenBy.toLowerCase().includes('anbazhakan'))) return false;
-      if (personalDrawPersonFilter === 'mom' && !(draw.takenBy.toLowerCase().includes('mom') || draw.takenBy.toLowerCase().includes('parimalam'))) return false;
-      if (personalDrawPersonFilter === 'kishor' && !draw.takenBy.toLowerCase().includes('kishor')) return false;
-      if (personalDrawPersonFilter === 'other' && (draw.takenBy.toLowerCase().includes('dad') || draw.takenBy.toLowerCase().includes('anbazhakan') || draw.takenBy.toLowerCase().includes('mom') || draw.takenBy.toLowerCase().includes('parimalam') || draw.takenBy.toLowerCase().includes('kishor'))) return false;
+  const totalOutstandingDebt = useMemo(() => {
+    return outstandingPersonalDraws.reduce((sum, d) => sum + d.amount, 0);
+  }, [outstandingPersonalDraws]);
 
-      const q = personalDrawSearch.toLowerCase().trim();
-      if (q) {
-        return (
-          draw.description.toLowerCase().includes(q) ||
-          draw.takenBy.toLowerCase().includes(q) ||
-          draw.tag.toLowerCase().includes(q) ||
-          String(draw.amount).includes(q)
-        );
-      }
-      return true;
-    });
-  }, [computedPersonalDraws, personalDrawStatusFilter, personalDrawPersonFilter, personalDrawSearch]);
-
-  // Computed Floating Deposits from Supabase transactions ledger
+  // Computed Floating Deposits
   const computedFloatingDeposits = useMemo<FloatingDeposit[]>(() => {
     return recentTransactions
-      .filter((t) => t.notes && t.notes.includes('[Floating Deposit'))
+      .filter((t) => t.type === 'transfer' && (t.notes || '').toLowerCase().includes('[floating deposit'))
       .map((tx) => {
         const notes = tx.notes || '';
-        
         let depositedBy = 'Dad (Anbazhakan)';
         const byMatch = notes.match(/Deposited By:\s*([^|]+)/i);
         if (byMatch) {
@@ -633,70 +457,276 @@ export default function CashVaultLedger() {
       });
   }, [recentTransactions]);
 
-  // ATM Relocations awaiting Physical Cash Box Verification
-  const computedRelocations = useMemo(() => {
-    return recentTransactions
-      .filter(tx => tx.type === 'atm_withdrawal' && tx.status === 'pending_verification')
-      .map(tx => {
-        let source: Exclude<WalletType, 'cash_in_hand'> = 'kishor_bank';
-        const n = (tx.notes || '').toLowerCase();
-        if (n.includes('dad')) source = 'dad_bank';
-        else if (n.includes('mom')) source = 'mom_bank';
-        else if (n.includes('kishor')) source = 'kishor_bank';
-
-        return {
-          id: tx.id,
-          source,
-          amount: Number(tx.amount || 0),
-          status: 'pending_verification' as const,
-          createdAt: new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          notes: tx.notes || '',
-        };
-      });
-  }, [recentTransactions]);
-
-  // Floating Capital Stats (Active Floating Deposits per person)
-  const floatStats = useMemo(() => {
-    const active = computedFloatingDeposits.filter(f => f.status === 'active');
-    const totalActiveFloat = active.reduce((sum, f) => sum + f.amount, 0);
-
-    const dadFloat = active
-      .filter(f => f.depositedBy.toLowerCase().includes('dad') || f.depositedBy.toLowerCase().includes('anbazhakan'))
-      .reduce((sum, f) => sum + f.amount, 0);
-
-    const momFloat = active
-      .filter(f => f.depositedBy.toLowerCase().includes('mom') || f.depositedBy.toLowerCase().includes('parimalam'))
-      .reduce((sum, f) => sum + f.amount, 0);
-
-    const kishorFloat = active
-      .filter(f => f.depositedBy.toLowerCase().includes('kishor'))
-      .reduce((sum, f) => sum + f.amount, 0);
-
-    return {
-      totalActiveFloat,
-      dadFloat,
-      momFloat,
-      kishorFloat,
-      activeCount: active.length,
-    };
+  const activeFloatingDeposits = useMemo(() => {
+    return computedFloatingDeposits.filter(f => f.status === 'active');
   }, [computedFloatingDeposits]);
 
-  // Action: External Deposit / Float Injection
+  // Master Transaction Feed filtered by active wallet and type
+  const filteredTransactions = useMemo(() => {
+    return recentTransactions.filter((tx) => {
+      const notes = (tx.notes || tx.description || '').toLowerCase();
+      
+      // Wallet account match
+      let matchesWallet = true;
+      if (selectedWalletFilter !== 'all') {
+        matchesWallet = tx.wallet_type === selectedWalletFilter ||
+          (tx.type === 'atm_withdrawal' && (
+            (selectedWalletFilter === 'kishor_bank' && (notes.includes('kishor') || (!notes.includes('dad') && !notes.includes('mom')))) ||
+            (selectedWalletFilter === 'dad_bank' && notes.includes('dad')) ||
+            (selectedWalletFilter === 'mom_bank' && notes.includes('mom'))
+          )) ||
+          (tx.type === 'transfer' && (
+            (selectedWalletFilter === 'kishor_bank' && notes.includes('kishor')) ||
+            (selectedWalletFilter === 'dad_bank' && notes.includes('dad')) ||
+            (selectedWalletFilter === 'mom_bank' && notes.includes('mom')) ||
+            (selectedWalletFilter === 'cash_in_hand' && notes.includes('cash'))
+          ));
+      }
+
+      // Type match
+      let matchesType = true;
+      if (ledgerTypeFilter !== 'all') {
+        matchesType = tx.type === ledgerTypeFilter;
+      }
+
+      // Search match
+      const q = ledgerSearch.toLowerCase().trim();
+      const matchesSearch = !q || 
+        (tx.notes && tx.notes.toLowerCase().includes(q)) ||
+        (tx.description && tx.description.toLowerCase().includes(q)) ||
+        String(tx.amount).includes(q) ||
+        tx.type.toLowerCase().includes(q);
+
+      return matchesWallet && matchesType && matchesSearch;
+    });
+  }, [recentTransactions, selectedWalletFilter, ledgerTypeFilter, ledgerSearch]);
+
+  // Denomination Calculations
+  const calculatedPhysicalCash = useMemo(() => {
+    return (
+      (denominations[500] || 0) * 500 +
+      (denominations[200] || 0) * 200 +
+      (denominations[100] || 0) * 100 +
+      (denominations[50] || 0) * 50 +
+      (denominations[20] || 0) * 20 +
+      (denominations[10] || 0) * 10
+    );
+  }, [denominations]);
+
+  const cashDisparity = calculatedPhysicalCash - (balances.cash_in_hand || 0);
+
+  // ── ACTION HANDLERS ──────────────────────────────────────────────────────────
+
+  // 1. ATM Trigger (Step 1)
+  const handleTriggerATM = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = Number(relocateAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid withdrawal amount.");
+      return;
+    }
+    if (balances[relocateSource] < amount) {
+      alert(`Insufficient balance in ${WALLET_META[relocateSource].name}. Available: ${formatCurrency(balances[relocateSource])}`);
+      return;
+    }
+
+    try {
+      setIsProcessingTransfer(true);
+      await updateBalance(relocateSource, -amount);
+      const sourceName = WALLET_META[relocateSource].name;
+
+      const { error } = await supabase.from('transactions').insert([
+        {
+          wallet_type: 'cash_in_hand',
+          type: 'atm_withdrawal',
+          status: 'pending_verification',
+          amount: amount,
+          notes: `[ATM Relocation] From: ${sourceName} -> Cash Box | Pending Physical Verification`,
+          created_by: profile?.id || null,
+        }
+      ]);
+
+      if (error) throw error;
+
+      await supabase.from('security_audit_logs').insert({
+        action_description: `ATM RELOCATION TRIGGERED: ₹${amount.toLocaleString('en-IN')} debited from ${sourceName}. Pending physical cash box confirmation.`,
+        target_table: 'transactions',
+      });
+
+      setRelocateAmount('');
+      setActiveModal('none');
+      await fetchData();
+      alert(`✓ ATM Withdrawal of ${formatCurrency(amount)} triggered from ${sourceName}!\n\n⚠️ Step 2 Pending: Please confirm inflow once currency notes are in the Physical Cash Box.`);
+    } catch (err: any) {
+      console.error('Error triggering ATM relocation:', err);
+      alert('Error triggering ATM: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsProcessingTransfer(false);
+    }
+  };
+
+  // 2. ATM Verify Inflow (Step 2)
+  const handleVerifyATM = async (txId: string, amount: number, source: WalletType, existingNotes?: string) => {
+    try {
+      setIsVerifyingAtmId(txId);
+      triggerHapticFeedback('light');
+
+      await updateBalance('cash_in_hand', amount);
+
+      const sourceName = WALLET_META[source]?.name || source;
+      const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const updatedNotes = existingNotes
+        ? `${existingNotes} | Verified & Credited to Cash Box on ${dateStr}`
+        : `ATM Cash Withdrawal verified from ${sourceName} into Physical Cash Box on ${dateStr}`;
+
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          status: 'completed',
+          notes: updatedNotes,
+        })
+        .eq('id', txId);
+
+      if (error) throw error;
+
+      await supabase.from('security_audit_logs').insert({
+        action_description: `ATM RELOCATION CONFIRMED: ₹${amount.toLocaleString('en-IN')} verified & credited into Physical Cash Box (Source: ${sourceName}).`,
+        target_table: 'transactions',
+      });
+
+      triggerHapticFeedback('success');
+      await fetchData();
+      alert(`✓ Verified & Credited ${formatCurrency(amount)} into Physical Cash Box!`);
+    } catch (err: any) {
+      console.error('Error verifying ATM inflow:', err);
+      alert('Error verifying ATM inflow: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsVerifyingAtmId(null);
+    }
+  };
+
+  // 3. Log Personal Spend
+  const handleLogSpend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = Number(spendAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid amount.");
+      return;
+    }
+    if (balances[spendWallet] < amount) {
+      alert(`Insufficient balance in ${WALLET_META[spendWallet].name}. Available: ${formatCurrency(balances[spendWallet])}`);
+      return;
+    }
+
+    const effectiveTakenBy = spendTakenBy === 'Other' ? (spendCustomTakenBy.trim() || 'Other') : spendTakenBy;
+
+    try {
+      setIsSubmittingSpend(true);
+      await updateBalance(spendWallet, -amount);
+
+      const desc = spendDesc.trim() || `${spendTag} by ${effectiveTakenBy}`;
+      const fullNote = `[${spendTag}] ${desc} | Admin Logged: ${activeAdminName} | Taken By: ${effectiveTakenBy} | Status: Outstanding`;
+
+      const { error } = await supabase.from('transactions').insert([
+        {
+          wallet_type: spendWallet,
+          type: 'personal_draw',
+          status: 'completed',
+          amount: amount,
+          notes: fullNote,
+          created_by: profile?.id || null,
+        }
+      ]);
+
+      if (error) throw error;
+
+      await supabase.from('security_audit_logs').insert({
+        action_description: `PERSONAL DRAW: ₹${amount.toLocaleString('en-IN')} taken by ${effectiveTakenBy} for ${spendTag} from ${WALLET_META[spendWallet].name}.`,
+        target_table: 'transactions',
+      });
+
+      setSpendAmount('');
+      setSpendDesc('');
+      if (spendTakenBy === 'Other') setSpendCustomTakenBy('');
+      setActiveModal('none');
+      await fetchData();
+      alert(`✓ Recorded ${formatCurrency(amount)} draw for ${effectiveTakenBy}!`);
+    } catch (err: any) {
+      console.error('Error logging spend:', err);
+      alert('Error logging spend: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsSubmittingSpend(false);
+    }
+  };
+
+  // 4. Settle Personal Debt (Put Cash Back)
+  const handleConfirmSettle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!settlingDraw) return;
+    const amount = Number(settleAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid repayment amount.");
+      return;
+    }
+    if (amount > settlingDraw.amount) {
+      alert(`Repayment cannot exceed the debt of ${formatCurrency(settlingDraw.amount)}.`);
+      return;
+    }
+
+    try {
+      setIsProcessingSettle(true);
+      // 1. Credit destination account
+      await updateBalance(settleDestWallet, amount);
+
+      // 2. Insert repayment transaction
+      await supabase.from('transactions').insert([
+        {
+          wallet_type: settleDestWallet,
+          type: 'transfer',
+          status: 'completed',
+          amount: amount,
+          notes: `Personal Draw Repayment of ${formatCurrency(amount)} by ${settlingDraw.takenBy} returned to ${WALLET_META[settleDestWallet].name} (Original: ${settlingDraw.tag})`,
+          created_by: profile?.id || null,
+        }
+      ]);
+
+      // 3. Update original spend note
+      const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const isFull = amount >= settlingDraw.amount;
+      const updatedNotes = isFull
+        ? `[${settlingDraw.tag}] ${settlingDraw.description} | Taken By: ${settlingDraw.takenBy} | Status: Settled (Repaid ${formatCurrency(amount)} into ${WALLET_META[settleDestWallet].name} on ${dateStr})`
+        : `[${settlingDraw.tag}] ${settlingDraw.description} | Taken By: ${settlingDraw.takenBy} | Status: Outstanding (Partially Repaid ${formatCurrency(amount)}, Remaining: ${formatCurrency(settlingDraw.amount - amount)})`;
+
+      await supabase
+        .from('transactions')
+        .update({ notes: updatedNotes })
+        .eq('id', settlingDraw.id);
+
+      setSettlingDraw(null);
+      setActiveModal('none');
+      await fetchData();
+      alert(`✓ Successfully repaid ${formatCurrency(amount)} back to ${WALLET_META[settleDestWallet].name}!`);
+    } catch (err: any) {
+      console.error('Error settling debt:', err);
+      alert('Error settling debt: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsProcessingSettle(false);
+    }
+  };
+
+  // 5. Deposit Money / Float Inflow
   const handleExecuteDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(depositAmount);
-
     if (isNaN(amount) || amount <= 0) {
       alert("Please enter a valid deposit amount.");
       return;
     }
 
-    const effectiveDepositor = depositBy === 'Other' 
-      ? (depositCustomBy.trim() || 'Other') 
-      : depositBy;
+    const effectiveDepositor = depositBy === 'Other' ? (depositCustomBy.trim() || 'Other') : depositBy;
 
-    setIsProcessingDeposit(true);
     try {
+      setIsProcessingDeposit(true);
       await updateBalance(depositDest, amount);
 
       const desc = depositNotes.trim() || `${depositTag} deposited by ${effectiveDepositor}`;
@@ -716,8 +746,9 @@ export default function CashVaultLedger() {
       setDepositAmount('');
       setDepositNotes('');
       if (depositBy === 'Other') setDepositCustomBy('');
+      setActiveModal('none');
       await fetchData();
-      alert(`✓ Successfully deposited ${formatCurrency(amount)} into ${WALLET_META[depositDest].name} by ${effectiveDepositor}! (Floating capital active: ${formatCurrency(amount)})`);
+      alert(`✓ Successfully deposited ${formatCurrency(amount)} into ${WALLET_META[depositDest].name}!`);
     } catch (err: any) {
       console.error('Error depositing funds:', err);
       alert('Error depositing funds: ' + (err.message || 'Unknown error'));
@@ -726,88 +757,10 @@ export default function CashVaultLedger() {
     }
   };
 
-  // Action: Open Float Recovery Modal (Choose payout account freely)
-  const handleOpenRecoverModal = (float: FloatingDeposit) => {
-    setRecoveringFloat(float);
-    setRecoverAmount(String(float.amount));
-    // Default to original wallet if it has sufficient funds; otherwise choose the wallet with the largest balance
-    if (balances[float.walletType] >= float.amount) {
-      setRecoverSourceWallet(float.walletType);
-    } else if (balances.cash_in_hand >= float.amount) {
-      setRecoverSourceWallet('cash_in_hand');
-    } else {
-      const sorted = (['cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank'] as WalletType[])
-        .sort((a, b) => (balances[b] || 0) - (balances[a] || 0));
-      setRecoverSourceWallet(sorted[0]);
-    }
-  };
-
-  // Action: Confirm Float Recovery from Selected Vault
-  const handleConfirmRecoverFloat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!recoveringFloat) return;
-
-    const amount = Number(recoverAmount);
-    if (isNaN(amount) || amount <= 0) {
-      alert("Please enter a valid recovery amount.");
-      return;
-    }
-
-    if (amount > recoveringFloat.amount) {
-      alert(`Recovery amount cannot exceed the floating deposit amount of ${formatCurrency(recoveringFloat.amount)}.`);
-      return;
-    }
-
-    if (balances[recoverSourceWallet] < amount) {
-      alert(`Insufficient balance in ${WALLET_META[recoverSourceWallet].name} to pay out ${formatCurrency(amount)}. Available: ${formatCurrency(balances[recoverSourceWallet])}`);
-      return;
-    }
-
-    setIsProcessingRecover(true);
-    try {
-      // 1. Deduct from selected payout account
-      await updateBalance(recoverSourceWallet, -amount);
-
-      // 2. Insert withdrawal transaction
-      await supabase.from('transactions').insert([
-        {
-          wallet_type: recoverSourceWallet,
-          type: 'transfer',
-          status: 'completed',
-          amount: amount,
-          notes: `Float Recovery of ${formatCurrency(amount)} by ${recoveringFloat.depositedBy} paid from ${WALLET_META[recoverSourceWallet].name} (Original Inflow: ${WALLET_META[recoveringFloat.walletType].name})`,
-          created_by: profile?.id || null,
-        }
-      ]);
-
-      // 3. Update original floating deposit note
-      const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const isFull = amount >= recoveringFloat.amount;
-      const updatedNotes = isFull
-        ? `[Floating Deposit - ${recoveringFloat.tag}] ${recoveringFloat.notes} | Deposited By: ${recoveringFloat.depositedBy} | Status: Recovered (Withdrawn ${formatCurrency(amount)} from ${WALLET_META[recoverSourceWallet].name} on ${dateStr})`
-        : `[Floating Deposit - ${recoveringFloat.tag}] ${recoveringFloat.notes} | Deposited By: ${recoveringFloat.depositedBy} | Status: Partially Recovered (Withdrawn ${formatCurrency(amount)} from ${WALLET_META[recoverSourceWallet].name} on ${dateStr}, Remaining Float: ${formatCurrency(recoveringFloat.amount - amount)})`;
-
-      await supabase
-        .from('transactions')
-        .update({ notes: updatedNotes })
-        .eq('id', recoveringFloat.id);
-
-      setRecoveringFloat(null);
-      await fetchData();
-      alert(`✓ Successfully recovered ${formatCurrency(amount)} back for ${recoveringFloat.depositedBy} from ${WALLET_META[recoverSourceWallet].name}!`);
-    } catch (err: any) {
-      console.error('Error recovering float:', err);
-      alert('Error recovering float: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsProcessingRecover(false);
-    }
-  };
-
-  // Action: Inter-Vault Transfer
+  // 6. Inter-Vault Transfer
   const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(transferAmount);
-
     if (isNaN(amount) || amount <= 0) {
       alert("Please enter a valid transfer amount.");
       return;
@@ -821,13 +774,11 @@ export default function CashVaultLedger() {
       return;
     }
 
-    setIsProcessingTransfer(true);
     try {
-      // 1. Debit Source & Credit Dest
+      setIsProcessingTransfer(true);
       await updateBalance(transferSource, -amount);
       await updateBalance(transferDest, amount);
 
-      // 2. Record transaction ledger in Supabase
       const notes = transferNotes.trim() 
         ? `Transfer: ${transferNotes.trim()} (${WALLET_META[transferSource].name} -> ${WALLET_META[transferDest].name})`
         : `Inter-Vault Transfer from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name}`;
@@ -840,21 +791,14 @@ export default function CashVaultLedger() {
           amount: amount,
           notes: notes,
           created_by: profile?.id || null,
-        },
-        {
-          wallet_type: transferDest,
-          type: 'transfer',
-          status: 'completed',
-          amount: amount,
-          notes: notes,
-          created_by: profile?.id || null,
         }
       ]);
 
       setTransferAmount('');
       setTransferNotes('');
+      setActiveModal('none');
       await fetchData();
-      alert(`Successfully transferred ${formatCurrency(amount)} from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name}!`);
+      alert(`✓ Transferred ${formatCurrency(amount)} from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name}!`);
     } catch (err) {
       console.error('Error executing transfer:', err);
       alert('Failed to complete transfer. Please try again.');
@@ -863,1983 +807,923 @@ export default function CashVaultLedger() {
     }
   };
 
-  // Action: ATM 2-Step Relocation Trigger
-  const handleTriggerATMRelocation = async (e: React.FormEvent) => {
+  // 7. Recover Floating Deposit
+  const handleConfirmRecoverFloat = async (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = Number(relocateAmount);
-
+    if (!recoveringFloat) return;
+    const amount = Number(recoverAmount);
     if (isNaN(amount) || amount <= 0) {
-      alert("Please enter a valid withdrawal amount.");
+      alert("Please enter a valid recovery amount.");
       return;
     }
-    if (balances[relocateSource] < amount) {
-      alert(`Insufficient bank balance in ${WALLET_META[relocateSource].name}. Available: ${formatCurrency(balances[relocateSource])}`);
+    if (amount > recoveringFloat.amount) {
+      alert(`Recovery cannot exceed ${formatCurrency(recoveringFloat.amount)}.`);
+      return;
+    }
+    if (balances[recoverSourceWallet] < amount) {
+      alert(`Insufficient balance in ${WALLET_META[recoverSourceWallet].name}. Available: ${formatCurrency(balances[recoverSourceWallet])}`);
       return;
     }
 
     try {
-      setIsProcessingTransfer(true);
-      // 1. Debit Source Bank Account
-      await updateBalance(relocateSource, -amount);
-
-      // 2. Insert into transactions table as 'pending_verification'
-      const sourceName = WALLET_META[relocateSource].name;
-      const { error } = await supabase.from('transactions').insert([
-        {
-          wallet_type: 'cash_in_hand',
-          type: 'atm_withdrawal',
-          status: 'pending_verification',
-          amount: amount,
-          notes: `[ATM Relocation] From: ${sourceName} -> Cash Box | Pending Physical Verification`,
-          created_by: profile?.id || null,
-        }
-      ]);
-
-      if (error) throw error;
-
-      // 3. Security Audit Log
-      await supabase.from('security_audit_logs').insert({
-        action_description: `ATM RELOCATION TRIGGERED: ₹${amount.toLocaleString('en-IN')} debited from ${sourceName}. Pending physical cash box inflow confirmation.`,
-        target_table: 'transactions',
-      });
-
-      setRelocateAmount('');
-      await fetchData();
-      alert(`✓ ATM Withdrawal of ${formatCurrency(amount)} triggered from ${sourceName}!\n\n⚠️ Step 2 Pending: Please confirm inflow once currency notes are placed inside the Physical Cash Box.`);
-    } catch (err: any) {
-      console.error('Error triggering ATM relocation:', err);
-      alert('Error triggering ATM relocation: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsProcessingTransfer(false);
-    }
-  };
-
-  // Action: ATM 2-Step Verify & Inflow to Cash Box
-  const handleVerifyATMRelocation = async (id: string, amount: number, source: WalletType, existingNotes?: string) => {
-    try {
-      setIsProcessingTransfer(true);
-      // 1. Credit Cash in Hand
-      await updateBalance('cash_in_hand', amount);
-
-      // 2. Update transaction status in Supabase to 'completed'
-      const sourceName = WALLET_META[source]?.name || source;
-      const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const updatedNotes = existingNotes
-        ? `${existingNotes} | Verified & Credited to Cash Box on ${dateStr}`
-        : `ATM Cash Withdrawal verified from ${sourceName} into Physical Cash Box on ${dateStr}`;
-
-      const { error } = await supabase
-        .from('transactions')
-        .update({
-          status: 'completed',
-          notes: updatedNotes,
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      // 3. Security Audit Log
-      await supabase.from('security_audit_logs').insert({
-        action_description: `ATM RELOCATION CONFIRMED: ₹${amount.toLocaleString('en-IN')} verified & credited into Physical Cash Box (Source: ${sourceName}).`,
-        target_table: 'transactions',
-      });
-
-      await fetchData();
-      alert(`✓ Verified & Credited ${formatCurrency(amount)} into Physical Cash Box!`);
-    } catch (err: any) {
-      console.error('Error verifying ATM relocation:', err);
-      alert('Error verifying ATM relocation: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsProcessingTransfer(false);
-    }
-  };
-
-  // Action: Personal Draw Logger
-  const handleLogPersonalDraw = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const amount = Number(spendAmount);
-
-    if (isNaN(amount) || amount <= 0) {
-      alert("Please enter a valid expense amount.");
-      return;
-    }
-    if (balances[spendWallet] < amount) {
-      alert(`Insufficient balance in ${WALLET_META[spendWallet].name}. Available: ${formatCurrency(balances[spendWallet])}`);
-      return;
-    }
-
-    const effectiveTakenBy = spendTakenBy === 'Other' 
-      ? (spendCustomTakenBy.trim() || 'Other') 
-      : spendTakenBy;
-
-    setIsSubmittingSpend(true);
-    try {
-      await updateBalance(spendWallet, -amount);
-
-      const desc = spendDesc.trim() || `${spendTag} taken by ${effectiveTakenBy}`;
-      const fullNote = `[${spendTag}] ${desc} | Taken By: ${effectiveTakenBy} | Status: Outstanding`;
+      setIsProcessingRecover(true);
+      await updateBalance(recoverSourceWallet, -amount);
 
       await supabase.from('transactions').insert([
         {
-          wallet_type: spendWallet,
-          type: 'personal_draw',
-          status: 'completed',
-          amount: amount,
-          notes: fullNote,
-          created_by: profile?.id || null,
-        }
-      ]);
-
-      setSpendAmount('');
-      setSpendDesc('');
-      if (spendTakenBy === 'Other') setSpendCustomTakenBy('');
-      await fetchData();
-      alert(`✓ Successfully recorded ₹${amount.toLocaleString('en-IN')} personal draw for ${effectiveTakenBy}.`);
-    } catch (err: any) {
-      console.error('Error recording personal draw:', err);
-      alert('Error recording personal draw: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsSubmittingSpend(false);
-    }
-  };
-
-  // Action: Open Settlement Modal
-  const handleOpenSettleModal = (draw: PersonalDraw) => {
-    setSettlingDraw(draw);
-    setSettleDestWallet(draw.walletType);
-    setSettleAmount(draw.amount.toString());
-  };
-
-  // Action: Confirm Settlement & Put Cash Back
-  const handleConfirmSettlement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!settlingDraw) return;
-
-    const repayAmt = Number(settleAmount);
-    if (isNaN(repayAmt) || repayAmt <= 0) {
-      alert("Please enter a valid amount to put back.");
-      return;
-    }
-
-    if (repayAmt > settlingDraw.amount) {
-      alert(`The amount to put back (${formatCurrency(repayAmt)}) cannot exceed the draw amount of ${formatCurrency(settlingDraw.amount)}. If you wish to deposit additional cash into the treasury, please use the Move Money / Deposit tab.`);
-      return;
-    }
-
-    setIsProcessingSettle(true);
-    try {
-      // Put cash / money back into the selected vault
-      await updateBalance(settleDestWallet, repayAmt);
-
-      // Record a transaction for the vault deposit
-      await supabase.from('transactions').insert([
-        {
-          wallet_type: settleDestWallet,
+          wallet_type: recoverSourceWallet,
           type: 'transfer',
           status: 'completed',
-          amount: repayAmt,
-          notes: `Personal Draw Repaid by ${settlingDraw.takenBy} into ${WALLET_META[settleDestWallet].name}`,
+          amount: amount,
+          notes: `Float Recovery of ${formatCurrency(amount)} by ${recoveringFloat.depositedBy} paid from ${WALLET_META[recoverSourceWallet].name}`,
           created_by: profile?.id || null,
         }
       ]);
 
       const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const isFull = amount >= recoveringFloat.amount;
+      const updatedNotes = isFull
+        ? `[Floating Deposit - ${recoveringFloat.tag}] ${recoveringFloat.notes} | Deposited By: ${recoveringFloat.depositedBy} | Status: Recovered (Withdrawn ${formatCurrency(amount)} from ${WALLET_META[recoverSourceWallet].name} on ${dateStr})`
+        : `[Floating Deposit - ${recoveringFloat.tag}] ${recoveringFloat.notes} | Deposited By: ${recoveringFloat.depositedBy} | Status: Partially Recovered (Remaining: ${formatCurrency(recoveringFloat.amount - amount)})`;
 
-      if (repayAmt < settlingDraw.amount) {
-        // Partial settlement: reduce draw amount and keep outstanding
-        const remainingAmt = settlingDraw.amount - repayAmt;
-        const updatedNotes = `[${settlingDraw.tag}] ${settlingDraw.description} | Taken By: ${settlingDraw.takenBy} | Status: Outstanding (Partial repayment of ${formatCurrency(repayAmt)} made on ${dateStr}; Remaining: ${formatCurrency(remainingAmt)})`;
+      await supabase
+        .from('transactions')
+        .update({ notes: updatedNotes })
+        .eq('id', recoveringFloat.id);
 
-        await supabase
-          .from('transactions')
-          .update({ 
-            amount: remainingAmt,
-            notes: updatedNotes 
-          })
-          .eq('id', settlingDraw.id);
-
-        alert(`✓ Put ${formatCurrency(repayAmt)} back into ${WALLET_META[settleDestWallet].name}! Remaining balance owed: ${formatCurrency(remainingAmt)}.`);
-      } else {
-        // Full settlement: mark as settled
-        const updatedNotes = `[${settlingDraw.tag}] ${settlingDraw.description} | Taken By: ${settlingDraw.takenBy} | Status: Settled (Put back ${formatCurrency(repayAmt)} into ${WALLET_META[settleDestWallet].name} on ${dateStr})`;
-        
-        await supabase
-          .from('transactions')
-          .update({ notes: updatedNotes })
-          .eq('id', settlingDraw.id);
-
-        alert(`✓ Successfully put ${formatCurrency(repayAmt)} back into ${WALLET_META[settleDestWallet].name}! Draw is fully settled.`);
-      }
-
-      setSettlingDraw(null);
+      setRecoveringFloat(null);
+      setActiveModal('none');
       await fetchData();
+      alert(`✓ Successfully recovered ${formatCurrency(amount)} for ${recoveringFloat.depositedBy}!`);
     } catch (err: any) {
-      console.error('Error settling personal draw:', err);
-      alert('Error settling personal draw: ' + (err.message || 'Unknown error'));
+      console.error('Error recovering float:', err);
+      alert('Error recovering float: ' + (err.message || 'Unknown error'));
     } finally {
-      setIsProcessingSettle(false);
+      setIsProcessingRecover(false);
     }
-  };
-
-  // Action: Delete Spend Record
-  const handleDeletePersonalDraw = async (draw: PersonalDraw) => {
-    const isSettled = draw.status === 'settled';
-
-    if (isSettled) {
-      // Draw was ALREADY settled (funds were already put back into the vault).
-      // Deleting this record must NOT refund or alter vault balance!
-      if (!confirm(`Are you sure you want to delete this settled draw record (${formatCurrency(draw.amount)} by ${draw.takenBy}) from history?\n\n(Note: Vault balance will NOT change because the funds were already put back when settled).`)) {
-        return;
-      }
-
-      try {
-        await supabase.from('transactions').delete().eq('id', draw.id);
-        await fetchData();
-        alert(`✓ Removed settled draw record from history.`);
-      } catch (err: any) {
-        console.error('Error deleting personal draw record:', err);
-        alert('Error deleting personal draw record: ' + (err.message || 'Unknown error'));
-      }
-    } else {
-      // Draw is OUTSTANDING. Canceling/deleting it refunds the money back to the vault.
-      if (!confirm(`Are you sure you want to cancel this active draw and refund ${formatCurrency(draw.amount)} back to ${WALLET_META[draw.walletType].name}?`)) {
-        return;
-      }
-
-      try {
-        await updateBalance(draw.walletType, draw.amount);
-        await supabase.from('transactions').delete().eq('id', draw.id);
-        await fetchData();
-        alert(`✓ Refunded ${formatCurrency(draw.amount)} back to ${WALLET_META[draw.walletType].name} and removed draw record.`);
-      } catch (err: any) {
-        console.error('Error deleting personal draw:', err);
-        alert('Error deleting personal draw: ' + (err.message || 'Unknown error'));
-      }
-    }
-  };
-
-  // Action: Save Denomination Count
-  const handleSaveDenominations = async () => {
-    const note = `Denomination reconciliation by ${activeAdminName}: Counted ${formatCurrency(calculatedPhysicalCash)} vs System ${formatCurrency(balances.cash_in_hand || 0)} (Disparity: ${formatCurrency(cashDisparity)})`;
-
-    setLastReconciliationNote(note);
-
-    await supabase.from('transactions').insert([
-      {
-        wallet_type: 'cash_in_hand',
-        type: 'transfer',
-        status: 'completed',
-        amount: Math.max(1, calculatedPhysicalCash),
-        notes: note,
-        denomination_log: denominations,
-        created_by: profile?.id || null,
-      }
-    ]);
-
-    await fetchData();
-    alert(`Denomination count recorded successfully! Disparity: ${formatCurrency(cashDisparity)}`);
   };
 
   return (
-    <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
       
-      {/* ── 1. TOP SUBTAB NAVIGATION ── */}
-      <div className="bg-slate-100/80 border border-gray-200/80 rounded-2xl sm:rounded-3xl p-1.5 sm:p-2.5 shadow-2xs">
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar scroll-smooth">
-          {CASH_SUBTABS.filter(tab => canAccessTreasurySubtab(profile?.role, tab.id)).map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeSubtab === tab.id;
+      {/* ── 1. UNIFIED TREASURY HERO HEADER ─────────────────────────────────── */}
+      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
+        {/* Subtle background glow circle */}
+        <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-indigo-500/15 blur-2xl pointer-events-none" />
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-indigo-300">
+                Treasury &amp; Multi-Vault Liquidity
+              </span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black font-mono tracking-tight text-white mt-1">
+              {formatCurrency(totalTreasuryBalance)}
+            </h2>
+            <p className="text-xs text-indigo-200/80 mt-0.5">
+              Physical cash box + 3 digital banking accounts synchronized
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <button
+              onClick={() => setActiveModal('denominations')}
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all border border-white/15 active:scale-95 cursor-pointer shadow-sm"
+            >
+              <Calculator size={14} className="text-indigo-300" />
+              <span>Count Cash (Tally)</span>
+            </button>
+
+            <button
+              onClick={() => fetchData()}
+              disabled={loading}
+              className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all border border-white/15 active:scale-95 cursor-pointer disabled:opacity-50"
+              title="Refresh Ledger"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 2. FOUR CORE VAULT CARDS (Interactive GPay / Account Feed Selector) ── */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-black uppercase tracking-wider text-gray-500">
+            Accounts &amp; Vault Balances
+          </span>
+          {selectedWalletFilter !== 'all' && (
+            <button
+              onClick={() => setSelectedWalletFilter('all')}
+              className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+            >
+              Show All Accounts
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+          {(['cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank'] as WalletType[]).map((wKey) => {
+            const meta = WALLET_META[wKey];
+            const Icon = meta.icon;
+            const bal = balances[wKey] || 0;
+            const isSelected = selectedWalletFilter === wKey;
 
             return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveSubtab(tab.id)}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-[11px] sm:text-xs shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
-                  isActive
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-transparent text-gray-600 hover:text-gray-900 hover:bg-white/60'
+              <div
+                key={wKey}
+                onClick={() => setSelectedWalletFilter(prev => prev === wKey ? 'all' : wKey)}
+                className={`bg-gradient-to-br ${meta.bgGradient} border-2 rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 cursor-pointer transition-all shadow-xs hover:shadow-md active:scale-98 ${
+                  isSelected ? 'border-indigo-600 ring-4 ring-indigo-500/20 shadow-md scale-[1.02]' : meta.borderClass
                 }`}
               >
-                <Icon size={14} className={isActive ? 'text-emerald-400' : 'text-gray-400'} />
-                <span className="leading-none whitespace-nowrap">{tab.label}</span>
-              </button>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className={`w-8 h-8 rounded-xl ${meta.iconBg} flex items-center justify-center font-bold shadow-2xs`}>
+                    <Icon size={16} />
+                  </div>
+                  <span className={`w-2.5 h-2.5 rounded-full ${meta.dotColor}`} />
+                </div>
+
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-black text-gray-900 truncate">
+                    {meta.name}
+                  </div>
+                  <div className="text-[10px] text-gray-500 font-medium truncate">
+                    {meta.owner}
+                  </div>
+                  <div className="text-base sm:text-2xl font-black text-gray-900 font-mono tracking-tight mt-1 truncate">
+                    {formatCurrency(bal)}
+                  </div>
+                </div>
+
+                <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[9px] sm:text-[10px] text-gray-400 font-bold uppercase">
+                  <span>{isSelected ? 'Viewing Feed' : 'Tap for Feed'}</span>
+                  <ArrowRight size={10} className={isSelected ? 'text-indigo-600 font-bold' : ''} />
+                </div>
+              </div>
             );
           })}
         </div>
       </div>
 
-      {/* ── SUBTAB 1: OVERVIEW & VAULTS ── */}
-      {activeSubtab === 'overview' && (
-        <div className="space-y-4 sm:space-y-6">
-          
-          {/* Top Liquidity Card */}
-          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-2xs space-y-3.5 sm:space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-gray-100 pb-3 sm:pb-4">
-              <div>
-                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                  <Activity size={13} className="text-emerald-600" />
-                  <span>Total Treasury Liquidity</span>
-                  <HelpTooltip text="Real-time multi-account balance synchronized across Physical Cash in Hand, Kishor Bank, Dad Bank, and Mom Bank." />
-                </span>
-                <span className="text-2xl sm:text-4xl font-black block font-mono text-gray-900 tracking-tight mt-0.5 sm:mt-1">
-                  {formatCurrency(totalTreasuryBalance)}
-                </span>
-              </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] sm:text-xs font-bold rounded-full w-fit">
-                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-pulse" /> 4 Vaults Synchronized
+      {/* ── 3. PARENT-FRIENDLY QUICK ACTION BUTTONS ─────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-2xs space-y-3">
+        <span className="text-xs font-black uppercase tracking-wider text-gray-500 block px-0.5">
+          Quick Cash Actions
+        </span>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          {/* Action 1: ATM to Cash Box */}
+          <button
+            onClick={() => setActiveModal('atm')}
+            className="bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200 text-indigo-950 p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
+          >
+            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
+              <Landmark size={16} />
+            </div>
+            <div className="min-w-0">
+              <strong className="text-xs sm:text-sm font-black block text-indigo-950 leading-tight">
+                🏧 ATM to Cash Box
+              </strong>
+              <span className="text-[10px] text-indigo-700/80 font-medium block mt-0.5">
+                Bank → Cash Box
               </span>
             </div>
+          </button>
 
-            {/* Split Progress Track */}
-            <div className="space-y-1.5 pt-0.5">
-              <div className="flex justify-between text-[11px] sm:text-xs font-bold text-gray-600">
-                <span>Cash: <strong className="text-emerald-700">{formatCurrency(balances.cash_in_hand)}</strong> ({physicalCashPercent}%)</span>
-                <span>Banks: <strong className="text-blue-700">{formatCurrency(totalTreasuryBalance - balances.cash_in_hand)}</strong> ({digitalBanksPercent}%)</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2 sm:h-2.5 overflow-hidden flex border border-gray-200">
-                <div className="bg-emerald-500 h-full transition-all duration-300" style={{ width: `${physicalCashPercent}%` }} />
-                <div className="bg-blue-500 h-full transition-all duration-300" style={{ width: `${digitalBanksPercent}%` }} />
-              </div>
+          {/* Action 2: Personal Spend / Draw */}
+          <button
+            onClick={() => setActiveModal('spend')}
+            className="bg-rose-50 hover:bg-rose-100/80 border border-rose-200 text-rose-950 p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
+          >
+            <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
+              <Coins size={16} />
             </div>
-
-            {/* Quick Action Buttons */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 pt-1">
-              <button
-                onClick={() => setActiveSubtab('transfers')}
-                className="p-2.5 sm:p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold text-gray-700 flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs"
-              >
-                <ArrowRightLeft size={13} className="text-emerald-600" /> Move Money
-              </button>
-              <button
-                onClick={() => setActiveSubtab('spends')}
-                className="p-2.5 sm:p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold text-gray-700 flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs"
-              >
-                <Coins size={13} className="text-rose-600" /> Log Spend
-              </button>
-              <button
-                onClick={() => setActiveSubtab('denominations')}
-                className="p-2.5 sm:p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold text-gray-700 flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs"
-              >
-                <Calculator size={13} className="text-amber-600" /> Count Cash
-              </button>
-              <button
-                onClick={() => setActiveSubtab('ledger')}
-                className="p-2.5 sm:p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold text-gray-700 flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs"
-              >
-                <History size={13} className="text-blue-600" /> View Ledger
-              </button>
+            <div className="min-w-0">
+              <strong className="text-xs sm:text-sm font-black block text-rose-950 leading-tight">
+                💸 Log Spend / Draw
+              </strong>
+              <span className="text-[10px] text-rose-700/80 font-medium block mt-0.5">
+                Petrol, Groceries, Dad
+              </span>
             </div>
-          </div>
+          </button>
 
-          {/* 4 Dedicated GPay-Style Vault Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
-            {(['cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank'] as WalletType[]).map((wKey) => {
-              const meta = WALLET_META[wKey];
-              const Icon = meta.icon;
-              const bal = balances[wKey] || 0;
-
-              return (
-                <div
-                  key={wKey}
-                  onClick={() => {
-                    setSelectedWalletDetail(wKey);
-                    setActiveSubtab('wallets');
-                  }}
-                  className={`bg-gradient-to-br ${meta.bgGradient} p-4 sm:p-5 rounded-2xl sm:rounded-3xl border ${meta.borderClass} shadow-2xs hover:shadow-xs transition-all duration-200 cursor-pointer group space-y-3 sm:space-y-4 hover:-translate-y-0.5 relative overflow-hidden`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl ${meta.iconBg} flex items-center justify-center shadow-2xs`}>
-                      <Icon size={18} className={meta.textAccent} />
-                    </div>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 sm:px-2.5 py-0.5 rounded-full border ${meta.badgeBg} flex items-center gap-1`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${meta.dotColor}`} /> Live
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-xs text-gray-500 font-semibold block">{meta.name}</span>
-                    <span className="text-xl sm:text-2xl font-black font-mono block mt-0.5 text-gray-900 tracking-tight">
-                      {formatCurrency(bal)}
-                    </span>
-                    <span className="text-[10px] sm:text-[11px] text-gray-400 font-mono mt-0.5 sm:mt-1 block truncate">
-                      {meta.accountNumber}
-                    </span>
-                  </div>
-
-                  <div className="pt-2 border-t border-gray-200/60 flex items-center justify-between text-[11px] sm:text-xs font-bold text-gray-600 group-hover:text-gray-900 transition-colors">
-                    <span>View Dedicated Statement</span>
-                    <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform text-gray-400 group-hover:text-gray-900" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Live Recent Activity Stream */}
-          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3 sm:space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <History size={15} className="text-indigo-600" />
-                Live Treasury Audit Activity
-              </h3>
-              <button
-                onClick={() => setActiveSubtab('ledger')}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
-              >
-                View Complete Ledger →
-              </button>
+          {/* Action 3: Deposit Float / Inflow */}
+          <button
+            onClick={() => setActiveModal('deposit')}
+            className="bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-950 p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
+          >
+            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
+              <Plus size={16} />
             </div>
-
-            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
-              {recentTransactions.slice(0, 8).map((tx) => {
-                const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx);
-                const dateLabel = tx.created_at 
-                  ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                  : 'Recent';
-
-                return (
-                  <div key={tx.id} className="p-3 sm:p-3.5 bg-gray-50/80 border border-gray-100 rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3">
-                    <div className="space-y-0.5 min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-md border ${badgeColor}`}>
-                          {badgeLabel}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
-                      </div>
-                      <p className="text-xs font-semibold text-gray-800 truncate mt-0.5">
-                        {tx.notes || tx.description || 'Treasury Movement'}
-                      </p>
-                      <span className="text-[10px] text-gray-500 font-medium block">
-                        Account: <strong className="text-gray-700">{WALLET_META[tx.wallet_type]?.name || tx.wallet_type}</strong>
-                      </span>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className={`text-xs sm:text-sm font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="min-w-0">
+              <strong className="text-xs sm:text-sm font-black block text-emerald-950 leading-tight">
+                📥 Deposit Money
+              </strong>
+              <span className="text-[10px] text-emerald-700/80 font-medium block mt-0.5">
+                Add Float / Inflow
+              </span>
             </div>
-          </div>
+          </button>
 
+          {/* Action 4: Transfer between Accounts */}
+          <button
+            onClick={() => setActiveModal('transfer')}
+            className="bg-blue-50 hover:bg-blue-100/80 border border-blue-200 text-blue-950 p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
+          >
+            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
+              <ArrowRightLeft size={16} />
+            </div>
+            <div className="min-w-0">
+              <strong className="text-xs sm:text-sm font-black block text-blue-950 leading-tight">
+                ⇄ Inter-Bank Transfer
+              </strong>
+              <span className="text-[10px] text-blue-700/80 font-medium block mt-0.5">
+                Move between Vaults
+              </span>
+            </div>
+          </button>
         </div>
-      )}
+      </div>
 
-      {/* ── SUBTAB 2: DEDICATED GPAY-STYLE WALLET PAGES ── */}
-      {activeSubtab === 'wallets' && (
-        <div className="space-y-4 sm:space-y-6">
-          
-          {/* Wallet Selector Pills */}
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5">
-            {(['cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank'] as WalletType[]).map((wKey) => {
-              const meta = WALLET_META[wKey];
-              const isSelected = selectedWalletDetail === wKey;
-
-              return (
-                <button
-                  key={wKey}
-                  onClick={() => setSelectedWalletDetail(wKey)}
-                  className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-[11px] sm:text-xs shrink-0 transition-all flex items-center gap-1.5 sm:gap-2 shadow-2xs cursor-pointer ${
-                    isSelected
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'bg-white border border-gray-200 text-gray-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${meta.dotColor}`} />
-                  <span className="whitespace-nowrap">{meta.name}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* GPay Hero Card */}
-          {(() => {
-            const meta = WALLET_META[selectedWalletDetail];
-            const Icon = meta.icon;
-            const bal = balances[selectedWalletDetail] || 0;
-
-            return (
-              <div className={`bg-gradient-to-br ${meta.bgGradient} rounded-2xl sm:rounded-3xl p-4 sm:p-8 border ${meta.borderClass} shadow-2xs space-y-4 sm:space-y-6 text-gray-900`}>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
-                  <div className="flex items-center gap-2.5 sm:gap-3">
-                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl ${meta.iconBg} flex items-center justify-center shadow-2xs shrink-0`}>
-                      <Icon size={20} className={meta.textAccent} />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-base sm:text-xl font-black text-gray-900 leading-tight truncate">{meta.name}</h3>
-                      <span className="text-[11px] sm:text-xs text-gray-500 font-medium block truncate">{meta.owner} · {meta.accountNumber}</span>
-                    </div>
-                  </div>
-                  <span className={`text-[10px] sm:text-[11px] font-bold px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border ${meta.badgeBg} w-fit`}>
-                    {meta.typeLabel}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase tracking-wider block">Available Balance</span>
-                  <span className="text-3xl sm:text-5xl font-black font-mono text-gray-900 block mt-0.5 sm:mt-1 tracking-tight">
-                    {formatCurrency(bal)}
-                  </span>
-                </div>
-
-                {/* GPay Fast Action Buttons */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-3 border-t border-gray-200/70">
-                  <button
-                    onClick={() => {
-                      setTransferDest(selectedWalletDetail);
-                      setActiveSubtab('transfers');
-                    }}
-                    className="py-2.5 sm:py-3 px-1 sm:px-2 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs text-center"
-                  >
-                    <Plus size={14} className="text-emerald-600 shrink-0" />
-                    <span className="truncate">Add / Inflow</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setTransferSource(selectedWalletDetail);
-                      setActiveSubtab('transfers');
-                    }}
-                    className="py-2.5 sm:py-3 px-1 sm:px-2 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs text-center"
-                  >
-                    <ArrowRightLeft size={14} className="text-blue-600 shrink-0" />
-                    <span className="truncate">Transfer</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSpendWallet(selectedWalletDetail);
-                      setActiveSubtab('spends');
-                    }}
-                    className="py-2.5 sm:py-3 px-1 sm:px-2 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs text-center"
-                  >
-                    <Coins size={14} className="text-rose-600 shrink-0" />
-                    <span className="truncate">Spend / Draw</span>
-                  </button>
-                </div>
+      {/* ── 4. ATTENTION REQUIRED: PENDING ATM & OUTSTANDING SPENDS ─────────── */}
+      {(pendingRelocations.length > 0 || outstandingPersonalDraws.length > 0 || activeFloatingDeposits.length > 0) && (
+        <div className="space-y-3">
+          {/* Pending ATM Relocation Banner */}
+          {pendingRelocations.length > 0 && (
+            <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-3 sm:p-4 space-y-2.5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs sm:text-sm font-black text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <AlertCircle size={15} className="text-amber-600 animate-pulse" />
+                  Pending Physical Cash Box Verification ({pendingRelocations.length})
+                </h4>
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full">
+                  Step 2
+                </span>
               </div>
-            );
-          })()}
-
-          {/* 3 Flow Metric Cards - Mobile Optimized */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <div className="bg-white border border-emerald-200/90 rounded-2xl sm:rounded-3xl p-2.5 sm:p-5 shadow-2xs space-y-0.5 sm:space-y-1 overflow-hidden">
-              <span className="text-[9px] sm:text-[11px] font-bold text-emerald-700 uppercase tracking-wider block truncate">
-                Total Inflow
-              </span>
-              <span className="text-xs sm:text-lg md:text-2xl font-black font-mono text-emerald-600 block truncate" title={`+${formatCurrency(walletStats.totalInflow)}`}>
-                +{formatCurrency(walletStats.totalInflow)}
-              </span>
-            </div>
-
-            <div className="bg-white border border-rose-200/90 rounded-2xl sm:rounded-3xl p-2.5 sm:p-5 shadow-2xs space-y-0.5 sm:space-y-1 overflow-hidden">
-              <span className="text-[9px] sm:text-[11px] font-bold text-rose-700 uppercase tracking-wider block truncate">
-                Total Outflow
-              </span>
-              <span className="text-xs sm:text-lg md:text-2xl font-black font-mono text-rose-600 block truncate" title={`-${formatCurrency(walletStats.totalOutflow)}`}>
-                -{formatCurrency(walletStats.totalOutflow)}
-              </span>
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-2.5 sm:p-5 shadow-2xs space-y-0.5 sm:space-y-1 overflow-hidden">
-              <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block truncate">
-                Net Flow
-              </span>
-              <span className={`text-xs sm:text-lg md:text-2xl font-black font-mono block truncate ${walletStats.netFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} title={`${walletStats.netFlow >= 0 ? '+' : ''}${formatCurrency(walletStats.netFlow)}`}>
-                {walletStats.netFlow >= 0 ? '+' : ''}{formatCurrency(walletStats.netFlow)}
-              </span>
-            </div>
-          </div>
-
-          {/* Wallet Statement Feed */}
-          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3 sm:space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h4 className="text-xs sm:text-sm font-bold text-gray-900">
-                {WALLET_META[selectedWalletDetail].name} Statement Feed
-              </h4>
-              <span className="text-[11px] sm:text-xs text-gray-400 font-mono">
-                {walletSpecificTxs.length} transactions
-              </span>
-            </div>
-
-            <div className="space-y-2 max-h-[450px] overflow-y-auto pr-1">
-              {walletSpecificTxs.length === 0 ? (
-                <div className="py-12 text-center text-xs text-gray-400">
-                  No transaction history recorded for this account yet.
-                </div>
-              ) : (
-                walletSpecificTxs.map((tx) => {
-                  const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx, selectedWalletDetail);
-                  const dateLabel = tx.created_at 
-                    ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                    : 'Recent';
-
+              <p className="text-[11px] text-amber-900/80 font-medium">
+                Currency was debited from bank. Click below once notes are physically placed inside the Cash Box:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {pendingRelocations.map((reloc) => {
+                  const isVerifying = isVerifyingAtmId === reloc.id;
                   return (
-                    <div key={tx.id} className="p-3 sm:p-4 bg-gray-50/70 border border-gray-100 rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3 hover:bg-slate-50 transition-colors">
-                      <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                          <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-md border ${badgeColor}`}>
-                            {badgeLabel}
-                          </span>
-                          <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
-                        </div>
-                        <p className="text-xs font-semibold text-gray-800 leading-snug truncate mt-0.5">
-                          {tx.notes || tx.description || 'Treasury Transaction'}
-                        </p>
+                    <div key={reloc.id} className="bg-white border border-amber-200 p-3 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase block truncate">From: {WALLET_META[reloc.source]?.name}</span>
+                        <span className="text-sm sm:text-base font-black text-gray-900 font-mono mt-0.5 block">{formatCurrency(reloc.amount)}</span>
+                        <span className="text-[9px] text-gray-400 font-mono">{reloc.createdAt}</span>
                       </div>
-
-                      <div className="text-right shrink-0">
-                        <span className={`text-xs sm:text-base font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
-                        </span>
-                      </div>
+                      <button
+                        onClick={() => handleVerifyATM(reloc.id, reloc.amount, reloc.source, reloc.notes)}
+                        disabled={isVerifying}
+                        className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                      >
+                        {isVerifying ? <RefreshCw size={12} className="animate-spin" /> : <Check size={13} />}
+                        <span>Confirm Inflow</span>
+                      </button>
                     </div>
                   );
-                })
-              )}
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* ── SUBTAB 3: MOVE MONEY, TRANSFERS & DEPOSITS ── */}
-      {activeSubtab === 'transfers' && (
-        <div className="space-y-4 sm:space-y-6">
-          {/* Top Banner: External Cash Deposit / Organizer Float Injection */}
-          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3.5 sm:space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-gray-100 pb-3 sm:pb-3.5">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 sm:gap-2.5">
-                  <span className="p-1.5 sm:p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                    <HandCoins size={16} />
-                  </span>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                      External Cash Deposit &amp; Organizer Float
-                    </h3>
-                    <p className="text-[11px] sm:text-xs text-gray-500 font-medium leading-tight">
-                      Inject outside personal capital (e.g. Dad/Mom bridging auction pot deficit) into the Cash Box or Bank
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <Sparkles size={11} className="text-emerald-600" /> Auto-Tracked as Floating Capital
-                </span>
+                })}
               </div>
             </div>
+          )}
 
-            <form onSubmit={handleExecuteDeposit} className="space-y-3.5 sm:space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-                
-                {/* Deposited By */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                    Who Is Depositing? (Deposited By)
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { id: 'Dad (Anbazhakan)', label: '👨 Dad' },
-                      { id: 'Mom (Parimalam)', label: '👩 Mom' },
-                      { id: 'Dr. Kishor', label: '🧑‍⚕️ Dr. Kishor' },
-                      { id: 'Other', label: '✍️ Other' },
-                    ].map((person) => {
-                      const isSelected = depositBy === person.id;
-                      return (
-                        <button
-                          key={person.id}
-                          type="button"
-                          onClick={() => {
-                            setDepositBy(person.id);
-                            if (person.id === 'Dad (Anbazhakan)') {
-                              setDepositNotes("Temporary float injected by Dad to bridge auction pot");
-                            } else if (person.id === 'Mom (Parimalam)') {
-                              setDepositNotes("Reserve cash deposit by Mom");
-                            } else if (person.id === 'Dr. Kishor') {
-                              setDepositNotes("Emergency capital injected by Dr. Kishor");
-                            }
-                          }}
-                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
-                            isSelected
-                              ? 'bg-emerald-600 text-white border-emerald-700 font-extrabold shadow-xs'
-                              : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
-                          }`}
-                        >
-                          {person.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {depositBy === 'Other' && (
-                    <input
-                      type="text"
-                      required
-                      placeholder="Enter depositor name..."
-                      value={depositCustomBy}
-                      onChange={(e) => setDepositCustomBy(e.target.value)}
-                      className="w-full mt-2 bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none transition-all"
-                    />
-                  )}
-                </div>
-
-                {/* Destination Account */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                    Deposit Into Vault (Destination)
-                  </label>
-                  <select
-                    value={depositDest}
-                    onChange={(e) => setDepositDest(e.target.value as WalletType)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:bg-white rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none transition-all"
-                  >
-                    <option value="cash_in_hand">💵 Physical Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                    <option value="kishor_bank">🏦 Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                    <option value="dad_bank">🏦 Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                    <option value="mom_bank">🏦 Mom Bank ({formatCurrency(balances.mom_bank)})</option>
-                  </select>
-
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block pt-1">
-                    Category Tag
-                  </label>
-                  <select
-                    value={depositTag}
-                    onChange={(e) => setDepositTag(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none transition-all"
-                  >
-                    <option value="Auction Payout Float">Auction Payout Float (Temporary Bridge)</option>
-                    <option value="General Capital Inflow">General Capital Inflow</option>
-                    <option value="Emergency Reserve">Emergency Reserve Injection</option>
-                    <option value="Personal Float">Personal Float Rotation</option>
-                  </select>
-                </div>
-
-                {/* Deposit Amount & Quick Presets */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                    Deposit Amount (₹)
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 20000"
-                    value={depositAmount}
-                    onChange={(e) => setDepositAmount(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-sm font-black text-emerald-700 focus:outline-none placeholder-gray-400 font-mono transition-all"
-                  />
-
-                  {/* Preset Pills */}
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {[5000, 10000, 20000, 30000, 50000, 100000].map((amt) => (
-                      <button
-                        key={amt}
-                        type="button"
-                        onClick={() => setDepositAmount(String(amt))}
-                        className="text-[10px] font-bold bg-gray-100 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 border border-gray-200 text-gray-700 px-2 py-1 rounded-lg transition-all cursor-pointer"
-                      >
-                        ₹{amt >= 100000 ? `${amt / 100000}L` : `${amt / 1000}k`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Purpose Notes & Submit */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3 items-center pt-2.5 sm:pt-3 border-t border-gray-100">
-                <div className="md:col-span-8">
-                  <input
-                    type="text"
-                    placeholder="Optional notes (e.g. ₹20k put in Cash Box for auction winner payout while awaiting member dues)..."
-                    value={depositNotes}
-                    onChange={(e) => setDepositNotes(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-500 focus:bg-white rounded-xl px-3.5 py-2 text-xs text-gray-900 placeholder-gray-400 focus:outline-none transition-all"
-                  />
-                </div>
-                <div className="md:col-span-4">
-                  <button
-                    type="submit"
-                    disabled={isProcessingDeposit}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-extrabold text-xs py-2.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
-                  >
-                    <Plus size={15} />
-                    {isProcessingDeposit ? 'Depositing...' : 'Deposit Cash into Vault'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            
-            {/* Inter-Vault Transfer Box */}
-            <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xs">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                  <ArrowRightLeft size={16} className="text-blue-600" />
-                  Inter-Vault Cash / Bank Transfer
-                </h3>
-                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full">
-                  Internal Rebalance
-                </span>
-              </div>
-
-              <form onSubmit={handleExecuteTransfer} className="space-y-3.5 sm:space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Source Account</label>
-                    <select
-                      value={transferSource}
-                      onChange={(e) => setTransferSource(e.target.value as WalletType)}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                    >
-                      <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                      <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                      <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                      <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Destination Account</label>
-                    <select
-                      value={transferDest}
-                      onChange={(e) => setTransferDest(e.target.value as WalletType)}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                    >
-                      <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                      <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                      <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                      <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Transfer Amount (₹)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 50000"
-                    value={transferAmount}
-                    onChange={(e) => setTransferAmount(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Reason / Purpose Notes</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Funds for auction payout, bank rebalancing..."
-                    value={transferNotes}
-                    onChange={(e) => setTransferNotes(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-xs font-medium text-gray-900 focus:outline-none shadow-2xs"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isProcessingTransfer}
-                  className="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3 rounded-xl shadow-2xs active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  {isProcessingTransfer ? 'Transferring...' : 'Execute Inter-Vault Transfer'}
-                </button>
-              </form>
-            </div>
-
-            {/* ATM Bank-to-Cash Relocation (2-Step Verification) */}
-            <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xs">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                  <Banknote size={16} className="text-indigo-600" />
-                  ATM Bank-to-Cash Relocation
-                </h3>
-                <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
-                  2-Step Verify
-                </span>
-              </div>
-
-              <form onSubmit={handleTriggerATMRelocation} className="space-y-3.5 sm:space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Source Bank Account</label>
-                    <select
-                      value={relocateSource}
-                      onChange={(e) => setRelocateSource(e.target.value as Exclude<WalletType, 'cash_in_hand'>)}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                    >
-                      <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                      <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                      <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Withdrawal Amount (₹)</label>
-                    <input
-                      type="number"
-                      required
-                      placeholder="e.g. 20000"
-                      value={relocateAmount}
-                      onChange={(e) => setRelocateAmount(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3 rounded-xl shadow-2xs active:scale-98 transition-all cursor-pointer"
-                >
-                  Trigger ATM Withdrawal
-                </button>
-              </form>
-
-              {/* Pending Physical Inflow Verification Queue */}
-              {computedRelocations.length > 0 && (
-                <div className="space-y-2.5 pt-3.5 border-t border-gray-100">
-                  <h4 className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
-                    <AlertCircle size={13} />
-                    Pending Physical Cash Box Verification ({computedRelocations.length})
-                  </h4>
-                  
-                  <div className="space-y-2">
-                    {computedRelocations.map((reloc) => (
-                      <div key={reloc.id} className="flex justify-between items-center bg-amber-50/70 border border-amber-200 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl gap-2">
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-bold text-gray-500 uppercase block truncate">From: {WALLET_META[reloc.source]?.name}</span>
-                          <span className="text-sm font-extrabold text-gray-900 font-mono mt-0.5 block">{formatCurrency(reloc.amount)}</span>
-                          <span className="text-[10px] text-gray-400 font-mono">{reloc.createdAt}</span>
-                        </div>
-                        <button
-                          onClick={() => handleVerifyATMRelocation(reloc.id, reloc.amount, reloc.source, reloc.notes)}
-                          className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs px-3 sm:px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer shrink-0"
-                        >
-                          <Check size={13} /> <span className="hidden sm:inline">Confirm</span> Inflow
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* ── SUBTAB 4: PERSONAL DRAWS, EXPENSES & FLOATING CAPITAL ── */}
-      {activeSubtab === 'spends' && (
-        <div className="space-y-4 sm:space-y-6">
-          
-          {/* Outstanding Personal Debt Overview Banner */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
-            <div className="bg-gradient-to-br from-rose-50 to-red-100/60 border border-rose-200/80 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs">
+          {/* Outstanding Personal Debt / Spends Banner */}
+          {outstandingPersonalDraws.length > 0 && (
+            <div className="bg-rose-50/80 border-2 border-rose-200 rounded-2xl p-3 sm:p-4 space-y-2.5 shadow-xs">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-wider flex items-center gap-1">
-                  <Coins size={12} className="text-rose-600" /> Total Owed
-                </span>
-                {personalDrawStats.outstandingCount > 0 && (
-                  <span className="text-[9px] font-extrabold bg-rose-600 text-white px-2 py-0.5 rounded-full animate-pulse">
-                    {personalDrawStats.outstandingCount} Active
-                  </span>
-                )}
-              </div>
-              <p className="text-sm sm:text-xl font-black text-rose-900 font-mono mt-1 truncate">
-                {formatCurrency(personalDrawStats.totalOutstanding)}
-              </p>
-              <span className="text-[10px] text-rose-600 font-medium block truncate">Outstanding personal debt</span>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1 truncate">
-                  👨 Dad
-                </span>
-                {floatStats.dadFloat > 0 && (
-                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md shrink-0">
-                    +{formatCurrency(floatStats.dadFloat)}
-                  </span>
-                )}
-              </div>
-              <p className={`text-sm sm:text-lg font-black font-mono truncate ${personalDrawStats.dadOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                {formatCurrency(personalDrawStats.dadOutstanding)}
-              </p>
-              <span className="text-[10px] text-gray-400 font-medium block truncate">
-                {personalDrawStats.dadOutstanding > 0 ? 'Owed to treasury' : '✓ ₹0 Debt Owed'}
-              </span>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1 truncate">
-                  👩 Mom
-                </span>
-                {floatStats.momFloat > 0 && (
-                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md shrink-0">
-                    +{formatCurrency(floatStats.momFloat)}
-                  </span>
-                )}
-              </div>
-              <p className={`text-sm sm:text-lg font-black font-mono truncate ${personalDrawStats.momOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                {formatCurrency(personalDrawStats.momOutstanding)}
-              </p>
-              <span className="text-[10px] text-gray-400 font-medium block truncate">
-                {personalDrawStats.momOutstanding > 0 ? 'Owed to treasury' : '✓ ₹0 Debt Owed'}
-              </span>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs space-y-0.5 sm:space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1 truncate">
-                  🧑‍⚕️ Dr. Kishor
-                </span>
-                {floatStats.kishorFloat > 0 && (
-                  <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md shrink-0">
-                    +{formatCurrency(floatStats.kishorFloat)}
-                  </span>
-                )}
-              </div>
-              <p className={`text-sm sm:text-lg font-black font-mono truncate ${personalDrawStats.kishorOutstanding > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                {formatCurrency(personalDrawStats.kishorOutstanding)}
-              </p>
-              <span className="text-[10px] text-gray-400 font-medium block truncate">
-                {personalDrawStats.kishorOutstanding > 0 ? 'Owed to treasury' : '✓ ₹0 Debt Owed'}
-              </span>
-            </div>
-          </div>
-
-          {/* 🌊 Active Floating Capital Available for 1-Tap Recovery */}
-          {floatStats.totalActiveFloat > 0 && (
-            <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/60 border border-emerald-300 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-2xs space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/80 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-xl bg-emerald-600 text-white shrink-0">
-                    <Sparkles size={16} />
-                  </span>
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-black text-emerald-950 flex items-center gap-2">
-                      Active Floating Capital Injected by Organizers ({formatCurrency(floatStats.totalActiveFloat)})
-                    </h4>
-                    <p className="text-[10px] sm:text-[11px] text-emerald-700 font-medium leading-tight">
-                      Temporary funds put in to bridge payouts. Take your cash back anytime without creating personal debt.
-                    </p>
-                  </div>
-                </div>
-
-                <span className="text-xs font-black text-emerald-900 bg-emerald-200 border border-emerald-300 px-2.5 py-0.5 rounded-full self-start sm:self-auto font-mono shrink-0">
-                  {floatStats.activeCount} Active Injections
+                <h4 className="text-xs sm:text-sm font-black text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Coins size={15} className="text-rose-600" />
+                  Active Personal Draws ({formatCurrency(totalOutstandingDebt)})
+                </h4>
+                <span className="text-[10px] font-bold text-rose-700 bg-rose-200 px-2 py-0.5 rounded-full">
+                  {outstandingPersonalDraws.length} Active
                 </span>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 pt-1">
-                {computedFloatingDeposits.filter(f => f.status === 'active').map((float) => (
-                  <div key={float.id} className="bg-white/90 border border-emerald-200 rounded-xl sm:rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between gap-2.5 sm:gap-3 shadow-2xs">
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
-                          {float.depositedBy}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-mono">{float.timestamp}</span>
-                      </div>
-
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-base sm:text-lg font-black font-mono text-emerald-700">
-                          +{formatCurrency(float.amount)}
-                        </span>
-                        <span className="text-[10px] text-gray-500 font-medium">
-                          in {WALLET_META[float.walletType]?.name}
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-gray-700 font-semibold mt-1 line-clamp-2">
-                        {float.notes}
-                      </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {outstandingPersonalDraws.slice(0, 6).map((draw) => (
+                  <div key={draw.id} className="bg-white border border-rose-200 p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase block truncate">{draw.takenBy} · {draw.tag}</span>
+                      <span className="text-sm font-black text-rose-900 font-mono block">{formatCurrency(draw.amount)}</span>
+                      <span className="text-[10px] text-gray-400 font-medium block truncate">{draw.description}</span>
                     </div>
-
                     <button
-                      type="button"
-                      onClick={() => handleOpenRecoverModal(float)}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                      onClick={() => {
+                        setSettlingDraw(draw);
+                        setSettleAmount(String(draw.amount));
+                        setActiveModal('settle');
+                      }}
+                      className="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-[11px] px-2.5 py-1.5 rounded-lg transition-all shrink-0 cursor-pointer shadow-2xs"
                     >
-                      <RotateCcw size={13} />
-                      ⚡ Take Back / Recover ₹{float.amount.toLocaleString('en-IN')}
+                      Put Back
                     </button>
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-            
-            {/* Fast Expense Entry Card (5 Cols) */}
-            <div className="lg:col-span-5 bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xs">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                  <Coins size={16} className="text-rose-600" />
-                  Fast Expense &amp; Personal Draw Logger
-                </h3>
-                <span className="text-[10px] text-rose-700 font-bold bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
-                  Vault Debit
-                </span>
-              </div>
-
-              <form onSubmit={handleLogPersonalDraw} className="space-y-3.5 sm:space-y-4">
-                
-                {/* Who Took It Selector (Large intuitive buttons for family) */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
-                    <span>Who Took This Money? (Taken By)</span>
-                    <span className="text-[9px] text-indigo-600 font-bold">1-Tap Select</span>
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                    {[
-                      { id: 'Dad (Anbazhakan)', label: '👨 Dad' },
-                      { id: 'Mom (Parimalam)', label: '👩 Mom' },
-                      { id: 'Dr. Kishor', label: '🧑‍⚕️ Dr. Kishor' },
-                      { id: 'Other', label: '✍️ Custom' },
-                    ].map((person) => {
-                      const isSelected = spendTakenBy === person.id;
-                      return (
-                        <button
-                          key={person.id}
-                          type="button"
-                          onClick={() => {
-                            setSpendTakenBy(person.id);
-                            if (person.id === 'Dad (Anbazhakan)') {
-                              setSpendDesc("Cash taken by Dad for personal use / rotation");
-                            } else if (person.id === 'Mom (Parimalam)') {
-                              setSpendDesc("Household expense / groceries taken by Mom");
-                            } else if (person.id === 'Dr. Kishor') {
-                              setSpendDesc("Collection travel expense by Dr. Kishor");
-                            }
-                          }}
-                          className={`py-2 px-2 sm:px-2.5 rounded-xl text-xs font-bold transition-all border text-left flex items-center justify-between cursor-pointer ${
-                            isSelected
-                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50'
-                          }`}
-                        >
-                          <span className="truncate">{person.label}</span>
-                          {isSelected && <Check size={12} className="shrink-0 ml-1" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {spendTakenBy === 'Other' && (
-                    <input
-                      type="text"
-                      required
-                      placeholder="Enter person name (e.g. Relative, Assistant)..."
-                      value={spendCustomTakenBy}
-                      onChange={(e) => setSpendCustomTakenBy(e.target.value)}
-                      className="w-full mt-2 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                    />
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Debit From Account</label>
-                    <select
-                      value={spendWallet}
-                      onChange={(e) => setSpendWallet(e.target.value as WalletType)}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                    >
-                      <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                      <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                      <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                      <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Spend Amount (₹)</label>
-                    <input
-                      type="number"
-                      required
-                      placeholder="e.g. 500"
-                      value={spendAmount}
-                      onChange={(e) => setSpendAmount(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                    />
-                  </div>
-                </div>
-
-                {/* Quick amount presets */}
-                <div className="flex flex-wrap gap-1.5">
-                  {[500, 1000, 2000, 5000, 7000, 10000].map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setSpendAmount(String(amt))}
-                      className="text-[10px] font-bold bg-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-gray-200 text-gray-600 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                    >
-                      ₹{amt.toLocaleString('en-IN')}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Category Tag</label>
-                  <select
-                    value={spendTag}
-                    onChange={(e) => setSpendTag(e.target.value as PersonalDraw['tag'])}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                  >
-                    <option value="Personal Expense">Personal Expense / Use</option>
-                    <option value="Money Lending / Rotation">Money Lending / Temporary Rotation</option>
-                    <option value="Petrol">Petrol</option>
-                    <option value="Maintenance">Bike / Vehicle Maintenance</option>
-                    <option value="Tea & Refreshments">Tea &amp; Refreshments</option>
-                    <option value="Collection Visits">Collection Visits</option>
-                    <option value="Groceries">Groceries / Household</option>
-                    <option value="Emergency Cash">Emergency Cash</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
-                    <span>Reason / Description</span>
-                    <button 
-                      type="button" 
-                      onClick={() => {
-                        if (spendTakenBy.includes('Dad')) {
-                          setSpendDesc("Cash taken by Dad for personal rotation / lending");
-                        } else if (spendTakenBy.includes('Mom')) {
-                          setSpendDesc("Household / personal expense taken by Mom");
-                        } else {
-                          setSpendDesc("Collection travel & refreshments expense");
-                        }
-                      }} 
-                      className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 hover:text-indigo-800 cursor-pointer"
-                    >
-                      <Mic size={11} /> Auto-fill
-                    </button>
-                  </label>
-                  <textarea
-                    placeholder="e.g. Petrol for collection visits, personal loan rotation, cash taken by Dad..."
-                    value={spendDesc}
-                    onChange={(e) => setSpendDesc(e.target.value)}
-                    rows={2}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none resize-none font-medium shadow-2xs leading-relaxed"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmittingSpend}
-                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-3 rounded-xl transition-all duration-150 shadow-2xs cursor-pointer disabled:opacity-50"
-                >
-                  {isSubmittingSpend ? 'Logging Draw...' : 'Log Personal Draw / Expense'}
-                </button>
-              </form>
-            </div>
-
-            {/* Personal Draws & Spends Ledger (7 Cols) */}
-            <div className="lg:col-span-7 bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-gray-100 pb-3">
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900">Personal Draws &amp; Spends Ledger</h3>
-                  <span className="text-[11px] text-gray-500">Track who took cash &amp; settle outstanding amounts</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
-                    {personalDrawStats.outstandingCount} Owed
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full">
-                    {personalDrawStats.settledCount} Settled
-                  </span>
-                </div>
-              </div>
-
-              {/* Filter Tabs & Search */}
-              <div className="space-y-2.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  {/* Status Filters */}
-                  <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto no-scrollbar">
-                    {[
-                      { id: 'all', label: `All (${computedPersonalDraws.length})` },
-                      { id: 'outstanding', label: `⚡ Owed (${personalDrawStats.outstandingCount})` },
-                      { id: 'settled', label: `✓ Settled (${personalDrawStats.settledCount})` },
-                    ].map((tab) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setPersonalDrawStatusFilter(tab.id as any)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                          personalDrawStatusFilter === tab.id
-                            ? 'bg-white text-gray-900 shadow-xs'
-                            : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Person Filter */}
-                  <select
-                    value={personalDrawPersonFilter}
-                    onChange={(e) => setPersonalDrawPersonFilter(e.target.value)}
-                    className="bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer w-full sm:w-auto"
-                  >
-                    <option value="all">All People</option>
-                    <option value="dad">👨 Dad (Anbazhakan)</option>
-                    <option value="mom">👩 Mom (Parimalam)</option>
-                    <option value="kishor">🧑‍⚕️ Dr. Kishor</option>
-                    <option value="other">✍️ Others</option>
-                  </select>
-                </div>
-
-                {/* Search input */}
-                <div className="relative">
-                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by reason, name, category, or amount..."
-                    value={personalDrawSearch}
-                    onChange={(e) => setPersonalDrawSearch(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Draws List */}
-              <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
-                {filteredPersonalDraws.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-gray-400 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                    No personal draws matching the selected filter.
-                  </div>
-                ) : (
-                  filteredPersonalDraws.map((draw) => {
-                    const isOutstanding = draw.status === 'outstanding';
-                    return (
-                      <div 
-                        key={draw.id} 
-                        className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all ${
-                          isOutstanding 
-                            ? 'bg-rose-50/30 border-rose-200/70 hover:border-rose-300' 
-                            : 'bg-gray-50/80 border-gray-200/80'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start gap-2.5 sm:gap-3">
-                          <div className="space-y-1.5 flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {/* Status Badge */}
-                              {isOutstanding ? (
-                                <span className="bg-rose-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
-                                  <Clock size={10} /> Outstanding
-                                </span>
-                              ) : (
-                                <span className="bg-emerald-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
-                                  <CheckCircle2 size={10} /> Settled
-                                </span>
-                              )}
-
-                              {/* Taken By Badge */}
-                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 truncate max-w-[150px]">
-                                <User size={10} className="shrink-0" /> {draw.takenBy}
-                              </span>
-
-                              {/* Category Tag */}
-                              <span className="bg-gray-100 text-gray-700 border border-gray-200 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
-                                {draw.tag}
-                              </span>
-
-                              {/* Source Wallet Tag */}
-                              <span className="text-[10px] text-gray-500 font-mono">
-                                from {WALLET_META[draw.walletType]?.name}
-                              </span>
-                            </div>
-
-                            <p className="text-xs text-gray-900 font-semibold leading-relaxed">
-                              {draw.description}
-                            </p>
-
-                            {/* Settlement Details Banner if Settled */}
-                            {!isOutstanding && draw.settlementDetails && (
-                              <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-2 text-[11px] text-emerald-800 font-medium flex items-center gap-1.5">
-                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                                <span>{draw.settlementDetails.notes || `Settled on ${draw.settlementDetails.settledAt}`}</span>
-                              </div>
-                            )}
-
-                            <div className="flex items-center gap-3 text-[10px] text-gray-400 font-mono">
-                              <span>Recorded: {draw.timestamp}</span>
-                            </div>
-                          </div>
-
-                          <div className="text-right shrink-0 flex flex-col items-end gap-1.5 sm:gap-2">
-                            <span className={`text-xs sm:text-base font-black font-mono block ${isOutstanding ? 'text-rose-600' : 'text-gray-500'}`}>
-                              -{formatCurrency(draw.amount)}
-                            </span>
-
-                            {isOutstanding ? (
-                              <div className="flex items-center gap-1 sm:gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenSettleModal(draw)}
-                                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1 transition-all shadow-xs cursor-pointer"
-                                >
-                                  <Banknote size={12} /> <span className="hidden sm:inline">Put Back</span><span className="sm:hidden">Settle</span>
-                                </button>
-                                <button 
-                                  onClick={() => handleDeletePersonalDraw(draw)}
-                                  className="text-gray-400 hover:text-rose-600 p-1.5 transition-colors cursor-pointer"
-                                  title="Delete draw & Refund vault"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            ) : (
-                              <button 
-                                onClick={() => handleDeletePersonalDraw(draw)}
-                                className="text-gray-300 hover:text-rose-500 p-1 transition-colors cursor-pointer"
-                                title="Delete log record"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-          </div>
-
-          {/* ── SIMPLE MODAL: PUT CASH BACK INTO VAULT ── */}
-          {settlingDraw && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-              <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto">
-                
-                {/* Modal Header */}
-                <div className="flex items-start justify-between border-b border-gray-100 pb-3">
-                  <div>
-                    <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
-                      <Banknote size={20} className="text-emerald-600" />
-                      Put Cash Back into Vault
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Settle {settlingDraw.takenBy}&apos;s draw of {formatCurrency(settlingDraw.amount)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSettlingDraw(null)}
-                    className="text-gray-400 hover:text-gray-700 p-1.5 rounded-xl hover:bg-gray-100 cursor-pointer"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <form onSubmit={handleConfirmSettlement} className="space-y-4">
-                  <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-3.5 sm:p-4 space-y-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-emerald-900 font-bold uppercase tracking-wider">
-                        Put Back Into Account
-                      </label>
-                      <select
-                        value={settleDestWallet}
-                        onChange={(e) => setSettleDestWallet(e.target.value as WalletType)}
-                        className="w-full bg-white border border-emerald-300 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
-                      >
-                        <option value="cash_in_hand">Physical Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                        <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                        <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
-                        <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] text-emerald-900 font-bold uppercase tracking-wider">
-                          Amount to Put Back (₹)
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setSettleAmount(String(settlingDraw.amount))}
-                          className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer"
-                        >
-                          Full: {formatCurrency(settlingDraw.amount)}
-                        </button>
-                      </div>
-                      <input
-                        type="number"
-                        required
-                        min={1}
-                        max={settlingDraw.amount}
-                        value={settleAmount}
-                        onChange={(e) => setSettleAmount(e.target.value)}
-                        className={`w-full bg-white border rounded-xl px-3.5 py-2.5 text-sm font-black text-gray-900 focus:outline-none font-mono shadow-2xs ${
-                          Number(settleAmount) > settlingDraw.amount 
-                            ? 'border-rose-400 focus:border-rose-500 bg-rose-50/30 text-rose-900' 
-                            : 'border-emerald-300 focus:border-emerald-500'
-                        }`}
-                      />
-                    </div>
-
-                    {/* Exceeded Warning */}
-                    {Number(settleAmount) > settlingDraw.amount && (
-                      <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-[11px] text-rose-800 font-medium leading-relaxed">
-                        ⚠️ <strong>Cannot exceed draw amount:</strong> This draw is for {formatCurrency(settlingDraw.amount)}. You cannot put back more than {formatCurrency(settlingDraw.amount)} for this specific draw. To deposit extra cash, use the <strong>Move Money</strong> tab.
-                      </div>
-                    )}
-
-                    {/* Partial Settlement Info */}
-                    {Number(settleAmount) > 0 && Number(settleAmount) < settlingDraw.amount && (
-                      <div className="bg-amber-50 border border-amber-200 p-2 rounded-xl text-[11px] text-amber-900 font-medium">
-                        ℹ️ <strong>Partial Settlement:</strong> Remaining <span className="font-bold font-mono">{formatCurrency(settlingDraw.amount - Number(settleAmount))}</span> will remain as active debt for {settlingDraw.takenBy}.
-                      </div>
-                    )}
-
-                    {/* Normal Full Settlement Info */}
-                    {Number(settleAmount) === settlingDraw.amount && (
-                      <p className="text-[11px] text-emerald-800 font-medium">
-                        ✓ Will credit <span className="font-bold">{formatCurrency(Number(settleAmount))}</span> back into {WALLET_META[settleDestWallet]?.name} and mark this draw as fully Settled.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-2.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setSettlingDraw(null)}
-                      className="w-full sm:flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer text-center"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isProcessingSettle || Number(settleAmount) <= 0 || Number(settleAmount) > settlingDraw.amount}
-                      className="w-full sm:flex-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-center"
-                    >
-                      {isProcessingSettle 
-                        ? 'Putting Cash Back...' 
-                        : Number(settleAmount) > settlingDraw.amount
-                        ? `Cannot Exceed ${formatCurrency(settlingDraw.amount)}`
-                        : `✓ Put ${formatCurrency(Number(settleAmount) || settlingDraw.amount)} Back`
-                      }
-                    </button>
-                  </div>
-                </form>
-
-              </div>
-            </div>
-          )}
-
-          {/* ── INTERACTIVE MODAL: RECOVER ORGANIZER FLOAT (CHOOSE ANY SOURCE ACCOUNT) ── */}
-          {recoveringFloat && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
-              <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto">
-                
-                {/* Modal Header */}
-                <div className="flex items-start justify-between border-b border-gray-100 pb-3">
-                  <div>
-                    <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
-                      <RotateCcw size={20} className="text-emerald-600" />
-                      Recover Organizer Float
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Refund {recoveringFloat.depositedBy} from any vault account with sufficient funds
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setRecoveringFloat(null)}
-                    className="text-gray-400 hover:text-gray-700 p-1.5 rounded-xl hover:bg-gray-100 cursor-pointer"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <form onSubmit={handleConfirmRecoverFloat} className="space-y-4">
-                  
-                  {/* Injected Float Summary Card */}
-                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Deposited Float</span>
-                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
-                        {recoveringFloat.depositedBy}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-lg font-black font-mono text-emerald-600">
-                        +{formatCurrency(recoveringFloat.amount)}
-                      </span>
-                      <span className="text-[11px] text-gray-500 font-medium">
-                        Original Inflow: {WALLET_META[recoveringFloat.walletType]?.name}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-600 italic">
-                      &quot;{recoveringFloat.notes}&quot;
-                    </p>
-                  </div>
-
-                  {/* Vault Source Selection (Freely choose any account) */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-700 font-bold uppercase tracking-wider block">
-                      Pay Out / Withdraw Cash From Account:
-                    </label>
-                    <div className="space-y-2">
-                      {[
-                        { type: 'cash_in_hand' as WalletType, label: '💵 Physical Cash Box', bal: balances.cash_in_hand },
-                        { type: 'kishor_bank' as WalletType, label: '🏦 Kishor Bank', bal: balances.kishor_bank },
-                        { type: 'dad_bank' as WalletType, label: '🏦 Dad Bank', bal: balances.dad_bank },
-                        { type: 'mom_bank' as WalletType, label: '🏦 Mom Bank', bal: balances.mom_bank },
-                      ].map((acc) => {
-                        const isSelected = recoverSourceWallet === acc.type;
-                        const hasEnough = (acc.bal || 0) >= (Number(recoverAmount) || recoveringFloat.amount);
-                        return (
-                          <button
-                            key={acc.type}
-                            type="button"
-                            onClick={() => setRecoverSourceWallet(acc.type)}
-                            className={`w-full p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
-                                : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <div className="space-y-0.5">
-                              <span className="text-xs font-bold text-gray-900 block">{acc.label}</span>
-                              <span className={`text-[11px] font-mono font-bold block ${acc.bal > 0 ? 'text-gray-600' : 'text-gray-400'}`}>
-                                Available: {formatCurrency(acc.bal || 0)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {!hasEnough && (
-                                <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                                  Low Bal
-                                </span>
-                              )}
-                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                                isSelected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-gray-300 bg-white'
-                              }`}>
-                                {isSelected && <Check size={10} />}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Amount to Recover */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] text-gray-700 font-bold uppercase tracking-wider">
-                        Amount to Recover (₹)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setRecoverAmount(String(recoveringFloat.amount))}
-                        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer"
-                      >
-                        Full Float: {formatCurrency(recoveringFloat.amount)}
-                      </button>
-                    </div>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      max={recoveringFloat.amount}
-                      value={recoverAmount}
-                      onChange={(e) => setRecoverAmount(e.target.value)}
-                      className={`w-full bg-white border rounded-xl px-3.5 py-2.5 text-sm font-black text-gray-900 focus:outline-none font-mono shadow-2xs ${
-                        balances[recoverSourceWallet] < Number(recoverAmount) || Number(recoverAmount) > recoveringFloat.amount
-                          ? 'border-rose-400 focus:border-rose-500 bg-rose-50/30'
-                          : 'border-emerald-300 focus:border-emerald-500'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Validation alerts */}
-                  {balances[recoverSourceWallet] < Number(recoverAmount) && (
-                    <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-[11px] text-rose-800 font-medium leading-relaxed">
-                      ⚠️ <strong>Insufficient balance in {WALLET_META[recoverSourceWallet].name}:</strong> Only {formatCurrency(balances[recoverSourceWallet])} available. Please select another account (e.g. Physical Cash Box) above.
-                    </div>
-                  )}
-
-                  {/* Action buttons */}
-                  <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-2.5 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setRecoveringFloat(null)}
-                      className="w-full sm:flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer text-center"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isProcessingRecover || Number(recoverAmount) <= 0 || Number(recoverAmount) > recoveringFloat.amount || balances[recoverSourceWallet] < Number(recoverAmount)}
-                      className="w-full sm:flex-2 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-center"
-                    >
-                      <RotateCcw size={13} />
-                      {isProcessingRecover 
-                        ? 'Processing Recovery...' 
-                        : balances[recoverSourceWallet] < Number(recoverAmount)
-                        ? 'Insufficient Balance'
-                        : `Withdraw ${formatCurrency(Number(recoverAmount) || recoveringFloat.amount)}`
-                      }
-                    </button>
-                  </div>
-                </form>
-
-              </div>
-            </div>
-          )}
-
         </div>
       )}
 
-      {/* ── SUBTAB 5: DENOMINATION COUNTER & RECONCILIATION ── */}
-      {activeSubtab === 'denominations' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          
-          {/* Note Counter Input Matrix */}
-          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                <Calculator size={16} className="text-emerald-600" />
-                Physical Note Counter Matrix
-              </h3>
-              <button
-                type="button"
-                onClick={() => setDenominations({ 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0 })}
-                className="text-xs text-gray-500 hover:text-gray-800 font-semibold flex items-center gap-1 cursor-pointer"
-              >
-                <RefreshCw size={12} /> Reset
-              </button>
-            </div>
-
-            <div className="space-y-2.5 sm:space-y-3">
-              {[500, 200, 100, 50, 20, 10].map((noteVal) => {
-                const count = denominations[noteVal] || 0;
-                const totalForNote = count * noteVal;
-
-                return (
-                  <div key={noteVal} className="flex items-center justify-between p-2.5 sm:p-3 bg-gray-50/80 border border-gray-100 rounded-xl sm:rounded-2xl gap-2 sm:gap-3">
-                    <div className="w-16 sm:w-20 shrink-0">
-                      <span className="text-xs sm:text-sm font-black font-mono text-gray-900">₹{noteVal}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <span className="text-xs text-gray-400 font-bold">×</span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={count === 0 ? '' : count}
-                        placeholder="0"
-                        onChange={(e) => {
-                          const val = Math.max(0, parseInt(e.target.value) || 0);
-                          setDenominations(prev => ({ ...prev, [noteVal]: val }));
-                        }}
-                        className="w-16 sm:w-24 bg-white border border-gray-200 focus:border-emerald-500 rounded-xl px-2 sm:px-3 py-1.5 text-xs font-bold font-mono text-center text-gray-900 focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="w-24 sm:w-28 text-right shrink-0">
-                      <span className="text-xs sm:text-sm font-black font-mono text-emerald-700 block truncate">
-                        {formatCurrency(totalForNote)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+      {/* ── 5. UNIFIED STATEMENT & ACTIVITY TIMELINE ────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xs">
+        {/* Header & Filter Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div>
+            <h3 className="text-base sm:text-lg font-black text-gray-900 flex items-center gap-2">
+              <History size={18} className="text-indigo-600" />
+              <span>
+                {selectedWalletFilter === 'all' 
+                  ? 'Unified Treasury Statement' 
+                  : `${WALLET_META[selectedWalletFilter].name} Statement`}
+              </span>
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Chronological feed of collections, ATM withdrawals, spends and transfers
+            </p>
           </div>
 
-          {/* Physical Cash vs App Disparity Card */}
-          <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs flex flex-col justify-between">
-            <div className="space-y-3.5 sm:space-y-4">
-              <div className="border-b border-gray-100 pb-3">
-                <h3 className="text-sm sm:text-base font-bold text-gray-900">
-                  Cash Box Reconciliation Audit
-                </h3>
-                <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">
-                  Live comparison between physical currency count and app records
-                </p>
-              </div>
-
-              {/* 2 Big Comparison Metric Cards */}
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                <div className="p-3.5 sm:p-4 bg-emerald-50/60 border border-emerald-200 rounded-xl sm:rounded-2xl space-y-1">
-                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">PHYSICAL COUNTED</span>
-                  <span className="text-xl sm:text-3xl font-black font-mono text-emerald-700 block truncate">
-                    {formatCurrency(calculatedPhysicalCash)}
-                  </span>
-                </div>
-
-                <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl space-y-1">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">APP CASH BOX</span>
-                  <span className="text-xl sm:text-3xl font-black font-mono text-slate-900 block truncate">
-                    {formatCurrency(balances.cash_in_hand || 0)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Disparity Status Callout */}
-              <div className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border ${
-                cashDisparity === 0
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                  : cashDisparity > 0
-                  ? 'bg-blue-50 border-blue-200 text-blue-800'
-                  : 'bg-rose-50 border-rose-200 text-rose-800'
-              }`}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold">
-                      {cashDisparity === 0 
-                        ? '✅ Perfect Match — Zero Disparity' 
-                        : cashDisparity > 0 
-                        ? 'ℹ️ Physical Surplus Detected' 
-                        : '⚠️ Physical Shortage Detected'}
-                    </span>
-                  </div>
-                  <span className="text-xs sm:text-sm font-black font-mono shrink-0">
-                    {cashDisparity > 0 ? '+' : ''}{formatCurrency(cashDisparity)}
-                  </span>
-                </div>
-                <p className="text-[10px] sm:text-[11px] opacity-80 mt-1">
-                  {cashDisparity === 0
-                    ? 'Physical banknotes in locker match the system balance exactly.'
-                    : cashDisparity > 0
-                    ? 'You counted more physical currency than recorded in the app.'
-                    : 'Counted cash is lower than system balance. Check for unrecorded spends or payouts.'}
-                </p>
-              </div>
-
-              {lastReconciliationNote && (
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl text-xs text-gray-600">
-                  <span className="font-bold text-gray-800 block mb-0.5">Last Record:</span>
-                  {lastReconciliationNote}
-                </div>
-              )}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 sm:w-60">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search statements..."
+                value={ledgerSearch}
+                onChange={(e) => setLedgerSearch(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-600 rounded-xl pl-8 pr-3 py-1.5 text-xs font-medium text-gray-900 focus:outline-none"
+              />
             </div>
 
             <button
-              type="button"
-              onClick={handleSaveDenominations}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3.5 rounded-xl shadow-2xs active:scale-98 transition-all cursor-pointer mt-3 sm:mt-4"
+              onClick={() => window.print()}
+              className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors cursor-pointer"
+              title="Print Statement"
             >
-              Record Reconciliation Snapshot
+              <Printer size={15} />
             </button>
           </div>
-
         </div>
-      )}
 
-      {/* ── SUBTAB 6: MASTER AUDIT LEDGER ── */}
-      {activeSubtab === 'ledger' && (
-        <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs">
-          
-          {/* Header & Filter Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3 sm:pb-4">
-            <div>
-              <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                <History size={18} className="text-indigo-600" />
-                Treasury Audit &amp; Movements Timeline
-              </h3>
-              <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">
-                Complete verifiable history of collections, transfers, spends, and ATM cash movements
-              </p>
+        {/* Quick Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-nowrap">
+          {[
+            { id: 'all', label: 'All Transactions' },
+            { id: 'collection', label: '📥 Collections' },
+            { id: 'atm_withdrawal', label: '🏧 ATM Cash' },
+            { id: 'personal_draw', label: '💸 Spends / Draws' },
+            { id: 'transfer', label: '⇄ Transfers & Floats' },
+            { id: 'payout', label: '🏆 Auction Payouts' },
+          ].map((pill) => {
+            const isSelected = ledgerTypeFilter === pill.id;
+            return (
+              <button
+                key={pill.id}
+                onClick={() => setLedgerTypeFilter(pill.id)}
+                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+                  isSelected 
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs' 
+                    : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200'
+                }`}
+              >
+                {pill.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Statement Timeline Feed List */}
+        <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+          {filteredTransactions.length === 0 ? (
+            <div className="py-16 text-center text-xs text-gray-400">
+              No transactions match your search filter.
+            </div>
+          ) : (
+            filteredTransactions.map((tx) => {
+              const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx, selectedWalletFilter);
+              const dateLabel = tx.created_at 
+                ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                : 'Recent';
+
+              return (
+                <div 
+                  key={tx.id} 
+                  className="p-3 sm:p-4 bg-gray-50/70 border border-gray-100 rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3 hover:bg-slate-50 transition-colors"
+                >
+                  <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <span className={`text-[9px] sm:text-[10px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                        {badgeLabel}
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
+                      <span className="text-[10px] text-gray-500 font-bold bg-gray-200/70 px-1.5 py-0.2 rounded">
+                        {WALLET_META[tx.wallet_type]?.name || tx.wallet_type}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-gray-800 leading-snug truncate mt-0.5">
+                      {tx.notes || tx.description || 'Treasury Ledger Movement'}
+                    </p>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className={`text-sm sm:text-base font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* ── MODAL 1: ATM WITHDRAWAL MODAL ───────────────────────────────────── */}
+      {activeModal === 'atm' && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <Landmark size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">ATM Bank to Cash Box</h3>
+                  <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">2-Step Verification</span>
+                </div>
+              </div>
+              <button onClick={() => setActiveModal('none')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center cursor-pointer">
+                <X size={16} />
+              </button>
             </div>
 
-            {/* Filter Controls */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <div className="relative w-full sm:w-48">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <form onSubmit={handleTriggerATM} className="space-y-4">
+              <div className="space-y-1 text-center">
+                <label className="text-[11px] font-extrabold uppercase text-gray-500">Withdrawal Amount (₹)</label>
                 <input
-                  type="text"
-                  placeholder="Search ledger..."
-                  value={ledgerSearch}
-                  onChange={(e) => setLedgerSearch(e.target.value)}
-                  className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none w-full"
+                  type="number"
+                  required
+                  min={1}
+                  placeholder="0"
+                  value={relocateAmount}
+                  onChange={(e) => setRelocateAmount(e.target.value)}
+                  className="w-full text-center text-3xl font-black font-mono py-2.5 border-2 border-gray-200 focus:border-indigo-600 rounded-2xl focus:outline-none"
+                  autoFocus
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <select
-                  value={ledgerWalletFilter}
-                  onChange={(e) => setLedgerWalletFilter(e.target.value)}
-                  className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-700 focus:outline-none flex-1 sm:flex-initial cursor-pointer"
-                >
-                  <option value="all">All Accounts</option>
-                  <option value="cash_in_hand">Cash Box</option>
-                  <option value="kishor_bank">Kishor Bank</option>
-                  <option value="dad_bank">Dad Bank</option>
-                  <option value="mom_bank">Mom Bank</option>
-                </select>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 uppercase">Debit from which bank?</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['kishor_bank', 'dad_bank', 'mom_bank'] as const).map((bKey) => (
+                    <button
+                      key={bKey}
+                      type="button"
+                      onClick={() => setRelocateSource(bKey)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        relocateSource === bKey ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs' : 'bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200'
+                      }`}
+                    >
+                      <div className="text-[10px] font-bold truncate">{WALLET_META[bKey].name}</div>
+                      <div className="text-xs font-mono font-black mt-0.5">{formatCurrency(balances[bKey] || 0)}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
+              <button
+                type="submit"
+                disabled={isProcessingTransfer || Number(relocateAmount) <= 0}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isProcessingTransfer ? 'Triggering...' : `Trigger ATM Withdrawal (${formatCurrency(Number(relocateAmount) || 0)})`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 2: PERSONAL SPEND / DRAW MODAL ─────────────────────────────── */}
+      {activeModal === 'spend' && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                  <Coins size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Log Personal Spend / Draw</h3>
+                  <p className="text-[11px] text-gray-500">Record cash taken for personal expense or rotation</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveModal('none')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleLogSpend} className="space-y-3.5">
+              <div className="space-y-1 text-center">
+                <label className="text-[11px] font-extrabold uppercase text-gray-500">Spend Amount (₹)</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  placeholder="0"
+                  value={spendAmount}
+                  onChange={(e) => setSpendAmount(e.target.value)}
+                  className="w-full text-center text-3xl font-black font-mono py-2.5 border-2 border-gray-200 focus:border-rose-600 rounded-2xl focus:outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 uppercase">Who is taking the cash?</label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {['Dad (Anbazhakan)', 'Mom (Parimalam)', 'Dr. Kishor', 'Other'].map((person) => (
+                    <button
+                      key={person}
+                      type="button"
+                      onClick={() => setSpendTakenBy(person)}
+                      className={`p-2 rounded-xl text-center text-[11px] font-bold border transition-all cursor-pointer truncate ${
+                        spendTakenBy === person ? 'bg-rose-600 text-white border-rose-700 shadow-xs' : 'bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200'
+                      }`}
+                    >
+                      {person.split(' ')[0]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Category</label>
+                  <select
+                    value={spendTag}
+                    onChange={(e) => setSpendTag(e.target.value as any)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                  >
+                    <option value="Petrol">⛽ Petrol</option>
+                    <option value="Groceries">🛒 Groceries</option>
+                    <option value="Tea & Refreshments">☕ Tea / Snacks</option>
+                    <option value="Personal Expense">💸 Personal Expense</option>
+                    <option value="Maintenance">🔧 Maintenance</option>
+                    <option value="Emergency Cash">🚨 Emergency</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Deduct From</label>
+                  <select
+                    value={spendWallet}
+                    onChange={(e) => setSpendWallet(e.target.value as any)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                  >
+                    <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
+                    <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
+                    <option value="dad_bank">Dad Bank ({formatCurrency(balances.dad_bank)})</option>
+                    <option value="mom_bank">Mom Bank ({formatCurrency(balances.mom_bank)})</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Reason / Note (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Scooter petrol or vegetables"
+                  value={spendDesc}
+                  onChange={(e) => setSpendDesc(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium text-gray-900 focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingSpend || Number(spendAmount) <= 0}
+                className="w-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingSpend ? 'Logging...' : `Record Spend (${formatCurrency(Number(spendAmount) || 0)})`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 3: DEPOSIT FLOAT / INFLOW MODAL ────────────────────────────── */}
+      {activeModal === 'deposit' && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <Plus size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Deposit Money / Float</h3>
+                  <p className="text-[11px] text-gray-500">Add emergency funds or capital injection into vault</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveModal('none')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleExecuteDeposit} className="space-y-3.5">
+              <div className="space-y-1 text-center">
+                <label className="text-[11px] font-extrabold uppercase text-gray-500">Deposit Amount (₹)</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  placeholder="0"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  className="w-full text-center text-3xl font-black font-mono py-2.5 border-2 border-gray-200 focus:border-emerald-600 rounded-2xl focus:outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Deposited By</label>
+                  <select
+                    value={depositBy}
+                    onChange={(e) => setDepositBy(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                  >
+                    <option value="Dad (Anbazhakan)">Dad (Anbazhakan)</option>
+                    <option value="Mom (Parimalam)">Mom (Parimalam)</option>
+                    <option value="Dr. Kishor">Dr. Kishor</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Destination Vault</label>
+                  <select
+                    value={depositDest}
+                    onChange={(e) => setDepositDest(e.target.value as any)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                  >
+                    <option value="cash_in_hand">Physical Cash Box</option>
+                    <option value="kishor_bank">Kishor Bank (UPI)</option>
+                    <option value="dad_bank">Dad's Bank</option>
+                    <option value="mom_bank">Mom's Bank</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Notes</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Floating reserve for auction prize pot"
+                  value={depositNotes}
+                  onChange={(e) => setDepositNotes(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium text-gray-900 focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isProcessingDeposit || Number(depositAmount) <= 0}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isProcessingDeposit ? 'Depositing...' : `Deposit ${formatCurrency(Number(depositAmount) || 0)}`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 4: INTER-BANK TRANSFER MODAL ──────────────────────────────── */}
+      {activeModal === 'transfer' && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <ArrowRightLeft size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Inter-Vault Transfer</h3>
+                  <p className="text-[11px] text-gray-500">Move money from one account to another</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveModal('none')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleExecuteTransfer} className="space-y-3.5">
+              <div className="space-y-1 text-center">
+                <label className="text-[11px] font-extrabold uppercase text-gray-500">Transfer Amount (₹)</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  placeholder="0"
+                  value={transferAmount}
+                  onChange={(e) => setTransferAmount(e.target.value)}
+                  className="w-full text-center text-3xl font-black font-mono py-2.5 border-2 border-gray-200 focus:border-blue-600 rounded-2xl focus:outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">From Account</label>
+                  <select
+                    value={transferSource}
+                    onChange={(e) => setTransferSource(e.target.value as any)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                  >
+                    <option value="kishor_bank">Kishor Bank</option>
+                    <option value="dad_bank">Dad Bank</option>
+                    <option value="mom_bank">Mom Bank</option>
+                    <option value="cash_in_hand">Cash Box</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">To Account</label>
+                  <select
+                    value={transferDest}
+                    onChange={(e) => setTransferDest(e.target.value as any)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                  >
+                    <option value="cash_in_hand">Cash Box</option>
+                    <option value="kishor_bank">Kishor Bank</option>
+                    <option value="dad_bank">Dad Bank</option>
+                    <option value="mom_bank">Mom Bank</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Reason / Note</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Bank rebalancing"
+                  value={transferNotes}
+                  onChange={(e) => setTransferNotes(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium text-gray-900 focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isProcessingTransfer || Number(transferAmount) <= 0}
+                className="w-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isProcessingTransfer ? 'Transferring...' : `Execute Transfer (${formatCurrency(Number(transferAmount) || 0)})`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 5: SETTLE PERSONAL DEBT (PUT BACK) ────────────────────────── */}
+      {activeModal === 'settle' && settlingDraw && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
+                  <Check size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Settle / Put Cash Back</h3>
+                  <p className="text-[11px] text-gray-500">{settlingDraw.takenBy} · {settlingDraw.tag}</p>
+                </div>
+              </div>
+              <button onClick={() => { setSettlingDraw(null); setActiveModal('none'); }} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmSettle} className="space-y-3.5">
+              <div className="space-y-1 text-center">
+                <label className="text-[11px] font-extrabold uppercase text-gray-500">Repayment Amount (₹)</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={settlingDraw.amount}
+                  value={settleAmount}
+                  onChange={(e) => setSettleAmount(e.target.value)}
+                  className="w-full text-center text-3xl font-black font-mono py-2.5 border-2 border-gray-200 focus:border-teal-600 rounded-2xl focus:outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Put back into which account?</label>
                 <select
-                  value={ledgerTypeFilter}
-                  onChange={(e) => setLedgerTypeFilter(e.target.value)}
-                  className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-700 focus:outline-none flex-1 sm:flex-initial cursor-pointer"
+                  value={settleDestWallet}
+                  onChange={(e) => setSettleDestWallet(e.target.value as any)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
                 >
-                  <option value="all">All Types</option>
-                  <option value="collection">Collections (+)</option>
-                  <option value="payout">Prize Payouts (-)</option>
-                  <option value="transfer">Transfers</option>
-                  <option value="personal_draw">Personal Draws (-)</option>
-                  <option value="atm_withdrawal">ATM Withdrawals</option>
+                  <option value="cash_in_hand">Physical Cash Box</option>
+                  <option value="kishor_bank">Kishor Bank (UPI)</option>
+                  <option value="dad_bank">Dad's Bank</option>
+                  <option value="mom_bank">Mom's Bank</option>
                 </select>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isProcessingSettle || Number(settleAmount) <= 0}
+                className="w-full bg-teal-600 hover:bg-teal-700 active:scale-95 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isProcessingSettle ? 'Settling...' : `Confirm Repayment (${formatCurrency(Number(settleAmount) || 0)})`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 6: DENOMINATIONS / NOTE COUNTER MODAL ─────────────────────── */}
+      {activeModal === 'denominations' && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-lg p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <Calculator size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Physical Cash Box Note Counter</h3>
+                  <p className="text-[11px] text-gray-500">Count 500, 200, 100 notes &amp; check against system cash</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveModal('none')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+              {/* Note Row Inputs */}
+              {[500, 200, 100, 50, 20, 10].map((note) => (
+                <div key={note} className="flex items-center justify-between bg-gray-50 border border-gray-200 p-2.5 rounded-xl gap-2">
+                  <span className="w-16 font-black font-mono text-sm text-gray-800">₹{note}</span>
+                  <div className="flex items-center gap-2 flex-1 max-w-[120px]">
+                    <span className="text-xs font-bold text-gray-400">×</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={denominations[note] || ''}
+                      onChange={(e) => setDenominations(prev => ({ ...prev, [note]: parseInt(e.target.value) || 0 }))}
+                      className="w-full text-center font-black font-mono bg-white border border-gray-300 rounded-lg py-1 text-sm focus:outline-none"
+                    />
+                  </div>
+                  <span className="w-24 text-right font-black font-mono text-sm text-indigo-700">
+                    {formatCurrency((denominations[note] || 0) * note)}
+                  </span>
+                </div>
+              ))}
+
+              {/* Tally Summary Card */}
+              <div className="bg-slate-900 text-white p-3.5 rounded-2xl space-y-2 mt-3">
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-gray-400">Physical Notes Counted:</span>
+                  <span className="font-mono text-emerald-400 text-sm font-black">{formatCurrency(calculatedPhysicalCash)}</span>
+                </div>
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-gray-400">System Cash in Hand:</span>
+                  <span className="font-mono text-white">{formatCurrency(balances.cash_in_hand)}</span>
+                </div>
+                <div className="pt-2 border-t border-white/10 flex justify-between items-center">
+                  <span className="text-xs font-black uppercase">Disparity (Difference):</span>
+                  <span className={`font-mono text-sm font-black px-2 py-0.5 rounded-md ${
+                    cashDisparity === 0 
+                      ? 'bg-emerald-500/20 text-emerald-400' 
+                      : cashDisparity > 0 
+                      ? 'bg-blue-500/20 text-blue-400' 
+                      : 'bg-rose-500/20 text-rose-400'
+                  }`}>
+                    {cashDisparity === 0 ? '✓ Perfect Tally (₹0)' : `${cashDisparity > 0 ? '+' : ''}${formatCurrency(cashDisparity)}`}
+                  </span>
+                </div>
               </div>
             </div>
+
+            <div className="pt-3 border-t border-gray-100 flex justify-end shrink-0">
+              <button
+                onClick={() => {
+                  triggerHapticFeedback('success');
+                  setActiveModal('none');
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-5 py-2.5 rounded-xl cursor-pointer"
+              >
+                Done Counting
+              </button>
+            </div>
           </div>
-
-          {/* Master Timeline Stream */}
-          <div className="space-y-2 max-h-[550px] overflow-y-auto pr-1">
-            {filteredMasterLedger.length === 0 ? (
-              <div className="py-16 text-center text-xs text-gray-400">
-                No matching transactions found in the treasury ledger.
-              </div>
-            ) : (
-              filteredMasterLedger.map((tx) => {
-                const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx);
-                const dateLabel = tx.created_at 
-                  ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                  : 'Recent';
-
-                return (
-                  <div key={tx.id} className="p-3 sm:p-4 bg-gray-50/70 border border-gray-100 rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3 hover:bg-slate-50 transition-colors">
-                    <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-md border ${badgeColor}`}>
-                          {badgeLabel}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
-                      </div>
-                      <p className="text-xs font-semibold text-gray-800 leading-snug truncate mt-0.5">
-                        {tx.notes || tx.description || 'Treasury Movement'}
-                      </p>
-                      <span className="text-[10px] text-gray-500 font-medium block truncate">
-                        Account: <strong className="text-gray-700">{WALLET_META[tx.wallet_type]?.name || tx.wallet_type}</strong>
-                      </span>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className={`text-xs sm:text-base font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
         </div>
       )}
 
