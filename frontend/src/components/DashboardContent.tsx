@@ -535,25 +535,31 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         return;
       }
 
-      // 2. Sync group_members to Supabase
-      const assigned = editGroupMembers.filter(m => m.profileId);
-      for (const m of assigned) {
+      // 2. Sync group_members to Supabase for all slots
+      for (const m of editGroupMembers) {
         const payload: any = {
           group_id: editingGroup.id,
           ticket_number: m.ticket,
-          profile_id: m.profileId,
+          profile_id: m.profileId || null,
           has_won_regular: m.hasWon,
           physical_book_synced: m.bookSynced ?? true,
-          split_pool: m.splitPool || null,
-          custom_installment: m.customInstallment || null,
-          exit_month: m.exitMonth || null,
-          transferred_from: m.transferredFrom || null,
-          transfer_effective_month: m.transferEffectiveMonth || null,
+          split_pool: m.profileId ? (m.splitPool || null) : null,
+          custom_installment: m.profileId ? (m.customInstallment || null) : null,
+          exit_month: m.profileId ? (m.exitMonth || null) : null,
+          transferred_from: m.profileId ? (m.transferredFrom || null) : null,
+          transfer_effective_month: m.profileId ? (m.transferEffectiveMonth || null) : null,
         };
         await supabase
           .from('group_members')
           .upsert(payload, { onConflict: 'group_id,ticket_number' });
       }
+
+      // If member count was decreased, clean up orphaned tickets beyond the new count
+      await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', editingGroup.id)
+        .gt('ticket_number', countNum);
 
       // Update local state
       setLocalGroups(prev =>
@@ -650,14 +656,27 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   const handleSaveSplit = async (ticketId: string, payers: { name: string; part: number }[]) => {
     try {
-      const { error } = await supabase
-        .from('group_members')
-        .update({ split_pool: payers.length > 0 ? payers : null })
-        .eq('id', ticketId);
+      const ticketObj = editGroupMembers.find(m => m.id === ticketId);
+      const isTempId = !ticketId || ticketId.startsWith('unassigned-') || ticketId.startsWith('member-');
 
-      if (error) {
-        alert(`Failed to save split pool: ${error.message}`);
-        return;
+      if (isTempId && editingGroup?.id && ticketObj) {
+        await supabase.from('group_members').upsert({
+          group_id: editingGroup.id,
+          ticket_number: ticketObj.ticket,
+          profile_id: ticketObj.profileId || null,
+          split_pool: payers.length > 0 ? payers : null,
+          physical_book_synced: true,
+        }, { onConflict: 'group_id,ticket_number' });
+      } else if (!isTempId) {
+        const { error } = await supabase
+          .from('group_members')
+          .update({ split_pool: payers.length > 0 ? payers : null })
+          .eq('id', ticketId);
+
+        if (error) {
+          alert(`Failed to save split pool: ${error.message}`);
+          return;
+        }
       }
 
       setEditGroupMembers(prev =>
@@ -690,14 +709,27 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   const handleSaveExit = async (ticketId: string, exitMonth: number | null) => {
     try {
-      const { error } = await supabase
-        .from('group_members')
-        .update({ exit_month: exitMonth })
-        .eq('id', ticketId);
+      const ticketObj = editGroupMembers.find(m => m.id === ticketId);
+      const isTempId = !ticketId || ticketId.startsWith('unassigned-') || ticketId.startsWith('member-');
 
-      if (error) {
-        alert(`Failed to update member exit: ${error.message}`);
-        return;
+      if (isTempId && editingGroup?.id && ticketObj) {
+        await supabase.from('group_members').upsert({
+          group_id: editingGroup.id,
+          ticket_number: ticketObj.ticket,
+          profile_id: ticketObj.profileId || null,
+          exit_month: exitMonth,
+          physical_book_synced: true,
+        }, { onConflict: 'group_id,ticket_number' });
+      } else if (!isTempId) {
+        const { error } = await supabase
+          .from('group_members')
+          .update({ exit_month: exitMonth })
+          .eq('id', ticketId);
+
+        if (error) {
+          alert(`Failed to update member exit: ${error.message}`);
+          return;
+        }
       }
 
       setEditGroupMembers(prev =>
@@ -737,20 +769,32 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       }
 
       const currentTicket = editGroupMembers.find(m => m.id === ticketId);
-      const prevProfileId = currentTicket?.profileId;
+      const prevProfileId = currentTicket?.profileId || null;
+      const isTempId = !ticketId || ticketId.startsWith('unassigned-') || ticketId.startsWith('member-');
 
-      const { error } = await supabase
-        .from('group_members')
-        .update({
+      if (isTempId && editingGroup?.id && currentTicket) {
+        await supabase.from('group_members').upsert({
+          group_id: editingGroup.id,
+          ticket_number: currentTicket.ticket,
           profile_id: recipientProfileId,
           transferred_from: prevProfileId,
           transfer_effective_month: startMonth,
-        })
-        .eq('id', ticketId);
+          physical_book_synced: true,
+        }, { onConflict: 'group_id,ticket_number' });
+      } else if (!isTempId) {
+        const { error } = await supabase
+          .from('group_members')
+          .update({
+            profile_id: recipientProfileId,
+            transferred_from: prevProfileId,
+            transfer_effective_month: startMonth,
+          })
+          .eq('id', ticketId);
 
-      if (error) {
-        alert(`Failed to transfer ticket: ${error.message}`);
-        return;
+        if (error) {
+          alert(`Failed to transfer ticket: ${error.message}`);
+          return;
+        }
       }
 
       setEditGroupMembers(prev =>
@@ -805,14 +849,27 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   const handleSaveCustomAmount = async (ticketId: string, amount: number | null) => {
     try {
-      const { error } = await supabase
-        .from('group_members')
-        .update({ custom_installment: amount })
-        .eq('id', ticketId);
+      const ticketObj = editGroupMembers.find(m => m.id === ticketId);
+      const isTempId = !ticketId || ticketId.startsWith('unassigned-') || ticketId.startsWith('member-');
 
-      if (error) {
-        alert(`Failed to save custom amount: ${error.message}`);
-        return;
+      if (isTempId && editingGroup?.id && ticketObj) {
+        await supabase.from('group_members').upsert({
+          group_id: editingGroup.id,
+          ticket_number: ticketObj.ticket,
+          profile_id: ticketObj.profileId || null,
+          custom_installment: amount,
+          physical_book_synced: true,
+        }, { onConflict: 'group_id,ticket_number' });
+      } else if (!isTempId) {
+        const { error } = await supabase
+          .from('group_members')
+          .update({ custom_installment: amount })
+          .eq('id', ticketId);
+
+        if (error) {
+          alert(`Failed to save custom amount: ${error.message}`);
+          return;
+        }
       }
 
       setEditGroupMembers(prev =>
@@ -846,8 +903,22 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const handleUnassignTicket = async (ticketRecordId: string, ticketNum: number) => {
     try {
       triggerHapticFeedback('light');
-      if (!ticketRecordId.startsWith('unassigned-')) {
-        const { error } = await supabase
+      if (editingGroup?.id) {
+        await supabase
+          .from('group_members')
+          .upsert({
+            group_id: editingGroup.id,
+            ticket_number: ticketNum,
+            profile_id: null,
+            physical_book_synced: true,
+            split_pool: null,
+            custom_installment: null,
+            exit_month: null,
+            transferred_from: null,
+            transfer_effective_month: null,
+          }, { onConflict: 'group_id,ticket_number' });
+      } else if (ticketRecordId && !ticketRecordId.startsWith('unassigned-') && !ticketRecordId.startsWith('member-')) {
+        await supabase
           .from('group_members')
           .update({
             profile_id: null,
@@ -858,11 +929,6 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
             transfer_effective_month: null,
           })
           .eq('id', ticketRecordId);
-
-        if (error) {
-          alert(`Failed to unassign ticket: ${error.message}`);
-          return;
-        }
       }
 
       setEditGroupMembers(prev =>
@@ -883,7 +949,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         );
       }
     } catch (err: any) {
-      alert(`Error unassigning ticket: ${err.message}`);
+      console.error('Error unassigning ticket:', err);
     }
   };
 
@@ -900,7 +966,6 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         if (m.ticket === fromTicket) {
           return {
             ...m,
-            id: toMember?.id || m.id,
             profileId: toMember?.profileId,
             name: toMember?.name || '',
             phone: toMember?.phone || '',
@@ -916,7 +981,6 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         if (m.ticket === toTicket) {
           return {
             ...m,
-            id: fromMember?.id || m.id,
             profileId: fromMember?.profileId,
             name: fromMember?.name || '',
             phone: fromMember?.phone || '',
