@@ -2783,24 +2783,22 @@ Thank you for your prompt payment! 🙏`;
           <div className="space-y-4 sm:space-y-6">
             {/* ⚠️ HIGH-PRIORITY ALERT BANNER: Pending Physical Cash Box Verification */}
             {pendingAtmRelocations.length > 0 && (
-              <div className="bg-gradient-to-r from-amber-50 via-amber-100/60 to-orange-50 border-2 border-amber-300 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5 animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-amber-200/80 pb-3">
-                  <div className="flex items-center gap-2.5 sm:gap-3">
-                    <div className="w-9 h-9 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs animate-pulse">
-                      <AlertCircle size={18} />
+              <div className="bg-gradient-to-r from-amber-50 via-amber-100/50 to-orange-50 border-2 border-amber-300/90 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-sm space-y-2.5 sm:space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                {/* Banner Header: Sleek single-line layout on mobile */}
+                <div className="flex items-center justify-between gap-2 border-b border-amber-200/70 pb-2 sm:pb-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs animate-pulse">
+                      <AlertCircle size={15} />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm sm:text-base font-black text-amber-950 uppercase tracking-tight">
-                          Pending Physical Cash Box Verification
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="text-xs sm:text-sm font-black text-amber-950 uppercase tracking-tight truncate">
+                          Pending Cash Box Verification
                         </h3>
-                        <span className="text-[10px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full shadow-2xs">
-                          {pendingAtmRelocations.length} Pending Inflow{pendingAtmRelocations.length > 1 ? 's' : ''}
+                        <span className="text-[9px] sm:text-[10px] font-black bg-amber-500 text-white px-1.5 py-0.5 rounded-full shadow-2xs shrink-0">
+                          {pendingAtmRelocations.length} Pending
                         </span>
                       </div>
-                      <p className="text-[11px] sm:text-xs text-amber-900/80 font-medium mt-0.5">
-                        Bank account was debited for ATM cash withdrawal. Confirm once physical currency notes are placed inside the Physical Cash Box.
-                      </p>
                     </div>
                   </div>
 
@@ -2808,18 +2806,24 @@ Thank you for your prompt payment! 🙏`;
                     <button
                       type="button"
                       onClick={() => setActiveTab('cash')}
-                      className="text-xs font-bold text-amber-900 hover:text-black bg-white/80 hover:bg-white px-3 py-1.5 rounded-xl border border-amber-300 transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer shadow-2xs"
+                      className="text-[10px] sm:text-xs font-bold text-amber-900 hover:text-black bg-white/90 hover:bg-white px-2.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-amber-300 transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                      title="Open Treasury"
                     >
-                      <Banknote size={14} className="text-indigo-600" />
-                      <span>Open Treasury</span>
-                      <ArrowRight size={12} />
+                      <Banknote size={13} className="text-indigo-600" />
+                      <span className="hidden xs:inline sm:inline">Treasury</span>
+                      <ArrowRight size={11} />
                     </button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3">
+                <p className="text-[10px] sm:text-xs text-amber-900/80 font-medium leading-tight">
+                  Bank balance was debited for ATM cash withdrawal. Confirm once physical currency notes are placed inside the Physical Cash Box:
+                </p>
+
+                {/* Pending Inflow Cards Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
                   {pendingAtmRelocations.map((item) => {
-                    let sourceName = 'Kishor Bank (UPI)';
+                    let sourceName = 'Kishor Bank';
                     let sourceIcon = '📱';
                     const n = (item.notes || '').toLowerCase();
                     if (n.includes('dad')) {
@@ -2837,19 +2841,19 @@ Thank you for your prompt payment! 🙏`;
                     return (
                       <div
                         key={item.id}
-                        className="bg-white border border-amber-200 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-xs hover:border-amber-400 transition-colors"
+                        className="bg-white border border-amber-200/90 rounded-xl sm:rounded-2xl p-2.5 sm:p-3.5 flex items-center justify-between gap-2.5 shadow-2xs hover:border-amber-400 transition-colors"
                       >
-                        <div className="min-w-0 space-y-0.5 sm:space-y-1">
+                        <div className="min-w-0 space-y-0.5">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-sm">{sourceIcon}</span>
-                            <span className="text-xs font-extrabold text-gray-700 truncate">{sourceName}</span>
+                            <span className="text-xs">{sourceIcon}</span>
+                            <span className="text-xs font-extrabold text-gray-800 truncate">{sourceName}</span>
                           </div>
-                          <div className="text-lg sm:text-2xl font-black text-gray-900 font-mono tracking-tight">
+                          <div className="text-base sm:text-xl font-black text-gray-900 font-mono tracking-tight leading-none">
                             ₹{Number(item.amount || 0).toLocaleString('en-IN')}
                           </div>
-                          <div className="text-[10px] text-gray-400 font-mono flex items-center gap-1">
-                            <Clock size={10} />
-                            <span>Debited on {dateStr} at {timeStr}</span>
+                          <div className="text-[9px] sm:text-[10px] text-gray-400 font-mono flex items-center gap-1 mt-0.5">
+                            <Clock size={9} />
+                            <span>Debited on {dateStr}, {timeStr}</span>
                           </div>
                         </div>
 
@@ -2857,12 +2861,12 @@ Thank you for your prompt payment! 🙏`;
                           type="button"
                           onClick={() => handleConfirmAtmInflowFromDashboard(item)}
                           disabled={isVerifying}
-                          className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition-all shadow-md shrink-0 cursor-pointer disabled:opacity-50"
+                          className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs px-3 sm:px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
                         >
                           {isVerifying ? (
-                            <RefreshCw size={13} className="animate-spin" />
+                            <RefreshCw size={12} className="animate-spin" />
                           ) : (
-                            <Check size={14} className="stroke-[3]" />
+                            <Check size={13} className="stroke-[3]" />
                           )}
                           <span>Confirm Inflow</span>
                         </button>
