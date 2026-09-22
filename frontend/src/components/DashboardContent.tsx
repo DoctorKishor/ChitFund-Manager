@@ -181,9 +181,11 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   // Chits Directory Switcher States (Loaded from Supabase)
   const [showWizard, setShowWizard] = useState(false);
-  const [groupFilter, setGroupFilter] = useState<'all' | 'active' | 'draft' | 'completed'>('all');
+  const [groupFilter, setGroupFilter] = useState<'all' | 'active' | 'draft' | 'completed' | 'bin'>('all');
   const [localGroups, setLocalGroups] = useState<any[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
+  const [isDuplicatingGroupId, setIsDuplicatingGroupId] = useState<string | null>(null);
+  const [isRestoringGroupId, setIsRestoringGroupId] = useState<string | null>(null);
 
   // Group Workspace Dashboard States
   const [selectedWorkspaceGroupId, setSelectedWorkspaceGroupId] = useState<string | null>(null);
@@ -322,6 +324,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
             auctionTime: g.auction_time || '19:00',
             nextAuctionDate: g.next_auction_date || null,
             nextAuctionTime: g.next_auction_time || g.auction_time || '19:00',
+            deletedAt: g.deleted_at || null,
           }))
         );
       }
@@ -854,10 +857,157 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   };
 
 
+  // ── Duplicate Chit Group & Clone All Enrolled Tickets (Supabase Persistent) ──
+  const handleDuplicateGroup = async (sourceGroup: any) => {
+    try {
+      setIsDuplicatingGroupId(sourceGroup.id);
+      triggerHapticFeedback('light');
+
+      // 1. Fetch all members assigned to this source group
+      const { data: members, error: memErr } = await supabase
+        .from('group_members')
+        .select('*')
+        .eq('group_id', sourceGroup.id)
+        .order('ticket_number', { ascending: true });
+
+      if (memErr) throw memErr;
+
+      // 2. Insert new duplicated group in Supabase
+      const newName = `${sourceGroup.name} (Copy)`;
+      const { data: newGroup, error: groupErr } = await supabase
+        .from('chit_groups')
+        .insert({
+          name: newName,
+          total_value: sourceGroup.totalValue,
+          duration_months: sourceGroup.duration,
+          member_count: sourceGroup.memberCount || sourceGroup.duration,
+          current_month: 0,
+          status: 'draft',
+          kai_iruppu_pool: 0,
+          start_date: new Date().toISOString().split('T')[0],
+          auction_day_of_month: sourceGroup.auctionDayOfMonth || 10,
+          auction_time: sourceGroup.auctionTime || '19:00',
+          next_auction_date: null,
+          next_auction_time: sourceGroup.auctionTime || '19:00',
+        })
+        .select()
+        .single();
+
+      if (groupErr) throw groupErr;
+
+      // 3. Clone all member tickets into group_members for the new group
+      if (members && members.length > 0) {
+        const clonedMembers = members.map((m: any) => ({
+          group_id: newGroup.id,
+          profile_id: m.profile_id,
+          ticket_number: m.ticket_number,
+          has_won_regular: false,
+          physical_book_synced: false,
+          split_pool: m.split_pool || null,
+          custom_installment: m.custom_installment || null,
+          exit_month: null,
+          transferred_from: null,
+          transfer_effective_month: null,
+        }));
+
+        const { error: insertMemErr } = await supabase
+          .from('group_members')
+          .insert(clonedMembers);
+
+        if (insertMemErr) throw insertMemErr;
+      }
+
+      // 4. Security audit log
+      await supabase.from('security_audit_logs').insert({
+        action_description: `GROUP DUPLICATED: "${sourceGroup.name}" cloned into new group "${newName}" with ${members?.length || 0} tickets.`,
+        target_table: 'chit_groups',
+      });
+
+      triggerHapticFeedback('success');
+      await fetchGroups();
+      alert(`✓ Chit Group "${sourceGroup.name}" duplicated successfully as "${newName}" with all member tickets cloned!`);
+    } catch (err: any) {
+      console.error('Error duplicating group:', err);
+      alert('Failed to duplicate group: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsDuplicatingGroupId(null);
+    }
+  };
+
+  // ── Move Chit Group to Recycle Bin (Soft Delete) ───────────────────────────
+  const handleMoveToRecycleBin = async (group: any) => {
+    const confirmMove = window.confirm(
+      `Move "${group.name}" to Recycle Bin?\n\nThis group will be hidden from the active chits list and operational dashboard. You can restore it anytime from the Recycle Bin tab.`
+    );
+    if (!confirmMove) return;
+
+    try {
+      triggerHapticFeedback('light');
+      const { error } = await supabase
+        .from('chit_groups')
+        .update({
+          status: 'deleted',
+          deleted_at: new Date().toISOString(),
+        })
+        .eq('id', group.id);
+
+      if (error) throw error;
+
+      await supabase.from('security_audit_logs').insert({
+        action_description: `GROUP MOVED TO RECYCLE BIN: "${group.name}" (${group.id}) marked as deleted.`,
+        target_table: 'chit_groups',
+      });
+
+      triggerHapticFeedback('success');
+      if (selectedWorkspaceGroupId === group.id) {
+        setSelectedWorkspaceGroupId(null);
+      }
+      await fetchGroups();
+      alert(`🗑️ "${group.name}" moved to Recycle Bin.`);
+    } catch (err: any) {
+      console.error('Error moving group to recycle bin:', err);
+      alert('Failed to move group to recycle bin: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // ── Restore Chit Group from Recycle Bin ────────────────────────────────────
+  const handleRestoreGroup = async (group: any) => {
+    try {
+      setIsRestoringGroupId(group.id);
+      triggerHapticFeedback('light');
+
+      const { error } = await supabase
+        .from('chit_groups')
+        .update({
+          status: 'draft',
+          deleted_at: null,
+        })
+        .eq('id', group.id);
+
+      if (error) throw error;
+
+      await supabase.from('security_audit_logs').insert({
+        action_description: `GROUP RESTORED FROM RECYCLE BIN: "${group.name}" (${group.id}) restored to Draft status.`,
+        target_table: 'chit_groups',
+      });
+
+      triggerHapticFeedback('success');
+      await fetchGroups();
+      alert(`✨ "${group.name}" restored successfully to Draft!`);
+    } catch (err: any) {
+      console.error('Error restoring group:', err);
+      alert('Failed to restore group: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsRestoringGroupId(null);
+    }
+  };
+
+  // ── Permanent Deletion / Purge from Supabase ──────────────────────────────
   const handleExecuteDeleteGroup = async () => {
     if (!deletingGroup) return;
     try {
       setIsDeletingGroup(true);
+      triggerHapticFeedback('warning');
 
       // 1. Delete transactions for this group
       await supabase.from('transactions').delete().eq('group_id', deletingGroup.id);
@@ -876,14 +1026,14 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         return;
       }
 
-      // Audit log
+      // 5. Audit log
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       setAuditLogs(prev => [
         {
           timestamp: `Today, ${timeStr}`,
           table: 'chit_groups',
-          desc: `PERMANENTLY DELETED CHIT GROUP: "${deletingGroup.name}" (Pool ₹${deletingGroup.totalValue?.toLocaleString('en-IN')}) with all enrolled tickets and logs`,
+          desc: `PERMANENTLY PURGED CHIT GROUP: "${deletingGroup.name}" (Pool ₹${deletingGroup.totalValue?.toLocaleString('en-IN')}) with all enrolled tickets and logs`,
           executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
         },
         ...prev,
@@ -897,9 +1047,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       setDeletingGroup(null);
       setDeletePhraseInput('');
       setDeleteSliderVal(0);
-      alert(`✅ Chit Group "${deletingGroup.name}" has been permanently removed.`);
+      alert(`✅ Chit Group "${deletingGroup.name}" has been permanently purged from Supabase.`);
     } catch (err: any) {
-      alert(`Error deleting group: ${err.message}`);
+      alert(`Error purging group: ${err.message}`);
     } finally {
       setIsDeletingGroup(false);
     }
@@ -1266,9 +1416,10 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   // Auto-select first active group when groups load
   useEffect(() => {
-    if (localGroups.length > 0) {
-      if (!activeDashboardGroupId || !localGroups.some(g => g.id === activeDashboardGroupId)) {
-        const firstActive = localGroups.find(g => g.status === 'active') || localGroups[0];
+    const validGroups = localGroups.filter(g => g.status !== 'deleted');
+    if (validGroups.length > 0) {
+      if (!activeDashboardGroupId || !validGroups.some(g => g.id === activeDashboardGroupId)) {
+        const firstActive = validGroups.find(g => g.status === 'active') || validGroups[0];
         setActiveDashboardGroupId(firstActive.id);
         setSelectedDashboardMonth(firstActive.currentMonth !== undefined && firstActive.currentMonth !== null ? firstActive.currentMonth : 0);
       }
@@ -2885,10 +3036,10 @@ Thank you for your prompt payment! 🙏`;
                   <Briefcase size={13} className="text-indigo-600" />
                   Chits:
                 </span>
-                {localGroups.length === 0 ? (
-                  <span className="text-xs text-gray-400 italic">No chit groups found</span>
+                {localGroups.filter(g => g.status !== 'deleted').length === 0 ? (
+                  <span className="text-xs text-gray-400 italic">No active chit groups found</span>
                 ) : (
-                  localGroups.map((group) => {
+                  localGroups.filter(g => g.status !== 'deleted').map((group) => {
                     const isSelected = (activeGroup?.id === group.id);
                     return (
                       <button
@@ -4311,14 +4462,11 @@ Thank you for your prompt payment! 🙏`;
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setDeletingGroup(selectedWorkspaceGroup);
-                      setDeletePhraseInput('');
-                      setDeleteSliderVal(0);
-                    }}
+                    onClick={() => handleMoveToRecycleBin(selectedWorkspaceGroup)}
                     className="border border-red-200 bg-red-50/60 hover:bg-red-100 text-red-700 font-bold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs active:scale-95"
+                    title="Move group to Recycle Bin"
                   >
-                    <Trash2 size={13} className="text-red-600" /> Delete
+                    <Trash2 size={13} className="text-red-600" /> Move to Bin
                   </button>
                 </div>
               </div>
@@ -4486,13 +4634,12 @@ Thank you for your prompt payment! 🙏`;
           ) : !showWizard ? (
             /* 2. DIRECTORY VIEW */
             <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-200">
-              
                {/* Summary Header banner */}
               <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-4">
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-gray-900">Chit Groups Directory</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Active Groups: <strong className="text-gray-700">{localGroups.filter(g => g.active).length}</strong> · Value: <strong className="text-indigo-600">{formatCurrency(localGroups.reduce((acc, g) => acc + g.totalValue, 0))}</strong>
+                    Active Groups: <strong className="text-gray-700">{localGroups.filter(g => g.status !== 'deleted' && (g.status === 'active' || (!g.status && g.active))).length}</strong> · Total Value: <strong className="text-indigo-600">{formatCurrency(localGroups.filter(g => g.status !== 'deleted').reduce((acc, g) => acc + g.totalValue, 0))}</strong>
                   </p>
                 </div>
 
@@ -4516,7 +4663,7 @@ Thank you for your prompt payment! 🙏`;
                       : 'bg-white border-gray-200 text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  All ({localGroups.length})
+                  All ({localGroups.filter(g => g.status !== 'deleted').length})
                 </button>
                 <button
                   onClick={() => setGroupFilter('active')}
@@ -4526,7 +4673,7 @@ Thank you for your prompt payment! 🙏`;
                       : 'bg-white border-gray-200 text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  Active ({localGroups.filter(g => g.status === 'active' || (!g.status && g.active)).length})
+                  Active ({localGroups.filter(g => g.status !== 'deleted' && (g.status === 'active' || (!g.status && g.active))).length})
                 </button>
                 <button
                   onClick={() => setGroupFilter('draft')}
@@ -4548,211 +4695,332 @@ Thank you for your prompt payment! 🙏`;
                 >
                   Completed ({localGroups.filter(g => g.status === 'completed').length})
                 </button>
+                <button
+                  onClick={() => setGroupFilter('bin')}
+                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 flex items-center gap-1.5 ${
+                    groupFilter === 'bin'
+                      ? 'bg-rose-600 text-white border-rose-700 shadow-2xs ring-2 ring-rose-500/20'
+                      : 'bg-rose-50/50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                  }`}
+                >
+                  <Trash2 size={12} />
+                  <span>Recycle Bin ({localGroups.filter(g => g.status === 'deleted').length})</span>
+                </button>
               </div>
 
-              {/* Groups Card Directory Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {localGroups.filter(g => {
-                  if (groupFilter === 'all') return true;
-                  if (groupFilter === 'draft') return g.status === 'draft';
-                  if (groupFilter === 'completed') return g.status === 'completed';
-                  return g.status === 'active' || (!g.status && g.active);
-                }).length === 0 ? (
-                  <div className="col-span-full py-12 px-6 bg-white border border-gray-200 rounded-2xl text-center flex flex-col items-center justify-center space-y-3 shadow-2xs">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                      <Briefcase size={24} />
+              {/* ── RECYCLE BIN VIEW ── */}
+              {groupFilter === 'bin' ? (
+                <div className="space-y-3">
+                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-rose-100 border border-rose-200 text-rose-700 flex items-center justify-center shrink-0">
+                        <Trash2 size={20} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-rose-950 flex items-center gap-2">
+                          Recycle Bin (குப்பைத் தொட்டி)
+                          <span className="text-[10px] font-extrabold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
+                            {localGroups.filter(g => g.status === 'deleted').length} Groups
+                          </span>
+                        </h4>
+                        <p className="text-xs text-rose-800 mt-0.5">
+                          Soft-deleted groups are securely preserved here. You can restore them to Draft anytime or permanently purge them.
+                        </p>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-gray-900">No Groups in this Category</h4>
-                      <p className="text-xs text-gray-500 max-w-sm">
-                        There are no chit groups with status <strong>{groupFilter}</strong> currently.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowWizard(true)}
-                      className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-xs active:scale-95"
-                    >
-                      + Create First Group
-                    </button>
                   </div>
-                ) : (
-                localGroups
-                  .filter(g => {
-                    if (groupFilter === 'all') return true;
-                    if (groupFilter === 'draft') return g.status === 'draft';
-                    if (groupFilter === 'completed') return g.status === 'completed';
-                    return g.status === 'active' || (!g.status && g.active);
-                  })
-                  .map((g) => {
-                    const progressPercent = (g.currentMonth / g.duration) * 100;
-                    
-                    return (
-                      <div key={g.id} className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 shadow-2xs hover:border-gray-300 transition-colors flex flex-col justify-between">
-                        <div className="space-y-3">
-                          {/* Card Top */}
-                          <div className="flex justify-between items-start">
-                            <div className="flex flex-col space-y-1 min-w-0">
-                              <div className="flex items-center space-x-2">
-                                <span className={`w-2 h-2 rounded-full shrink-0 ${
-                                  g.status === 'draft' ? 'bg-amber-500' : g.status === 'completed' ? 'bg-purple-500' : 'bg-green-500 animate-pulse'
-                                }`}></span>
-                                <h4 className="text-xs sm:text-sm font-bold text-gray-900 truncate max-w-[150px] sm:max-w-[180px]">{g.name}</h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                    {localGroups.filter(g => g.status === 'deleted').length === 0 ? (
+                      <div className="col-span-full py-12 px-6 bg-white border border-dashed border-gray-200 rounded-2xl text-center flex flex-col items-center justify-center space-y-2 shadow-2xs">
+                        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center">
+                          <Trash2 size={24} />
+                        </div>
+                        <h4 className="text-sm font-bold text-gray-900">Recycle Bin is Empty</h4>
+                        <p className="text-xs text-gray-500">No deleted chit groups found.</p>
+                      </div>
+                    ) : (
+                      localGroups
+                        .filter(g => g.status === 'deleted')
+                        .map((g) => (
+                          <div key={g.id} className="bg-white border-2 border-rose-150 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs hover:border-rose-300 transition-colors flex flex-col justify-between">
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-start">
+                                <div className="flex flex-col space-y-1 min-w-0">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="w-2 h-2 rounded-full shrink-0 bg-rose-500"></span>
+                                    <h4 className="text-xs sm:text-sm font-bold text-gray-900 truncate max-w-[150px] sm:max-w-[180px]">{g.name}</h4>
+                                  </div>
+                                  <div>
+                                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border inline-block bg-rose-50 text-rose-700 border-rose-200">
+                                      IN RECYCLE BIN
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
+                                  <Trash2 size={15} />
+                                </div>
                               </div>
-                              <div>
-                                <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border inline-block ${
-                                  g.status === 'draft'
-                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                    : g.status === 'completed'
-                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                }`}>
-                                  {g.status ? g.status.toUpperCase() : 'ACTIVE'}
-                                </span>
+
+                              <div className="bg-rose-50/60 border border-rose-150 rounded-xl p-2.5 space-y-1 text-[11px] text-rose-950">
+                                <div className="flex justify-between">
+                                  <span className="text-rose-700 font-medium">Total Pool:</span>
+                                  <strong className="font-bold text-gray-900">{formatCurrency(g.totalValue)}</strong>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-rose-700 font-medium">Duration:</span>
+                                  <strong>{g.duration} Months ({g.memberCount || g.duration} Tickets)</strong>
+                                </div>
+                                {g.deletedAt && (
+                                  <div className="flex justify-between pt-1 border-t border-rose-200/60 text-[10px]">
+                                    <span className="text-rose-600">Deleted:</span>
+                                    <span className="font-medium text-rose-800">
+                                      {new Date(g.deletedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
-                            {/* Quick Action Icons */}
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
                               <button
                                 type="button"
-                                title="Edit chit details"
-                                onClick={() => openEditGroupModal(g)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors active:scale-95"
+                                disabled={isRestoringGroupId === g.id}
+                                onClick={() => handleRestoreGroup(g)}
+                                className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                               >
-                                <Edit3 size={14} />
+                                {isRestoringGroupId === g.id ? (
+                                  <RefreshCw size={13} className="animate-spin" />
+                                ) : (
+                                  <RotateCcw size={13} />
+                                )}
+                                <span>Restore Group</span>
                               </button>
                               <button
                                 type="button"
-                                title="Delete group"
                                 onClick={() => {
                                   setDeletingGroup(g);
                                   setDeletePhraseInput('');
                                   setDeleteSliderVal(0);
                                 }}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors active:scale-95"
+                                className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={13} />
+                                <span>Delete Perm</span>
                               </button>
                             </div>
                           </div>
-
-                          {/* Horizontal Progress bar — or Launch Month badge */}
-                          {g.currentMonth === 0 ? (
-                            <div className="flex items-center gap-2 py-1">
-                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
-                              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Launch Month — Organizer Profit Phase</span>
-                            </div>
-                          ) : (
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase tracking-wider">
-                                <span>Progress</span>
-                                <span>Month {g.currentMonth} of {g.duration}</span>
+                        ))
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* ── ACTIVE / DRAFT / COMPLETED DIRECTORY GRID ── */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                  {localGroups.filter(g => {
+                    if (g.status === 'deleted') return false;
+                    if (groupFilter === 'all') return true;
+                    if (groupFilter === 'draft') return g.status === 'draft';
+                    if (groupFilter === 'completed') return g.status === 'completed';
+                    return g.status === 'active' || (!g.status && g.active);
+                  }).length === 0 ? (
+                    <div className="col-span-full py-12 px-6 bg-white border border-gray-200 rounded-2xl text-center flex flex-col items-center justify-center space-y-3 shadow-2xs">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <Briefcase size={24} />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold text-gray-900">No Groups in this Category</h4>
+                        <p className="text-xs text-gray-500 max-w-sm">
+                          There are no chit groups with status <strong>{groupFilter}</strong> currently.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowWizard(true)}
+                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-xs active:scale-95"
+                      >
+                        + Create First Group
+                      </button>
+                    </div>
+                  ) : (
+                  localGroups
+                    .filter(g => {
+                      if (g.status === 'deleted') return false;
+                      if (groupFilter === 'all') return true;
+                      if (groupFilter === 'draft') return g.status === 'draft';
+                      if (groupFilter === 'completed') return g.status === 'completed';
+                      return g.status === 'active' || (!g.status && g.active);
+                    })
+                    .map((g) => {
+                      const progressPercent = (g.currentMonth / g.duration) * 100;
+                      
+                      return (
+                        <div key={g.id} className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 shadow-2xs hover:border-gray-300 transition-colors flex flex-col justify-between">
+                          <div className="space-y-3">
+                            {/* Card Top */}
+                            <div className="flex justify-between items-start">
+                              <div className="flex flex-col space-y-1 min-w-0">
+                                <div className="flex items-center space-x-2">
+                                  <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                    g.status === 'draft' ? 'bg-amber-500' : g.status === 'completed' ? 'bg-purple-500' : 'bg-green-500 animate-pulse'
+                                  }`}></span>
+                                  <h4 className="text-xs sm:text-sm font-bold text-gray-900 truncate max-w-[150px] sm:max-w-[180px]">{g.name}</h4>
+                                </div>
+                                <div>
+                                  <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border inline-block ${
+                                    g.status === 'draft'
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : g.status === 'completed'
+                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  }`}>
+                                    {g.status ? g.status.toUpperCase() : 'ACTIVE'}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                                <div 
-                                  className="bg-indigo-600 h-full rounded-full transition-all duration-300"
-                                  style={{ width: `${progressPercent}%` }}
-                                ></div>
+
+                              {/* Quick Action Icons */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  title="Edit chit details"
+                                  onClick={() => openEditGroupModal(g)}
+                                  className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors active:scale-95"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Move to Recycle Bin"
+                                  onClick={() => handleMoveToRecycleBin(g)}
+                                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors active:scale-95"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
                               </div>
                             </div>
-                          )}
 
-                          {/* Metadata Tracks */}
-                          <div className="space-y-1.5 text-[10px] sm:text-[11px] text-gray-500">
-                            <div className="flex justify-between">
-                              <span>Total Pool:</span>
-                              <strong className="text-gray-900">{formatCurrency(g.totalValue)}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Monthly Installment:</span>
-                              <strong className="text-indigo-600">{formatCurrency(g.totalValue / g.duration)}</strong>
-                            </div>
-                            {g.currentMonth === 0 && (
-                              <div className="flex justify-between">
-                                <span>Organizer Profit:</span>
-                                <strong className="text-amber-600">{formatCurrency(g.totalValue)}</strong>
+                            {/* Horizontal Progress bar — or Launch Month badge */}
+                            {g.currentMonth === 0 ? (
+                              <div className="flex items-center gap-2 py-1">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Launch Month — Organizer Profit Phase</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                                  <span>Progress</span>
+                                  <span>Month {g.currentMonth} of {g.duration}</span>
+                                </div>
+                                <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                  <div 
+                                    className="bg-indigo-600 h-full rounded-full transition-all duration-300"
+                                    style={{ width: `${progressPercent}%` }}
+                                  ></div>
+                                </div>
                               </div>
                             )}
-                            {(() => {
-                              const { display, isOverride } = getGroupAuctionDate(g.id);
-                              return (
-                                <div className="flex justify-between items-center">
-                                  <span>Auction Date:</span>
-                                  <div className="flex items-center gap-1">
-                                    <strong className={isOverride ? 'text-amber-600' : 'text-gray-700'}>{display}</strong>
-                                    <button
-                                      onClick={() => setScheduleModalGroup(g)}
-                                      className="text-[8px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded hover:bg-indigo-100 transition-colors cursor-pointer"
-                                    >
-                                      Edit
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </div>
 
-                        {/* Footer Split Button containers */}
-                        {g.currentMonth === 0 ? (
-                          // Month-0 Launch: show a single Confirm Launch CTA spanning full width
-                          <div className="pt-3 border-t border-gray-100">
-                            <button
-                              onClick={() => {
-                                setLocalGroups(prev => prev.map(grp =>
-                                  grp.id === g.id ? { ...grp, currentMonth: 1 } : grp
-                                ));
-                                const now = new Date();
-                                const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                                setAuditLogs(prev => [
-                                  {
-                                    timestamp: `Today, ${timeStr}`,
-                                    table: 'chit_groups',
-                                    desc: `LAUNCH CONFIRMED for "${g.name}" — ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit. Group advanced to Month 1.`,
-                                    executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
-                                  },
-                                  ...prev
-                                ]);
-                                alert(`✅ Launch confirmed! ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
-                              }}
-                              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95"
-                            >
-                              <Rocket size={13} /> Confirm Launch &amp; Roll to M1
-                            </button>
+                            {/* Metadata Tracks */}
+                            <div className="space-y-1.5 text-[10px] sm:text-[11px] text-gray-500">
+                              <div className="flex justify-between">
+                                <span>Total Pool:</span>
+                                <strong className="text-gray-900">{formatCurrency(g.totalValue)}</strong>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Monthly Installment:</span>
+                                <strong className="text-indigo-600">{formatCurrency(g.totalValue / g.duration)}</strong>
+                              </div>
+                              {g.currentMonth === 0 && (
+                                <div className="flex justify-between">
+                                  <span>Organizer Profit:</span>
+                                  <strong className="text-amber-600">{formatCurrency(g.totalValue)}</strong>
+                                </div>
+                              )}
+                              {(() => {
+                                const { display, isOverride } = getGroupAuctionDate(g.id);
+                                return (
+                                  <div className="flex justify-between items-center">
+                                    <span>Auction Date:</span>
+                                    <div className="flex items-center gap-1">
+                                      <strong className={isOverride ? 'text-amber-600' : 'text-gray-700'}>{display}</strong>
+                                      <button
+                                        onClick={() => setScheduleModalGroup(g)}
+                                        className="text-[8px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded hover:bg-indigo-100 transition-colors cursor-pointer"
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedWorkspaceGroupId(g.id);
-                                fetchWorkspaceMembers(g.id);
-                              }}
-                              className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 text-indigo-700 font-bold text-xs py-2 rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95"
-                            >
-                              <Briefcase size={12} /> Workspace
-                            </button>
-                            <button
-                              onClick={() => {
-                                const copy = {
-                                  ...g,
-                                  id: Math.random().toString(),
-                                  name: `${g.name} (Copy)`
-                                };
-                                setLocalGroups(prev => [copy, ...prev]);
-                                alert(`Chit Group template "${g.name}" duplicated successfully!`);
-                              }}
-                              className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs py-2 rounded-xl transition-all active:scale-95"
-                            >
-                              Duplicate
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+
+                          {/* Footer Split Button containers */}
+                          {g.currentMonth === 0 ? (
+                            // Month-0 Launch: show a single Confirm Launch CTA spanning full width
+                            <div className="pt-3 border-t border-gray-100">
+                              <button
+                                onClick={() => {
+                                  setLocalGroups(prev => prev.map(grp =>
+                                    grp.id === g.id ? { ...grp, currentMonth: 1 } : grp
+                                  ));
+                                  const now = new Date();
+                                  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                  setAuditLogs(prev => [
+                                    {
+                                      timestamp: `Today, ${timeStr}`,
+                                      table: 'chit_groups',
+                                      desc: `LAUNCH CONFIRMED for "${g.name}" — ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit. Group advanced to Month 1.`,
+                                      executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
+                                    },
+                                    ...prev
+                                  ]);
+                                  alert(`✅ Launch confirmed! ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
+                                }}
+                                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95"
+                              >
+                                <Rocket size={13} /> Confirm Launch &amp; Roll to M1
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedWorkspaceGroupId(g.id);
+                                  fetchWorkspaceMembers(g.id);
+                                }}
+                                className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 text-indigo-700 font-bold text-xs py-2 rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95"
+                              >
+                                <Briefcase size={12} /> Workspace
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isDuplicatingGroupId === g.id}
+                                onClick={() => handleDuplicateGroup(g)}
+                                className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-60"
+                              >
+                                {isDuplicatingGroupId === g.id ? (
+                                  <>
+                                    <RefreshCw size={12} className="animate-spin text-indigo-600" />
+                                    <span>Cloning...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy size={12} />
+                                    <span>Duplicate</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             /* 3. SETUP WIZARD VIEW */
