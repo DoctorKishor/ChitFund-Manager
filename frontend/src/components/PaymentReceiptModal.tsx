@@ -81,6 +81,30 @@ function numberToWordsINR(amount: number): string {
   return result.trim() + ' Rupees Only';
 }
 
+// Helper to get formatted Calendar Month label for a chit group month
+function getReceiptMonthLabel(startDateStr: string | null | undefined, monthNumber: number): string {
+  if (!startDateStr) {
+    return monthNumber === 0 ? 'Month 0 (Launch Month)' : `Month ${monthNumber}`;
+  }
+  try {
+    const base = new Date(startDateStr);
+    if (isNaN(base.getTime())) {
+      return monthNumber === 0 ? 'Month 0 (Launch Month)' : `Month ${monthNumber}`;
+    }
+    // Month 0 is launch month at start_date, Month 1 is start_date + 1 month
+    const targetDate = new Date(base.getFullYear(), base.getMonth() + monthNumber, 1);
+    const monthName = targetDate.toLocaleString('en-IN', { month: 'long' });
+    const year = targetDate.getFullYear();
+    
+    if (monthNumber === 0) {
+      return `${monthName} ${year} · Month 0 (Launch)`;
+    }
+    return `${monthName} ${year} · Month ${monthNumber}`;
+  } catch {
+    return monthNumber === 0 ? 'Month 0 (Launch Month)' : `Month ${monthNumber}`;
+  }
+}
+
 export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   isOpen,
   onClose,
@@ -120,6 +144,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   const totalGroupOutstanding = remainingBalance + pastPendingDues;
 
   const receiptNo = `RCP-${String(transaction.id || 'TX001').slice(0, 8).toUpperCase()}`;
+  const monthLabel = getReceiptMonthLabel(group?.start_date, month);
   
   const txDate = transaction.created_at ? new Date(transaction.created_at) : new Date();
   const dateFormatted = txDate.toLocaleDateString('en-IN', {
@@ -254,7 +279,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: `Receipt ${receiptNo} - ${memberName}`,
-          text: `Official Payment Receipt for ${memberName} (Ticket #${ticketNum}) · ${groupName} Month ${month} (${formatCurrency(paidAmount)})`,
+          text: `Official Payment Receipt for ${memberName} (Ticket #${ticketNum}) · ${groupName} ${monthLabel} (${formatCurrency(paidAmount)})`,
           files: [file]
         });
         triggerHapticFeedback('success');
@@ -273,15 +298,14 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           `*Receipt No:* ${receiptNo}\n` +
           `*Subscriber:* ${memberName} (Ticket #${ticketNum})\n` +
           `*Group:* ${groupName}\n` +
-          `*Payment Applied For:* Month ${month === 0 ? '0 (Launch)' : month}\n` +
-          `*Amount Paid:* ${formatCurrency(paidAmount)}\n` +
+          `*Payment Applied For:* ${monthLabel}\n` +
+          `*Amount Received:* ${formatCurrency(paidAmount)}\n` +
           `*Payment Mode:* ${walletDisplay}\n` +
           `*Date:* ${dateFormatted}, ${timeFormatted}\n` +
           `----------------------------------\n` +
-          `*Month ${month} Installment:* ${formatCurrency(calculatedDue)}\n` +
-          `*Month ${month} Pending:* ${isCleared ? '₹0 (CLEARED ✅)' : `${formatCurrency(remainingBalance)} PENDING`}\n` +
+          `*Month ${month === 0 ? '0' : month} Pending:* ${isCleared ? '₹0 (CLEARED ✅)' : `${formatCurrency(remainingBalance)} PENDING`}\n` +
           `*Past Overdue (${groupName}):* ${pastPendingDues > 0 ? `${formatCurrency(pastPendingDues)} (Pending in M${pastPendingMonths.join(', M')})` : '₹0 (All Previous Months Cleared ✅)'}\n` +
-          `*Total Group Outstanding:* ${totalGroupOutstanding === 0 ? '₹0 (Fully Settled ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}\n\n` +
+          `*Total Group Outstanding:* ${totalGroupOutstanding === 0 ? '₹0 (All Dues Cleared ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}\n\n` +
           `_Receipt image downloaded. Thank you!_ 🙏`;
         
         const waUrl = cleanPhone 
@@ -418,7 +442,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               Ticket #{ticketNum}
             </span>
             <span className="text-[10px] text-slate-600 font-bold block truncate mt-0.5">
-              {groupName} · M{month === 0 ? '0 (Launch)' : month}
+              {groupName} · M{month === 0 ? '0' : month}
             </span>
           </div>
         </div>
@@ -439,11 +463,11 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         {/* Detailed Payment & Group Dues Breakdown Matrix */}
         <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs shadow-2xs">
           
-          {/* Payment Applied For Month */}
+          {/* Payment Applied For Month (With Formatted Calendar Month Name) */}
           <div className="flex justify-between items-center px-3.5 py-2.5 bg-slate-50/70">
             <span className="text-slate-500 font-semibold">Payment For Month</span>
-            <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded text-[10.5px]">
-              {month === 0 ? 'Month 0 (Launch Month)' : `Month ${month}`}
+            <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-lg text-[11px] shadow-2xs">
+              {monthLabel}
             </span>
           </div>
 
@@ -452,14 +476,6 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
             <span className="text-slate-500 font-semibold">Payment Mode</span>
             <span className="font-bold text-slate-800 font-mono bg-slate-100 px-2 py-0.5 rounded text-[10.5px]">
               {walletDisplay}
-            </span>
-          </div>
-
-          {/* Month Installment Due */}
-          <div className="flex justify-between items-center px-3.5 py-2.5">
-            <span className="text-slate-500 font-semibold">Month {month} Installment Due</span>
-            <span className="font-bold text-slate-800">
-              {formatCurrency(calculatedDue)}
             </span>
           </div>
 
@@ -473,7 +489,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
           {/* Current Month Balance (Cleared or Pending) */}
           <div className="flex justify-between items-center px-3.5 py-2.5">
-            <span className="text-slate-600 font-bold">Month {month} Pending Balance</span>
+            <span className="text-slate-600 font-bold">Month {month === 0 ? '0' : month} Pending Balance</span>
             <span className={`font-black ${isCleared ? 'text-emerald-700' : 'text-amber-700'}`}>
               {isCleared ? '₹0 (CLEARED ✅)' : `${formatCurrency(remainingBalance)} PENDING`}
             </span>
@@ -498,7 +514,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           <div className="flex justify-between items-center px-3.5 py-2.5 bg-slate-100/70 border-t border-slate-200">
             <span className="text-slate-800 font-extrabold text-[11.5px]">Total Outstanding ({groupName})</span>
             <span className={`font-black text-sm ${totalGroupOutstanding === 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-              {totalGroupOutstanding === 0 ? '₹0 (Fully Settled ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}
+              {totalGroupOutstanding === 0 ? '₹0 (All Dues Cleared ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}
             </span>
           </div>
 
