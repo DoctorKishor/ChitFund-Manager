@@ -347,6 +347,12 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               flex-direction: column;
               gap: 3px;
             }
+            .group-name {
+              font-size: 13px;
+              font-weight: 900;
+              text-transform: uppercase;
+              letter-spacing: 0.2px;
+            }
             .chit-amount {
               font-size: 15px;
               font-weight: 900;
@@ -437,6 +443,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             
             <div class="header-block">
               <div class="header-left">
+                <div class="group-name">GROUP - ${group.name.toUpperCase()}</div>
                 <div class="chit-amount">CHIT AMOUNT - ${formatINR(group.totalValue)}</div>
                 <div class="months-dur">MONTHS - ${group.duration} MONTHS</div>
                 <div class="monthly-due">MONTHLY DUE - ${effectiveDuePerMember}${activeMonthsList.length > 1 ? ` (${activeMonthsList.length} MONTHS)` : ''}</div>
@@ -473,7 +480,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             </table>
 
             <div class="footer-block">
-              <div>Group: <strong>${group.name}</strong> · Cycle: <strong>${activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `Months ${activeMonthsList.join(', ')}`}</strong></div>
+              <div>Cycle: <strong>${activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `Months ${activeMonthsList.join(', ')}`}</strong></div>
               <div>Organizer Signature: _________________________</div>
             </div>
           </div>
@@ -884,6 +891,9 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             <div className="flex justify-between items-start mb-4 sm:mb-6 text-black border-b-2 border-black pb-2.5 sm:pb-3">
               {/* Left Column */}
               <div className="space-y-1">
+                <div className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-black">
+                  GROUP - <span className="font-black">{group.name.toUpperCase()}</span>
+                </div>
                 <div className="text-xs sm:text-base font-black tracking-tight">
                   CHIT AMOUNT - <span className="text-sm sm:text-lg">{formatINR(group.totalValue)}</span>
                 </div>
@@ -967,7 +977,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             {/* ── FOOTER SIGN-OFF ── */}
             <div className="mt-6 sm:mt-8 pt-3 sm:pt-4 flex justify-between items-center text-[9px] sm:text-[11px] text-gray-700 border-t border-gray-400">
               <div className="font-semibold">
-                Group: <strong>{group.name}</strong> · Cycle: <strong>{activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `Months ${activeMonthsList.join(', ')}`}</strong>
+                Cycle: <strong>{activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `Months ${activeMonthsList.join(', ')}`}</strong>
               </div>
               <div className="font-bold">
                 Organizer Signature: _________________________
