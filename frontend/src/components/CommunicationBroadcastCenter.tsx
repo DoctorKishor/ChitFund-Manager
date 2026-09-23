@@ -1001,7 +1001,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                     </button>
 
                     {showInsertDropdown && (
-                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 w-72 sm:w-80 max-h-80 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
+                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 w-[calc(100vw-3.5rem)] max-w-[320px] sm:w-80 max-h-80 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
                         <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
                           Select Dynamic Variable
                         </div>
@@ -1035,8 +1035,8 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                     )}
                   </div>
 
-                  {/* 2. Emoji Picker Popover Button */}
-                  <div className="relative" ref={emojiPickerRef}>
+                  {/* 2. Emoji Picker Popover Button (DESKTOP ONLY - hidden on mobile) */}
+                  <div className="relative hidden sm:inline-flex" ref={emojiPickerRef}>
                     <button
                       type="button"
                       onClick={() => {
@@ -1050,7 +1050,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                     </button>
 
                     {showEmojiPicker && (
-                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-3 w-72 sm:w-80 space-y-2 animate-in zoom-in-95 duration-100">
+                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-3 w-80 space-y-2 animate-in zoom-in-95 duration-100">
                         {/* Emoji Category Tabs */}
                         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-1">
                           {EMOJI_CATEGORIES.map((c) => (
@@ -1116,7 +1116,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
                 {/* Autocomplete Dropdown Popup when typing `{`, `<`, or `/` */}
                 {showSuggestMenu && filteredSuggestVariables.length > 0 && (
-                  <div className="absolute left-3 top-14 z-30 bg-white border border-gray-200 rounded-2xl shadow-2xl p-2 w-72 sm:w-80 max-h-72 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
+                  <div className="absolute left-2 right-2 sm:right-auto sm:left-3 top-14 z-30 bg-white border border-gray-200 rounded-2xl shadow-2xl p-2 max-w-[calc(100vw-3.5rem)] sm:w-80 max-h-72 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
                     <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 flex justify-between items-center">
                       <span>Insert Dynamic Variable</span>
                       <span className="text-[9px] lowercase font-normal text-indigo-600">Enter / Tab</span>
