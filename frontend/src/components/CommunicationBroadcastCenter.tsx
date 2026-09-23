@@ -31,7 +31,8 @@ import {
   User,
   Phone,
   Tag,
-  AlertCircle
+  AlertCircle,
+  Plus
 } from 'lucide-react';
 
 interface GroupMetadata {
@@ -65,7 +66,7 @@ interface VariableDefinition {
   label: string;
   category: 'group' | 'auction' | 'financials' | 'winner' | 'org';
   description: string;
-  example: (meta: GroupMetadata | null, orgSig: string, orgPhone: string) => string;
+  getValue: (meta: GroupMetadata | null, orgSig: string, orgPhone: string) => string;
 }
 
 const BROADCAST_VARIABLES: VariableDefinition[] = [
@@ -75,42 +76,42 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
     label: 'Chit Group Name',
     category: 'group',
     description: 'Name of the selected chit group',
-    example: (m) => m?.name || 'Gold Star Chit',
+    getValue: (m) => m?.name || 'Sample Chit Group',
   },
   {
     key: 'current_month',
     label: 'Current Month #',
     category: 'group',
-    description: 'Current cycle month number (e.g. 1, 2)',
-    example: (m) => String(m?.currentMonth ?? 1),
+    description: 'Current cycle month number',
+    getValue: (m) => String(m?.currentMonth ?? 1),
   },
   {
     key: 'month_display',
-    label: 'Month Display Label',
+    label: 'Month Label',
     category: 'group',
-    description: 'Formatted month label (e.g. Month 1 or Month 0 - Launch)',
-    example: (m) => (m?.currentMonth === 0 ? 'Month 0 (Launch Month)' : `Month ${m?.currentMonth ?? 1}`),
+    description: 'Formatted month label (Month 1, Month 0 - Launch)',
+    getValue: (m) => (m?.currentMonth === 0 ? 'Month 0 (Launch Month)' : `Month ${m?.currentMonth ?? 1}`),
   },
   {
     key: 'total_chit_value',
     label: 'Total Chit Value',
     category: 'group',
     description: 'Total value pool of the chit fund',
-    example: (m) => formatINR(m?.totalValue ?? 200000),
+    getValue: (m) => formatINR(m?.totalValue ?? 100000),
   },
   {
     key: 'member_count',
     label: 'Member Count',
     category: 'group',
-    description: 'Total member tickets in the group',
-    example: (m) => String(m?.memberCount ?? 20),
+    description: 'Total member tickets in group',
+    getValue: (m) => String(m?.memberCount ?? 10),
   },
   {
     key: 'duration_months',
     label: 'Group Duration',
     category: 'group',
     description: 'Total duration in months',
-    example: (m) => `${m?.durationMonths ?? 20} Months`,
+    getValue: (m) => `${m?.durationMonths ?? 10} Months`,
   },
 
   // Auction Dates & Timings
@@ -119,21 +120,21 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
     label: 'Auction Date',
     category: 'auction',
     description: 'Date of this monthly auction session',
-    example: (m) => m?.formattedAuctionDate || 'Sun, 12 Oct 2026',
+    getValue: (m) => m?.formattedAuctionDate || 'Sun, 11 Oct 2026',
   },
   {
     key: 'auction_time',
     label: 'Auction Time',
     category: 'auction',
     description: '12-hour scheduled auction time',
-    example: (m) => m?.formattedAuctionTime || '07:00 PM',
+    getValue: (m) => m?.formattedAuctionTime || '07:00 PM',
   },
   {
     key: 'next_auction_date',
     label: 'Next Upcoming Auction Date',
     category: 'auction',
-    description: 'Upcoming scheduled date for subsequent month',
-    example: (m) => m?.formattedNextAuctionDate || 'Sun, 09 Nov 2026',
+    description: 'Upcoming scheduled date for next month',
+    getValue: (m) => m?.formattedNextAuctionDate || 'Sun, 08 Nov 2026',
   },
 
   // Financials & Installments
@@ -141,29 +142,29 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
     key: 'installment_due',
     label: 'Monthly Installment Due',
     category: 'financials',
-    description: 'Monthly installment due per member ticket',
-    example: (m) => (m?.isLaabaSeetuActive ? '₹0 (Laaba Seetu)' : formatINR(m?.fixedInstallment ?? 10000)),
+    description: 'Monthly installment due per ticket',
+    getValue: (m) => (m?.isLaabaSeetuActive ? '₹0 (Laaba Seetu)' : formatINR(m?.fixedInstallment ?? 10000)),
   },
   {
     key: 'kai_iruppu_pool',
-    label: 'Accumulated Discount Pool',
+    label: 'Discount Pool (Kai Iruppu)',
     category: 'financials',
-    description: 'Running discount pool (Kai Iruppu)',
-    example: (m) => formatINR(m?.kaiIruppuPool ?? 35000),
+    description: 'Running accumulated discount pool',
+    getValue: (m) => formatINR(m?.kaiIruppuPool ?? 0),
   },
   {
     key: 'laaba_seetu_status',
     label: 'Laaba Seetu Status',
     category: 'financials',
     description: 'Current profit month status',
-    example: (m) => (m?.isLaabaSeetuActive ? 'ACTIVE (₹0 Installment Due)' : 'Accumulating'),
+    getValue: (m) => (m?.isLaabaSeetuActive ? 'ACTIVE (₹0 Installment Due)' : 'Accumulating'),
   },
   {
     key: 'laaba_seetu_notice',
-    label: 'Laaba Seetu Banner Text',
+    label: 'Laaba Seetu Banner Notice',
     category: 'financials',
-    description: 'Automatic banner notice if Laaba Seetu is active this month',
-    example: (m) =>
+    description: 'Automatic notice if Laaba Seetu is active',
+    getValue: (m) =>
       m?.isLaabaSeetuActive
         ? '🎉 SPECIAL PROFIT MONTH (LAABA SEETU)! Monthly installment due is ₹0 for all subscribers.\n'
         : '',
@@ -175,28 +176,28 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
     label: 'Auction Winner Name',
     category: 'winner',
     description: 'Full name of winning subscriber',
-    example: (m) => m?.winnerName || 'Ramesh Kumar',
+    getValue: (m) => m?.winnerName || 'Pending Auction',
   },
   {
     key: 'winner_ticket',
     label: 'Winner Ticket #',
     category: 'winner',
     description: 'Ticket number of the auction winner',
-    example: (m) => (m?.winnerTicketNumber ? `Ticket #${m.winnerTicketNumber}` : 'Ticket #4'),
+    getValue: (m) => (m?.winnerTicketNumber ? `Ticket #${m.winnerTicketNumber}` : 'Ticket #1'),
   },
   {
     key: 'winning_discount',
     label: 'Winning Bid Discount',
     category: 'winner',
-    description: 'Discount amount bid by winning subscriber',
-    example: (m) => formatINR(m?.winningDiscount ?? 30000),
+    description: 'Discount amount bid by winner',
+    getValue: (m) => formatINR(m?.winningDiscount ?? 0),
   },
   {
     key: 'net_payout',
     label: 'Winner Net Payout',
     category: 'winner',
-    description: 'Net prize pot disbursed to the winner',
-    example: (m) => formatINR(m?.netPayout ?? 170000),
+    description: 'Net prize pot disbursed to winner',
+    getValue: (m) => formatINR(m?.netPayout ?? (m?.totalValue ?? 100000)),
   },
 
   // Organization & Contacts
@@ -205,21 +206,21 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
     label: 'Organization Signature',
     category: 'org',
     description: 'Custom organization name or signature line',
-    example: (_, orgSig) => orgSig || "Dr. Kishor Anbazhakan's Chit Fund Organization",
+    getValue: (_, orgSig) => orgSig || "Dr. Kishor Anbazhakan's Chit Fund Organization",
   },
   {
     key: 'org_phone',
     label: 'Organizer Phone',
     category: 'org',
     description: 'Organizer contact mobile number',
-    example: (_, __, orgPhone) => orgPhone || '9943609010',
+    getValue: (_, __, orgPhone) => orgPhone || '9943609010',
   },
   {
     key: 'today_date',
     label: "Today's Date",
     category: 'org',
-    description: "Current calendar date formatted (e.g. 23 Sep 2026)",
-    example: () =>
+    description: "Current calendar date (e.g. 23 Sep 2026)",
+    getValue: () =>
       new Date().toLocaleDateString('en-IN', {
         day: 'numeric',
         month: 'short',
@@ -279,7 +280,7 @@ interface CommunicationBroadcastCenterProps {
 }
 
 export default function CommunicationBroadcastCenter({ onAddAuditLog }: CommunicationBroadcastCenterProps) {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const [groupsMetadata, setGroupsMetadata] = useState<Record<string, GroupMetadata>>({});
   const [activeGroupKey, setActiveGroupKey] = useState<string>('');
   const [templateType, setTemplateType] = useState<'pre-auction' | 'post-auction'>('pre-auction');
@@ -322,15 +323,14 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     return profile?.phoneNumber || '9943609010';
   });
 
-  // Autocomplete popup state for typing `{` or `<`
+  // Autocomplete popup state for typing `{`, `<`, or `/`
   const [showSuggestMenu, setShowSuggestMenu] = useState<boolean>(false);
   const [suggestFilter, setSuggestFilter] = useState<string>('');
   const [suggestIndex, setSuggestIndex] = useState<number>(0);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [variableSearchTerm, setVariableSearchTerm] = useState<string>('');
-  const [showVariableDrawer, setShowVariableDrawer] = useState<boolean>(false);
+  const [showInsertDropdown, setShowInsertDropdown] = useState<boolean>(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Sync profile data when available
   useEffect(() => {
@@ -356,6 +356,17 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
       localStorage.setItem('chit_broadcast_phone', val);
     }
   };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowInsertDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch active chit groups and winner details from Supabase
   const fetchGroups = async () => {
@@ -508,13 +519,13 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
   const selectedMeta = groupsMetadata[activeGroupKey] || null;
 
-  // Real-Time Compiler: Replaces all {variables} with dynamic data
+  // Real-Time Compiler: Replaces all {variables} with dynamic live data
   const compiledBroadcastText = useMemo(() => {
     if (!activeRawTemplate) return '';
     let result = activeRawTemplate;
 
     BROADCAST_VARIABLES.forEach((v) => {
-      const val = v.example(selectedMeta, signatureLine, contactPhone);
+      const val = v.getValue(selectedMeta, signatureLine, contactPhone);
       // Replace {key}, {{key}}, and <key> (case-insensitive)
       const regexCurlySingle = new RegExp(`\\{${v.key}\\}`, 'gi');
       const regexCurlyDouble = new RegExp(`\\{\\{${v.key}\\}\\}`, 'gi');
@@ -530,17 +541,30 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   }, [activeRawTemplate, selectedMeta, signatureLine, contactPhone]);
 
   // Insert a variable token into the textarea at the current cursor position
-  const insertVariableAtCursor = (varKey: string) => {
+  const insertVariableAtCursor = (varKey: string, replaceTrigger: boolean = false) => {
     triggerHapticFeedback('light');
     const token = `{${varKey}}`;
     const textarea = textareaRef.current;
 
     if (textarea) {
-      const start = textarea.selectionStart || 0;
-      const end = textarea.selectionEnd || 0;
+      const cursorPos = textarea.selectionStart || 0;
+      let start = cursorPos;
+      let end = textarea.selectionEnd || cursorPos;
       const text = activeRawTemplate;
-      const updated = text.substring(0, start) + token + text.substring(end);
 
+      if (replaceTrigger) {
+        const textBeforeCursor = text.slice(0, cursorPos);
+        const lastTrigger = Math.max(
+          textBeforeCursor.lastIndexOf('{'),
+          textBeforeCursor.lastIndexOf('<'),
+          textBeforeCursor.lastIndexOf('/')
+        );
+        if (lastTrigger !== -1) {
+          start = lastTrigger;
+        }
+      }
+
+      const updated = text.substring(0, start) + token + text.substring(end);
       handleTemplateChange(updated);
 
       setTimeout(() => {
@@ -552,21 +576,26 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     }
 
     setShowSuggestMenu(false);
+    setShowInsertDropdown(false);
   };
 
-  // Autocomplete Detection on Textarea keyup/change
+  // Autocomplete Detection on Textarea keyup/change: Triggers on `{`, `<`, or `/`
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     handleTemplateChange(val);
 
     const cursorPos = e.target.selectionStart || 0;
     const textBeforeCursor = val.slice(0, cursorPos);
-    const lastOpenBrace = Math.max(textBeforeCursor.lastIndexOf('{'), textBeforeCursor.lastIndexOf('<'));
+    const lastTrigger = Math.max(
+      textBeforeCursor.lastIndexOf('{'),
+      textBeforeCursor.lastIndexOf('<'),
+      textBeforeCursor.lastIndexOf('/')
+    );
 
-    if (lastOpenBrace !== -1 && lastOpenBrace >= cursorPos - 15) {
-      const query = textBeforeCursor.slice(lastOpenBrace + 1);
-      // If no space or closing bracket
-      if (!query.includes(' ') && !query.includes('}') && !query.includes('>')) {
+    if (lastTrigger !== -1 && lastTrigger >= cursorPos - 20) {
+      const query = textBeforeCursor.slice(lastTrigger + 1);
+      // If no space, newline, or closing symbol
+      if (!query.includes(' ') && !query.includes('\n') && !query.includes('}') && !query.includes('>')) {
         setSuggestFilter(query);
         setShowSuggestMenu(true);
         setSuggestIndex(0);
@@ -589,24 +618,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
         e.preventDefault();
         const selectedVar = filteredSuggestVariables[suggestIndex];
         if (selectedVar) {
-          const textarea = textareaRef.current;
-          if (textarea) {
-            const cursorPos = textarea.selectionStart || 0;
-            const textBeforeCursor = activeRawTemplate.slice(0, cursorPos);
-            const lastOpenBrace = Math.max(textBeforeCursor.lastIndexOf('{'), textBeforeCursor.lastIndexOf('<'));
-            if (lastOpenBrace !== -1) {
-              const prefix = activeRawTemplate.slice(0, lastOpenBrace);
-              const suffix = activeRawTemplate.slice(cursorPos);
-              const token = `{${selectedVar.key}}`;
-              const updated = prefix + token + suffix;
-              handleTemplateChange(updated);
-              setTimeout(() => {
-                textarea.focus();
-                textarea.setSelectionRange(prefix.length + token.length, prefix.length + token.length);
-              }, 50);
-            }
-          }
-          setShowSuggestMenu(false);
+          insertVariableAtCursor(selectedVar.key, true);
         }
       } else if (e.key === 'Escape') {
         setShowSuggestMenu(false);
@@ -620,22 +632,10 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     return BROADCAST_VARIABLES.filter(
       (v) =>
         v.key.toLowerCase().includes(suggestFilter.toLowerCase()) ||
-        v.label.toLowerCase().includes(suggestFilter.toLowerCase())
+        v.label.toLowerCase().includes(suggestFilter.toLowerCase()) ||
+        v.description.toLowerCase().includes(suggestFilter.toLowerCase())
     );
   }, [suggestFilter]);
-
-  // Filtered variables for Variable Chips Drawer
-  const filteredDrawerVariables = useMemo(() => {
-    return BROADCAST_VARIABLES.filter((v) => {
-      const matchCat = selectedCategory === 'all' || v.category === selectedCategory;
-      const matchSearch =
-        !variableSearchTerm ||
-        v.key.toLowerCase().includes(variableSearchTerm.toLowerCase()) ||
-        v.label.toLowerCase().includes(variableSearchTerm.toLowerCase()) ||
-        v.description.toLowerCase().includes(variableSearchTerm.toLowerCase());
-      return matchCat && matchSearch;
-    });
-  }, [selectedCategory, variableSearchTerm]);
 
   const handleCopyText = () => {
     navigator.clipboard.writeText(compiledBroadcastText);
@@ -685,7 +685,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             </h4>
           </div>
           <span className="text-[11px] text-gray-400">
-            Automatically appended wherever <code className="text-indigo-600 font-bold">{'{org_signature}'}</code> and <code className="text-indigo-600 font-bold">{'{org_phone}'}</code> are used
+            Replaces <code className="text-indigo-600 font-bold">{'{org_signature}'}</code> and <code className="text-indigo-600 font-bold">{'{org_phone}'}</code>
           </span>
         </div>
 
@@ -721,7 +721,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
       </div>
 
       {/* Main Broadcast Studio Card */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-6">
+      <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-5">
         {/* Top Control Bar: Group Selector, Template Mode, and View Mode */}
         <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 border-b border-gray-100 pb-5">
           {/* Left: Group Selector */}
@@ -831,94 +831,82 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           </div>
         </div>
 
-        {/* Dynamic Variable Chips & Quick Insert Bar */}
-        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-            <div className="flex items-center space-x-2">
-              <Tag size={15} className="text-indigo-600" />
-              <span className="text-xs font-bold text-gray-800">
-                Click any Dynamic Variable to insert into your template:
-              </span>
-            </div>
-
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'group', label: 'Chit Group' },
-                { id: 'auction', label: 'Auction Dates' },
-                { id: 'financials', label: 'Financials' },
-                { id: 'winner', label: 'Winner Info' },
-                { id: 'org', label: 'Organization' },
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all shrink-0 ${
-                    selectedCategory === cat.id
-                      ? 'bg-indigo-600 text-white shadow-2xs'
-                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Variable Chips Ribbon */}
-          <div className="flex flex-wrap gap-2 pt-1 max-h-36 overflow-y-auto pr-1">
-            {filteredDrawerVariables.map((v) => {
-              const previewSample = v.example(selectedMeta, signatureLine, contactPhone);
-              return (
-                <button
-                  key={v.key}
-                  type="button"
-                  onClick={() => insertVariableAtCursor(v.key)}
-                  title={`${v.description}\nCurrent Value: "${previewSample}"`}
-                  className="group inline-flex items-center gap-1.5 bg-white hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 text-gray-800 hover:text-indigo-700 px-2.5 py-1.5 rounded-xl text-xs font-mono font-semibold transition-all shadow-2xs active:scale-95"
-                >
-                  <span className="text-indigo-600 font-bold">{`{${v.key}}`}</span>
-                  <span className="text-[10px] font-sans text-gray-400 group-hover:text-indigo-600 font-normal">
-                    ({v.label})
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-slate-200/60">
-            <span>
-              💡 <strong>Pro-Tip:</strong> Type <code className="bg-white px-1.5 py-0.5 rounded border text-indigo-600 font-bold">{'{'}</code> or <code className="bg-white px-1.5 py-0.5 rounded border text-indigo-600 font-bold">{'<'}</code> directly inside the editor to open autocomplete.
-            </span>
-
-            <button
-              type="button"
-              onClick={handleResetDefaultTemplate}
-              className="text-gray-500 hover:text-rose-600 font-semibold flex items-center gap-1 transition-colors"
-            >
-              <RotateCcw size={12} />
-              <span>Reset Template</span>
-            </button>
-          </div>
-        </div>
-
         {/* Workspace: Split or Single View */}
         <div className={`grid gap-6 ${viewMode === 'split' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
-          {/* LEFT: Template Editor */}
+          {/* LEFT: Template Editor (LIGHT THEME) */}
           {(viewMode === 'edit' || viewMode === 'split') && (
             <div className="space-y-2 relative">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Code2 size={14} className="text-indigo-600" />
-                  <span>Template Source Code (with Variables)</span>
-                </label>
-                <span className="text-[11px] text-gray-400 font-mono">
-                  {activeRawTemplate.length} chars
-                </span>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Code2 size={14} className="text-indigo-600" />
+                    <span>Template Source Code</span>
+                  </label>
+
+                  {/* Quick Insert Variable Popover Button */}
+                  <div className="relative" ref={dropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setShowInsertDropdown(!showInsertDropdown)}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg transition-colors active:scale-95"
+                    >
+                      <Plus size={12} />
+                      <span>Insert Variable</span>
+                      <ChevronDown size={11} className={`transition-transform ${showInsertDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {showInsertDropdown && (
+                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 w-80 max-h-80 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
+                        <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                          Select Variable to Insert
+                        </div>
+                        {BROADCAST_VARIABLES.map((v) => {
+                          const liveVal = v.getValue(selectedMeta, signatureLine, contactPhone);
+                          return (
+                            <button
+                              key={v.key}
+                              type="button"
+                              onClick={() => insertVariableAtCursor(v.key, false)}
+                              className="w-full text-left p-2 rounded-xl text-xs hover:bg-indigo-50 transition-colors flex flex-col gap-0.5 group"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-mono font-bold text-[11px] text-indigo-700 group-hover:text-indigo-900">
+                                  {`{${v.key}}`}
+                                </span>
+                                <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono uppercase">
+                                  {v.category}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] text-gray-500">
+                                <span>{v.label}</span>
+                                <span className="font-semibold text-emerald-600 truncate max-w-[130px]" title={liveVal}>
+                                  {liveVal || '—'}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-400 font-mono">
+                    {activeRawTemplate.length} chars
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleResetDefaultTemplate}
+                    title="Reset template to standard default"
+                    className="text-gray-400 hover:text-rose-600 transition-colors p-1"
+                  >
+                    <RotateCcw size={13} />
+                  </button>
+                </div>
               </div>
 
+              {/* Textarea with Light Theme */}
               <div className="relative">
                 <textarea
                   ref={textareaRef}
@@ -926,42 +914,64 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   value={activeRawTemplate}
                   onChange={handleTextareaInput}
                   onKeyDown={handleTextareaKeyDown}
-                  placeholder="Type your message template here..."
-                  className="w-full bg-slate-900 text-slate-100 border border-slate-700 focus:border-indigo-500 rounded-2xl p-4 text-xs font-mono leading-relaxed focus:outline-none resize-none shadow-inner"
+                  placeholder="Type message template. Type { or < or / to insert live variables..."
+                  className="w-full bg-white text-gray-900 border border-gray-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-2xl p-4 text-xs font-mono leading-relaxed focus:outline-none resize-none shadow-2xs transition-all"
                 />
 
-                {/* Autocomplete Dropdown Popup */}
+                {/* Autocomplete Dropdown Popup when typing `{`, `<`, or `/` */}
                 {showSuggestMenu && filteredSuggestVariables.length > 0 && (
-                  <div className="absolute left-4 bottom-6 z-30 bg-white border border-gray-200 rounded-2xl shadow-2xl p-2 w-72 max-h-60 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
-                    <div className="px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 flex justify-between items-center">
-                      <span>Insert Variable</span>
-                      <span className="text-[9px] lowercase font-normal">Press Enter or Tab</span>
+                  <div className="absolute left-4 top-16 z-30 bg-white border border-gray-200 rounded-2xl shadow-2xl p-2 w-80 max-h-72 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
+                    <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 flex justify-between items-center">
+                      <span>Insert Dynamic Variable</span>
+                      <span className="text-[9px] lowercase font-normal text-indigo-600">Enter / Tab</span>
                     </div>
-                    {filteredSuggestVariables.map((v, idx) => (
-                      <button
-                        key={v.key}
-                        type="button"
-                        onClick={() => {
-                          insertVariableAtCursor(v.key);
-                        }}
-                        onMouseEnter={() => setSuggestIndex(idx)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs transition-colors flex items-center justify-between ${
-                          suggestIndex === idx
-                            ? 'bg-indigo-50 text-indigo-700 font-bold'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="min-w-0">
-                          <span className="font-mono text-[11px] block truncate">{`{${v.key}}`}</span>
-                          <span className="text-[10px] text-gray-400 font-sans block truncate">{v.label}</span>
-                        </div>
-                        <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">
-                          {v.category}
-                        </span>
-                      </button>
-                    ))}
+                    {filteredSuggestVariables.map((v, idx) => {
+                      const liveVal = v.getValue(selectedMeta, signatureLine, contactPhone);
+                      return (
+                        <button
+                          key={v.key}
+                          type="button"
+                          onClick={() => {
+                            insertVariableAtCursor(v.key, true);
+                          }}
+                          onMouseEnter={() => setSuggestIndex(idx)}
+                          className={`w-full text-left p-2 rounded-xl text-xs transition-colors flex flex-col gap-0.5 ${
+                            suggestIndex === idx
+                              ? 'bg-indigo-50 border border-indigo-200 shadow-2xs'
+                              : 'hover:bg-gray-50 border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-[11px] font-bold text-indigo-700">
+                              {`{${v.key}}`}
+                            </span>
+                            <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono uppercase">
+                              {v.category}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-gray-500 font-medium truncate max-w-[130px]">{v.label}</span>
+                            <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded text-[10px] truncate max-w-[140px]" title={liveVal}>
+                              Live: {liveVal || '—'}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
+              </div>
+
+              {/* Helper Footer Hint */}
+              <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
+                <span>
+                  💡 Type <code className="bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 text-indigo-700 font-bold">{'{'}</code>, <code className="bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 text-indigo-700 font-bold">{'<'}</code>, or <code className="bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 text-indigo-700 font-bold">{'/'}</code> to open live variable autocomplete.
+                </span>
+
+                <span className="text-[10px] text-emerald-600 font-bold">
+                  Auto-saved
+                </span>
               </div>
             </div>
           )}
@@ -974,7 +984,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   <Eye size={14} className="text-emerald-600" />
                   <span>Live Compiled Preview (Ready for WhatsApp)</span>
                 </label>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                   ✓ Variables Live Substituted
                 </span>
               </div>
