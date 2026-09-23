@@ -927,7 +927,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
               </button>
             </div>
 
-            {/* Mobile / Desktop View Mode Segment */}
+            {/* Mobile & Desktop View Mode Segment */}
             <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 w-full sm:w-auto">
               <button
                 type="button"
@@ -959,7 +959,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                 type="button"
                 onClick={() => setViewMode('split')}
                 title="Side-by-Side Split View"
-                className={`hidden lg:flex p-1.5 px-2.5 rounded-lg text-xs font-bold transition-all items-center justify-center gap-1 ${
+                className={`flex-1 sm:flex-initial p-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                   viewMode === 'split'
                     ? 'bg-white text-gray-900 shadow-xs'
                     : 'text-gray-500 hover:text-gray-800'
@@ -1199,12 +1199,12 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                 </div>
               </div>
 
-              {/* Desktop Action Buttons */}
-              <div className="hidden sm:flex flex-row gap-2.5 justify-end pt-1">
+              {/* Action Buttons: Copy to Clipboard & Share via WhatsApp (Visible on ALL devices) */}
+              <div className="flex flex-col sm:flex-row gap-2.5 justify-end pt-2">
                 <button
                   type="button"
                   onClick={handleCopyText}
-                  className="bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-800 text-xs font-bold px-5 py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all border border-gray-300 shadow-2xs"
+                  className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-800 text-xs font-bold px-5 py-3 sm:py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all border border-gray-300 shadow-2xs"
                 >
                   {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
                   <span>{copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}</span>
@@ -1214,7 +1214,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   href={formatWhatsAppUrl()}
                   target="_blank"
                   rel="noreferrer"
-                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold px-6 py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md shadow-emerald-600/20 text-center"
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold px-6 py-3 sm:py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md shadow-emerald-600/20 text-center"
                 >
                   <Send size={15} />
                   <span>Share via WhatsApp</span>
@@ -1223,28 +1223,6 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             </div>
           )}
         </div>
-      </div>
-
-      {/* ── Mobile Sticky Bottom Action Bar ── */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 p-3 flex items-center gap-2 shadow-lg">
-        <button
-          type="button"
-          onClick={handleCopyText}
-          className="flex-1 bg-gray-100 active:bg-gray-200 text-gray-800 text-xs font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 border border-gray-300"
-        >
-          {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
-          <span>{copied ? 'Copied!' : 'Copy'}</span>
-        </button>
-
-        <a
-          href={formatWhatsAppUrl()}
-          target="_blank"
-          rel="noreferrer"
-          className="flex-2 bg-emerald-600 active:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 text-center"
-        >
-          <Send size={15} />
-          <span>Share WhatsApp</span>
-        </a>
       </div>
     </div>
   );
