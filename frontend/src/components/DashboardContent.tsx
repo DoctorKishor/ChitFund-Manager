@@ -15,6 +15,7 @@ import QuickMemberCollectModal, { CollectableMember } from './QuickMemberCollect
 import QuickPersonalDrawModal from './QuickPersonalDrawModal';
 import QuickAtmWithdrawalModal from './QuickAtmWithdrawalModal';
 import PaymentChecklistPrintModal from './PaymentChecklistPrintModal';
+import { PaymentReceiptModal } from './PaymentReceiptModal';
 import SlideToConfirm from './SlideToConfirm';
 import { HelpTooltip } from './HelpTooltip';
 import { triggerHapticFeedback } from '../utils/haptics';
@@ -240,6 +241,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [draggedTicketNum, setDraggedTicketNum] = useState<number | null>(null);
   const [dragOverTicketNum, setDragOverTicketNum] = useState<number | null>(null);
   const [printChecklistGroup, setPrintChecklistGroup] = useState<any | null>(null);
+  const [viewingReceiptTx, setViewingReceiptTx] = useState<{ tx: any; member: any } | null>(null);
 
   // High-Security Delete Group Modal States
   const [deletingGroup, setDeletingGroup] = useState<any | null>(null);
@@ -4070,19 +4072,32 @@ Thank you for your prompt payment! 🙏`;
                                 <span className="font-semibold text-gray-900 truncate">{member.name}</span>
                                 <span className="text-[10px] text-gray-500 font-mono">#{member.ticket}</span>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className="font-bold text-emerald-700">
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="font-bold text-emerald-700 mr-0.5">
                                   {formatCurrency(member.paid)} paid
                                 </span>
                                 {memTx && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenEditPayment(memTx)}
-                                    title="Edit payment receipt"
-                                    className="p-1 text-emerald-700 hover:text-indigo-700 hover:bg-emerald-100 rounded-md transition-colors"
-                                  >
-                                    <Edit3 size={12} />
-                                  </button>
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        triggerHapticFeedback('light');
+                                        setViewingReceiptTx({ tx: memTx, member });
+                                      }}
+                                      title="Share Receipt PNG"
+                                      className="p-1 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100 rounded-md transition-colors cursor-pointer"
+                                    >
+                                      <Share2 size={12} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditPayment(memTx)}
+                                      title="Edit payment receipt"
+                                      className="p-1 text-emerald-700 hover:text-indigo-700 hover:bg-emerald-100 rounded-md transition-colors cursor-pointer"
+                                    >
+                                      <Edit3 size={12} />
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             </div>
@@ -4156,18 +4171,20 @@ Thank you for your prompt payment! 🙏`;
                             </span>
 
                             <div className="flex items-center gap-1.5">
-                              {/* WhatsApp Share Button */}
+                              {/* Rendered PNG Receipt Share Button */}
                               {matchedMember && (
-                                <a
-                                  href={generateWhatsAppReceiptUrl(matchedMember, Number(tx.amount || 0), baseInstallment, tx)}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="Share receipt on WhatsApp"
-                                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition-colors active:scale-95"
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    triggerHapticFeedback('light');
+                                    setViewingReceiptTx({ tx, member: matchedMember });
+                                  }}
+                                  title="Share Receipt PNG"
+                                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors active:scale-95 cursor-pointer shadow-2xs"
                                 >
                                   <Share2 size={12} />
                                   <span className="text-[10px]">Share</span>
-                                </a>
+                                </button>
                               )}
 
                               {/* Edit Payment Button */}
@@ -4554,6 +4571,30 @@ Thank you for your prompt payment! 🙏`;
                   </div>
                 </form>
               </div>
+            )}
+
+            {/* ── MODAL: RENDERED PAYMENT RECEIPT PNG SHARING ── */}
+            {viewingReceiptTx && activeGroup && (
+              <PaymentReceiptModal
+                isOpen={Boolean(viewingReceiptTx)}
+                onClose={() => setViewingReceiptTx(null)}
+                transaction={viewingReceiptTx.tx}
+                member={viewingReceiptTx.member}
+                group={activeGroup}
+                month={selectedDashboardMonth}
+                totalDue={baseInstallment}
+                organizerCompanyName={
+                  profile?.fullName 
+                    ? (profile.fullName.toUpperCase().includes('CHIT') ? profile.fullName.toUpperCase() : `${profile.fullName.toUpperCase()} CHIT FUNDS`)
+                    : 'ANBAZHAKAN CHIT FUNDS'
+                }
+                organizerInitials={
+                  profile?.fullName
+                    ? profile.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+                    : 'AC'
+                }
+                formatCurrency={formatCurrency}
+              />
             )}
 
             {/* Live System Activity and Audit Log */}

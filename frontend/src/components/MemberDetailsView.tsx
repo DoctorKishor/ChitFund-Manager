@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useWallet, WalletType } from '@/context/WalletContext';
 import PassbookScannerModal from './PassbookScannerModal';
 import PassbookSheetGeneratorModal, { StickerItem } from './PassbookSheetGeneratorModal';
+import { PaymentReceiptModal } from './PaymentReceiptModal';
 import { getPassbookScanUrl } from '@/utils/qrCodeGenerator';
 import { 
   ArrowLeft,
@@ -79,6 +80,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
   const [paymentReceiptUrl, setPaymentReceiptUrl] = useState<string>('');
   const [receiptFileToUpload, setReceiptFileToUpload] = useState<File | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+  const [viewingReceiptTx, setViewingReceiptTx] = useState<any | null>(null);
 
   const fetchMemberData = async () => {
     try {
@@ -1428,15 +1430,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
                         <div className="flex items-center gap-1.5">
                           {isCollection && (
-                            <a
-                              href={generateWhatsAppReceiptUrl(tx)}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Share receipt on WhatsApp"
-                              className="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors active:scale-95"
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViewingReceiptTx(tx);
+                              }}
+                              title="Share Rendered Receipt PNG"
+                              className="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors active:scale-95 cursor-pointer shadow-2xs"
                             >
                               <Share2 size={14} />
-                            </a>
+                            </button>
                           )}
                           <button
                             type="button"
@@ -1879,6 +1882,40 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
         items={printItems}
         defaultTitle={`${memberName} — Passbook Sticker Sheet`}
       />
+
+      {/* Rendered PNG Payment Receipt Modal */}
+      {viewingReceiptTx && (() => {
+        const matchedEnrollment = memberEnrollments.find(e => e.group_id === viewingReceiptTx.group_id) || memberEnrollments[0];
+        const matchedGroup = matchedEnrollment?.chit_groups;
+        const ticket = matchedEnrollment?.ticket_number ?? 1;
+
+        return (
+          <PaymentReceiptModal
+            isOpen={Boolean(viewingReceiptTx)}
+            onClose={() => setViewingReceiptTx(null)}
+            transaction={viewingReceiptTx}
+            member={{
+              name: memberProfile?.full_name || 'Subscriber',
+              ticket: ticket,
+              phone: memberProfile?.phone_number || ''
+            }}
+            group={matchedGroup || { name: 'Chit Group', monthly_installment: 10000 }}
+            month={viewingReceiptTx.month ?? matchedGroup?.current_month ?? 1}
+            totalDue={matchedGroup?.monthly_installment}
+            organizerCompanyName={
+              profile?.fullName 
+                ? (profile.fullName.toUpperCase().includes('CHIT') ? profile.fullName.toUpperCase() : `${profile.fullName.toUpperCase()} CHIT FUNDS`)
+                : 'ANBAZHAKAN CHIT FUNDS'
+            }
+            organizerInitials={
+              profile?.fullName
+                ? profile.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+                : 'AC'
+            }
+            formatCurrency={formatCurrency}
+          />
+        );
+      })()}
     </div>
   );
 }
