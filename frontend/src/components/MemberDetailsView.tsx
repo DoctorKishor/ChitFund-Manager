@@ -1404,7 +1404,13 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                               {isCollection ? 'Collection' : 'Prize Payout'}
                             </span>
                             <span className="text-[10px] font-mono font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md">
-                              {!tx.wallet_type || tx.wallet_type.includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
+                              {tx.wallet_type === 'kishor_bank'
+                                ? 'KISHOR BANK (UPI)'
+                                : tx.wallet_type === 'dad_bank'
+                                ? 'DAD BANK'
+                                : tx.wallet_type === 'mom_bank'
+                                ? 'MOM BANK'
+                                : 'CASH IN HAND'}
                             </span>
                             {tx.verification_proof_url && (
                               <a
@@ -1521,7 +1527,13 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     <div className="bg-gray-50 rounded-xl p-3">
                       <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Disbursement</span>
                       <span className="font-bold text-gray-900">
-                        {!prize.walletType || prize.walletType.includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
+                        {prize.walletType === 'kishor_bank'
+                          ? 'KISHOR BANK (UPI)'
+                          : prize.walletType === 'dad_bank'
+                          ? 'DAD BANK'
+                          : prize.walletType === 'mom_bank'
+                          ? 'MOM BANK'
+                          : 'CASH IN HAND'}
                       </span>
                     </div>
                   </div>
@@ -1892,6 +1904,21 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
         const matchedEnrollment = memberEnrollments.find(e => e.group_id === viewingReceiptTx.group_id) || memberEnrollments[0];
         const matchedGroup = matchedEnrollment?.chit_groups;
         const ticket = matchedEnrollment?.ticket_number ?? 1;
+        const txMonth = viewingReceiptTx.month ?? matchedGroup?.current_month ?? 1;
+
+        // Compute past pending dues strictly for this matched chit group
+        const grpBreakdown = (groupDuesBreakdowns || []).find((b: any) => b?.groupId === viewingReceiptTx.group_id || b?.groupId === matchedGroup?.id);
+        let pastPendingDues = 0;
+        const pastPendingMonths: number[] = [];
+
+        if (grpBreakdown?.monthDues) {
+          grpBreakdown.monthDues.forEach((md: any) => {
+            if (md.month < txMonth && md.remainingDue > 0) {
+              pastPendingDues += md.remainingDue;
+              pastPendingMonths.push(md.month);
+            }
+          });
+        }
 
         return (
           <PaymentReceiptModal
@@ -1904,11 +1931,13 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               phone: memberProfile?.phone_number || ''
             }}
             group={matchedGroup || { name: 'Chit Group', monthly_installment: 10000 }}
-            month={viewingReceiptTx.month ?? matchedGroup?.current_month ?? 1}
+            month={txMonth}
             totalDue={matchedGroup?.monthly_installment}
             organizerCompanyName={organizationName}
             organizerInitials={organizationInitials}
             formatCurrency={formatCurrency}
+            pastPendingDues={pastPendingDues}
+            pastPendingMonths={pastPendingMonths}
           />
         );
       })()}

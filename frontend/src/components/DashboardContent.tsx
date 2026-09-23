@@ -4152,7 +4152,13 @@ Thank you for your prompt payment! 🙏`;
                               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                                 <span className="text-xs font-bold text-gray-900 truncate">{memberName}</span>
                                 <span className="text-[10px] font-mono bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded shrink-0">
-                                  {!tx.wallet_type || tx.wallet_type.includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
+                                  {tx.wallet_type === 'kishor_bank'
+                                    ? 'KISHOR BANK (UPI)'
+                                    : tx.wallet_type === 'dad_bank'
+                                    ? 'DAD BANK'
+                                    : tx.wallet_type === 'mom_bank'
+                                    ? 'MOM BANK'
+                                    : 'CASH IN HAND'}
                                 </span>
                                 {tx.verification_proof_url && (
                                   <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded flex items-center gap-0.5 shrink-0">
@@ -4576,20 +4582,38 @@ Thank you for your prompt payment! 🙏`;
             )}
 
             {/* ── MODAL: RENDERED PAYMENT RECEIPT PNG SHARING ── */}
-            {viewingReceiptTx && activeGroup && (
-              <PaymentReceiptModal
-                isOpen={Boolean(viewingReceiptTx)}
-                onClose={() => setViewingReceiptTx(null)}
-                transaction={viewingReceiptTx.tx}
-                member={viewingReceiptTx.member}
-                group={activeGroup}
-                month={selectedDashboardMonth}
-                totalDue={baseInstallment}
-                organizerCompanyName={organizationName}
-                organizerInitials={organizationInitials}
-                formatCurrency={formatCurrency}
-              />
-            )}
+            {viewingReceiptTx && activeGroup && (() => {
+              const memberId = viewingReceiptTx.member?.profileId || viewingReceiptTx.member?.id || viewingReceiptTx.tx?.profile_id;
+              let pastPendingDues = 0;
+              const pastPendingMonths: number[] = [];
+
+              for (let m = 0; m < selectedDashboardMonth; m++) {
+                const mDue = isLaaba ? 0 : (viewingReceiptTx.member?.customInstallment || baseInstallment);
+                const mPaid = getMemberPaidAmountForMonth(memberId, m);
+                const mRemaining = Math.max(0, mDue - mPaid);
+                if (mRemaining > 0) {
+                  pastPendingDues += mRemaining;
+                  pastPendingMonths.push(m);
+                }
+              }
+
+              return (
+                <PaymentReceiptModal
+                  isOpen={Boolean(viewingReceiptTx)}
+                  onClose={() => setViewingReceiptTx(null)}
+                  transaction={viewingReceiptTx.tx}
+                  member={viewingReceiptTx.member}
+                  group={activeGroup}
+                  month={selectedDashboardMonth}
+                  totalDue={baseInstallment}
+                  organizerCompanyName={organizationName}
+                  organizerInitials={organizationInitials}
+                  formatCurrency={formatCurrency}
+                  pastPendingDues={pastPendingDues}
+                  pastPendingMonths={pastPendingMonths}
+                />
+              );
+            })()}
 
             {/* Live System Activity and Audit Log */}
             <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">

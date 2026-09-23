@@ -33,6 +33,8 @@ interface PaymentReceiptModalProps {
   organizerCompanyName?: string;
   organizerInitials?: string;
   formatCurrency?: (val: number) => string;
+  pastPendingDues?: number;
+  pastPendingMonths?: number[];
 }
 
 // Convert numbers to Indian Rupees in words
@@ -89,7 +91,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   totalDue,
   organizerCompanyName,
   organizerInitials,
-  formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`
+  formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`,
+  pastPendingDues = 0,
+  pastPendingMonths = [],
 }) => {
   const { 
     organizationName: globalOrgName, 
@@ -113,6 +117,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   const calculatedDue = totalDue || Number(group?.monthly_installment || 0);
   const remainingBalance = Math.max(0, calculatedDue - paidAmount);
   const isCleared = remainingBalance === 0;
+  const totalGroupOutstanding = remainingBalance + pastPendingDues;
 
   const receiptNo = `RCP-${String(transaction.id || 'TX001').slice(0, 8).toUpperCase()}`;
   
@@ -263,7 +268,22 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         // Also prepare WhatsApp URL
         const digits = memberPhone.replace(/\D/g, '');
         const cleanPhone = digits.length === 10 ? `91${digits}` : digits;
-        const msg = `*CHIT FUNDS PAYMENT RECEIPT* 🧾\n\n*Receipt No:* ${receiptNo}\n*Subscriber:* ${memberName} (Ticket #${ticketNum})\n*Group:* ${groupName} (Month ${month})\n*Amount Paid:* ${formatCurrency(paidAmount)}\n*Mode:* ${walletDisplay}\n*Date:* ${dateFormatted}, ${timeFormatted}\n*Status:* ${isCleared ? '✅ FULLY CLEARED' : '⏳ PARTIAL'}\n\n_Receipt image downloaded. Thank you!_ 🙏`;
+        const msg = `*CHIT FUNDS PAYMENT RECEIPT* 🧾\n` +
+          `----------------------------------\n` +
+          `*Receipt No:* ${receiptNo}\n` +
+          `*Subscriber:* ${memberName} (Ticket #${ticketNum})\n` +
+          `*Group:* ${groupName}\n` +
+          `*Payment Applied For:* Month ${month === 0 ? '0 (Launch)' : month}\n` +
+          `*Amount Paid:* ${formatCurrency(paidAmount)}\n` +
+          `*Payment Mode:* ${walletDisplay}\n` +
+          `*Date:* ${dateFormatted}, ${timeFormatted}\n` +
+          `----------------------------------\n` +
+          `*Month ${month} Installment:* ${formatCurrency(calculatedDue)}\n` +
+          `*Month ${month} Pending:* ${isCleared ? '₹0 (CLEARED ✅)' : `${formatCurrency(remainingBalance)} PENDING`}\n` +
+          `*Past Overdue (${groupName}):* ${pastPendingDues > 0 ? `${formatCurrency(pastPendingDues)} (Pending in M${pastPendingMonths.join(', M')})` : '₹0 (All Previous Months Cleared ✅)'}\n` +
+          `*Total Group Outstanding:* ${totalGroupOutstanding === 0 ? '₹0 (Fully Settled ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}\n\n` +
+          `_Receipt image downloaded. Thank you!_ 🙏`;
+        
         const waUrl = cleanPhone 
           ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
           : `https://wa.me/?text=${encodeURIComponent(msg)}`;
@@ -398,7 +418,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               Ticket #{ticketNum}
             </span>
             <span className="text-[10px] text-slate-600 font-bold block truncate mt-0.5">
-              {groupName} · M{month}
+              {groupName} · M{month === 0 ? '0 (Launch)' : month}
             </span>
           </div>
         </div>
@@ -416,33 +436,69 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           </div>
         </div>
 
-        {/* Payment Breakdown Rows */}
+        {/* Detailed Payment & Group Dues Breakdown Matrix */}
         <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs shadow-2xs">
+          
+          {/* Payment Applied For Month */}
           <div className="flex justify-between items-center px-3.5 py-2.5 bg-slate-50/70">
+            <span className="text-slate-500 font-semibold">Payment For Month</span>
+            <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded text-[10.5px]">
+              {month === 0 ? 'Month 0 (Launch Month)' : `Month ${month}`}
+            </span>
+          </div>
+
+          {/* Payment Mode */}
+          <div className="flex justify-between items-center px-3.5 py-2.5">
             <span className="text-slate-500 font-semibold">Payment Mode</span>
-            <span className="font-bold text-slate-900 font-mono bg-slate-200/80 px-2.5 py-0.5 rounded text-[10.5px]">
+            <span className="font-bold text-slate-800 font-mono bg-slate-100 px-2 py-0.5 rounded text-[10.5px]">
               {walletDisplay}
             </span>
           </div>
 
+          {/* Month Installment Due */}
           <div className="flex justify-between items-center px-3.5 py-2.5">
-            <span className="text-slate-500 font-semibold">Installment Due</span>
+            <span className="text-slate-500 font-semibold">Month {month} Installment Due</span>
             <span className="font-bold text-slate-800">
               {formatCurrency(calculatedDue)}
             </span>
           </div>
 
-          <div className="flex justify-between items-center px-3.5 py-2.5">
-            <span className="text-slate-500 font-semibold">Amount Credited</span>
-            <span className="font-extrabold text-emerald-600">
-              {formatCurrency(paidAmount)}
+          {/* Amount Paid in this Receipt */}
+          <div className="flex justify-between items-center px-3.5 py-2.5 bg-emerald-50/40">
+            <span className="text-emerald-800 font-bold">Amount Credited (This Receipt)</span>
+            <span className="font-extrabold text-emerald-700 font-mono text-sm">
+              +{formatCurrency(paidAmount)}
             </span>
           </div>
 
-          <div className="flex justify-between items-center px-3.5 py-2.5 bg-slate-50/70">
-            <span className="text-slate-700 font-bold">Month {month} Balance</span>
+          {/* Current Month Balance (Cleared or Pending) */}
+          <div className="flex justify-between items-center px-3.5 py-2.5">
+            <span className="text-slate-600 font-bold">Month {month} Pending Balance</span>
             <span className={`font-black ${isCleared ? 'text-emerald-700' : 'text-amber-700'}`}>
               {isCleared ? '₹0 (CLEARED ✅)' : `${formatCurrency(remainingBalance)} PENDING`}
+            </span>
+          </div>
+
+          {/* Past Pending Dues for this Particular Chit Group */}
+          <div className="flex justify-between items-center px-3.5 py-2.5 bg-slate-50/60">
+            <div>
+              <span className="text-slate-600 font-bold block">Past Pending Dues ({groupName})</span>
+              {pastPendingDues > 0 && pastPendingMonths.length > 0 ? (
+                <span className="text-[9.5px] text-amber-700 font-mono font-medium block">
+                  Overdue in: {pastPendingMonths.map(m => `Month ${m}`).join(', ')}
+                </span>
+              ) : null}
+            </div>
+            <span className={`font-black ${pastPendingDues > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+              {pastPendingDues > 0 ? formatCurrency(pastPendingDues) : '₹0 (All Previous Months Cleared ✅)'}
+            </span>
+          </div>
+
+          {/* Total Group Outstanding Balance */}
+          <div className="flex justify-between items-center px-3.5 py-2.5 bg-slate-100/70 border-t border-slate-200">
+            <span className="text-slate-800 font-extrabold text-[11.5px]">Total Outstanding ({groupName})</span>
+            <span className={`font-black text-sm ${totalGroupOutstanding === 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+              {totalGroupOutstanding === 0 ? '₹0 (Fully Settled ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}
             </span>
           </div>
 
