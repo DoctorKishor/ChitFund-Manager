@@ -300,7 +300,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
           <style>
             @page {
               size: A4 portrait;
-              margin: 10mm 12mm;
+              margin: 8mm 10mm;
             }
             * {
               box-sizing: border-box;
@@ -320,11 +320,12 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               margin: 0 auto;
             }
             .invocation {
-              font-size: 13px;
-              font-weight: 900;
+              text-align: center;
+              font-size: 11px;
+              font-weight: 800;
               text-transform: uppercase;
-              letter-spacing: 1px;
-              margin-bottom: 12px;
+              letter-spacing: 1.5px;
+              margin-bottom: 8px;
               font-family: Georgia, serif;
             }
             .header-block {
@@ -332,43 +333,43 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               justify-content: space-between;
               align-items: flex-start;
               border-bottom: 2px solid #000000;
-              padding-bottom: 10px;
-              margin-bottom: 16px;
+              padding-bottom: 8px;
+              margin-bottom: 12px;
             }
             .header-left {
               display: flex;
               flex-direction: column;
-              gap: 4px;
+              gap: 3px;
             }
             .header-right {
               text-align: right;
               display: flex;
               flex-direction: column;
-              gap: 4px;
+              gap: 3px;
             }
             .chit-amount {
-              font-size: 16px;
+              font-size: 15px;
               font-weight: 900;
               letter-spacing: -0.2px;
             }
             .months-dur {
-              font-size: 13px;
+              font-size: 12px;
               font-weight: 700;
               text-transform: uppercase;
             }
             .monthly-due {
-              font-size: 14px;
+              font-size: 13px;
               font-weight: 900;
             }
             .cycle-label {
-              font-size: 14px;
+              font-size: 13px;
               font-weight: 900;
               text-transform: uppercase;
               text-decoration: underline;
               text-underline-offset: 3px;
             }
             .date-label {
-              font-size: 13px;
+              font-size: 12px;
               font-weight: 700;
               text-decoration: underline;
               text-underline-offset: 3px;
@@ -380,8 +381,8 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             }
             th {
               border: 1px solid #000000;
-              padding: 6px 4px;
-              font-size: 11px;
+              padding: 5px 4px;
+              font-size: 10.5px;
               font-weight: 900;
               background: #ffffff;
               text-align: center;
@@ -392,9 +393,9 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             }
             td {
               border: 1px solid #000000;
-              font-size: 11px;
+              font-size: 10.5px;
               font-weight: 600;
-              padding: ${totalMembers <= 10 ? '10px 4px' : totalMembers <= 15 ? '7px 4px' : totalMembers <= 20 ? '5px 4px' : '4px 3px'};
+              padding: ${totalMembers <= 10 ? '9px 4px' : totalMembers <= 15 ? '6px 4px' : totalMembers <= 20 ? '4.5px 4px' : '3.5px 3px'};
               vertical-align: middle;
             }
             td.td-sl {
@@ -416,16 +417,16 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             td.td-date {
               text-align: center;
               font-family: monospace;
-              font-size: 10px;
+              font-size: 9.5px;
             }
             .footer-block {
-              margin-top: 20px;
-              padding-top: 10px;
+              margin-top: 16px;
+              padding-top: 8px;
               border-top: 1px solid #666666;
               display: flex;
               justify-content: space-between;
               align-items: center;
-              font-size: 10px;
+              font-size: 9.5px;
               color: #444444;
             }
           </style>
@@ -513,7 +514,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
 
       const pageWidth = 210;
       const pageHeight = 297;
-      const margin = 10;
+      const margin = 8;
       const printWidth = pageWidth - (margin * 2);
       const printHeight = pageHeight - (margin * 2);
 
@@ -539,48 +540,62 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
 
   // Dynamic row height padding for the screen preview
   const dynamicRowPadding = useMemo(() => {
-    if (totalMembers <= 10) return 'py-3';
-    if (totalMembers <= 15) return 'py-2.5';
-    if (totalMembers <= 20) return 'py-2';
-    if (totalMembers <= 25) return 'py-1.5';
-    return 'py-1';
+    if (totalMembers <= 10) return 'py-2.5 sm:py-3';
+    if (totalMembers <= 15) return 'py-2 sm:py-2.5';
+    if (totalMembers <= 20) return 'py-1.5 sm:py-2';
+    if (totalMembers <= 25) return 'py-1 sm:py-1.5';
+    return 'py-0.5 sm:py-1';
   }, [totalMembers]);
 
   return (
-    <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-60 bg-black/75 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-y-auto">
       
-      {/* ── MODAL CONTAINER ── */}
-      <div className="bg-gray-100 rounded-3xl w-full max-w-4xl max-h-[96dvh] flex flex-col shadow-2xl overflow-hidden my-auto border border-gray-300">
+      {/* ── MODAL CONTAINER (Full-screen on mobile, rounded card on desktop) ── */}
+      <div className="bg-gray-100 sm:rounded-3xl w-full max-w-4xl h-[100dvh] sm:h-auto sm:max-h-[96dvh] flex flex-col shadow-2xl overflow-hidden my-auto border-0 sm:border border-gray-300">
         
         {/* 1. Modal Control Header */}
-        <div className="p-4 sm:p-5 bg-white border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0">
-          <div>
+        <div className="p-3.5 sm:p-5 bg-white border-b border-gray-200 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5 sm:gap-3 shrink-0">
+          <div className="flex items-center justify-between sm:justify-start gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="p-1.5 bg-indigo-50 text-indigo-700 rounded-xl">
                 <FileText size={16} />
               </span>
-              <h3 className="text-base font-bold text-gray-900">
-                Payment Checklist Printout
-              </h3>
-              <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-150">
-                A4 Single-Page Format
-              </span>
-              {activeMonthsList.length > 1 && (
-                <span className="text-[10px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">
-                  {activeMonthsList.length} Months Combined
-                </span>
-              )}
+              <div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-tight">
+                    Payment Checklist
+                  </h3>
+                  <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-full border border-indigo-150">
+                    A4 Single-Page
+                  </span>
+                  {activeMonthsList.length > 1 && (
+                    <span className="text-[10px] font-extrabold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded-full border border-purple-200">
+                      {activeMonthsList.length}M Combined
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-500 line-clamp-1">
+                  Physical monthly ledger for <strong>{group.name}</strong>
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Traditional physical monthly ledger checklist for <strong>{group.name}</strong>
-            </p>
+
+            {/* Mobile close button on top right */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="sm:hidden text-gray-400 hover:text-gray-700 p-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+            >
+              <X size={20} />
+            </button>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={handlePrint}
-              className="bg-gray-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+              className="flex-1 sm:flex-none justify-center bg-gray-900 hover:bg-black text-white text-xs font-bold px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
             >
               <Printer size={14} />
               <span>Print Checklist</span>
@@ -590,16 +605,16 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               type="button"
               disabled={isGeneratingPdf}
               onClick={handleDownloadPdf}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-50"
+              className="flex-1 sm:flex-none justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-50"
             >
               {isGeneratingPdf ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-              <span>Save PDF</span>
+              <span>Download PDF</span>
             </button>
 
             <button
               type="button"
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-700 p-2 rounded-xl hover:bg-gray-100 transition-colors"
+              className="hidden sm:inline-flex text-gray-400 hover:text-gray-700 p-2 rounded-xl hover:bg-gray-100 transition-colors"
             >
               <X size={18} />
             </button>
@@ -607,12 +622,12 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
         </div>
 
         {/* 2. Interactive Options & Configuration Bar */}
-        <div className="bg-white/90 border-b border-gray-200 px-4 sm:px-6 py-3.5 shrink-0 space-y-3">
+        <div className="bg-white/95 border-b border-gray-200 px-3.5 sm:px-6 py-3 shrink-0 space-y-2.5 max-h-[38vh] sm:max-h-none overflow-y-auto">
           
           {/* Mode Selector Row (Single vs Multi Month) */}
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 bg-gray-50 border border-gray-200 p-2.5 rounded-2xl">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-800">Collection Duration:</span>
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 bg-gray-50 border border-gray-200 p-2 rounded-2xl">
+            <div className="flex items-center justify-between sm:justify-start gap-2">
+              <span className="text-[11px] font-bold text-gray-800">Duration:</span>
               <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-0.5 shadow-2xs">
                 <button
                   type="button"
@@ -620,7 +635,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                     triggerHapticFeedback('light');
                     setCollectionMode('single');
                   }}
-                  className={`text-[11px] font-bold px-3 py-1 rounded-lg transition-all ${
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all ${
                     collectionMode === 'single'
                       ? 'bg-indigo-600 text-white shadow-2xs'
                       : 'text-gray-600 hover:text-gray-900'
@@ -634,7 +649,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                     triggerHapticFeedback('light');
                     setCollectionMode('multi');
                   }}
-                  className={`text-[11px] font-bold px-3 py-1 rounded-lg transition-all ${
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all ${
                     collectionMode === 'multi'
                       ? 'bg-purple-600 text-white shadow-2xs'
                       : 'text-gray-600 hover:text-gray-900'
@@ -676,15 +691,15 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
 
           {/* Month Selector Controls */}
           {collectionMode === 'single' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                <label className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
                   Target Month Cycle
                 </label>
                 <select
                   value={selectedSingleMonth}
                   onChange={(e) => setSelectedSingleMonth(Number(e.target.value))}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
                 >
                   <option value={0}>Month 0 (Launch Month)</option>
                   {Array.from({ length: totalMembers }).map((_, idx) => (
@@ -696,7 +711,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                <label className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
                   Header Month Line
                 </label>
                 <input
@@ -704,44 +719,44 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                   value={customHeaderCycle}
                   onChange={(e) => setCustomHeaderCycle(e.target.value)}
                   placeholder="e.g. OCTOBER"
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                  Scheduled Date (DD.MM.YYYY)
+                <label className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Scheduled Date
                 </label>
                 <input
                   type="text"
                   value={customDateStr}
                   onChange={(e) => setCustomDateStr(e.target.value)}
                   placeholder="e.g. 13.09.2026"
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                  Top Auspicious Title
+                <label className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Auspicious Title
                 </label>
                 <input
                   type="text"
                   value={invocationTitle}
                   onChange={(e) => setInvocationTitle(e.target.value)}
                   placeholder="OM NAMA SIVAYA"
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
                 />
               </div>
             </div>
           ) : (
             /* Multi-Month Multi-Select Checkboxes Grid */
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                  Select Months to Combine in Checklist ({activeMonthsList.length} Selected):
+                <label className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Select Months to Combine ({activeMonthsList.length} Selected):
                 </label>
-                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex flex-wrap gap-1.5 max-h-20 sm:max-h-24 overflow-y-auto p-1.5 bg-gray-50 rounded-xl border border-gray-200">
                   {Array.from({ length: totalMembers }).map((_, idx) => {
                     const mNum = idx + 1;
                     const isSelected = selectedMultiMonths.includes(mNum);
@@ -750,23 +765,23 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                         key={mNum}
                         type="button"
                         onClick={() => handleToggleMultiMonth(mNum)}
-                        className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1 ${
+                        className={`text-[10px] sm:text-[11px] font-bold px-2 py-0.5 sm:py-1 rounded-lg border transition-all flex items-center gap-1 ${
                           isSelected
                             ? 'bg-purple-600 text-white border-purple-700 shadow-2xs'
                             : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
                         }`}
                       >
-                        {isSelected && <Check size={11} />}
-                        <span>Month {mNum}</span>
+                        {isSelected && <Check size={10} />}
+                        <span>M{mNum}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  <label className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
                     Header Month Line
                   </label>
                   <input
@@ -774,33 +789,33 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                     value={customHeaderCycle}
                     onChange={(e) => setCustomHeaderCycle(e.target.value)}
                     placeholder="e.g. OCTOBER, NOVEMBER"
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                    Scheduled Date (DD.MM.YYYY)
+                  <label className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Scheduled Date
                   </label>
                   <input
                     type="text"
                     value={customDateStr}
                     onChange={(e) => setCustomDateStr(e.target.value)}
                     placeholder="e.g. 10.11.2026"
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                    Top Auspicious Title
+                  <label className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Auspicious Title
                   </label>
                   <input
                     type="text"
                     value={invocationTitle}
                     onChange={(e) => setInvocationTitle(e.target.value)}
                     placeholder="OM NAMA SIVAYA"
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
                   />
                 </div>
               </div>
@@ -808,113 +823,113 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
           )}
 
           {/* Prefill Payments Toggle */}
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-800">Pre-fill Recorded Payments:</span>
-              <span className="text-[11px] text-gray-500 hidden sm:inline">
+          <div className="flex items-center justify-between pt-1.5 border-t border-gray-100">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-gray-800">Pre-fill:</span>
+              <span className="text-[10px] text-gray-500">
                 {prefillPayments 
-                  ? `Fills dates & paid amounts for ${activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `${activeMonthsList.length} selected months`}` 
-                  : 'Empty columns for blank handwritten paper tracking'}
+                  ? `With recorded payments` 
+                  : 'Blank handwritten sheet'}
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 bg-gray-100 p-0.5 rounded-xl border border-gray-200">
+            <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-xl border border-gray-200">
               <button
                 type="button"
                 onClick={() => setPrefillPayments(false)}
-                className={`text-[11px] font-bold px-3 py-1 rounded-lg transition-all ${
+                className={`text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all ${
                   !prefillPayments
                     ? 'bg-white text-gray-900 shadow-2xs'
                     : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
-                Empty Sheet
+                Empty
               </button>
               <button
                 type="button"
                 onClick={() => setPrefillPayments(true)}
-                className={`text-[11px] font-bold px-3 py-1 rounded-lg transition-all ${
+                className={`text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all ${
                   prefillPayments
                     ? 'bg-indigo-600 text-white shadow-2xs'
                     : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
-                Pre-fill Data
+                Pre-fill
               </button>
             </div>
           </div>
         </div>
 
         {/* 3. Printable Document Preview Canvas (Isomorphic to A4 Sheet) */}
-        <div className="p-4 sm:p-8 overflow-y-auto flex-1 flex justify-center bg-gray-200/70">
+        <div className="p-2 sm:p-6 overflow-y-auto overflow-x-auto flex-1 flex justify-center bg-gray-200/70">
           
           {/* Exact A4 Sheet Simulation */}
           <div 
             ref={printableRef}
             id="printable-payment-checklist"
-            className="w-full max-w-[760px] bg-white text-black p-6 sm:p-10 shadow-lg border border-gray-300 font-sans leading-tight"
+            className="w-full max-w-[760px] min-w-[320px] bg-white text-black p-4 sm:p-8 shadow-lg border border-gray-300 font-sans leading-tight my-auto"
             style={{
               minHeight: '297mm',
               boxSizing: 'border-box',
             }}
           >
-            {/* ── TOP INVOCATION LINE ── */}
+            {/* ── TOP INVOCATION LINE (CENTERED & SMALL) ── */}
             {invocationTitle.trim() && (
-              <div className="text-left font-black tracking-wider text-xs sm:text-sm uppercase mb-4 text-black font-serif">
+              <div className="text-center font-bold tracking-widest text-[10px] sm:text-xs uppercase mb-3 text-black font-serif">
                 {invocationTitle}
               </div>
             )}
 
             {/* ── HEADER SUMMARY SECTION ── */}
-            <div className="flex justify-between items-start mb-6 text-black border-b-2 border-black pb-3">
+            <div className="flex justify-between items-start mb-4 sm:mb-6 text-black border-b-2 border-black pb-2.5 sm:pb-3">
               {/* Left Column */}
-              <div className="space-y-1.5">
-                <div className="text-sm sm:text-base font-black tracking-tight">
-                  CHIT AMOUNT - <span className="text-base sm:text-lg">{formatINR(group.totalValue)}</span>
+              <div className="space-y-1">
+                <div className="text-xs sm:text-base font-black tracking-tight">
+                  CHIT AMOUNT - <span className="text-sm sm:text-lg">{formatINR(group.totalValue)}</span>
                 </div>
-                <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-black">
+                <div className="text-[11px] sm:text-sm font-bold uppercase tracking-wider text-black">
                   MONTHS - {group.duration} MONTHS
                 </div>
-                <div className="text-xs sm:text-sm font-black tracking-wide">
-                  MONTHLY DUE - <span className="text-sm sm:text-base">{effectiveDuePerMember}</span>
+                <div className="text-[11px] sm:text-sm font-black tracking-wide">
+                  MONTHLY DUE - <span className="text-xs sm:text-base">{effectiveDuePerMember}</span>
                   {activeMonthsList.length > 1 && (
-                    <span className="text-xs font-bold ml-1.5 text-gray-700">({activeMonthsList.length} MONTHS)</span>
+                    <span className="text-[10px] sm:text-xs font-bold ml-1 text-gray-700">({activeMonthsList.length} MONTHS)</span>
                   )}
                 </div>
               </div>
 
               {/* Right Column */}
-              <div className="text-right space-y-1.5">
-                <div className="text-xs sm:text-sm font-black uppercase tracking-wider underline underline-offset-4 decoration-black">
+              <div className="text-right space-y-1">
+                <div className="text-[11px] sm:text-sm font-black uppercase tracking-wider underline underline-offset-4 decoration-black">
                   {customHeaderCycle || computedMonthDetails.headerCycleLabel}
                 </div>
-                <div className="text-xs sm:text-sm font-bold tracking-wider underline underline-offset-4 decoration-black">
+                <div className="text-[10px] sm:text-sm font-bold tracking-wider underline underline-offset-4 decoration-black">
                   {customDateStr || computedMonthDetails.formattedDate}
                 </div>
               </div>
             </div>
 
             {/* ── MAIN CHECKLIST TABLE ── */}
-            <div className="w-full">
-              <table className="w-full border-collapse border border-black text-black">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full border-collapse border border-black text-black text-[10px] sm:text-xs">
                 <thead>
-                  <tr className="border-b-2 border-black bg-white text-[11px] sm:text-xs font-black">
-                    <th className="border border-black px-2 py-2 text-center w-[10%]">
+                  <tr className="border-b-2 border-black bg-white font-black">
+                    <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[10%]">
                       SL.NO.
                     </th>
-                    <th className="border border-black px-3 py-2 text-left w-[42%]">
+                    <th className="border border-black px-2 sm:px-3 py-1.5 sm:py-2 text-left w-[42%]">
                       NAME
                     </th>
-                    <th className="border border-black px-2 py-2 text-center w-[14%]">
+                    <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[14%]">
                       AMOUNT
                     </th>
-                    <th className="border border-black px-2 py-2 text-center w-[12%]">
+                    <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[12%]">
                       DATE
                     </th>
-                    <th className="border border-black px-2 py-2 text-center w-[11%]">
+                    <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[11%]">
                       PAID
                     </th>
-                    <th className="border border-black px-2 py-2 text-center w-[11%]">
+                    <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[11%]">
                       BALANCE
                     </th>
                   </tr>
@@ -923,24 +938,24 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                   {checklistRows.map((row) => (
                     <tr 
                       key={row.ticket} 
-                      className={`border-b border-black text-[11px] sm:text-xs font-semibold ${dynamicRowPadding}`}
+                      className={`border-b border-black font-semibold ${dynamicRowPadding}`}
                     >
-                      <td className="border border-black px-2 text-center font-bold text-black align-middle">
+                      <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
                         {row.ticket}
                       </td>
-                      <td className="border border-black px-3 text-left font-black text-black truncate align-middle">
+                      <td className="border border-black px-2 sm:px-3 text-left font-black text-black truncate align-middle max-w-[140px] sm:max-w-none">
                         {row.name}
                       </td>
-                      <td className="border border-black px-2 text-center font-bold text-black align-middle">
+                      <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
                         {row.dueAmount}
                       </td>
-                      <td className="border border-black px-2 text-center font-mono text-[10px] sm:text-[11px] align-middle">
+                      <td className="border border-black px-1 text-center font-mono text-[9px] sm:text-[11px] align-middle">
                         {row.paidDate || ''}
                       </td>
-                      <td className="border border-black px-2 text-center font-bold text-black align-middle">
+                      <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
                         {row.paidAmount !== undefined ? row.paidAmount : ''}
                       </td>
-                      <td className="border border-black px-2 text-center font-bold text-black align-middle">
+                      <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
                         {row.balanceAmount !== undefined ? (row.balanceAmount === 0 ? '-' : row.balanceAmount) : ''}
                       </td>
                     </tr>
@@ -950,7 +965,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             </div>
 
             {/* ── FOOTER SIGN-OFF ── */}
-            <div className="mt-8 pt-4 flex justify-between items-center text-[10px] sm:text-[11px] text-gray-700 border-t border-gray-400">
+            <div className="mt-6 sm:mt-8 pt-3 sm:pt-4 flex justify-between items-center text-[9px] sm:text-[11px] text-gray-700 border-t border-gray-400">
               <div className="font-semibold">
                 Group: <strong>{group.name}</strong> · Cycle: <strong>{activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `Months ${activeMonthsList.join(', ')}`}</strong>
               </div>
@@ -966,3 +981,4 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
     </div>
   );
 }
+
