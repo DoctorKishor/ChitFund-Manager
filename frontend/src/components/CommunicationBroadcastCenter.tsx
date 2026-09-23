@@ -38,7 +38,8 @@ import {
   Cloud,
   CloudUpload,
   RefreshCw,
-  Sliders
+  Sliders,
+  Languages
 } from 'lucide-react';
 
 interface GroupMetadata {
@@ -49,6 +50,7 @@ interface GroupMetadata {
   durationMonths: number;
   currentMonth: number;
   kaiIruppuPool: number;
+  previousPool: number;
   auctionDayOfMonth: number;
   auctionTime: string;
   nextAuctionDate: string;
@@ -56,7 +58,10 @@ interface GroupMetadata {
   startDate: string;
   calculatedAuctionDate: Date;
   formattedAuctionDate: string;
+  formattedAuctionDateShort: string;
+  formattedAuctionDayTamil: string;
   formattedAuctionTime: string;
+  formattedAuctionTimeTamil: string;
   nextCalculatedDate: Date;
   formattedNextAuctionDate: string;
   winnerName: string;
@@ -75,6 +80,46 @@ interface VariableDefinition {
   getValue: (meta: GroupMetadata | null, orgSig: string, orgPhone: string) => string;
 }
 
+// Tamil Day Names
+const TAMIL_DAYS = ['ஞாயிறு', 'திங்கள்', 'செவ்வாய்', 'புதன்', 'வியாழன்', 'வெள்ளி', 'சனி'];
+
+function formatTamilTime(timeStr?: string | null, d?: Date): string {
+  let hour = 10;
+  let minute = '30';
+  if (timeStr) {
+    const parts = timeStr.trim().split(':');
+    if (parts.length >= 2) {
+      hour = parseInt(parts[0], 10);
+      minute = parts[1].slice(0, 2);
+    }
+  } else if (d) {
+    hour = d.getHours();
+    minute = String(d.getMinutes()).padStart(2, '0');
+  }
+
+  let period = 'காலை';
+  if (hour >= 12 && hour < 16) {
+    period = 'மதியம்';
+  } else if (hour >= 16 && hour < 20) {
+    period = 'மாலை';
+  } else if (hour >= 20 || hour < 4) {
+    period = 'இரவு';
+  }
+
+  let displayHour = hour % 12;
+  if (displayHour === 0) displayHour = 12;
+
+  return `${period} ${displayHour}.${minute}`;
+}
+
+function formatShortDate(d: Date): string {
+  if (!d || isNaN(d.getTime())) return '12/7/26';
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  const yearShort = String(d.getFullYear()).slice(-2);
+  return `${day}/${month}/${yearShort}`;
+}
+
 const BROADCAST_VARIABLES: VariableDefinition[] = [
   // Chit Group Details
   {
@@ -88,75 +133,131 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
     key: 'current_month',
     label: 'Current Month #',
     category: 'group',
-    description: 'Current cycle month number',
+    description: 'Current cycle month number (e.g. 21)',
     getValue: (m) => String(m?.currentMonth ?? 1),
   },
   {
     key: 'month_display',
-    label: 'Month Label',
+    label: 'Month Label (EN)',
     category: 'group',
     description: 'Formatted month label (Month 1, Month 0 - Launch)',
     getValue: (m) => (m?.currentMonth === 0 ? 'Month 0 (Launch Month)' : `Month ${m?.currentMonth ?? 1}`),
   },
   {
     key: 'total_chit_value',
-    label: 'Total Chit Value',
+    label: 'Total Chit Value (₹)',
     category: 'group',
-    description: 'Total value pool of the chit fund',
-    getValue: (m) => formatINR(m?.totalValue ?? 100000),
+    description: 'Formatted total value pool (₹2,40,000)',
+    getValue: (m) => formatINR(m?.totalValue ?? 240000),
+  },
+  {
+    key: 'total_chit_value_raw',
+    label: 'Total Value Plain (240000)',
+    category: 'group',
+    description: 'Plain numeric total value without ₹ symbol',
+    getValue: (m) => String(m?.totalValue ?? 240000),
   },
   {
     key: 'member_count',
-    label: 'Member Count',
+    label: 'Member Count (24)',
     category: 'group',
     description: 'Total member tickets in group',
-    getValue: (m) => String(m?.memberCount ?? 10),
+    getValue: (m) => String(m?.memberCount ?? 20),
   },
   {
     key: 'duration_months',
     label: 'Group Duration',
     category: 'group',
     description: 'Total duration in months',
-    getValue: (m) => `${m?.durationMonths ?? 10} Months`,
+    getValue: (m) => `${m?.durationMonths ?? 20} Months`,
   },
 
-  // Auction Dates & Timings
+  // Auction Dates & Timings (English & Tamil)
   {
     key: 'auction_date',
-    label: 'Auction Date',
+    label: 'Auction Date (Sun, 12 Oct)',
     category: 'auction',
-    description: 'Date of this monthly auction session',
-    getValue: (m) => m?.formattedAuctionDate || 'Sun, 11 Oct 2026',
+    description: 'Formatted auction date in English',
+    getValue: (m) => m?.formattedAuctionDate || 'Sun, 12 Jul 2026',
+  },
+  {
+    key: 'auction_date_short',
+    label: 'Auction Date Short (12/7/26)',
+    category: 'auction',
+    description: 'Short numeric date format D/M/YY',
+    getValue: (m) => m?.formattedAuctionDateShort || '12/7/26',
+  },
+  {
+    key: 'auction_day_tamil',
+    label: 'Tamil Day (ஞாயிறு)',
+    category: 'auction',
+    description: 'Day name in Tamil (ஞாயிறு, திங்கள், etc.)',
+    getValue: (m) => m?.formattedAuctionDayTamil || 'ஞாயிறு',
   },
   {
     key: 'auction_time',
-    label: 'Auction Time',
+    label: 'Auction Time (10:30 AM)',
     category: 'auction',
-    description: '12-hour scheduled auction time',
-    getValue: (m) => m?.formattedAuctionTime || '07:00 PM',
+    description: '12-hour English auction time',
+    getValue: (m) => m?.formattedAuctionTime || '10:30 AM',
+  },
+  {
+    key: 'auction_time_tamil',
+    label: 'Tamil Time (காலை 10.30)',
+    category: 'auction',
+    description: 'Time formatted in Tamil (காலை 10.30, மாலை 7.00)',
+    getValue: (m) => m?.formattedAuctionTimeTamil || 'காலை 10.30',
   },
   {
     key: 'next_auction_date',
-    label: 'Next Upcoming Auction Date',
+    label: 'Next Month Auction Date',
     category: 'auction',
     description: 'Upcoming scheduled date for next month',
-    getValue: (m) => m?.formattedNextAuctionDate || 'Sun, 08 Nov 2026',
+    getValue: (m) => m?.formattedNextAuctionDate || 'Sun, 09 Aug 2026',
   },
 
   // Financials & Installments
   {
     key: 'installment_due',
-    label: 'Monthly Installment Due',
+    label: 'Monthly Installment (₹10,000)',
     category: 'financials',
-    description: 'Monthly installment due per ticket',
+    description: 'Monthly installment due with ₹ symbol',
     getValue: (m) => (m?.isLaabaSeetuActive ? '₹0 (Laaba Seetu)' : formatINR(m?.fixedInstallment ?? 10000)),
   },
   {
-    key: 'kai_iruppu_pool',
-    label: 'Discount Pool (Kai Iruppu)',
+    key: 'installment_due_raw',
+    label: 'Installment Plain (10000)',
     category: 'financials',
-    description: 'Running accumulated discount pool',
-    getValue: (m) => formatINR(m?.kaiIruppuPool ?? 0),
+    description: 'Plain numeric installment without ₹ symbol',
+    getValue: (m) => (m?.isLaabaSeetuActive ? '0' : String(m?.fixedInstallment ?? 10000)),
+  },
+  {
+    key: 'kai_iruppu_pool',
+    label: 'Discount Pool (₹1,68,000)',
+    category: 'financials',
+    description: 'Current accumulated discount pool with ₹',
+    getValue: (m) => formatINR(m?.kaiIruppuPool ?? 168000),
+  },
+  {
+    key: 'kai_iruppu_pool_raw',
+    label: 'Discount Pool Plain (168000)',
+    category: 'financials',
+    description: 'Plain current accumulated discount pool',
+    getValue: (m) => String(m?.kaiIruppuPool ?? 168000),
+  },
+  {
+    key: 'previous_pool',
+    label: 'Previous Pool (₹1,67,000)',
+    category: 'financials',
+    description: 'Discount pool before this auction with ₹',
+    getValue: (m) => formatINR(m?.previousPool ?? 167000),
+  },
+  {
+    key: 'previous_pool_raw',
+    label: 'Previous Pool Plain (167000)',
+    category: 'financials',
+    description: 'Plain discount pool before this auction',
+    getValue: (m) => String(m?.previousPool ?? 167000),
   },
   {
     key: 'laaba_seetu_status',
@@ -193,17 +294,24 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
   },
   {
     key: 'winning_discount',
-    label: 'Winning Bid Discount',
+    label: 'Winning Discount (₹1,000)',
     category: 'winner',
-    description: 'Discount amount bid by winner',
-    getValue: (m) => formatINR(m?.winningDiscount ?? 0),
+    description: 'Discount amount bid by winner with ₹',
+    getValue: (m) => formatINR(m?.winningDiscount ?? 1000),
+  },
+  {
+    key: 'winning_discount_raw',
+    label: 'Winning Discount Plain (1000)',
+    category: 'winner',
+    description: 'Plain numeric winning discount bid',
+    getValue: (m) => String(m?.winningDiscount ?? 1000),
   },
   {
     key: 'net_payout',
-    label: 'Winner Net Payout',
+    label: 'Winner Net Payout (₹)',
     category: 'winner',
     description: 'Net prize pot disbursed to winner',
-    getValue: (m) => formatINR(m?.netPayout ?? (m?.totalValue ?? 100000)),
+    getValue: (m) => formatINR(m?.netPayout ?? (m?.totalValue ?? 240000)),
   },
 
   // Organization & Contacts
@@ -234,6 +342,46 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
       }),
   },
 ];
+
+// Standard Default Templates (English & Tamil based on father's exact format)
+const DEFAULT_PRE_AUCTION_EN = `Dear Members,
+
+Group [{group_name}] Auction #[{month_display}] is scheduled for {auction_date} at {auction_time}.
+Monthly Installment Due per ticket: [{installment_due}].
+Total Chit Value: {total_chit_value} | Members: {member_count}
+{laaba_seetu_notice}
+Please clear all outstanding installment dues prior to the live bidding session.
+
+Regards,
+{org_signature}
+Contact: {org_phone}`;
+
+const DEFAULT_POST_AUCTION_EN = `Dear Members,
+
+Group [{group_name}] Auction #[{month_display}] has concluded successfully!
+
+🏆 Auction Winner: {winner_name} ({winner_ticket})
+💰 Winning Discount: {winning_discount}
+💵 Net Winner Payout: {net_payout}
+📊 Accumulated Discount Pool: {kai_iruppu_pool}
+
+Next Monthly Auction: {next_auction_date}
+
+Regards,
+{org_signature}
+Contact: {org_phone}`;
+
+const DEFAULT_PRE_AUCTION_TA = `*வணக்கம்,*
+
+*{current_month} ம் மாத சீட்டு {auction_date_short} {auction_day_tamil} {auction_time_tamil} மணிக்கு நடைபெறும்,* *அதுசமயம் தாங்கள் அவசியம் கலந்து கொள்ள வேண்டுகிறேன்.*
+*தங்களது சீட்டு விவரம்*
+*{member_count}×{installment_due_raw}={total_chit_value_raw}.*`;
+
+const DEFAULT_POST_AUCTION_TA = `*{current_month}ம் மாத தள்ளுபடி {winning_discount_raw},*
+
+*முன் கையிருப்பு {previous_pool_raw},*
+
+*கையிருப்பு {kai_iruppu_pool_raw}.*`;
 
 // Curated Emoji Palette for Professional Chit Broadcasts
 const EMOJI_CATEGORIES = [
@@ -282,34 +430,6 @@ function formatDatePretty(d: Date): string {
   });
 }
 
-// Standard Default Templates
-const DEFAULT_PRE_AUCTION_TEMPLATE = `Dear Members,
-
-Group [{group_name}] Auction #[{month_display}] is scheduled for {auction_date} at {auction_time}.
-Monthly Installment Due per ticket: [{installment_due}].
-Total Chit Value: {total_chit_value} | Members: {member_count}
-{laaba_seetu_notice}
-Please clear all outstanding installment dues prior to the live bidding session.
-
-Regards,
-{org_signature}
-Contact: {org_phone}`;
-
-const DEFAULT_POST_AUCTION_TEMPLATE = `Dear Members,
-
-Group [{group_name}] Auction #[{month_display}] has concluded successfully!
-
-🏆 Auction Winner: {winner_name} ({winner_ticket})
-💰 Winning Discount: {winning_discount}
-💵 Net Winner Payout: {net_payout}
-📊 Accumulated Discount Pool: {kai_iruppu_pool}
-
-Next Monthly Auction: {next_auction_date}
-
-Regards,
-{org_signature}
-Contact: {org_phone}`;
-
 interface CommunicationBroadcastCenterProps {
   onAddAuditLog?: (desc: string) => void;
 }
@@ -318,6 +438,9 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   const { profile } = useAuth();
   const [groupsMetadata, setGroupsMetadata] = useState<Record<string, GroupMetadata>>({});
   const [activeGroupKey, setActiveGroupKey] = useState<string>('');
+  
+  // Language & Template Mode State
+  const [language, setLanguage] = useState<'en' | 'ta'>('ta'); // Default to Tamil as per business style
   const [templateType, setTemplateType] = useState<'pre-auction' | 'post-auction'>('pre-auction');
   const [copied, setCopied] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
@@ -329,20 +452,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'saving' | 'error'>('synced');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Custom Templates per type (loaded from localStorage / Supabase or defaults)
-  const [preAuctionTemplate, setPreAuctionTemplate] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('chit_template_pre_auction') || DEFAULT_PRE_AUCTION_TEMPLATE;
-    }
-    return DEFAULT_PRE_AUCTION_TEMPLATE;
-  });
-
-  const [postAuctionTemplate, setPostAuctionTemplate] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('chit_template_post_auction') || DEFAULT_POST_AUCTION_TEMPLATE;
-    }
-    return DEFAULT_POST_AUCTION_TEMPLATE;
-  });
+  // Templates Store (EN & TA)
+  const [preAuctionEn, setPreAuctionEn] = useState<string>(DEFAULT_PRE_AUCTION_EN);
+  const [postAuctionEn, setPostAuctionEn] = useState<string>(DEFAULT_POST_AUCTION_EN);
+  const [preAuctionTa, setPreAuctionTa] = useState<string>(DEFAULT_PRE_AUCTION_TA);
+  const [postAuctionTa, setPostAuctionTa] = useState<string>(DEFAULT_POST_AUCTION_TA);
 
   // Custom Dynamic Signature & Phone Line
   const [signatureLine, setSignatureLine] = useState<string>(() => {
@@ -371,7 +485,6 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   // Emoji Picker Popover State
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
   const [selectedEmojiCategory, setSelectedEmojiCategory] = useState<string>('finance');
-  const [emojiSearchTerm, setEmojiSearchTerm] = useState<string>('');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const insertDropdownRef = useRef<HTMLDivElement>(null);
@@ -402,23 +515,31 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
       if (data?.value) {
         const val = data.value;
-        if (val.pre_auction) {
-          setPreAuctionTemplate(val.pre_auction);
-          if (typeof window !== 'undefined') localStorage.setItem('chit_template_pre_auction', val.pre_auction);
-        }
-        if (val.post_auction) {
-          setPostAuctionTemplate(val.post_auction);
-          if (typeof window !== 'undefined') localStorage.setItem('chit_template_post_auction', val.post_auction);
-        }
-        if (val.org_signature) {
-          setSignatureLine(val.org_signature);
-          if (typeof window !== 'undefined') localStorage.setItem('chit_broadcast_signature', val.org_signature);
-        }
-        if (val.org_phone) {
-          setContactPhone(val.org_phone);
-          if (typeof window !== 'undefined') localStorage.setItem('chit_broadcast_phone', val.org_phone);
-        }
+        if (val.pre_auction_en) setPreAuctionEn(val.pre_auction_en);
+        else if (val.pre_auction) setPreAuctionEn(val.pre_auction);
+
+        if (val.post_auction_en) setPostAuctionEn(val.post_auction_en);
+        else if (val.post_auction) setPostAuctionEn(val.post_auction);
+
+        if (val.pre_auction_ta) setPreAuctionTa(val.pre_auction_ta);
+        if (val.post_auction_ta) setPostAuctionTa(val.post_auction_ta);
+
+        if (val.org_signature) setSignatureLine(val.org_signature);
+        if (val.org_phone) setContactPhone(val.org_phone);
+
         setCloudSyncStatus('synced');
+      } else {
+        // Fallback to local storage
+        if (typeof window !== 'undefined') {
+          const lPreEn = localStorage.getItem('chit_template_pre_en');
+          const lPostEn = localStorage.getItem('chit_template_post_en');
+          const lPreTa = localStorage.getItem('chit_template_pre_ta');
+          const lPostTa = localStorage.getItem('chit_template_post_ta');
+          if (lPreEn) setPreAuctionEn(lPreEn);
+          if (lPostEn) setPostAuctionEn(lPostEn);
+          if (lPreTa) setPreAuctionTa(lPreTa);
+          if (lPostTa) setPostAuctionTa(lPostTa);
+        }
       }
     } catch (err) {
       console.warn('Note: Cloud templates fetch fallback to local storage:', err);
@@ -427,20 +548,34 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
   // 2. Persist Custom Templates to Supabase
   const persistToCloud = useCallback(async (
-    pre: string,
-    post: string,
+    preEn: string,
+    postEn: string,
+    preTa: string,
+    postTa: string,
     sig: string,
     phone: string
   ) => {
     try {
       setCloudSyncStatus('saving');
       const payload = {
-        pre_auction: pre,
-        post_auction: post,
+        pre_auction_en: preEn,
+        post_auction_en: postEn,
+        pre_auction_ta: preTa,
+        post_auction_ta: postTa,
         org_signature: sig,
         org_phone: phone,
         updated_at: new Date().toISOString(),
       };
+
+      // Also cache in local storage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('chit_template_pre_en', preEn);
+        localStorage.setItem('chit_template_post_en', postEn);
+        localStorage.setItem('chit_template_pre_ta', preTa);
+        localStorage.setItem('chit_template_post_ta', postTa);
+        localStorage.setItem('chit_broadcast_signature', sig);
+        localStorage.setItem('chit_broadcast_phone', phone);
+      }
 
       const { error } = await supabase.from('system_settings').upsert({
         key: 'broadcast_templates',
@@ -463,15 +598,17 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
   // Debounced cloud saver
   const triggerDebouncedCloudSave = useCallback((
-    pre: string,
-    post: string,
+    preEn: string,
+    postEn: string,
+    preTa: string,
+    postTa: string,
     sig: string,
     phone: string
   ) => {
     setCloudSyncStatus('saving');
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      persistToCloud(pre, post, sig, phone);
+      persistToCloud(preEn, postEn, preTa, postTa, sig, phone);
     }, 800);
   }, [persistToCloud]);
 
@@ -512,11 +649,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           .select('group_id, profile_id, ticket_number');
 
         groupsData.forEach((g: any) => {
-          const totalVal = Number(g.total_value) || 100000;
-          const memberCount = Number(g.member_count) || Number(g.duration_months) || 10;
+          const totalVal = Number(g.total_value) || 240000;
+          const memberCount = Number(g.member_count) || Number(g.duration_months) || 24;
           const duration = Number(g.duration_months) || memberCount;
           const installment = Math.floor(totalVal / (memberCount || 1));
-          const currentM = (g.current_month !== undefined && g.current_month !== null) ? Number(g.current_month) : 0;
+          const currentM = (g.current_month !== undefined && g.current_month !== null) ? Number(g.current_month) : 1;
           const kaiIruppu = Number(g.kai_iruppu_pool) || 0;
 
           // Check if Laaba Seetu is active (kai_iruppu_pool >= total_value)
@@ -525,7 +662,10 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           // Compute dates
           const calcAuctionDate = computeNextAuctionDateTime(g);
           const formattedDate = formatDatePretty(calcAuctionDate);
-          const formattedTime = formatTime12h(g.next_auction_time || g.auction_time || '19:00');
+          const formattedDateShort = formatShortDate(calcAuctionDate);
+          const formattedDayTamil = TAMIL_DAYS[calcAuctionDate.getDay()] || 'ஞாயிறு';
+          const formattedTime = formatTime12h(g.next_auction_time || g.auction_time || '10:30');
+          const formattedTimeTamil = formatTamilTime(g.next_auction_time || g.auction_time, calcAuctionDate);
 
           // Compute Next Month's Date
           const nextCycleDate = new Date(calcAuctionDate);
@@ -561,6 +701,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
           const winningDiscount = Number(latestLog?.winning_discount ?? latestLog?.winning_bid ?? 0);
           const netPayout = totalVal - winningDiscount;
+          const previousPool = Math.max(0, kaiIruppu - winningDiscount);
 
           metaMap[g.id] = {
             id: g.id,
@@ -570,14 +711,18 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             durationMonths: duration,
             currentMonth: currentM,
             kaiIruppuPool: kaiIruppu,
+            previousPool: previousPool,
             auctionDayOfMonth: g.auction_day_of_month || 10,
-            auctionTime: g.auction_time || '19:00',
+            auctionTime: g.auction_time || '10:30',
             nextAuctionDate: g.next_auction_date || '',
-            nextAuctionTime: g.next_auction_time || '19:00',
+            nextAuctionTime: g.next_auction_time || '10:30',
             startDate: g.start_date || '',
             calculatedAuctionDate: calcAuctionDate,
             formattedAuctionDate: formattedDate,
+            formattedAuctionDateShort: formattedDateShort,
+            formattedAuctionDayTamil: formattedDayTamil,
             formattedAuctionTime: formattedTime,
+            formattedAuctionTimeTamil: formattedTimeTamil,
             nextCalculatedDate: nextMonthSunday,
             formattedNextAuctionDate: formattedNextDate,
             winnerName: winnerName,
@@ -603,43 +748,62 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     fetchGroups();
   }, []);
 
-  // Active raw template based on pre/post switch
-  const activeRawTemplate = templateType === 'pre-auction' ? preAuctionTemplate : postAuctionTemplate;
+  // Retrieve current active raw template
+  const activeRawTemplate = useMemo(() => {
+    if (language === 'ta') {
+      return templateType === 'pre-auction' ? preAuctionTa : postAuctionTa;
+    }
+    return templateType === 'pre-auction' ? preAuctionEn : postAuctionEn;
+  }, [language, templateType, preAuctionEn, postAuctionEn, preAuctionTa, postAuctionTa]);
 
   const handleTemplateChange = (val: string) => {
-    if (templateType === 'pre-auction') {
-      setPreAuctionTemplate(val);
-      if (typeof window !== 'undefined') localStorage.setItem('chit_template_pre_auction', val);
-      triggerDebouncedCloudSave(val, postAuctionTemplate, signatureLine, contactPhone);
+    if (language === 'ta') {
+      if (templateType === 'pre-auction') {
+        setPreAuctionTa(val);
+        triggerDebouncedCloudSave(preAuctionEn, postAuctionEn, val, postAuctionTa, signatureLine, contactPhone);
+      } else {
+        setPostAuctionTa(val);
+        triggerDebouncedCloudSave(preAuctionEn, postAuctionEn, preAuctionTa, val, signatureLine, contactPhone);
+      }
     } else {
-      setPostAuctionTemplate(val);
-      if (typeof window !== 'undefined') localStorage.setItem('chit_template_post_auction', val);
-      triggerDebouncedCloudSave(preAuctionTemplate, val, signatureLine, contactPhone);
+      if (templateType === 'pre-auction') {
+        setPreAuctionEn(val);
+        triggerDebouncedCloudSave(val, postAuctionEn, preAuctionTa, postAuctionTa, signatureLine, contactPhone);
+      } else {
+        setPostAuctionEn(val);
+        triggerDebouncedCloudSave(preAuctionEn, val, preAuctionTa, postAuctionTa, signatureLine, contactPhone);
+      }
     }
   };
 
   const handleSignatureChange = (val: string) => {
     setSignatureLine(val);
-    if (typeof window !== 'undefined') localStorage.setItem('chit_broadcast_signature', val);
-    triggerDebouncedCloudSave(preAuctionTemplate, postAuctionTemplate, val, contactPhone);
+    triggerDebouncedCloudSave(preAuctionEn, postAuctionEn, preAuctionTa, postAuctionTa, val, contactPhone);
   };
 
   const handlePhoneChange = (val: string) => {
     setContactPhone(val);
-    if (typeof window !== 'undefined') localStorage.setItem('chit_broadcast_phone', val);
-    triggerDebouncedCloudSave(preAuctionTemplate, postAuctionTemplate, signatureLine, val);
+    triggerDebouncedCloudSave(preAuctionEn, postAuctionEn, preAuctionTa, postAuctionTa, signatureLine, val);
   };
 
   const handleResetDefaultTemplate = () => {
-    if (confirm('Reset this template back to the standard default format and sync to cloud?')) {
-      if (templateType === 'pre-auction') {
-        setPreAuctionTemplate(DEFAULT_PRE_AUCTION_TEMPLATE);
-        if (typeof window !== 'undefined') localStorage.removeItem('chit_template_pre_auction');
-        triggerDebouncedCloudSave(DEFAULT_PRE_AUCTION_TEMPLATE, postAuctionTemplate, signatureLine, contactPhone);
+    if (confirm(`Reset the current ${language === 'ta' ? 'Tamil' : 'English'} ${templateType} template to standard default?`)) {
+      if (language === 'ta') {
+        if (templateType === 'pre-auction') {
+          setPreAuctionTa(DEFAULT_PRE_AUCTION_TA);
+          triggerDebouncedCloudSave(preAuctionEn, postAuctionEn, DEFAULT_PRE_AUCTION_TA, postAuctionTa, signatureLine, contactPhone);
+        } else {
+          setPostAuctionTa(DEFAULT_POST_AUCTION_TA);
+          triggerDebouncedCloudSave(preAuctionEn, postAuctionEn, preAuctionTa, DEFAULT_POST_AUCTION_TA, signatureLine, contactPhone);
+        }
       } else {
-        setPostAuctionTemplate(DEFAULT_POST_AUCTION_TEMPLATE);
-        if (typeof window !== 'undefined') localStorage.removeItem('chit_template_post_auction');
-        triggerDebouncedCloudSave(preAuctionTemplate, DEFAULT_POST_AUCTION_TEMPLATE, signatureLine, contactPhone);
+        if (templateType === 'pre-auction') {
+          setPreAuctionEn(DEFAULT_PRE_AUCTION_EN);
+          triggerDebouncedCloudSave(DEFAULT_PRE_AUCTION_EN, postAuctionEn, preAuctionTa, postAuctionTa, signatureLine, contactPhone);
+        } else {
+          setPostAuctionEn(DEFAULT_POST_AUCTION_EN);
+          triggerDebouncedCloudSave(preAuctionEn, DEFAULT_POST_AUCTION_EN, preAuctionTa, postAuctionTa, signatureLine, contactPhone);
+        }
       }
       triggerHapticFeedback('success');
     }
@@ -766,13 +930,9 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
   // Filtered emojis for Emoji Picker
   const displayedEmojis = useMemo(() => {
-    if (emojiSearchTerm.trim()) {
-      const term = emojiSearchTerm.toLowerCase();
-      return EMOJI_CATEGORIES.flatMap((c) => c.emojis).filter((emoji) => emoji.includes(term));
-    }
     const cat = EMOJI_CATEGORIES.find((c) => c.id === selectedEmojiCategory);
     return cat ? cat.emojis : EMOJI_CATEGORIES[0].emojis;
-  }, [selectedEmojiCategory, emojiSearchTerm]);
+  }, [selectedEmojiCategory]);
 
   const handleCopyText = () => {
     navigator.clipboard.writeText(compiledBroadcastText);
@@ -786,7 +946,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   };
 
   return (
-    <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200 pb-20 sm:pb-6">
+    <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200 pb-12 sm:pb-6">
       
       {/* ── Organization Signature & Contact Header Card ── */}
       <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-3">
@@ -863,9 +1023,10 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
       {/* ── Main Broadcast Studio Card ── */}
       <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 shadow-2xs space-y-4 sm:space-y-5">
         
-        {/* Top Control Bar: Group Selector, Template Mode, and View Mode */}
+        {/* Top Control Bar: Group Selector, Language Toggle, Template Mode, and View Mode */}
         <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-3.5 border-b border-gray-100 pb-4">
-          {/* Left: Group Selector & Pills */}
+          
+          {/* Left: Group Selector & Active Pills */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
             <div className="space-y-1 min-w-[200px] w-full sm:w-auto">
               <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
@@ -890,7 +1051,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   {selectedMeta.currentMonth === 0 ? 'Month 0 (Launch)' : `Month ${selectedMeta.currentMonth}`}
                 </span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700">
-                  📅 {selectedMeta.formattedAuctionDate}
+                  📅 {selectedMeta.formattedAuctionDateShort} ({selectedMeta.formattedAuctionDayTamil})
                 </span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Due: {formatINR(selectedMeta.fixedInstallment)}
@@ -899,9 +1060,42 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             )}
           </div>
 
-          {/* Right: Template Type & View Mode Controls */}
+          {/* Right: Language Toggle, Pre/Post Switch, and View Modes */}
           <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 pt-1 lg:pt-0">
-            {/* Pre/Post Template Switch */}
+            
+            {/* 1. Language Switcher (தமிழ் | English) */}
+            <div className="flex items-center bg-indigo-50/80 p-1 rounded-xl border border-indigo-200 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setLanguage('ta');
+                  triggerHapticFeedback('light');
+                }}
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  language === 'ta'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-indigo-900 hover:bg-indigo-100/60'
+                }`}
+              >
+                <span>தமிழ்</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLanguage('en');
+                  triggerHapticFeedback('light');
+                }}
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  language === 'en'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-indigo-900 hover:bg-indigo-100/60'
+                }`}
+              >
+                <span>English</span>
+              </button>
+            </div>
+
+            {/* 2. Pre/Post Template Switch */}
             <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 w-full sm:w-auto">
               <button
                 type="button"
@@ -912,7 +1106,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Pre-Auction Notice
+                {language === 'ta' ? 'முன் அறிவிப்பு' : 'Pre-Auction Notice'}
               </button>
               <button
                 type="button"
@@ -923,11 +1117,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Post-Auction Summary
+                {language === 'ta' ? 'ஏல முடிவு' : 'Post-Auction Summary'}
               </button>
             </div>
 
-            {/* Mobile & Desktop View Mode Segment */}
+            {/* 3. View Mode Segment (Editor | Preview | Split View) */}
             <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 w-full sm:w-auto">
               <button
                 type="button"
@@ -982,10 +1176,10 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                 <div className="flex items-center gap-1.5">
                   <label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
                     <Code2 size={14} className="text-indigo-600" />
-                    <span>Template Source Code</span>
+                    <span>{language === 'ta' ? 'தமிழ் மாதிரி வடிவம்' : 'Template Source'}</span>
                   </label>
 
-                  {/* 1. Quick Insert Variable Popover Button */}
+                  {/* 1. Quick Insert Variable Popover Button (Anchored Right-0 on mobile) */}
                   <div className="relative" ref={insertDropdownRef}>
                     <button
                       type="button"
@@ -996,14 +1190,14 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-lg transition-colors active:scale-95"
                     >
                       <Plus size={12} />
-                      <span>Insert Variable</span>
+                      <span>{language === 'ta' ? 'விவரம் சேர்க்க' : 'Insert Variable'}</span>
                       <ChevronDown size={11} className={`transition-transform ${showInsertDropdown ? 'rotate-180' : ''}`} />
                     </button>
 
                     {showInsertDropdown && (
                       <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 w-[calc(100vw-3rem)] max-w-[320px] sm:w-80 max-h-80 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
                         <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                          Select Dynamic Variable
+                          {language === 'ta' ? 'சீட்டு விவரங்கள் (Dynamic Variables)' : 'Select Dynamic Variable'}
                         </div>
                         {BROADCAST_VARIABLES.map((v) => {
                           const liveVal = v.getValue(selectedMeta, signatureLine, contactPhone);
@@ -1110,7 +1304,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   value={activeRawTemplate}
                   onChange={handleTextareaInput}
                   onKeyDown={handleTextareaKeyDown}
-                  placeholder="Type message template. Type { or < or / to insert live variables..."
+                  placeholder={language === 'ta' ? 'செய்தி மாதிரி இங்கே தட்டச்சு செய்யவும்... { அல்லது < அல்லது / அழுத்தவும்' : 'Type message template. Type { or < or / to insert live variables...'}
                   className="w-full bg-white text-gray-900 border border-gray-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-2xl p-3.5 sm:p-4 text-xs font-mono leading-relaxed focus:outline-none resize-none shadow-2xs transition-all"
                 />
 
@@ -1118,7 +1312,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                 {showSuggestMenu && filteredSuggestVariables.length > 0 && (
                   <div className="absolute left-2 right-2 sm:right-auto sm:left-3 top-14 z-30 bg-white border border-gray-200 rounded-2xl shadow-2xl p-2 max-w-[calc(100vw-3.5rem)] sm:w-80 max-h-72 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
                     <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 flex justify-between items-center">
-                      <span>Insert Dynamic Variable</span>
+                      <span>{language === 'ta' ? 'விவரம் தேர்வு செய்' : 'Insert Dynamic Variable'}</span>
                       <span className="text-[9px] lowercase font-normal text-indigo-600">Enter / Tab</span>
                     </div>
                     {filteredSuggestVariables.map((v, idx) => {
@@ -1162,7 +1356,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
               {/* Helper Footer Hint */}
               <div className="flex items-center justify-between text-[11px] text-gray-500 pt-0.5">
                 <span>
-                  💡 Type <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'{'}</code>, <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'<'}</code>, or <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'/'}</code> for live variable autocomplete.
+                  💡 Type <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'{'}</code>, <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'<'}</code>, or <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'/'}</code> for live autocomplete.
                 </span>
 
                 <span className="text-[10px] text-emerald-600 font-bold hidden sm:inline">
@@ -1178,10 +1372,10 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
               <div className="flex justify-between items-center">
                 <label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
                   <Eye size={14} className="text-emerald-600" />
-                  <span>Live Compiled Preview (Ready for WhatsApp)</span>
+                  <span>{language === 'ta' ? 'நேரடி முன்னோட்டம் (வாட்ஸ்அப் செய்தி)' : 'Live Compiled Preview (Ready for WhatsApp)'}</span>
                 </label>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                  ✓ Real-time Substituted
+                  ✓ {language === 'ta' ? 'தமிழ் வடிவம்' : 'Real-time Substituted'}
                 </span>
               </div>
 
@@ -1195,11 +1389,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                 </div>
 
                 <div className="pt-2.5 text-center text-[10px] sm:text-[11px] text-gray-500">
-                  Live data for <strong>{selectedMeta?.name || 'Chit Group'}</strong>
+                  {language === 'ta' ? 'சீட்டுக் குழு' : 'Live data for'}: <strong>{selectedMeta?.name || 'Chit Group'}</strong>
                 </div>
               </div>
 
-              {/* Action Buttons: Copy to Clipboard & Share via WhatsApp (Visible on ALL devices) */}
+              {/* Action Buttons: Copy to Clipboard & Share via WhatsApp */}
               <div className="flex flex-col sm:flex-row gap-2.5 justify-end pt-2">
                 <button
                   type="button"
@@ -1207,7 +1401,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-800 text-xs font-bold px-5 py-3 sm:py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all border border-gray-300 shadow-2xs"
                 >
                   {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
-                  <span>{copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}</span>
+                  <span>{copied ? (language === 'ta' ? 'நகலெடுக்கப்பட்டது!' : 'Copied!') : (language === 'ta' ? 'செய்தியை நகலெடு' : 'Copy to Clipboard')}</span>
                 </button>
 
                 <a
@@ -1217,7 +1411,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold px-6 py-3 sm:py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md shadow-emerald-600/20 text-center"
                 >
                   <Send size={15} />
-                  <span>Share via WhatsApp</span>
+                  <span>{language === 'ta' ? 'WhatsApp மூலம் அனுப்புக' : 'Share via WhatsApp'}</span>
                 </a>
               </div>
             </div>
