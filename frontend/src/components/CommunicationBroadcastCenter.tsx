@@ -343,33 +343,27 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
   },
 ];
 
-// Standard Default Templates (English & Tamil based on father's exact format)
-const DEFAULT_PRE_AUCTION_EN = `Dear Members,
+// Standard Default Templates (English & Tamil based on WhatsApp bold format)
+const DEFAULT_PRE_AUCTION_EN = `*Dear Members,*
 
-Group [{group_name}] Auction #[{month_display}] is scheduled for {auction_date} at {auction_time}.
-Monthly Installment Due per ticket: [{installment_due}].
-Total Chit Value: {total_chit_value} | Members: {member_count}
+*Month {current_month} Chit Auction will be held on {auction_date} ({auction_date_short}) at {auction_time}.* *Please ensure your presence and participation.*
+
+*Chit Details:*
+*{member_count} × {installment_due_raw} = {total_chit_value_raw}*
 {laaba_seetu_notice}
-Please clear all outstanding installment dues prior to the live bidding session.
+*Regards,*
+*{org_signature}*
+*Contact: {org_phone}*`;
 
-Regards,
-{org_signature}
-Contact: {org_phone}`;
+const DEFAULT_POST_AUCTION_EN = `*Month {current_month} Auction Discount: {winning_discount_raw},*
 
-const DEFAULT_POST_AUCTION_EN = `Dear Members,
+*Previous Balance Pool: {previous_pool_raw},*
 
-Group [{group_name}] Auction #[{month_display}] has concluded successfully!
+*Current Balance Pool: {kai_iruppu_pool_raw}.*
 
-🏆 Auction Winner: {winner_name} ({winner_ticket})
-💰 Winning Discount: {winning_discount}
-💵 Net Winner Payout: {net_payout}
-📊 Accumulated Discount Pool: {kai_iruppu_pool}
-
-Next Monthly Auction: {next_auction_date}
-
-Regards,
-{org_signature}
-Contact: {org_phone}`;
+*🏆 Winner: {winner_name} ({winner_ticket})*
+*💵 Net Payout: {net_payout}*
+*Next Monthly Auction: {next_auction_date}*`;
 
 const DEFAULT_PRE_AUCTION_TA = `*வணக்கம்,*
 
@@ -428,6 +422,35 @@ function formatDatePretty(d: Date): string {
     month: 'short',
     year: 'numeric',
   });
+}
+
+function renderWhatsAppFormatted(text: string) {
+  if (!text) return null;
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-1">
+      {lines.map((line, lIdx) => {
+        if (!line.trim()) {
+          return <div key={lIdx} className="h-2.5" />;
+        }
+        const parts = line.split(/(\*[^*]+\*)/g);
+        return (
+          <div key={lIdx} className="leading-relaxed">
+            {parts.map((part, pIdx) => {
+              if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+                return (
+                  <strong key={pIdx} className="font-bold text-gray-950">
+                    {part.slice(1, -1)}
+                  </strong>
+                );
+              }
+              return <span key={pIdx}>{part}</span>;
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 interface CommunicationBroadcastCenterProps {
@@ -1381,11 +1404,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
               {/* WhatsApp Simulated Bubble */}
               <div className="bg-[#EFEAE2] border border-gray-300 rounded-2xl p-3.5 sm:p-4 shadow-inner flex flex-col justify-between min-h-[300px]">
-                <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-3 max-w-full text-xs text-gray-900 font-sans whitespace-pre-wrap leading-relaxed border border-emerald-100 relative">
+                <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm max-w-full text-xs text-gray-900 font-sans border border-emerald-100 relative">
                   <div className="absolute top-2 right-3 text-[10px] text-gray-400 font-mono">
                     {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                   </div>
-                  <div>{compiledBroadcastText}</div>
+                  <div className="pt-1">{renderWhatsAppFormatted(compiledBroadcastText)}</div>
                 </div>
 
                 <div className="pt-2.5 text-center text-[10px] sm:text-[11px] text-gray-500">
