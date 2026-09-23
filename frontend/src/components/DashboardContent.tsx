@@ -14,6 +14,7 @@ import AuctionScheduleModal from './AuctionScheduleModal';
 import QuickMemberCollectModal, { CollectableMember } from './QuickMemberCollectModal';
 import QuickPersonalDrawModal from './QuickPersonalDrawModal';
 import QuickAtmWithdrawalModal from './QuickAtmWithdrawalModal';
+import PaymentChecklistPrintModal from './PaymentChecklistPrintModal';
 import SlideToConfirm from './SlideToConfirm';
 import { HelpTooltip } from './HelpTooltip';
 import { triggerHapticFeedback } from '../utils/haptics';
@@ -23,6 +24,7 @@ import {
   Users, 
   Briefcase, 
   Calendar, 
+  Printer, 
   Send, 
   ShieldAlert, 
   CheckCircle2, 
@@ -237,6 +239,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [expandedEditTicketIds, setExpandedEditTicketIds] = useState<number[]>([]);
   const [draggedTicketNum, setDraggedTicketNum] = useState<number | null>(null);
   const [dragOverTicketNum, setDragOverTicketNum] = useState<number | null>(null);
+  const [printChecklistGroup, setPrintChecklistGroup] = useState<any | null>(null);
 
   // High-Security Delete Group Modal States
   const [deletingGroup, setDeletingGroup] = useState<any | null>(null);
@@ -4834,9 +4837,24 @@ Thank you for your prompt payment! 🙏`;
                       Live status of assigned tickets and auction winning eligibility
                     </p>
                   </div>
-                  <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-full w-fit">
-                    Total: {workspaceMembers.length} / {selectedWorkspaceGroup.duration} Tickets
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setPrintChecklistGroup(selectedWorkspaceGroup);
+                      }}
+                      className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-800 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      title="Print monthly payment checklist sheet / PDF"
+                    >
+                      <Printer size={13} className="text-gray-600" />
+                      <span>Print Checklist</span>
+                    </button>
+
+                    <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-3 py-1.5 rounded-xl w-fit border border-gray-200">
+                      Total: {workspaceMembers.length} / {selectedWorkspaceGroup.duration} Tickets
+                    </span>
+                  </div>
                 </div>
 
                 {loadingWorkspaceMembers ? (
@@ -8870,6 +8888,14 @@ Thank you for your prompt payment! 🙏`;
           }
         }}
       />
+
+      {/* 4. Payment Checklist Printout Modal (A4 Single Page Format) */}
+      {printChecklistGroup && (
+        <PaymentChecklistPrintModal
+          group={printChecklistGroup}
+          onClose={() => setPrintChecklistGroup(null)}
+        />
+      )}
     </>
   );
 }
