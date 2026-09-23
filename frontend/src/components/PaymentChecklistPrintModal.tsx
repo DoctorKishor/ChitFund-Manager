@@ -307,6 +307,9 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
+            html, body {
+              height: 100%;
+            }
             body {
               margin: 0;
               padding: 0;
@@ -317,7 +320,15 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             .sheet-container {
               width: 100%;
               max-width: 100%;
+              min-height: 275mm;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
               margin: 0 auto;
+              box-sizing: border-box;
+            }
+            .content-section {
+              flex: 1;
             }
             .invocation {
               text-align: center;
@@ -334,7 +345,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               align-items: flex-start;
               border-bottom: 2px solid #000000;
               padding-bottom: 8px;
-              margin-bottom: 12px;
+              margin-bottom: 14px;
             }
             .header-left {
               display: flex;
@@ -387,8 +398,8 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             }
             th {
               border: 1px solid #000000;
-              padding: 5px 4px;
-              font-size: 10.5px;
+              padding: 6px 4px;
+              font-size: 11px;
               font-weight: 900;
               background: #ffffff;
               text-align: center;
@@ -399,9 +410,9 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             }
             td {
               border: 1px solid #000000;
-              font-size: 10.5px;
+              font-size: ${totalMembers <= 5 ? '13px' : totalMembers <= 10 ? '12px' : totalMembers <= 15 ? '11px' : '10.5px'};
               font-weight: 600;
-              padding: ${totalMembers <= 10 ? '9px 4px' : totalMembers <= 15 ? '6px 4px' : totalMembers <= 20 ? '4.5px 4px' : '3.5px 3px'};
+              padding: ${totalMembers <= 5 ? '18px 6px' : totalMembers <= 10 ? '12px 5px' : totalMembers <= 15 ? '8px 4px' : totalMembers <= 20 ? '5px 4px' : '3.5px 3px'};
               vertical-align: middle;
             }
             td.td-sl {
@@ -423,61 +434,63 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             td.td-date {
               text-align: center;
               font-family: monospace;
-              font-size: 9.5px;
+              font-size: 10px;
             }
             .footer-block {
-              margin-top: 16px;
-              padding-top: 8px;
+              margin-top: 24px;
+              padding-top: 10px;
               border-top: 1px solid #666666;
               display: flex;
               justify-content: space-between;
               align-items: center;
-              font-size: 9.5px;
+              font-size: 10px;
               color: #444444;
             }
           </style>
         </head>
         <body>
           <div class="sheet-container">
-            ${invocationTitle.trim() ? `<div class="invocation">${invocationTitle}</div>` : ''}
-            
-            <div class="header-block">
-              <div class="header-left">
-                <div class="group-name">GROUP - ${group.name.toUpperCase()}</div>
-                <div class="chit-amount">CHIT AMOUNT - ${formatINR(group.totalValue)}</div>
-                <div class="months-dur">MONTHS - ${group.duration} MONTHS</div>
-                <div class="monthly-due">MONTHLY DUE - ${effectiveDuePerMember}${activeMonthsList.length > 1 ? ` (${activeMonthsList.length} MONTHS)` : ''}</div>
+            <div class="content-section">
+              ${invocationTitle.trim() ? `<div class="invocation">${invocationTitle}</div>` : ''}
+              
+              <div class="header-block">
+                <div class="header-left">
+                  <div class="group-name">GROUP - ${group.name.toUpperCase()}</div>
+                  <div class="chit-amount">CHIT AMOUNT - ${formatINR(group.totalValue)}</div>
+                  <div class="months-dur">MONTHS - ${group.duration} MONTHS</div>
+                  <div class="monthly-due">MONTHLY DUE - ${effectiveDuePerMember}${activeMonthsList.length > 1 ? ` (${activeMonthsList.length} MONTHS)` : ''}</div>
+                </div>
+                <div class="header-right">
+                  <div class="cycle-label">${customHeaderCycle || computedMonthDetails.headerCycleLabel}</div>
+                  <div class="date-label">${customDateStr || computedMonthDetails.formattedDate}</div>
+                </div>
               </div>
-              <div class="header-right">
-                <div class="cycle-label">${customHeaderCycle || computedMonthDetails.headerCycleLabel}</div>
-                <div class="date-label">${customDateStr || computedMonthDetails.formattedDate}</div>
-              </div>
-            </div>
 
-            <table>
-              <thead>
-                <tr>
-                  <th style="width: 8%;">SL.NO.</th>
-                  <th class="th-name" style="width: 44%;">NAME</th>
-                  <th style="width: 14%;">AMOUNT</th>
-                  <th style="width: 12%;">DATE</th>
-                  <th style="width: 11%;">PAID</th>
-                  <th style="width: 11%;">BALANCE</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${checklistRows.map(row => `
+              <table>
+                <thead>
                   <tr>
-                    <td class="td-sl">${row.ticket}</td>
-                    <td class="td-name">${row.name}</td>
-                    <td class="td-num">${row.dueAmount}</td>
-                    <td class="td-date">${row.paidDate || ''}</td>
-                    <td class="td-num">${row.paidAmount !== undefined ? row.paidAmount : ''}</td>
-                    <td class="td-num">${row.balanceAmount !== undefined ? (row.balanceAmount === 0 ? '-' : row.balanceAmount) : ''}</td>
+                    <th style="width: 6%;">SL.NO.</th>
+                    <th class="th-name" style="width: 30%;">NAME</th>
+                    <th style="width: 16%;">AMOUNT</th>
+                    <th style="width: 16%;">DATE</th>
+                    <th style="width: 16%;">PAID</th>
+                    <th style="width: 16%;">BALANCE</th>
                   </tr>
-                `).join('')}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  ${checklistRows.map(row => `
+                    <tr>
+                      <td class="td-sl">${row.ticket}</td>
+                      <td class="td-name">${row.name}</td>
+                      <td class="td-num">${row.dueAmount}</td>
+                      <td class="td-date">${row.paidDate || ''}</td>
+                      <td class="td-num">${row.paidAmount !== undefined ? row.paidAmount : ''}</td>
+                      <td class="td-num">${row.balanceAmount !== undefined ? (row.balanceAmount === 0 ? '-' : row.balanceAmount) : ''}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
 
             <div class="footer-block">
               <div>Cycle: <strong>${activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `Months ${activeMonthsList.join(', ')}`}</strong></div>
@@ -547,11 +560,12 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
 
   // Dynamic row height padding for the screen preview
   const dynamicRowPadding = useMemo(() => {
-    if (totalMembers <= 10) return 'py-2.5 sm:py-3';
-    if (totalMembers <= 15) return 'py-2 sm:py-2.5';
-    if (totalMembers <= 20) return 'py-1.5 sm:py-2';
-    if (totalMembers <= 25) return 'py-1 sm:py-1.5';
-    return 'py-0.5 sm:py-1';
+    if (totalMembers <= 5) return 'py-4 sm:py-5 text-xs sm:text-sm';
+    if (totalMembers <= 10) return 'py-3 sm:py-3.5 text-xs sm:text-sm';
+    if (totalMembers <= 15) return 'py-2 sm:py-2.5 text-[11px] sm:text-xs';
+    if (totalMembers <= 20) return 'py-1.5 sm:py-2 text-[10px] sm:text-xs';
+    if (totalMembers <= 25) return 'py-1 sm:py-1.5 text-[10px] sm:text-xs';
+    return 'py-0.5 sm:py-1 text-[9px] sm:text-[10px]';
   }, [totalMembers]);
 
   return (
@@ -870,112 +884,114 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
         {/* 3. Printable Document Preview Canvas (Isomorphic to A4 Sheet) */}
         <div className="p-2 sm:p-6 overflow-y-auto overflow-x-auto flex-1 flex justify-center bg-gray-200/70">
           
-          {/* Exact A4 Sheet Simulation */}
+          {/* Exact A4 Sheet Simulation with full page height distribution */}
           <div 
             ref={printableRef}
             id="printable-payment-checklist"
-            className="w-full max-w-[760px] min-w-[320px] bg-white text-black p-4 sm:p-8 shadow-lg border border-gray-300 font-sans leading-tight my-auto"
+            className="w-full max-w-[760px] min-w-[320px] bg-white text-black p-4 sm:p-8 shadow-lg border border-gray-300 font-sans leading-tight my-auto flex flex-col justify-between"
             style={{
-              minHeight: '297mm',
+              minHeight: '275mm',
               boxSizing: 'border-box',
             }}
           >
-            {/* ── TOP INVOCATION LINE (CENTERED & SMALL) ── */}
-            {invocationTitle.trim() && (
-              <div className="text-center font-bold tracking-widest text-[10px] sm:text-xs uppercase mb-3 text-black font-serif">
-                {invocationTitle}
-              </div>
-            )}
+            <div>
+              {/* ── TOP INVOCATION LINE (CENTERED & SMALL) ── */}
+              {invocationTitle.trim() && (
+                <div className="text-center font-bold tracking-widest text-[10px] sm:text-xs uppercase mb-3 text-black font-serif">
+                  {invocationTitle}
+                </div>
+              )}
 
-            {/* ── HEADER SUMMARY SECTION ── */}
-            <div className="flex justify-between items-start mb-4 sm:mb-6 text-black border-b-2 border-black pb-2.5 sm:pb-3">
-              {/* Left Column */}
-              <div className="space-y-1">
-                <div className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-black">
-                  GROUP - <span className="font-black">{group.name.toUpperCase()}</span>
+              {/* ── HEADER SUMMARY SECTION ── */}
+              <div className="flex justify-between items-start mb-4 sm:mb-6 text-black border-b-2 border-black pb-2.5 sm:pb-3">
+                {/* Left Column */}
+                <div className="space-y-1">
+                  <div className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-black">
+                    GROUP - <span className="font-black">{group.name.toUpperCase()}</span>
+                  </div>
+                  <div className="text-xs sm:text-base font-black tracking-tight">
+                    CHIT AMOUNT - <span className="text-sm sm:text-lg">{formatINR(group.totalValue)}</span>
+                  </div>
+                  <div className="text-[11px] sm:text-sm font-bold uppercase tracking-wider text-black">
+                    MONTHS - {group.duration} MONTHS
+                  </div>
+                  <div className="text-[11px] sm:text-sm font-black tracking-wide">
+                    MONTHLY DUE - <span className="text-xs sm:text-base">{effectiveDuePerMember}</span>
+                    {activeMonthsList.length > 1 && (
+                      <span className="text-[10px] sm:text-xs font-bold ml-1 text-gray-700">({activeMonthsList.length} MONTHS)</span>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs sm:text-base font-black tracking-tight">
-                  CHIT AMOUNT - <span className="text-sm sm:text-lg">{formatINR(group.totalValue)}</span>
-                </div>
-                <div className="text-[11px] sm:text-sm font-bold uppercase tracking-wider text-black">
-                  MONTHS - {group.duration} MONTHS
-                </div>
-                <div className="text-[11px] sm:text-sm font-black tracking-wide">
-                  MONTHLY DUE - <span className="text-xs sm:text-base">{effectiveDuePerMember}</span>
-                  {activeMonthsList.length > 1 && (
-                    <span className="text-[10px] sm:text-xs font-bold ml-1 text-gray-700">({activeMonthsList.length} MONTHS)</span>
-                  )}
+
+                {/* Right Column */}
+                <div className="text-right space-y-1">
+                  <div className="text-[11px] sm:text-sm font-black uppercase tracking-wider underline underline-offset-4 decoration-black">
+                    {customHeaderCycle || computedMonthDetails.headerCycleLabel}
+                  </div>
+                  <div className="text-[10px] sm:text-sm font-bold tracking-wider underline underline-offset-4 decoration-black">
+                    {customDateStr || computedMonthDetails.formattedDate}
+                  </div>
                 </div>
               </div>
 
-              {/* Right Column */}
-              <div className="text-right space-y-1">
-                <div className="text-[11px] sm:text-sm font-black uppercase tracking-wider underline underline-offset-4 decoration-black">
-                  {customHeaderCycle || computedMonthDetails.headerCycleLabel}
-                </div>
-                <div className="text-[10px] sm:text-sm font-bold tracking-wider underline underline-offset-4 decoration-black">
-                  {customDateStr || computedMonthDetails.formattedDate}
-                </div>
-              </div>
-            </div>
-
-            {/* ── MAIN CHECKLIST TABLE ── */}
-            <div className="w-full overflow-x-auto">
-              <table className="w-full border-collapse border border-black text-black text-[10px] sm:text-xs">
-                <thead>
-                  <tr className="border-b-2 border-black bg-white font-black">
-                    <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[10%]">
-                      SL.NO.
-                    </th>
-                    <th className="border border-black px-2 sm:px-3 py-1.5 sm:py-2 text-left w-[42%]">
-                      NAME
-                    </th>
-                    <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[14%]">
-                      AMOUNT
-                    </th>
-                    <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[12%]">
-                      DATE
-                    </th>
-                    <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[11%]">
-                      PAID
-                    </th>
-                    <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[11%]">
-                      BALANCE
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {checklistRows.map((row) => (
-                    <tr 
-                      key={row.ticket} 
-                      className={`border-b border-black font-semibold ${dynamicRowPadding}`}
-                    >
-                      <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
-                        {row.ticket}
-                      </td>
-                      <td className="border border-black px-2 sm:px-3 text-left font-black text-black truncate align-middle max-w-[140px] sm:max-w-none">
-                        {row.name}
-                      </td>
-                      <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
-                        {row.dueAmount}
-                      </td>
-                      <td className="border border-black px-1 text-center font-mono text-[9px] sm:text-[11px] align-middle">
-                        {row.paidDate || ''}
-                      </td>
-                      <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
-                        {row.paidAmount !== undefined ? row.paidAmount : ''}
-                      </td>
-                      <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
-                        {row.balanceAmount !== undefined ? (row.balanceAmount === 0 ? '-' : row.balanceAmount) : ''}
-                      </td>
+              {/* ── MAIN CHECKLIST TABLE ── */}
+              <div className="w-full overflow-x-auto">
+                <table className="w-full border-collapse border border-black text-black text-[10px] sm:text-xs">
+                  <thead>
+                    <tr className="border-b-2 border-black bg-white font-black">
+                      <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[6%]">
+                        SL.NO.
+                      </th>
+                      <th className="border border-black px-2 sm:px-3 py-1.5 sm:py-2 text-left w-[30%]">
+                        NAME
+                      </th>
+                      <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[16%]">
+                        AMOUNT
+                      </th>
+                      <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[16%]">
+                        DATE
+                      </th>
+                      <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[16%]">
+                        PAID
+                      </th>
+                      <th className="border border-black px-1.5 sm:px-2 py-1.5 sm:py-2 text-center w-[16%]">
+                        BALANCE
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {checklistRows.map((row) => (
+                      <tr 
+                        key={row.ticket} 
+                        className={`border-b border-black font-semibold ${dynamicRowPadding}`}
+                      >
+                        <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
+                          {row.ticket}
+                        </td>
+                        <td className="border border-black px-2 sm:px-3 text-left font-black text-black truncate align-middle max-w-[140px] sm:max-w-none">
+                          {row.name}
+                        </td>
+                        <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
+                          {row.dueAmount}
+                        </td>
+                        <td className="border border-black px-1 text-center font-mono text-[9px] sm:text-[11px] align-middle">
+                          {row.paidDate || ''}
+                        </td>
+                        <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
+                          {row.paidAmount !== undefined ? row.paidAmount : ''}
+                        </td>
+                        <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
+                          {row.balanceAmount !== undefined ? (row.balanceAmount === 0 ? '-' : row.balanceAmount) : ''}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            {/* ── FOOTER SIGN-OFF ── */}
-            <div className="mt-6 sm:mt-8 pt-3 sm:pt-4 flex justify-between items-center text-[9px] sm:text-[11px] text-gray-700 border-t border-gray-400">
+            {/* ── FOOTER SIGN-OFF PINNED AT BOTTOM OF A4 ── */}
+            <div className="mt-8 pt-4 flex justify-between items-center text-[10px] sm:text-xs text-gray-700 border-t border-gray-400">
               <div className="font-semibold">
                 Cycle: <strong>{activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `Months ${activeMonthsList.join(', ')}`}</strong>
               </div>
@@ -991,4 +1007,5 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
     </div>
   );
 }
+
 
