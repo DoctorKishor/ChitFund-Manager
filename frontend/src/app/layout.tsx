@@ -4,6 +4,7 @@ import "./globals.css";
 import { WalletProvider } from "@/context/WalletContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { MaintenanceProvider } from "@/context/MaintenanceContext";
+import { OrganizationProvider } from "@/context/OrganizationContext";
 import ServiceWorkerCleanup from "@/components/ServiceWorkerCleanup";
 import NetworkStatusBanner from "@/components/NetworkStatusBanner";
 
@@ -36,11 +37,13 @@ export default function RootLayout({
         <ServiceWorkerCleanup />
         <NetworkStatusBanner />
         <AuthProvider>
-          <MaintenanceProvider>
-            <WalletProvider>
-              {children}
-            </WalletProvider>
-          </MaintenanceProvider>
+          <OrganizationProvider>
+            <MaintenanceProvider>
+              <WalletProvider>
+                {children}
+              </WalletProvider>
+            </MaintenanceProvider>
+          </OrganizationProvider>
         </AuthProvider>
       </body>
     </html>

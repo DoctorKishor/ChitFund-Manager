@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useWallet, WalletType } from '@/context/WalletContext';
+import { useOrganization } from '@/context/OrganizationContext';
 import PassbookScannerModal from './PassbookScannerModal';
 import PassbookSheetGeneratorModal, { StickerItem } from './PassbookSheetGeneratorModal';
 import { PaymentReceiptModal } from './PaymentReceiptModal';
@@ -49,6 +50,7 @@ interface MemberDetailsViewProps {
 
 export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: MemberDetailsViewProps) {
   const { profile } = useAuth();
+  const { organizationName, organizationInitials, organizationTagline } = useOrganization();
   const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printItems, setPrintItems] = useState<StickerItem[]>([]);
@@ -479,7 +481,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       `Account: ${tx.wallet_type?.replace(/_/g, ' ').toUpperCase()}\n` +
       `${tx.notes ? `Note: ${tx.notes}\n` : ''}` +
       `Status: COMPLETED\n\n` +
-      `Thank you,\nDr. Kishor Anbazhakan's Chit Funds`;
+      `Thank you,\n${organizationName}`;
     return `https://web.whatsapp.com/send?phone=${memberProfile?.phone_number || ''}&text=${encodeURIComponent(text)}`;
   };
 
@@ -1902,16 +1904,8 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             group={matchedGroup || { name: 'Chit Group', monthly_installment: 10000 }}
             month={viewingReceiptTx.month ?? matchedGroup?.current_month ?? 1}
             totalDue={matchedGroup?.monthly_installment}
-            organizerCompanyName={
-              profile?.fullName 
-                ? (profile.fullName.toUpperCase().includes('CHIT') ? profile.fullName.toUpperCase() : `${profile.fullName.toUpperCase()} CHIT FUNDS`)
-                : 'ANBAZHAKAN CHIT FUNDS'
-            }
-            organizerInitials={
-              profile?.fullName
-                ? profile.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-                : 'AC'
-            }
+            organizerCompanyName={organizationName}
+            organizerInitials={organizationInitials}
             formatCurrency={formatCurrency}
           />
         );

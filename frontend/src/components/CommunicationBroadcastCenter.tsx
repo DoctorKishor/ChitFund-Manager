@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { useOrganization } from '@/context/OrganizationContext';
 import { HelpTooltip } from './HelpTooltip';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import { computeNextAuctionDateTime, formatTime12h, getFirstSundayOnOrAfterDay } from '@/utils/auctionSchedule';
@@ -320,7 +321,7 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
     label: 'Organization Signature',
     category: 'org',
     description: 'Custom organization name or signature line',
-    getValue: (_, orgSig) => orgSig || "Dr. Kishor Anbazhakan's Chit Fund Organization",
+    getValue: (_, orgSig) => orgSig || 'Chit Fund Organization',
   },
   {
     key: 'org_phone',
@@ -530,6 +531,7 @@ interface CommunicationBroadcastCenterProps {
 
 export default function CommunicationBroadcastCenter({ onAddAuditLog }: CommunicationBroadcastCenterProps) {
   const { profile } = useAuth();
+  const { organizationName } = useOrganization();
   const [groupsMetadata, setGroupsMetadata] = useState<Record<string, GroupMetadata>>({});
   const [activeGroupKey, setActiveGroupKey] = useState<string>('');
   
@@ -557,10 +559,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     if (typeof window !== 'undefined') {
       return (
         localStorage.getItem('chit_broadcast_signature') ||
+        organizationName ||
         (profile?.fullName ? `${profile.fullName}'s Chit Fund Organization` : 'Chit Fund Organization')
       );
     }
-    return profile?.fullName ? `${profile.fullName}'s Chit Fund Organization` : 'Chit Fund Organization';
+    return organizationName || (profile?.fullName ? `${profile.fullName}'s Chit Fund Organization` : 'Chit Fund Organization');
   });
 
   const [contactPhone, setContactPhone] = useState<string>(() => {
@@ -1115,7 +1118,7 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
               value={signatureLine}
               onChange={(e) => handleSignatureChange(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-gray-900 focus:outline-none font-semibold shadow-2xs"
-              placeholder="e.g. Dr. Kishor Anbazhakan's Chit Fund Organization"
+              placeholder={organizationName || "e.g. Chit Fund Organization"}
             />
           </div>
 

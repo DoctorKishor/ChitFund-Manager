@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useWallet, WalletType } from '../context/WalletContext';
+import { useOrganization } from '../context/OrganizationContext';
 import { supabase } from '../utils/supabase/client';
 import LiveAuctionEngine from './LiveAuctionEngine';
 import CashVaultLedger from './CashVaultLedger';
@@ -155,6 +156,7 @@ interface DashboardContentProps {
 export default function DashboardContent({ activeTab, setActiveTab }: DashboardContentProps) {
   const { profile } = useAuth();
   const { balances, updateBalance } = useWallet();
+  const { organizationName, organizationInitials, organizationTagline } = useOrganization();
 
   // Group Creation & Enrollment States
   const [newGroupName, setNewGroupName] = useState('');
@@ -4583,16 +4585,8 @@ Thank you for your prompt payment! 🙏`;
                 group={activeGroup}
                 month={selectedDashboardMonth}
                 totalDue={baseInstallment}
-                organizerCompanyName={
-                  profile?.fullName 
-                    ? (profile.fullName.toUpperCase().includes('CHIT') ? profile.fullName.toUpperCase() : `${profile.fullName.toUpperCase()} CHIT FUNDS`)
-                    : 'ANBAZHAKAN CHIT FUNDS'
-                }
-                organizerInitials={
-                  profile?.fullName
-                    ? profile.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-                    : 'AC'
-                }
+                organizerCompanyName={organizationName}
+                organizerInitials={organizationInitials}
                 formatCurrency={formatCurrency}
               />
             )}

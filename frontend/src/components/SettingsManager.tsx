@@ -1,7 +1,6 @@
-'use client';
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useOrganization, computeInitials } from '@/context/OrganizationContext';
 import { supabase } from '@/utils/supabase/client';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import SlideToConfirm from './SlideToConfirm';
@@ -33,10 +32,14 @@ import {
   Coins,
   Users,
   Trophy,
-  History
+  History,
+  Building2,
+  Sparkles,
+  Landmark,
+  BadgeCheck
 } from 'lucide-react';
 
-type SettingsSubTab = 'profile' | 'security' | 'database';
+type SettingsSubTab = 'organization' | 'profile' | 'security' | 'database';
 
 interface DatabaseStats {
   groupsCount: number;
@@ -49,7 +52,29 @@ interface DatabaseStats {
 
 export default function SettingsManager() {
   const { user, profile, refreshProfile, signOut } = useAuth();
-  const [activeSubTab, setActiveSubTab] = useState<SettingsSubTab>('profile');
+  const {
+    organizationName: globalOrgName,
+    organizationTagline: globalOrgTagline,
+    organizationInitials: globalOrgInitials,
+    updateOrganizationSettings,
+  } = useOrganization();
+
+  const [activeSubTab, setActiveSubTab] = useState<SettingsSubTab>('organization');
+
+  // Organization Branding Form State
+  const [orgNameInput, setOrgNameInput] = useState(globalOrgName);
+  const [orgTaglineInput, setOrgTaglineInput] = useState(globalOrgTagline);
+  const [orgInitialsInput, setOrgInitialsInput] = useState(globalOrgInitials);
+  const [isSavingOrg, setIsSavingOrg] = useState(false);
+  const [orgSuccessMsg, setOrgSuccessMsg] = useState<string | null>(null);
+  const [orgErrorMsg, setOrgErrorMsg] = useState<string | null>(null);
+
+  // Sync organization state when global context updates
+  useEffect(() => {
+    setOrgNameInput(globalOrgName);
+    setOrgTaglineInput(globalOrgTagline);
+    setOrgInitialsInput(globalOrgInitials);
+  }, [globalOrgName, globalOrgTagline, globalOrgInitials]);
 
   // Profile Form State
   const [fullName, setFullName] = useState(profile?.fullName || '');
@@ -139,6 +164,46 @@ export default function SettingsManager() {
       fetchDbStats();
     }
   }, [activeSubTab, fetchDbStats]);
+
+  // 0. Save Organization Branding Settings
+  const handleSaveOrganization = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOrgSuccessMsg(null);
+    setOrgErrorMsg(null);
+
+    const cleanName = orgNameInput.trim();
+    if (!cleanName) {
+      setOrgErrorMsg('Please enter a valid Chit Funds / Organization Name.');
+      triggerHapticFeedback('warning');
+      return;
+    }
+
+    try {
+      setIsSavingOrg(true);
+      triggerHapticFeedback('light');
+
+      const computed = orgInitialsInput.trim() || computeInitials(cleanName);
+      const res = await updateOrganizationSettings({
+        name: cleanName,
+        tagline: orgTaglineInput.trim(),
+        initials: computed,
+      });
+
+      if (!res.success) {
+        setOrgErrorMsg(res.error || 'Failed to update organization settings.');
+        triggerHapticFeedback('error');
+      } else {
+        setOrgSuccessMsg('Chit Funds Organization name saved successfully! Applied globally across all tabs, reports, receipts, and PDFs.');
+        triggerHapticFeedback('success');
+      }
+    } catch (err: any) {
+      console.error('Save organization failed:', err);
+      setOrgErrorMsg(err.message || 'An unexpected error occurred.');
+      triggerHapticFeedback('error');
+    } finally {
+      setIsSavingOrg(false);
+    }
+  };
 
   // 1. Save Profile Changes
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -315,6 +380,19 @@ export default function SettingsManager() {
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none border-t border-gray-150 mt-5 pt-4">
           <button
             type="button"
+            onClick={() => setActiveSubTab('organization')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 ${
+              activeSubTab === 'organization'
+                ? 'bg-gray-900 text-white shadow-xs'
+                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+            }`}
+          >
+            <Building2 size={14} />
+            <span>Chit Funds Branding</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveSubTab('profile')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 ${
               activeSubTab === 'profile'
@@ -353,6 +431,183 @@ export default function SettingsManager() {
           </button>
         </div>
       </div>
+
+      {/* ── SUB-TAB 0: CHIT FUNDS BRANDING & ORGANIZATION ── */}
+      {activeSubTab === 'organization' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
+          {/* Main Organization Form */}
+          <div className="lg:col-span-2 bg-white border border-gray-200 rounded-3xl p-6 sm:p-7 shadow-2xs space-y-6">
+            <div>
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <Building2 size={18} className="text-indigo-600" />
+                <span>Chit Funds Organization Branding</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Configure your Chit Fund Name and official branding. Changes apply instantly across the entire application — including Receipt PNGs, PDF Reports, WhatsApp Broadcasts, and Passbook sheets.
+              </p>
+            </div>
+
+            {orgSuccessMsg && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>{orgSuccessMsg}</span>
+              </div>
+            )}
+
+            {orgErrorMsg && (
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                <span>{orgErrorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveOrganization} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Chit Funds / Organization Name *
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <Building2 size={15} />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={orgNameInput}
+                    onChange={(e) => setOrgNameInput(e.target.value)}
+                    placeholder="e.g. ANBAZHAKAN CHIT FUNDS or SRI LAKSHMI CHIT FUNDS"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-600 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-gray-900 focus:outline-none uppercase"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Printed as the primary business title on all receipt cards, statements, and PDF documents.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Official Tagline / Subtitle
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <Sparkles size={15} />
+                  </div>
+                  <input
+                    type="text"
+                    value={orgTaglineInput}
+                    onChange={(e) => setOrgTaglineInput(e.target.value)}
+                    placeholder="e.g. TRUSTED CHIT FUNDS MANAGEMENT"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-600 rounded-xl pl-10 pr-4 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none uppercase"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Displayed below the company name on receipt slips and report headers.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Brand Monogram / Logo Initials
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <Landmark size={15} />
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={3}
+                    value={orgInitialsInput}
+                    onChange={(e) => setOrgInitialsInput(e.target.value.toUpperCase())}
+                    placeholder={computeInitials(orgNameInput || 'CF')}
+                    className="w-full max-w-[120px] bg-gray-50 border border-gray-200 focus:border-indigo-600 rounded-xl pl-10 pr-4 py-2.5 text-xs font-mono font-black text-gray-900 focus:outline-none uppercase"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  2-letter logo badge on receipts and mobile portals. (Auto-computed if empty: <strong className="font-mono">{computeInitials(orgNameInput || 'CF')}</strong>)
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isSavingOrg}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingOrg ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" /> Saving Branding...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={14} /> Save Organization Branding
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Live Branding Preview Card */}
+          <div className="space-y-4">
+            <div className="bg-slate-900 text-white rounded-3xl p-5 border border-slate-800 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles size={12} className="text-emerald-400" />
+                  <span>Live Branding Preview</span>
+                </span>
+                <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                  ACTIVE
+                </span>
+              </div>
+
+              {/* Sample Header Preview */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-md shrink-0 border border-emerald-300">
+                    {orgInitialsInput.trim() || computeInitials(orgNameInput || 'CF')}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-black text-white uppercase tracking-wider leading-tight truncate">
+                      {orgNameInput.trim() || 'ANBAZHAKAN CHIT FUNDS'}
+                    </div>
+                    <div className="text-[9px] text-emerald-400 font-bold tracking-widest uppercase mt-0.5 truncate">
+                      {orgTaglineInput.trim() || 'TRUSTED CHIT FUNDS MANAGEMENT'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Automatic Global Synchronization:
+                </div>
+                <ul className="space-y-1.5 text-[11px] text-slate-300">
+                  <li className="flex items-center gap-2">
+                    <BadgeCheck size={14} className="text-emerald-400 shrink-0" />
+                    <span>Payment Receipt PNGs &amp; Share Cards</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <BadgeCheck size={14} className="text-emerald-400 shrink-0" />
+                    <span>Monthly Statements &amp; Defaulters PDFs</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <BadgeCheck size={14} className="text-emerald-400 shrink-0" />
+                    <span>Live Auction Minutes &amp; Documents</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <BadgeCheck size={14} className="text-emerald-400 shrink-0" />
+                    <span>Passbook Covers &amp; QR Sticker Sheets</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <BadgeCheck size={14} className="text-emerald-400 shrink-0" />
+                    <span>WhatsApp Broadcast Templates</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── SUB-TAB 1: PROFILE & ACCOUNT ── */}
       {activeSubTab === 'profile' && (

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { triggerHapticFeedback } from '../utils/haptics';
+import { useOrganization } from '@/context/OrganizationContext';
 
 interface PaymentReceiptModalProps {
   isOpen: boolean;
@@ -86,10 +87,16 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   group,
   month,
   totalDue,
-  organizerCompanyName = 'ANBAZHAKAN CHIT FUNDS',
-  organizerInitials = 'AC',
+  organizerCompanyName,
+  organizerInitials,
   formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`
 }) => {
+  const { 
+    organizationName: globalOrgName, 
+    organizationTagline: globalOrgTagline, 
+    organizationInitials: globalOrgInitials 
+  } = useOrganization();
+
   const previewRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -97,6 +104,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   const [shareStatus, setShareStatus] = useState<string | null>(null);
 
   if (!isOpen || !transaction) return null;
+
+  const activeOrgName = organizerCompanyName || globalOrgName;
+  const activeOrgTagline = globalOrgTagline || 'TRUSTED CHIT FUNDS MANAGEMENT';
+  const activeOrgInitials = organizerInitials || globalOrgInitials;
 
   const paidAmount = Number(transaction.amount || 0);
   const calculatedDue = totalDue || Number(group?.monthly_installment || 0);
@@ -322,14 +333,14 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           {/* Logo & Brand Name perfectly aligned */}
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 font-black flex items-center justify-center text-base shadow-md shrink-0 border border-emerald-300">
-              {organizerInitials || 'DK'}
+              {activeOrgInitials}
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-black tracking-wider uppercase text-white leading-tight truncate">
-                {organizerCompanyName}
+                {activeOrgName}
               </h2>
               <p className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase mt-0.5">
-                TRUSTED CHIT FUNDS MANAGEMENT
+                {activeOrgTagline}
               </p>
             </div>
           </div>

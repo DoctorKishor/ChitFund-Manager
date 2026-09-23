@@ -48,6 +48,7 @@ import AuctionScheduleModal from '@/components/AuctionScheduleModal';
 import { computeNextAuctionDateTime } from '@/utils/auctionSchedule';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import { useAuth } from '@/context/AuthContext';
+import { useOrganization } from '@/context/OrganizationContext';
 import { exportAuctionReportPdf, shareAuctionReportToWhatsApp } from '@/utils/auctionPdfExporter';
 import AuctionReportDocument, { AuctionReportData } from '@/components/AuctionReportDocument';
 
@@ -114,6 +115,7 @@ function fmtDate(d: Date): string {
 
 export default function LiveAuctionEngine() {
   const { profile } = useAuth();
+  const { organizationName } = useOrganization();
 
   // 1. Initial State Data (Loaded from Supabase)
   const [allGroups, setAllGroups] = useState<ChitGroup[]>([]);
@@ -799,9 +801,9 @@ export default function LiveAuctionEngine() {
     try {
       setIsGeneratingReportPdf(true);
       triggerHapticFeedback('light');
-      const organizerCompanyName = profile?.fullName 
+      const organizerCompanyName = organizationName || (profile?.fullName 
         ? `${profile.fullName}'s Chit Funds` 
-        : "Chit Funds Manager";
+        : "Chit Funds Manager");
       await exportAuctionReportPdf({
         container: containerEl,
         groupName,
@@ -830,9 +832,9 @@ export default function LiveAuctionEngine() {
     try {
       setIsSharingWhatsApp(true);
       triggerHapticFeedback('light');
-      const organizerCompanyName = profile?.fullName 
+      const organizerCompanyName = organizationName || (profile?.fullName 
         ? `${profile.fullName}'s Chit Funds` 
-        : "Chit Funds Manager";
+        : "Chit Funds Manager");
       await shareAuctionReportToWhatsApp({
         container: containerEl,
         groupName,

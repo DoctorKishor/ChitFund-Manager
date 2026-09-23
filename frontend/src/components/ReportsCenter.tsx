@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useWallet } from '@/context/WalletContext';
+import { useOrganization } from '@/context/OrganizationContext';
 import { 
   TrendingUp, 
   AlertTriangle, 
@@ -74,6 +75,7 @@ const REPORT_SUBTABS: SubtabConfig[] = [
 export default function ReportsCenter() {
   const { profile } = useAuth();
   const { balances } = useWallet();
+  const { organizationName: organizerCompanyName, organizationInitials: organizerInitials } = useOrganization();
   const [activeSubtab, setActiveSubtab] = useState<ReportSubtab>('monthly');
 
   // Supabase Data State
@@ -1480,14 +1482,6 @@ export default function ReportsCenter() {
       maximumFractionDigits: 0,
     }).format(amount);
   };
-
-  const organizerCompanyName = profile?.fullName 
-    ? `${profile.fullName}'s Chit Funds` 
-    : "Dr. Kishor Anbazhakan's Chit Funds";
-
-  const organizerInitials = profile?.fullName 
-    ? profile.fullName.split(' ').filter(Boolean).map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() 
-    : 'CF';
 
   // ── High Quality Section-Aware Dynamic Multi-Page PDF Generator ───────────
   const handleDownloadPDF = async () => {
