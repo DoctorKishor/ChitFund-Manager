@@ -598,6 +598,27 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+// Helper to ensure App Portal link is included in templates
+function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
+  if (!tmpl || tmpl.includes('app_portal_url') || tmpl.includes('app_url')) return tmpl;
+  
+  if (isTamil) {
+    const portalSnippet = `📲 *சீட்டு கணக்கு & பாஸ்புக் விவரங்களை பார்க்க:*\n{app_portal_url}\n`;
+    if (tmpl.includes('இங்ஙனம்,')) {
+      return tmpl.replace('இங்ஙனம்,', `${portalSnippet}\nஇங்ஙனம்,`);
+    } else if (tmpl.includes('நன்றி,')) {
+      return tmpl.replace('நன்றி,', `${portalSnippet}\nநன்றி,`);
+    }
+    return tmpl + `\n\n${portalSnippet}`;
+  } else {
+    const portalSnippet = `📲 *Track your chit details & live passbook:*\n{app_portal_url}\n`;
+    if (tmpl.includes('Regards,')) {
+      return tmpl.replace('Regards,', `${portalSnippet}\nRegards,`);
+    }
+    return tmpl + `\n\n${portalSnippet}`;
+  }
+}
+
   // 1. Fetch Cloud Templates from Supabase public.system_settings
   const fetchCloudTemplates = useCallback(async () => {
     try {
@@ -609,14 +630,14 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
       if (data?.value) {
         const val = data.value;
-        if (val.pre_auction_en) setPreAuctionEn(val.pre_auction_en);
-        else if (val.pre_auction) setPreAuctionEn(val.pre_auction);
+        if (val.pre_auction_en) setPreAuctionEn(ensurePortalLinkInTemplate(val.pre_auction_en, false));
+        else if (val.pre_auction) setPreAuctionEn(ensurePortalLinkInTemplate(val.pre_auction, false));
 
-        if (val.post_auction_en) setPostAuctionEn(val.post_auction_en);
-        else if (val.post_auction) setPostAuctionEn(val.post_auction);
+        if (val.post_auction_en) setPostAuctionEn(ensurePortalLinkInTemplate(val.post_auction_en, false));
+        else if (val.post_auction) setPostAuctionEn(ensurePortalLinkInTemplate(val.post_auction, false));
 
-        if (val.pre_auction_ta) setPreAuctionTa(val.pre_auction_ta);
-        if (val.post_auction_ta) setPostAuctionTa(val.post_auction_ta);
+        if (val.pre_auction_ta) setPreAuctionTa(ensurePortalLinkInTemplate(val.pre_auction_ta, true));
+        if (val.post_auction_ta) setPostAuctionTa(ensurePortalLinkInTemplate(val.post_auction_ta, true));
 
         if (val.org_signature) setSignatureLine(val.org_signature);
         if (val.org_phone) setContactPhone(val.org_phone);
@@ -629,10 +650,10 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           const lPostEn = localStorage.getItem('chit_template_post_en');
           const lPreTa = localStorage.getItem('chit_template_pre_ta');
           const lPostTa = localStorage.getItem('chit_template_post_ta');
-          if (lPreEn) setPreAuctionEn(lPreEn);
-          if (lPostEn) setPostAuctionEn(lPostEn);
-          if (lPreTa) setPreAuctionTa(lPreTa);
-          if (lPostTa) setPostAuctionTa(lPostTa);
+          if (lPreEn) setPreAuctionEn(ensurePortalLinkInTemplate(lPreEn, false));
+          if (lPostEn) setPostAuctionEn(ensurePortalLinkInTemplate(lPostEn, false));
+          if (lPreTa) setPreAuctionTa(ensurePortalLinkInTemplate(lPreTa, true));
+          if (lPostTa) setPostAuctionTa(ensurePortalLinkInTemplate(lPostTa, true));
         }
       }
     } catch (err) {
