@@ -243,7 +243,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [draggedTicketNum, setDraggedTicketNum] = useState<number | null>(null);
   const [dragOverTicketNum, setDragOverTicketNum] = useState<number | null>(null);
   const [printChecklistGroup, setPrintChecklistGroup] = useState<any | null>(null);
-  const [viewingReceiptTx, setViewingReceiptTx] = useState<{ tx: any; member: any } | null>(null);
+  const [viewingReceiptTx, setViewingReceiptTx] = useState<{ tx: any; member: any; allocations?: any[]; totalCollectedAmount?: number } | null>(null);
 
   // High-Security Delete Group Modal States
   const [deletingGroup, setDeletingGroup] = useState<any | null>(null);
@@ -1955,7 +1955,10 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         return;
       }
 
-      // 3. Build atomic collection rows per allocated month
+      // 3. Build atomic collection rows per allocated month with linked Batch ID
+      const batchId = `RCP-${Date.now().toString(36).toUpperCase()}`;
+      const batchTag = `[Batch:${batchId}|Total:${amt}|Alloc:${allocations.map(a => `${a.month}:${a.amount}:${a.type}`).join(';')}]`;
+
       const rowsToInsert = allocations.map(item => {
         const typeLabel = item.type === 'arrear' 
           ? ' (Arrear Cleared)' 
@@ -1963,7 +1966,8 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
             ? ' (Advance Pre-paid)' 
             : '';
         const defaultNote = `Month ${item.month}${typeLabel} collection payment - Ticket #${recordingPaymentMember.ticket} (${recordingPaymentMember.name})`;
-        const finalNote = paymentNote.trim() ? `${defaultNote} — Note: ${paymentNote.trim()}` : defaultNote;
+        const userNotePart = paymentNote.trim() ? ` — Note: ${paymentNote.trim()}` : '';
+        const finalNote = `${defaultNote}${userNotePart} ${batchTag}`;
 
         return {
           group_id: activeDashboardGroupId,
@@ -2006,6 +2010,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         ...prev,
       ]);
 
+      const finishedPaymentMember = recordingPaymentMember;
       setRecordingPaymentMember(null);
       setQuickPaymentAmount('');
       setPaymentNote('');
@@ -2015,6 +2020,20 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       setPaymentAllocationMode('auto');
       setPaymentCustomMonths([]);
       await fetchDashboardData(activeDashboardGroupId);
+
+      // 6. Open the Combined Multi-Month Receipt Modal for this complete payment!
+      setViewingReceiptTx({
+        tx: {
+          id: batchId,
+          amount: amt,
+          wallet_type: paymentWalletType,
+          created_at: effectiveDateStr,
+          notes: paymentNote.trim() ? `${paymentNote.trim()} ${batchTag}` : batchTag,
+        },
+        member: finishedPaymentMember,
+        allocations: allocations,
+        totalCollectedAmount: amt,
+      });
     } catch (err: any) {
       console.error('Error processing quick payment:', err);
       alert('An error occurred while processing payment.');
@@ -4611,6 +4630,8 @@ Thank you for your prompt payment! 🙏`;
                   formatCurrency={formatCurrency}
                   pastPendingDues={pastPendingDues}
                   pastPendingMonths={pastPendingMonths}
+                  allocations={viewingReceiptTx.allocations}
+                  totalCollectedAmount={viewingReceiptTx.totalCollectedAmount}
                 />
               );
             })()}

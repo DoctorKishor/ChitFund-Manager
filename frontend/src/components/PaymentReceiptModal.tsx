@@ -22,6 +22,14 @@ import { toPng } from 'html-to-image';
 import { triggerHapticFeedback } from '../utils/haptics';
 import { useOrganization } from '@/context/OrganizationContext';
 
+export interface PaymentAllocationItem {
+  month: number;
+  amount: number;
+  type?: 'current' | 'arrear' | 'advance';
+  statusAfter?: 'cleared' | 'partial' | 'overpaid';
+  due?: number;
+}
+
 interface PaymentReceiptModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -35,6 +43,8 @@ interface PaymentReceiptModalProps {
   formatCurrency?: (val: number) => string;
   pastPendingDues?: number;
   pastPendingMonths?: number[];
+  allocations?: PaymentAllocationItem[];
+  totalCollectedAmount?: number;
 }
 
 // Convert numbers to Indian Rupees in words
@@ -81,6 +91,29 @@ function numberToWordsINR(amount: number): string {
   return result.trim() + ' Rupees Only';
 }
 
+// Helper to parse batch metadata from transaction note if not passed directly via props
+function parseBatchMetadata(notes?: string | null): { batchId?: string; totalAmount?: number; allocations?: PaymentAllocationItem[] } | null {
+  if (!notes) return null;
+  const match = notes.match(/\[Batch:([A-Za-z0-9_-]+)\|Total:([0-9.]+)\|Alloc:([^\]]+)\]/);
+  if (!match) return null;
+  try {
+    const batchId = match[1];
+    const totalAmount = parseFloat(match[2]);
+    const allocStr = match[3];
+    const allocations: PaymentAllocationItem[] = allocStr.split(';').map(item => {
+      const [m, a, t] = item.split(':');
+      return {
+        month: parseInt(m, 10),
+        amount: parseFloat(a),
+        type: (t as any) || 'current'
+      };
+    });
+    return { batchId, totalAmount, allocations };
+  } catch {
+    return null;
+  }
+}
+
 // Helper to get formatted Calendar Month label for a chit group month
 function getReceiptMonthLabel(startDateStr: string | null | undefined, monthNumber: number, txDateStr?: string | null): string {
   try {
@@ -117,6 +150,8 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`,
   pastPendingDues = 0,
   pastPendingMonths = [],
+  allocations: propAllocations,
+  totalCollectedAmount: propTotalCollectedAmount,
 }) => {
   const { 
     organizationName: globalOrgName, 
@@ -132,18 +167,31 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
   if (!isOpen || !transaction) return null;
 
+  const parsedBatch = parseBatchMetadata(transaction.notes);
+  const activeAllocations = (propAllocations && propAllocations.length > 0)
+    ? propAllocations 
+    : (parsedBatch?.allocations && parsedBatch.allocations.length > 0)
+      ? parsedBatch.allocations
+      : null;
+
+  const isMultiMonth = Boolean(activeAllocations && activeAllocations.length > 1);
+
   const activeOrgName = organizerCompanyName || globalOrgName;
   const activeOrgTagline = globalOrgTagline || 'TRUSTED CHIT FUNDS MANAGEMENT';
   const activeOrgInitials = organizerInitials || globalOrgInitials;
 
-  const paidAmount = Number(transaction.amount || 0);
+  const rawPaidAmount = Number(transaction.amount || 0);
+  const effectiveTotalPaid = propTotalCollectedAmount || parsedBatch?.totalAmount || (activeAllocations ? activeAllocations.reduce((sum, a) => sum + Number(a.amount || 0), 0) : rawPaidAmount);
+  
   const calculatedDue = totalDue || Number(group?.monthly_installment || 0);
-  const remainingBalance = Math.max(0, calculatedDue - paidAmount);
+  const remainingBalance = Math.max(0, calculatedDue - rawPaidAmount);
   const isCleared = remainingBalance === 0;
-  const totalGroupOutstanding = remainingBalance + pastPendingDues;
+  const totalGroupOutstanding = isMultiMonth ? pastPendingDues : (remainingBalance + pastPendingDues);
 
-  const receiptNo = `RCP-${String(transaction.id || 'TX001').slice(0, 8).toUpperCase()}`;
-  const monthLabel = getReceiptMonthLabel(group?.start_date, month, transaction.created_at);
+  const receiptNo = parsedBatch?.batchId || `RCP-${String(transaction.id || 'TX001').slice(0, 8).toUpperCase()}`;
+  const monthLabel = isMultiMonth 
+    ? `Multi-Month Settlement (${activeAllocations!.map(a => `M${a.month}`).join(' + ')})`
+    : getReceiptMonthLabel(group?.start_date, month, transaction.created_at);
   
   const txDate = transaction.created_at ? new Date(transaction.created_at) : new Date();
   const dateFormatted = txDate.toLocaleDateString('en-IN', {
@@ -167,10 +215,15 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
   const walletDisplay = isCash ? 'CASH IN HAND' : 'ONLINE TRANSFER';
   const groupName = group?.name || 'Chit Group';
-  const amountInWords = numberToWordsINR(paidAmount);
+  const amountInWords = numberToWordsINR(effectiveTotalPaid);
+
+  const cleanNotes = (transaction.notes || '')
+    .replace(/\[Batch:[^\]]+\]/g, '')
+    .replace(/—\s*Note:\s*$/i, '')
+    .trim();
 
   const cleanMemberName = memberName.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const filename = `Receipt_${receiptNo}_${cleanMemberName}_Month${month}.png`;
+  const filename = `Receipt_${receiptNo}_${cleanMemberName}_${isMultiMonth ? 'Combined' : `Month${month}`}.png`;
 
   // Base portal URL
   const appPortalUrl = typeof window !== 'undefined' 
@@ -281,7 +334,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: `Receipt ${receiptNo} - ${memberName}`,
-          text: `Official Payment Receipt for ${memberName} (Ticket #${ticketNum}) · ${groupName} ${monthLabel} (${formatCurrency(paidAmount)})`,
+          text: `Official Payment Receipt for ${memberName} (Ticket #${ticketNum}) · ${groupName} ${monthLabel} (${formatCurrency(effectiveTotalPaid)})`,
           files: [file]
         });
         triggerHapticFeedback('success');
@@ -295,17 +348,26 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         // Also prepare WhatsApp URL
         const digits = memberPhone.replace(/\D/g, '');
         const cleanPhone = digits.length === 10 ? `91${digits}` : digits;
+
+        const settlementSection = isMultiMonth && activeAllocations
+          ? `*Settlement Breakdown:*\n` + activeAllocations.map(a => {
+              const mName = getReceiptMonthLabel(group?.start_date, a.month, transaction.created_at);
+              const tag = a.type === 'arrear' ? 'Past Arrear' : a.type === 'advance' ? 'Advance Pre-paid' : 'Current Month';
+              return `  • ${mName} (${tag}): ${formatCurrency(a.amount)}`;
+            }).join('\n') + '\n'
+          : `*Month ${month === 0 ? '0' : month} Pending Due:* ${isCleared ? 'No Pending (Cleared ✅)' : `${formatCurrency(remainingBalance)} Pending`}\n`;
+
         const msg = `*CHIT FUNDS PAYMENT RECEIPT* 🧾\n` +
           `----------------------------------\n` +
           `*Receipt No:* ${receiptNo}\n` +
           `*Subscriber:* ${memberName} (Ticket #${ticketNum})\n` +
           `*Group:* ${groupName}\n` +
           `*Payment Applied For:* ${monthLabel}\n` +
-          `*Amount Received:* ${formatCurrency(paidAmount)}\n` +
+          `*Amount Received:* ${formatCurrency(effectiveTotalPaid)}\n` +
           `*Payment Mode:* ${walletDisplay}\n` +
           `*Date:* ${dateFormatted}, ${timeFormatted}\n` +
           `----------------------------------\n` +
-          `*Month ${month === 0 ? '0' : month} Pending Due:* ${isCleared ? 'No Pending (Cleared ✅)' : `${formatCurrency(remainingBalance)} Pending`}\n` +
+          settlementSection +
           `*Past Pending Dues (${groupName}):* ${pastPendingDues > 0 ? `${formatCurrency(pastPendingDues)} (Pending in M${pastPendingMonths.join(', M')})` : 'No Past Pending (Cleared ✅)'}\n` +
           `*Total Group Outstanding:* ${totalGroupOutstanding === 0 ? 'No Pending (Fully Cleared ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}\n\n` +
           `_Receipt image downloaded. Thank you!_ 🙏`;
@@ -444,7 +506,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               Ticket #{ticketNum}
             </span>
             <span className="text-[10px] text-slate-600 font-bold block truncate mt-0.5">
-              {groupName} · M{month === 0 ? '0' : month}
+              {groupName} · {isMultiMonth ? 'Combined' : `M${month === 0 ? '0' : month}`}
             </span>
           </div>
         </div>
@@ -455,7 +517,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
             Amount Received
           </div>
           <div className="text-2xl sm:text-3xl font-black text-emerald-700 tracking-tight my-0.5">
-            {formatCurrency(paidAmount)}
+            {formatCurrency(effectiveTotalPaid)}
           </div>
           <div className="text-[10px] font-bold text-emerald-900 italic">
             {amountInWords}
@@ -465,9 +527,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         {/* Detailed Payment & Group Dues Breakdown Matrix */}
         <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs shadow-2xs">
           
-          {/* Row 1: Payment Applied For Month (Calendar Month Name + Month Number) */}
+          {/* Row 1: Payment Applied For Month */}
           <div className="flex justify-between items-center px-3.5 py-2 bg-slate-50/70">
-            <span className="text-slate-600 font-semibold text-[11px]">Payment For Month</span>
+            <span className="text-slate-600 font-semibold text-[11px]">Payment Applied For</span>
             <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-lg text-[11px] shadow-2xs">
               {monthLabel}
             </span>
@@ -481,19 +543,54 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
             </span>
           </div>
 
-          {/* Row 3: Current Month Pending Due */}
-          <div className="flex justify-between items-center px-3.5 py-2 bg-slate-50/40">
-            <span className="text-slate-700 font-bold text-[11px]">
-              Month {month === 0 ? '0' : month} Pending Due
-            </span>
-            <span className={`font-extrabold text-[11px] px-2 py-0.5 rounded border ${
-              isCleared 
-                ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
-                : 'text-amber-700 bg-amber-50 border-amber-200'
-            }`}>
-              {isCleared ? 'No Pending (Cleared ✅)' : `${formatCurrency(remainingBalance)} Pending`}
-            </span>
-          </div>
+          {/* Row 3: Itemized Settlement Breakdown for Multi-Month or Single Month Due */}
+          {isMultiMonth && activeAllocations && activeAllocations.length > 0 ? (
+            <div className="divide-y divide-slate-100">
+              <div className="px-3.5 py-1.5 bg-slate-100/80 text-[9.5px] font-black text-slate-700 uppercase tracking-wider flex justify-between items-center">
+                <span>Month Settled</span>
+                <span>Amount Applied</span>
+              </div>
+              {activeAllocations.map((alloc, idx) => {
+                const mLabel = getReceiptMonthLabel(group?.start_date, alloc.month, transaction.created_at);
+                const isArr = alloc.type === 'arrear';
+                const isAdv = alloc.type === 'advance';
+                const typeTag = isArr ? 'Past Arrear' : isAdv ? 'Advance Pre-paid' : 'Current Month';
+                return (
+                  <div key={idx} className="flex justify-between items-center px-3.5 py-2 bg-slate-50/40">
+                    <div>
+                      <span className="text-slate-800 font-bold block text-[11px]">{mLabel}</span>
+                      <span className={`text-[9px] font-semibold block ${isArr ? 'text-amber-700' : isAdv ? 'text-indigo-600' : 'text-slate-500'}`}>
+                        {typeTag}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-extrabold text-emerald-700 font-mono text-[11.5px] block">
+                        +{formatCurrency(alloc.amount)}
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                        isArr ? 'bg-amber-100 text-amber-800' : isAdv ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {isArr ? 'Arrear Settled ✅' : isAdv ? 'Advance Pre-paid ⚡' : 'Applied ✅'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex justify-between items-center px-3.5 py-2 bg-slate-50/40">
+              <span className="text-slate-700 font-bold text-[11px]">
+                Month {month === 0 ? '0' : month} Pending Due
+              </span>
+              <span className={`font-extrabold text-[11px] px-2 py-0.5 rounded border ${
+                isCleared 
+                  ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                  : 'text-amber-700 bg-amber-50 border-amber-200'
+              }`}>
+                {isCleared ? 'No Pending (Cleared ✅)' : `${formatCurrency(remainingBalance)} Pending`}
+              </span>
+            </div>
+          )}
 
           {/* Row 4: Past Pending Dues for this Particular Chit Group */}
           <div className="flex justify-between items-center px-3.5 py-2">
@@ -526,12 +623,12 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
             </span>
           </div>
 
-          {/* Optional Note */}
-          {transaction.notes && (
+          {/* Optional Note (Clean) */}
+          {cleanNotes && (
             <div className="flex justify-between items-center px-3.5 py-1.5 bg-amber-50/40 text-[10px]">
               <span className="text-slate-400 font-semibold">Note</span>
               <span className="text-slate-700 italic truncate max-w-[260px] font-medium">
-                {transaction.notes}
+                {cleanNotes}
               </span>
             </div>
           )}
