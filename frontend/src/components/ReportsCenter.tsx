@@ -994,11 +994,11 @@ export default function ReportsCenter() {
       let methodLabel = isComplete || isPartial ? 'Cash' : 'Pending Disbursal';
       if (winnerPayoutTxs.length > 0) {
         const lastTx = winnerPayoutTxs[winnerPayoutTxs.length - 1];
-        if (lastTx.wallet_type === 'kishor_bank') methodLabel = 'Kishor Bank';
-        else if (lastTx.wallet_type === 'dad_bank') methodLabel = 'Dad Bank';
-        else if (lastTx.wallet_type === 'mom_bank') methodLabel = 'Mom Bank';
-        else if (lastTx.wallet_type === 'cash_in_hand' || lastTx.wallet_type === 'cash') methodLabel = 'Cash';
-        else methodLabel = lastTx.wallet_type || 'Disbursed';
+        if (lastTx.wallet_type === 'cash_in_hand' || lastTx.wallet_type === 'cash' || String(lastTx.wallet_type).toLowerCase().includes('cash')) {
+          methodLabel = 'Cash';
+        } else {
+          methodLabel = 'Online Transfer';
+        }
       }
 
       let dateLabel = `M${a.month}`;
@@ -1039,10 +1039,11 @@ export default function ReportsCenter() {
         let methodLabel = mDisbursed > 0 ? 'Cash' : 'Pending Disbursal';
         if (mPayoutTxs.length > 0) {
           const lastTx = mPayoutTxs[0];
-          if (lastTx.wallet_type === 'kishor_bank') methodLabel = 'Kishor Bank';
-          else if (lastTx.wallet_type === 'dad_bank') methodLabel = 'Dad Bank';
-          else if (lastTx.wallet_type === 'mom_bank') methodLabel = 'Mom Bank';
-          else methodLabel = 'Cash';
+          if (lastTx.wallet_type === 'cash_in_hand' || lastTx.wallet_type === 'cash' || String(lastTx.wallet_type).toLowerCase().includes('cash')) {
+            methodLabel = 'Cash';
+          } else {
+            methodLabel = 'Online Transfer';
+          }
         }
 
         winnersList.push({
@@ -1181,11 +1182,11 @@ export default function ReportsCenter() {
     let payoutDate = '';
     if (memberPayoutTxs.length > 0) {
       const lastPayoutTx = memberPayoutTxs[memberPayoutTxs.length - 1];
-      if (lastPayoutTx.wallet_type === 'kishor_bank') payoutMethod = 'Kishor Bank';
-      else if (lastPayoutTx.wallet_type === 'dad_bank') payoutMethod = 'Dad Bank';
-      else if (lastPayoutTx.wallet_type === 'mom_bank') payoutMethod = 'Mom Bank';
-      else if (lastPayoutTx.wallet_type === 'cash_in_hand' || lastPayoutTx.wallet_type === 'cash') payoutMethod = 'Cash Box';
-      else payoutMethod = lastPayoutTx.wallet_type || 'Disbursed';
+      if (lastPayoutTx.wallet_type === 'cash_in_hand' || lastPayoutTx.wallet_type === 'cash' || String(lastPayoutTx.wallet_type).toLowerCase().includes('cash')) {
+        payoutMethod = 'Cash';
+      } else {
+        payoutMethod = 'Online Transfer';
+      }
 
       if (lastPayoutTx.created_at) {
         const pd = new Date(lastPayoutTx.created_at);

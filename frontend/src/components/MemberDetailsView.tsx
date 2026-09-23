@@ -478,7 +478,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
     const text = `*OFFICIAL PAYMENT RECEIPT*\n\n` +
       `Dear ${memberName},\n` +
       `We have successfully recorded your payment of *${formatCurrency(amt)}* on ${dateStr}.\n` +
-      `Account: ${tx.wallet_type?.replace(/_/g, ' ').toUpperCase()}\n` +
+      `Mode: ${!tx.wallet_type || tx.wallet_type.includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}\n` +
       `${tx.notes ? `Note: ${tx.notes}\n` : ''}` +
       `Status: COMPLETED\n\n` +
       `Thank you,\n${organizationName}`;
@@ -1404,7 +1404,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                               {isCollection ? 'Collection' : 'Prize Payout'}
                             </span>
                             <span className="text-[10px] font-mono font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md">
-                              {tx.wallet_type?.replace(/_/g, ' ').toUpperCase() || 'CASH'}
+                              {!tx.wallet_type || tx.wallet_type.includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
                             </span>
                             {tx.verification_proof_url && (
                               <a
@@ -1520,7 +1520,9 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
                     <div className="bg-gray-50 rounded-xl p-3">
                       <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Disbursement</span>
-                      <span className="font-bold text-gray-900">{prize.walletType.replace(/_/g, ' ').toUpperCase()}</span>
+                      <span className="font-bold text-gray-900">
+                        {!prize.walletType || prize.walletType.includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -1318,7 +1318,7 @@ export default function SubscriberPortal() {
                             <span className={`uppercase text-[9px] px-1 py-0.2 rounded font-mono ${
                               isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
                             }`}>
-                              {tx.walletType.replace(/_/g, ' ')}
+                              {!tx.walletType || tx.walletType.toLowerCase().includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
                             </span>
                           </div>
                         </div>
@@ -1615,7 +1615,7 @@ export default function SubscriberPortal() {
                             <span className={`uppercase text-[9px] px-1.5 py-0.2 rounded font-mono ${
                               isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
                             }`}>
-                              {tx.walletType.replace(/_/g, ' ')}
+                              {!tx.walletType || tx.walletType.toLowerCase().includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
                             </span>
                           </div>
                         </div>
@@ -1846,7 +1846,9 @@ export default function SubscriberPortal() {
               </div>
               <div className="flex justify-between">
                 <span className="opacity-60">Payment Mode:</span>
-                <span className="uppercase font-mono">{selectedTx.walletType.replace(/_/g, ' ')}</span>
+                <span className="uppercase font-mono font-semibold">
+                  {!selectedTx.walletType || selectedTx.walletType.toLowerCase().includes('cash') ? 'Cash in Hand' : 'Online Transfer'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="opacity-60">Date:</span>

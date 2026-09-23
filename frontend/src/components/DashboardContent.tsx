@@ -2698,7 +2698,7 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
 *Ticket No:* #${member.ticket}
 *Subscriber:* ${member.name}
 *Amount Paid:* ₹${Number(tx?.amount || paidAmount).toLocaleString('en-IN')}
-*Payment Mode:* ${tx?.wallet_type ? tx.wallet_type.replace(/_/g, ' ').toUpperCase() : 'Cash'}
+*Payment Mode:* ${!tx?.wallet_type || tx.wallet_type.includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
 *Date:* ${dateStr}
 ----------------------------------
 *Total Due this Month:* ₹${totalDue.toLocaleString('en-IN')}
@@ -4152,7 +4152,7 @@ Thank you for your prompt payment! 🙏`;
                               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                                 <span className="text-xs font-bold text-gray-900 truncate">{memberName}</span>
                                 <span className="text-[10px] font-mono bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded shrink-0">
-                                  {tx.wallet_type?.replace(/_/g, ' ').toUpperCase() || 'CASH'}
+                                  {!tx.wallet_type || tx.wallet_type.includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
                                 </span>
                                 {tx.verification_proof_url && (
                                   <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded flex items-center gap-0.5 shrink-0">
