@@ -214,8 +214,9 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
           return activeMonthsList.some(mNum => new RegExp(`\\bMonth\\s+${mNum}\\b`, 'i').test(tx.notes));
         });
 
-        if (memberTxs.length > 0) {
-          const totalPaid = memberTxs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+        const totalPaid = memberTxs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+
+        if (totalPaid > 0) {
           const latestTx = memberTxs[0];
           if (latestTx?.created_at) {
             const d = new Date(latestTx.created_at);
@@ -230,7 +231,11 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
           balanceAmount = Math.max(0, totalDue - totalPaid);
           isPaid = totalPaid >= totalDue;
         } else {
-          balanceAmount = totalDue;
+          // If no payment made for this cycle, leave DATE, PAID, and BALANCE empty for manual paper handwriting
+          paidDate = '';
+          paidAmount = undefined;
+          balanceAmount = undefined;
+          isPaid = false;
         }
       }
 
