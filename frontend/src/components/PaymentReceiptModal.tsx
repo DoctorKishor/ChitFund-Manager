@@ -132,8 +132,10 @@ function getReceiptMonthLabel(startDateStr: string | null | undefined, monthNumb
 
   const fallbackDate = txDateStr ? new Date(txDateStr) : new Date();
   const validDate = !isNaN(fallbackDate.getTime()) ? fallbackDate : new Date();
-  const monthName = validDate.toLocaleString('en-IN', { month: 'long' });
-  const year = validDate.getFullYear();
+  // If Month 1 is validDate, Month 0 was -1 month, Month 2 is +1 month
+  const targetFallback = new Date(validDate.getFullYear(), validDate.getMonth() + (monthNumber <= 0 ? -1 : monthNumber - 1), 1);
+  const monthName = targetFallback.toLocaleString('en-IN', { month: 'long' });
+  const year = targetFallback.getFullYear();
   return monthNumber === 0 ? `${monthName} ${year} · Month 0 (Launch)` : `${monthName} ${year} · Month ${monthNumber}`;
 }
 

@@ -4185,9 +4185,23 @@ Thank you for your prompt payment! 🙏`;
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                              <div className="flex items-center gap-2 text-[10px] text-gray-400 flex-wrap">
                                 <span>{dateStr}</span>
-                                {tx.notes && <span className="text-gray-500 italic max-w-[150px] sm:max-w-xs truncate">· {tx.notes}</span>}
+                                {tx.notes && (() => {
+                                  const clean = tx.notes.replace(/\[Batch:[^\]]+\]/g, '').trim();
+                                  const batchMatch = tx.notes.match(/\[Batch:([A-Za-z0-9_-]+)\|Total:([0-9.]+)\|Alloc:([^\]]+)\]/);
+                                  const total = batchMatch ? parseFloat(batchMatch[2]) : null;
+                                  return (
+                                    <>
+                                      {clean && <span className="text-gray-500 italic max-w-[150px] sm:max-w-xs truncate">· {clean}</span>}
+                                      {total && total !== Number(tx.amount) && (
+                                        <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                                          Part of {formatCurrency(total)} Batch
+                                        </span>
+                                      )}
+                                    </>
+                                  );
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -4319,10 +4333,23 @@ Thank you for your prompt payment! 🙏`;
                               )}
                             </>
                           ) : (
-                            <>
-                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Logged Amount</span>
-                              <span className="font-bold text-indigo-600">{formatCurrency(Number(editingTransaction.amount || 0))}</span>
-                            </>
+                            (() => {
+                              const match = editingTransaction.notes?.match(/\[Batch:([A-Za-z0-9_-]+)\|Total:([0-9.]+)\|Alloc:([^\]]+)\]/);
+                              const batchTotal = match ? parseFloat(match[2]) : null;
+                              return (
+                                <>
+                                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Logged Amount</span>
+                                  <div className="flex items-center gap-1.5 justify-end flex-wrap">
+                                    <span className="font-bold text-indigo-600">{formatCurrency(Number(editingTransaction.amount || 0))}</span>
+                                    {batchTotal && batchTotal !== Number(editingTransaction.amount) && (
+                                      <span className="text-[9.5px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.2 rounded">
+                                        Part of {formatCurrency(batchTotal)} Total
+                                      </span>
+                                    )}
+                                  </div>
+                                </>
+                              );
+                            })()
                           )}
                         </div>
                       </div>
