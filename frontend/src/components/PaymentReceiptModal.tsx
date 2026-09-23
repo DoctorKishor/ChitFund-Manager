@@ -82,27 +82,26 @@ function numberToWordsINR(amount: number): string {
 }
 
 // Helper to get formatted Calendar Month label for a chit group month
-function getReceiptMonthLabel(startDateStr: string | null | undefined, monthNumber: number): string {
-  if (!startDateStr) {
-    return monthNumber === 0 ? 'Month 0 (Launch Month)' : `Month ${monthNumber}`;
-  }
+function getReceiptMonthLabel(startDateStr: string | null | undefined, monthNumber: number, txDateStr?: string | null): string {
   try {
-    const base = new Date(startDateStr);
-    if (isNaN(base.getTime())) {
-      return monthNumber === 0 ? 'Month 0 (Launch Month)' : `Month ${monthNumber}`;
+    if (startDateStr) {
+      const base = new Date(startDateStr);
+      if (!isNaN(base.getTime())) {
+        const targetDate = new Date(base.getFullYear(), base.getMonth() + monthNumber, 1);
+        const monthName = targetDate.toLocaleString('en-IN', { month: 'long' });
+        const year = targetDate.getFullYear();
+        return monthNumber === 0 ? `${monthName} ${year} · Month 0 (Launch)` : `${monthName} ${year} · Month ${monthNumber}`;
+      }
     }
-    // Month 0 is launch month at start_date, Month 1 is start_date + 1 month
-    const targetDate = new Date(base.getFullYear(), base.getMonth() + monthNumber, 1);
-    const monthName = targetDate.toLocaleString('en-IN', { month: 'long' });
-    const year = targetDate.getFullYear();
-    
-    if (monthNumber === 0) {
-      return `${monthName} ${year} · Month 0 (Launch)`;
-    }
-    return `${monthName} ${year} · Month ${monthNumber}`;
-  } catch {
-    return monthNumber === 0 ? 'Month 0 (Launch Month)' : `Month ${monthNumber}`;
+  } catch (e) {
+    // Fallback
   }
+
+  const fallbackDate = txDateStr ? new Date(txDateStr) : new Date();
+  const validDate = !isNaN(fallbackDate.getTime()) ? fallbackDate : new Date();
+  const monthName = validDate.toLocaleString('en-IN', { month: 'long' });
+  const year = validDate.getFullYear();
+  return monthNumber === 0 ? `${monthName} ${year} · Month 0 (Launch)` : `${monthName} ${year} · Month ${monthNumber}`;
 }
 
 export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
@@ -144,7 +143,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   const totalGroupOutstanding = remainingBalance + pastPendingDues;
 
   const receiptNo = `RCP-${String(transaction.id || 'TX001').slice(0, 8).toUpperCase()}`;
-  const monthLabel = getReceiptMonthLabel(group?.start_date, month);
+  const monthLabel = getReceiptMonthLabel(group?.start_date, month, transaction.created_at);
   
   const txDate = transaction.created_at ? new Date(transaction.created_at) : new Date();
   const dateFormatted = txDate.toLocaleDateString('en-IN', {
@@ -178,13 +177,15 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
     ? window.location.origin 
     : process.env.NEXT_PUBLIC_APP_URL || 'https://chitfund.app';
 
-  // Helper to generate pixel-perfect PNG dataUrl from the unconstrained offscreen export element
+  // Helper to generate unclipped, full-page pixel-perfect PNG dataUrl
   const getReceiptPngDataUrl = async (): Promise<string> => {
     const targetNode = exportRef.current || previewRef.current;
     if (!targetNode) throw new Error('Receipt render target not found');
 
     const width = 480;
-    const height = targetNode.scrollHeight || targetNode.offsetHeight || 620;
+    const scrollH = targetNode.scrollHeight;
+    const offsetH = targetNode.offsetHeight;
+    const height = Math.max(scrollH, offsetH, 560);
 
     return await toPng(targetNode, {
       quality: 1,
@@ -198,11 +199,12 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       style: {
         width: `${width}px`,
         maxWidth: `${width}px`,
-        height: 'auto',
+        height: `${height}px`,
         maxHeight: 'none',
         overflow: 'visible',
         transform: 'none',
         margin: '0',
+        padding: '0',
       }
     });
   };
@@ -303,9 +305,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           `*Payment Mode:* ${walletDisplay}\n` +
           `*Date:* ${dateFormatted}, ${timeFormatted}\n` +
           `----------------------------------\n` +
-          `*Month ${month === 0 ? '0' : month} Pending:* ${isCleared ? '₹0 (CLEARED ✅)' : `${formatCurrency(remainingBalance)} PENDING`}\n` +
-          `*Past Overdue (${groupName}):* ${pastPendingDues > 0 ? `${formatCurrency(pastPendingDues)} (Pending in M${pastPendingMonths.join(', M')})` : '₹0 (All Previous Months Cleared ✅)'}\n` +
-          `*Total Group Outstanding:* ${totalGroupOutstanding === 0 ? '₹0 (All Dues Cleared ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}\n\n` +
+          `*Month ${month === 0 ? '0' : month} Pending Due:* ${isCleared ? 'No Pending (Cleared ✅)' : `${formatCurrency(remainingBalance)} Pending`}\n` +
+          `*Past Pending Dues (${groupName}):* ${pastPendingDues > 0 ? `${formatCurrency(pastPendingDues)} (Pending in M${pastPendingMonths.join(', M')})` : 'No Past Pending (Cleared ✅)'}\n` +
+          `*Total Group Outstanding:* ${totalGroupOutstanding === 0 ? 'No Pending (Fully Cleared ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}\n\n` +
           `_Receipt image downloaded. Thank you!_ 🙏`;
         
         const waUrl = cleanPhone 
@@ -371,24 +373,24 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
     }
   };
 
-  // Shared Receipt Visual Template Component (Light Luxury Theme)
+  // Shared Receipt Visual Template Component (Full-page, Crisp Light Luxury Theme)
   const renderReceiptCard = () => (
     <div className="w-[480px] bg-white text-slate-900 shadow-2xl overflow-hidden font-sans border border-slate-200" style={{ borderRadius: '0px' }}>
       
       {/* ── TOP LIGHT LUXURY HEADER ── */}
-      <div className="bg-gradient-to-b from-slate-50 via-slate-50/90 to-white text-slate-900 p-5 border-b-2 border-emerald-500">
+      <div className="bg-gradient-to-b from-slate-50 via-slate-50/90 to-white text-slate-900 px-4 py-3.5 border-b-2 border-emerald-500">
         <div className="flex items-center justify-between gap-3">
           
-          {/* Logo & Brand Name perfectly aligned */}
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-black flex items-center justify-center text-base shadow-sm shrink-0 border border-emerald-500/30">
+          {/* Logo & Brand Name */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-black flex items-center justify-center text-sm shadow-sm shrink-0 border border-emerald-500/30">
               {activeOrgInitials}
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-black tracking-wider uppercase text-slate-900 leading-tight truncate">
+              <h2 className="text-xs sm:text-sm font-black tracking-wider uppercase text-slate-900 leading-tight truncate">
                 {activeOrgName}
               </h2>
-              <p className="text-[10px] text-emerald-700 font-bold tracking-widest uppercase mt-0.5">
+              <p className="text-[9.5px] text-emerald-700 font-bold tracking-widest uppercase mt-0.5">
                 {activeOrgTagline}
               </p>
             </div>
@@ -396,10 +398,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
           {/* Paid Tag Badge */}
           <div className="shrink-0 text-right">
-            <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-2xs">
+            <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-2xs">
               <CheckCircle2 size={11} className="text-emerald-600" /> PAID
             </span>
-            <p className="text-[10px] font-mono text-slate-500 mt-1 font-bold">
+            <p className="text-[9.5px] font-mono text-slate-500 mt-0.5 font-bold">
               {receiptNo}
             </p>
           </div>
@@ -407,7 +409,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         </div>
 
         {/* Sub-header Banner */}
-        <div className="mt-3.5 pt-2.5 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-600">
+        <div className="mt-2.5 pt-2 border-t border-slate-200 flex items-center justify-between text-[9.5px] text-slate-600">
           <span className="font-extrabold text-slate-800 tracking-wider flex items-center gap-1">
             <Sparkles size={11} className="text-emerald-600" /> OFFICIAL PAYMENT RECEIPT
           </span>
@@ -416,10 +418,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       </div>
 
       {/* ── BODY CONTENT ── */}
-      <div className="p-5 space-y-4 bg-white">
+      <div className="p-4 space-y-3 bg-white">
         
         {/* Subscriber & Group Grid */}
-        <div className="grid grid-cols-2 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+        <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
           <div>
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
               Subscriber Name
@@ -448,14 +450,14 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         </div>
 
         {/* Hero Amount Paid Box */}
-        <div className="p-4 bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-teal-50 border border-emerald-300 rounded-xl text-center relative overflow-hidden shadow-2xs">
-          <div className="text-[10px] font-black text-emerald-800 uppercase tracking-widest mb-0.5">
+        <div className="p-3 bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-teal-50 border border-emerald-300 rounded-xl text-center relative overflow-hidden shadow-2xs">
+          <div className="text-[9.5px] font-black text-emerald-800 uppercase tracking-widest mb-0.5">
             Amount Received
           </div>
-          <div className="text-3xl font-black text-emerald-700 tracking-tight my-0.5">
+          <div className="text-2xl sm:text-3xl font-black text-emerald-700 tracking-tight my-0.5">
             {formatCurrency(paidAmount)}
           </div>
-          <div className="text-[10.5px] font-bold text-emerald-900 italic">
+          <div className="text-[10px] font-bold text-emerald-900 italic">
             {amountInWords}
           </div>
         </div>
@@ -463,63 +465,70 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         {/* Detailed Payment & Group Dues Breakdown Matrix */}
         <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs shadow-2xs">
           
-          {/* Payment Applied For Month (With Formatted Calendar Month Name) */}
-          <div className="flex justify-between items-center px-3.5 py-2.5 bg-slate-50/70">
-            <span className="text-slate-500 font-semibold">Payment For Month</span>
+          {/* Row 1: Payment Applied For Month (Calendar Month Name + Month Number) */}
+          <div className="flex justify-between items-center px-3.5 py-2 bg-slate-50/70">
+            <span className="text-slate-600 font-semibold text-[11px]">Payment For Month</span>
             <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-lg text-[11px] shadow-2xs">
               {monthLabel}
             </span>
           </div>
 
-          {/* Payment Mode */}
-          <div className="flex justify-between items-center px-3.5 py-2.5">
-            <span className="text-slate-500 font-semibold">Payment Mode</span>
-            <span className="font-bold text-slate-800 font-mono bg-slate-100 px-2 py-0.5 rounded text-[10.5px]">
+          {/* Row 2: Payment Mode (Confidential Masking) */}
+          <div className="flex justify-between items-center px-3.5 py-2">
+            <span className="text-slate-600 font-semibold text-[11px]">Payment Mode</span>
+            <span className="font-bold text-slate-800 font-mono bg-slate-100 px-2.5 py-0.5 rounded text-[10.5px]">
               {walletDisplay}
             </span>
           </div>
 
-          {/* Amount Paid in this Receipt */}
-          <div className="flex justify-between items-center px-3.5 py-2.5 bg-emerald-50/40">
-            <span className="text-emerald-800 font-bold">Amount Credited (This Receipt)</span>
-            <span className="font-extrabold text-emerald-700 font-mono text-sm">
-              +{formatCurrency(paidAmount)}
+          {/* Row 3: Current Month Pending Due */}
+          <div className="flex justify-between items-center px-3.5 py-2 bg-slate-50/40">
+            <span className="text-slate-700 font-bold text-[11px]">
+              Month {month === 0 ? '0' : month} Pending Due
+            </span>
+            <span className={`font-extrabold text-[11px] px-2 py-0.5 rounded border ${
+              isCleared 
+                ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                : 'text-amber-700 bg-amber-50 border-amber-200'
+            }`}>
+              {isCleared ? 'No Pending (Cleared ✅)' : `${formatCurrency(remainingBalance)} Pending`}
             </span>
           </div>
 
-          {/* Current Month Balance (Cleared or Pending) */}
-          <div className="flex justify-between items-center px-3.5 py-2.5">
-            <span className="text-slate-600 font-bold">Month {month === 0 ? '0' : month} Pending Balance</span>
-            <span className={`font-black ${isCleared ? 'text-emerald-700' : 'text-amber-700'}`}>
-              {isCleared ? '₹0 (CLEARED ✅)' : `${formatCurrency(remainingBalance)} PENDING`}
-            </span>
-          </div>
-
-          {/* Past Pending Dues for this Particular Chit Group */}
-          <div className="flex justify-between items-center px-3.5 py-2.5 bg-slate-50/60">
-            <div>
-              <span className="text-slate-600 font-bold block">Past Pending Dues ({groupName})</span>
+          {/* Row 4: Past Pending Dues for this Particular Chit Group */}
+          <div className="flex justify-between items-center px-3.5 py-2">
+            <div className="pr-2">
+              <span className="text-slate-700 font-bold block text-[11px]">Past Pending Dues ({groupName})</span>
               {pastPendingDues > 0 && pastPendingMonths.length > 0 ? (
-                <span className="text-[9.5px] text-amber-700 font-mono font-medium block">
-                  Overdue in: {pastPendingMonths.map(m => `Month ${m}`).join(', ')}
+                <span className="text-[9px] text-amber-700 font-mono font-medium block">
+                  Pending in: {pastPendingMonths.map(m => `Month ${m}`).join(', ')}
                 </span>
               ) : null}
             </div>
-            <span className={`font-black ${pastPendingDues > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-              {pastPendingDues > 0 ? formatCurrency(pastPendingDues) : '₹0 (All Previous Months Cleared ✅)'}
+            <span className={`font-extrabold text-[11px] px-2 py-0.5 rounded border shrink-0 ${
+              pastPendingDues === 0 
+                ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                : 'text-amber-700 bg-amber-50 border-amber-200'
+            }`}>
+              {pastPendingDues === 0 ? 'No Past Pending ✅' : `${formatCurrency(pastPendingDues)} Pending`}
             </span>
           </div>
 
-          {/* Total Group Outstanding Balance */}
-          <div className="flex justify-between items-center px-3.5 py-2.5 bg-slate-100/70 border-t border-slate-200">
-            <span className="text-slate-800 font-extrabold text-[11.5px]">Total Outstanding ({groupName})</span>
-            <span className={`font-black text-sm ${totalGroupOutstanding === 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-              {totalGroupOutstanding === 0 ? '₹0 (All Dues Cleared ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}
+          {/* Row 5: Total Group Outstanding Balance */}
+          <div className="flex justify-between items-center px-3.5 py-2 bg-slate-100/80 border-t border-slate-200">
+            <span className="text-slate-900 font-extrabold text-[11.5px]">Total Outstanding ({groupName})</span>
+            <span className={`font-black text-xs px-2.5 py-0.5 rounded border ${
+              totalGroupOutstanding === 0 
+                ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                : 'text-rose-600 bg-rose-50 border-rose-200'
+            }`}>
+              {totalGroupOutstanding === 0 ? '₹0 (All Cleared ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}
             </span>
           </div>
 
+          {/* Optional Note */}
           {transaction.notes && (
-            <div className="flex justify-between items-center px-3.5 py-2 bg-amber-50/40 text-[10.5px]">
+            <div className="flex justify-between items-center px-3.5 py-1.5 bg-amber-50/40 text-[10px]">
               <span className="text-slate-400 font-semibold">Note</span>
               <span className="text-slate-700 italic truncate max-w-[260px] font-medium">
                 {transaction.notes}
@@ -529,20 +538,20 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         </div>
 
         {/* Sign-off & Verification Seal */}
-        <div className="pt-3 border-t border-dashed border-slate-300 flex items-center justify-between text-[9.5px] text-slate-500">
+        <div className="pt-2.5 border-t border-dashed border-slate-300 flex items-center justify-between text-[9px] text-slate-500">
           <div className="space-y-0.5">
             <div className="flex items-center gap-1 text-emerald-700 font-extrabold">
-              <ShieldCheck size={13} className="text-emerald-600" />
+              <ShieldCheck size={12} className="text-emerald-600" />
               <span>AUTHENTICATED RECORD</span>
             </div>
-            <p className="text-[9px] text-slate-400 font-medium">
+            <p className="text-[8.5px] text-slate-400 font-medium">
               Passbook: <strong className="text-slate-600">{appPortalUrl.replace(/^https?:\/\//, '')}</strong>
             </p>
           </div>
 
           <div className="text-right flex flex-col items-end">
-            <div className="w-20 h-4 border-b border-slate-400 border-dashed" />
-            <span className="text-[8.5px] font-bold text-slate-600 uppercase mt-0.5">
+            <div className="w-18 h-3.5 border-b border-slate-400 border-dashed" />
+            <span className="text-[8px] font-bold text-slate-600 uppercase mt-0.5">
               Authorized Signatory
             </span>
           </div>
@@ -551,7 +560,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       </div>
 
       {/* Bottom Security Bar */}
-      <div className="bg-slate-100 px-4 py-2 border-t border-slate-200 text-center text-[8.5px] text-slate-500 font-mono font-medium">
+      <div className="bg-slate-100 px-4 py-1.5 border-t border-slate-200 text-center text-[8px] text-slate-500 font-mono font-medium">
         Computer-generated digital receipt · Registered on Supabase Ledger
       </div>
 
@@ -560,10 +569,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto flex flex-col max-h-[96dvh]">
+      <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto flex flex-col max-h-[92vh] sm:max-h-[95vh]">
         
         {/* Top Actions Header (Light Theme) */}
-        <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
+        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0 shadow-2xs">
               <FileCheck size={16} />
@@ -572,8 +581,8 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               <h3 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
                 Payment Receipt PNG
               </h3>
-              <p className="text-[10px] text-slate-500 font-mono font-semibold">
-                {receiptNo} · Month {month}
+              <p className="text-[10px] text-slate-500 font-mono font-semibold truncate">
+                {receiptNo} · {monthLabel}
               </p>
             </div>
           </div>
@@ -588,18 +597,18 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         </div>
 
         {/* Scrollable Receipt Preview Area (Light Theme) */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-slate-100/90 flex flex-col items-center justify-start min-h-0">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-slate-100/90 flex flex-col items-center justify-start min-h-0">
           
           {/* Status / Toast alert if any */}
           {shareStatus && (
-            <div className="mb-3 px-3 py-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 shadow-2xs">
+            <div className="mb-2.5 px-3 py-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 shadow-2xs">
               <CheckCircle2 size={14} className="text-emerald-600" />
               <span>{shareStatus}</span>
             </div>
           )}
 
           {copiedToast && (
-            <div className="mb-3 px-3 py-1.5 bg-indigo-50 border border-indigo-300 text-indigo-800 text-xs font-semibold rounded-xl flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 shadow-2xs">
+            <div className="mb-2.5 px-3 py-1.5 bg-indigo-50 border border-indigo-300 text-indigo-800 text-xs font-semibold rounded-xl flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 shadow-2xs">
               <Check size={14} className="text-indigo-600" />
               <span>Receipt image copied to clipboard! (Ctrl+V to paste)</span>
             </div>
@@ -615,7 +624,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         </div>
 
         {/* Modal Action Controls Bar (Light Theme) */}
-        <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
           
           <div className="flex items-center gap-1.5">
             <button
@@ -667,18 +676,20 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
       </div>
 
-      {/* ── UNCONSTRAINED OFFSCREEN EXPORT RENDER ELEMENT (Prevents all scroll & viewport clipping) ── */}
+      {/* ── UNCONSTRAINED OFFSCREEN EXPORT RENDER ELEMENT (Guarantees Full Page PNG with Zero Crop) ── */}
       <div
         style={{
-          position: 'fixed',
+          position: 'absolute',
           top: 0,
           left: '-9999px',
           width: '480px',
+          height: 'auto',
+          overflow: 'visible',
           zIndex: -9999,
           pointerEvents: 'none',
         }}
       >
-        <div ref={exportRef} style={{ width: '480px', backgroundColor: '#ffffff' }}>
+        <div ref={exportRef} style={{ width: '480px', height: 'auto', overflow: 'visible', backgroundColor: '#ffffff' }}>
           {renderReceiptCard()}
         </div>
       </div>
@@ -686,3 +697,4 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
     </div>
   );
 };
+
