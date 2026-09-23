@@ -343,39 +343,71 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
   },
 ];
 
-// Standard Default Templates (English & Tamil based on WhatsApp bold format)
-const DEFAULT_PRE_AUCTION_EN = `*Dear Members,*
+// Standard Default Templates (Option A: Traditional & Respectful with Rupee symbols & Dividers)
+const DEFAULT_PRE_AUCTION_EN = `Dear Members,
 
-*Month {current_month} Chit Auction will be held on {auction_date} ({auction_date_short}) at {auction_time}.* *Please ensure your presence and participation.*
-
+*{group_name} — Month {current_month} Auction Notice*
+━━━━━━━━━━━━━━━━━━━━
+• Date : *{auction_date} ({auction_date_short})*
+• Time : *{auction_time}*
+• Installment : *₹{installment_due_raw}*
+━━━━━━━━━━━━━━━━━━━━
 *Chit Details:*
-*{member_count} × {installment_due_raw} = {total_chit_value_raw}*
+{member_count} Members × ₹{installment_due_raw} = *₹{total_chit_value_raw}*
 {laaba_seetu_notice}
-*Regards,*
+Please ensure your timely presence and participation.
+
+Regards,
 *{org_signature}*
-*Contact: {org_phone}*`;
+Contact: {org_phone}`;
 
-const DEFAULT_POST_AUCTION_EN = `*Month {current_month} Auction Discount: {winning_discount_raw},*
+const DEFAULT_POST_AUCTION_EN = `Dear Members,
 
-*Previous Balance Pool: {previous_pool_raw},*
+*{group_name} — Month {current_month} Auction Summary*
+━━━━━━━━━━━━━━━━━━━━
+• Winning Discount : *₹{winning_discount_raw}*
+• Previous Pool : *₹{previous_pool_raw}*
+• Current Discount Pool : *₹{kai_iruppu_pool_raw}*
+━━━━━━━━━━━━━━━━━━━━
+• Winner : *{winner_name} ({winner_ticket})*
+• Net Winner Payout : *{net_payout}*
+• Next Auction Date : *{next_auction_date}*
 
-*Current Balance Pool: {kai_iruppu_pool_raw}.*
+Regards,
+*{org_signature}*
+Contact: {org_phone}`;
 
-*🏆 Winner: {winner_name} ({winner_ticket})*
-*💵 Net Payout: {net_payout}*
-*Next Monthly Auction: {next_auction_date}*`;
+const DEFAULT_PRE_AUCTION_TA = `அன்புடையீர் வணக்கம்,
 
-const DEFAULT_PRE_AUCTION_TA = `*வணக்கம்,*
+நமது *{group_name}* சீட்டின் *{current_month}-ம் மாத ஏல அறிவிப்பு*
+━━━━━━━━━━━━━━━━━━━━
+• தேதி : *{auction_date_short} ({auction_day_tamil})*
+• நேரம் : *{auction_time_tamil} மணி*
+• தவணை : *₹{installment_due_raw}*
+━━━━━━━━━━━━━━━━━━━━
+*சீட்டு தவணை விவரம்:*
+{member_count} நபர்கள் × ₹{installment_due_raw} = *₹{total_chit_value_raw}*
+{laaba_seetu_notice}
+தாங்கள் தவறாமல் குறித்த நேரத்தில் கலந்துகொள்ள அன்புடன் வேண்டுகிறோம்.
 
-*{current_month} ம் மாத சீட்டு {auction_date_short} {auction_day_tamil} {auction_time_tamil} மணிக்கு நடைபெறும்,* *அதுசமயம் தாங்கள் அவசியம் கலந்து கொள்ள வேண்டுகிறேன்.*
-*தங்களது சீட்டு விவரம்*
-*{member_count}×{installment_due_raw}={total_chit_value_raw}.*`;
+இங்ஙனம்,
+*{org_signature}*
+தொடர்புக்கு: {org_phone}`;
 
-const DEFAULT_POST_AUCTION_TA = `*{current_month}ம் மாத தள்ளுபடி {winning_discount_raw},*
+const DEFAULT_POST_AUCTION_TA = `வணக்கம்,
 
-*முன் கையிருப்பு {previous_pool_raw},*
+நமது *{group_name}* சீட்டின் *{current_month}-ம் மாத ஏல கணக்கு விவரம்*
+━━━━━━━━━━━━━━━━━━━━
+• ஏலத் தள்ளுபடி : *₹{winning_discount_raw}*
+• முன் கையிருப்பு : *₹{previous_pool_raw}*
+• புதிய கையிருப்பு : *₹{kai_iruppu_pool_raw}*
+━━━━━━━━━━━━━━━━━━━━
+• வெற்றி பெற்றவர் : *{winner_name} ({winner_ticket})*
+• அடுத்த ஏலத் தேதி : *{next_auction_date}*
 
-*கையிருப்பு {kai_iruppu_pool_raw}.*`;
+நன்றி,
+*{org_signature}*
+தொடர்புக்கு: {org_phone}`;
 
 // Curated Emoji Palette for Professional Chit Broadcasts
 const EMOJI_CATEGORIES = [
@@ -431,7 +463,14 @@ function renderWhatsAppFormatted(text: string) {
     <div className="space-y-1">
       {lines.map((line, lIdx) => {
         if (!line.trim()) {
-          return <div key={lIdx} className="h-2.5" />;
+          return <div key={lIdx} className="h-2" />;
+        }
+        if (line.includes('━') || line.includes('───')) {
+          return (
+            <div key={lIdx} className="text-gray-300 select-none font-mono text-[10px] tracking-tight py-0.5 leading-none">
+              {line}
+            </div>
+          );
         }
         const parts = line.split(/(\*[^*]+\*)/g);
         return (
