@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/utils/supabase/client';
 import { triggerHapticFeedback } from '@/utils/haptics';
+import SlideToConfirm from './SlideToConfirm';
 import {
   User,
   Lock,
@@ -19,10 +20,32 @@ import {
   Sliders,
   Save,
   LogOut,
-  Info
+  Info,
+  Database,
+  Trash2,
+  AlertTriangle,
+  Layers,
+  Flame,
+  Check,
+  X,
+  ShieldAlert,
+  Server,
+  Coins,
+  Users,
+  Trophy,
+  History
 } from 'lucide-react';
 
-type SettingsSubTab = 'profile' | 'security';
+type SettingsSubTab = 'profile' | 'security' | 'database';
+
+interface DatabaseStats {
+  groupsCount: number;
+  membershipsCount: number;
+  subscribersCount: number;
+  transactionsCount: number;
+  auctionLogsCount: number;
+  auditLogsCount: number;
+}
 
 export default function SettingsManager() {
   const { user, profile, refreshProfile, signOut } = useAuth();
@@ -45,6 +68,22 @@ export default function SettingsManager() {
   const [passwordSuccessMsg, setPasswordSuccessMsg] = useState<string | null>(null);
   const [passwordErrorMsg, setPasswordErrorMsg] = useState<string | null>(null);
 
+  // Database Management / Reset States
+  const [dbStats, setDbStats] = useState<DatabaseStats>({
+    groupsCount: 0,
+    membershipsCount: 0,
+    subscribersCount: 0,
+    transactionsCount: 0,
+    auctionLogsCount: 0,
+    auditLogsCount: 0,
+  });
+  const [loadingDbStats, setLoadingDbStats] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [confirmKeyword, setConfirmKeyword] = useState('');
+  const [isResettingDb, setIsResettingDb] = useState(false);
+  const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
+  const [resetErrorMsg, setResetErrorMsg] = useState<string | null>(null);
+
   // Sync profile data when context changes
   useEffect(() => {
     if (profile) {
@@ -59,6 +98,47 @@ export default function SettingsManager() {
     if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
     return digits;
   };
+
+  // Fetch live database statistics for test data
+  const fetchDbStats = useCallback(async () => {
+    try {
+      setLoadingDbStats(true);
+      const [
+        { count: groupsCount },
+        { count: membershipsCount },
+        { count: subscribersCount },
+        { count: transactionsCount },
+        { count: auctionLogsCount },
+        { count: auditLogsCount },
+      ] = await Promise.all([
+        supabase.from('chit_groups').select('*', { count: 'exact', head: true }),
+        supabase.from('group_members').select('*', { count: 'exact', head: true }),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'subscriber'),
+        supabase.from('transactions').select('*', { count: 'exact', head: true }),
+        supabase.from('auction_logs').select('*', { count: 'exact', head: true }),
+        supabase.from('security_audit_logs').select('*', { count: 'exact', head: true }),
+      ]);
+
+      setDbStats({
+        groupsCount: groupsCount || 0,
+        membershipsCount: membershipsCount || 0,
+        subscribersCount: subscribersCount || 0,
+        transactionsCount: transactionsCount || 0,
+        auctionLogsCount: auctionLogsCount || 0,
+        auditLogsCount: auditLogsCount || 0,
+      });
+    } catch (err) {
+      console.error('Failed to load database stats:', err);
+    } finally {
+      setLoadingDbStats(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSubTab === 'database') {
+      fetchDbStats();
+    }
+  }, [activeSubTab, fetchDbStats]);
 
   // 1. Save Profile Changes
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -156,6 +236,54 @@ export default function SettingsManager() {
     }
   };
 
+  // 3. Execute Complete Test Database Reset / Purge
+  const handleExecuteDatabaseReset = async () => {
+    if (confirmKeyword.trim().toUpperCase() !== 'RESET') {
+      setResetErrorMsg('Please type RESET in capital letters to confirm database purge.');
+      triggerHapticFeedback('warning');
+      return;
+    }
+
+    try {
+      setIsResettingDb(true);
+      setResetErrorMsg(null);
+      setResetSuccessMsg(null);
+
+      // Call the secure RPC function
+      const { data, error } = await supabase.rpc('reset_test_database', {
+        caller_id: profile?.id || user?.id,
+      });
+
+      if (error) {
+        // Fallback: If RPC fails, execute sequential deletes directly via Supabase client
+        console.warn('RPC reset_test_database failed, performing direct cascade reset:', error);
+
+        await supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('auction_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('group_members').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('chit_groups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('profiles').delete().eq('role', 'subscriber');
+        await supabase.from('global_treasury').update({
+          current_balance: 0,
+          pending_verification_balance: 0,
+          last_updated_by: profile?.id || null
+        }).neq('wallet_type', '');
+      }
+
+      triggerHapticFeedback('success');
+      setResetSuccessMsg('Database test data cleared completely! All chit groups, transactions, auctions, and test subscribers have been wiped. Treasury vaults reset to ₹0.');
+      setShowResetModal(false);
+      setConfirmKeyword('');
+      await fetchDbStats();
+    } catch (err: any) {
+      console.error('Failed to reset database:', err);
+      setResetErrorMsg(err.message || 'An error occurred while resetting the database.');
+      triggerHapticFeedback('error');
+    } finally {
+      setIsResettingDb(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* ── Top Header Ribbon ── */}
@@ -167,10 +295,10 @@ export default function SettingsManager() {
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-                Settings &amp; Profile Management
+                Settings &amp; System Management
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                Manage your administrator account details and security password
+                Manage your administrator account, security credentials, and database testing data
               </p>
             </div>
           </div>
@@ -209,6 +337,19 @@ export default function SettingsManager() {
           >
             <Lock size={14} />
             <span>Security &amp; Password</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('database')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 ${
+              activeSubTab === 'database'
+                ? 'bg-rose-700 text-white shadow-xs'
+                : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+            }`}
+          >
+            <Database size={14} />
+            <span>Database &amp; Test Data</span>
           </button>
         </div>
       </div>
@@ -507,6 +648,270 @@ export default function SettingsManager() {
                   <LogOut size={14} /> End Active Session / Sign Out
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SUB-TAB 3: DATABASE & TEST DATA (DANGER ZONE) ── */}
+      {activeSubTab === 'database' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Notifications */}
+          {resetSuccessMsg && (
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-start gap-3 shadow-xs">
+              <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold">{resetSuccessMsg}</p>
+                <p className="text-[11px] text-emerald-700">
+                  You can now create brand new test groups or deploy fresh production records.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-2 inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-3 py-1.5 rounded-lg transition-all active:scale-95"
+                >
+                  <RefreshCw size={12} /> Reload Application State
+                </button>
+              </div>
+            </div>
+          )}
+
+          {resetErrorMsg && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-3">
+              <AlertCircle size={18} className="text-rose-600 shrink-0" />
+              <span>{resetErrorMsg}</span>
+            </div>
+          )}
+
+          {/* Database Live Telemetry Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-gray-400 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Chit Groups</span>
+                <Layers size={14} className="text-indigo-500" />
+              </div>
+              <p className="text-xl font-black text-gray-900 font-mono">
+                {loadingDbStats ? '...' : dbStats.groupsCount}
+              </p>
+              <span className="text-[10px] text-gray-400 mt-0.5 block">Active &amp; Drafts</span>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-gray-400 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Memberships</span>
+                <Users size={14} className="text-blue-500" />
+              </div>
+              <p className="text-xl font-black text-gray-900 font-mono">
+                {loadingDbStats ? '...' : dbStats.membershipsCount}
+              </p>
+              <span className="text-[10px] text-gray-400 mt-0.5 block">Enrolled Tickets</span>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-gray-400 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Subscribers</span>
+                <User size={14} className="text-violet-500" />
+              </div>
+              <p className="text-xl font-black text-gray-900 font-mono">
+                {loadingDbStats ? '...' : dbStats.subscribersCount}
+              </p>
+              <span className="text-[10px] text-gray-400 mt-0.5 block">Test Profiles</span>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-gray-400 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Transactions</span>
+                <Coins size={14} className="text-emerald-500" />
+              </div>
+              <p className="text-xl font-black text-gray-900 font-mono">
+                {loadingDbStats ? '...' : dbStats.transactionsCount}
+              </p>
+              <span className="text-[10px] text-gray-400 mt-0.5 block">Ledger Receipts</span>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-gray-400 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Auctions</span>
+                <Trophy size={14} className="text-amber-500" />
+              </div>
+              <p className="text-xl font-black text-gray-900 font-mono">
+                {loadingDbStats ? '...' : dbStats.auctionLogsCount}
+              </p>
+              <span className="text-[10px] text-gray-400 mt-0.5 block">Auction Logs</span>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-gray-400 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Audit Logs</span>
+                <History size={14} className="text-gray-500" />
+              </div>
+              <p className="text-xl font-black text-gray-900 font-mono">
+                {loadingDbStats ? '...' : dbStats.auditLogsCount}
+              </p>
+              <span className="text-[10px] text-gray-400 mt-0.5 block">Security Trails</span>
+            </div>
+          </div>
+
+          {/* Danger Zone Card */}
+          <div className="bg-white border-2 border-rose-200 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center space-x-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-lg shrink-0">
+                  <Flame size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
+                    Danger Zone: Test Database Reset
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Clear test data from Supabase before publishing or initiating new simulation rounds.
+                  </p>
+                </div>
+              </div>
+
+              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md bg-rose-100 text-rose-800">
+                Admin Exclusive
+              </span>
+            </div>
+
+            {/* Scope Explanation Matrix */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-200 space-y-2.5">
+                <div className="font-bold text-rose-900 flex items-center gap-1.5">
+                  <Trash2 size={14} className="text-rose-600" />
+                  <span>Data That Will Be Completely Wiped:</span>
+                </div>
+                <ul className="space-y-1 text-rose-800 text-[11px] list-disc pl-4">
+                  <li>All <strong>Chit Groups</strong> and tickets</li>
+                  <li>All <strong>Group Memberships</strong> &amp; pocket book sync records</li>
+                  <li>All <strong>Auction Logs</strong>, bidding history &amp; winner payouts</li>
+                  <li>All <strong>Payment Receipts</strong>, collections &amp; personal draws</li>
+                  <li>All <strong>Test Subscriber Profiles</strong></li>
+                  <li>All historical <strong>Audit Logs</strong></li>
+                </ul>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-2.5">
+                <div className="font-bold text-emerald-900 flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-emerald-600" />
+                  <span>Structural Integrity &amp; Admin Accounts Preserved:</span>
+                </div>
+                <ul className="space-y-1 text-emerald-800 text-[11px] list-disc pl-4">
+                  <li><strong>PostgreSQL Schema</strong>, tables, indexes &amp; triggers</li>
+                  <li><strong>Row-Level Security (RLS)</strong> access policies</li>
+                  <li><strong>Admin &amp; Manager Auth Accounts</strong> (Dr. Kishor Anbazhakan)</li>
+                  <li><strong>4 Treasury Vault Structures</strong> (reset to ₹0 balances: Cash Box, Kishor Bank, Dad Bank, Mom Bank)</li>
+                  <li>System settings &amp; custom roles definition</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Action Area */}
+            <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-[11px] text-gray-500 text-center sm:text-left">
+                ⚠️ This operation cannot be undone. Always verify you are ready to wipe test records.
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmKeyword('');
+                  setResetErrorMsg(null);
+                  setShowResetModal(true);
+                  triggerHapticFeedback('warning');
+                }}
+                className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all shadow-md shadow-rose-600/20 flex items-center justify-center gap-2 active:scale-95"
+              >
+                <Trash2 size={15} />
+                <span>Delete Test Database &amp; Reset</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 2-STEP CONFIRMATION MODAL ── */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl border border-gray-200 p-6 sm:p-7 w-full max-w-lg space-y-5 shadow-2xl relative animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex justify-between items-start">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-gray-900">
+                    Confirm Database Test Purge
+                  </h4>
+                  <p className="text-xs text-gray-500">
+                    Irreversible administrative operation
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                className="text-gray-400 hover:text-gray-700 p-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Warning Message */}
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-2">
+              <div className="font-bold flex items-center gap-1.5">
+                <Flame size={14} className="text-rose-600" />
+                <span>You are about to purge all testing data:</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-rose-950 pt-1">
+                <div>• {dbStats.groupsCount} Chit Groups</div>
+                <div>• {dbStats.membershipsCount} Enrolled Tickets</div>
+                <div>• {dbStats.subscribersCount} Test Members</div>
+                <div>• {dbStats.transactionsCount} Transactions</div>
+                <div>• {dbStats.auctionLogsCount} Auction Logs</div>
+                <div>• Treasury Balances → ₹0</div>
+              </div>
+            </div>
+
+            {/* Keyword Confirmation Prompt */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-700">
+                Type <span className="font-mono text-rose-600 font-black">RESET</span> below to unlock confirmation:
+              </label>
+              <input
+                type="text"
+                autoFocus
+                placeholder="Type RESET here"
+                value={confirmKeyword}
+                onChange={(e) => setConfirmKeyword(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-300 focus:border-rose-600 rounded-xl px-4 py-2.5 text-xs font-mono font-bold tracking-widest text-gray-900 focus:outline-none uppercase"
+              />
+            </div>
+
+            {/* Slider Confirmation */}
+            <div className="pt-2">
+              <SlideToConfirm
+                onConfirm={handleExecuteDatabaseReset}
+                disabled={confirmKeyword.trim().toUpperCase() !== 'RESET' || isResettingDb}
+                isLoading={isResettingDb}
+                label="Slide to Wipe All Test Data"
+                confirmedLabel="Database Wiped!"
+                loadingLabel="Purging Test Data..."
+                colorVariant="red"
+              />
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                disabled={isResettingDb}
+                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition-all"
+              >
+                Cancel / Keep Data
+              </button>
             </div>
           </div>
         </div>

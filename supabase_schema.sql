@@ -794,4 +794,69 @@ insert into public.system_settings (key, value)
 values ('maintenance_mode', '{"enabled": false, "message": "Scheduled upgrades in progress."}'::jsonb)
 on conflict (key) do nothing;
 
+-- ==========================================
+-- 9. Secure Test Database Reset / Purge RPC
+-- ==========================================
+create or replace function public.reset_test_database(caller_id uuid default auth.uid())
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  caller_role text;
+  result jsonb;
+begin
+  -- 1. Security Check: Only admins can invoke this database reset
+  select role into caller_role from public.profiles where id = caller_id;
+  if caller_role != 'admin' then
+    raise exception 'Unauthorized: Only an administrator can execute a database reset.';
+  end if;
+
+  -- 2. Clear transactional and auction history
+  delete from public.transactions;
+  delete from public.auction_logs;
+  
+  -- 3. Clear memberships and chit groups
+  delete from public.group_members;
+  delete from public.chit_groups;
+  
+  -- 4. Clear passbook inventory if any
+  delete from public.passbook_inventory;
+
+  -- 5. Delete all test subscribers/non-auth profiles, but PRESERVE authenticated admin users
+  delete from public.profiles 
+  where id not in (select id from auth.users)
+     or role = 'subscriber';
+
+  -- 6. Reset all 4 treasury vaults to zero balance
+  update public.global_treasury 
+  set current_balance = 0, 
+      pending_verification_balance = 0,
+      last_updated_by = caller_id;
+
+  -- Ensure all 4 default vaults exist in case any was missing
+  insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
+  values 
+    ('cash_in_hand', 0, 0, caller_id),
+    ('kishor_bank', 0, 0, caller_id),
+    ('dad_bank', 0, 0, caller_id),
+    ('mom_bank', 0, 0, caller_id)
+  on conflict (wallet_type) do update 
+  set current_balance = 0, pending_verification_balance = 0;
+
+  -- 7. Reset audit logs and record the purge event
+  delete from public.security_audit_logs;
+  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
+  values (caller_id, 'SYSTEM RESET: Full test database cleared. All chit groups, transactions, auctions, and test members wiped.', 'all', timezone('utc'::text, now()));
+
+  result := jsonb_build_object(
+    'success', true,
+    'message', 'Database test data wiped successfully. Treasury reset to ₹0. System ready for fresh testing or production.'
+  );
+
+  return result;
+end;
+$$;
+
 
