@@ -1001,7 +1001,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                     </button>
 
                     {showInsertDropdown && (
-                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 w-[calc(100vw-3.5rem)] max-w-[320px] sm:w-80 max-h-80 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
+                      <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 w-[calc(100vw-3rem)] max-w-[320px] sm:w-80 max-h-80 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
                         <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
                           Select Dynamic Variable
                         </div>
