@@ -330,6 +330,26 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
     getValue: (_, __, orgPhone) => orgPhone || '9943609010',
   },
   {
+    key: 'app_portal_url',
+    label: 'App Portal Link (URL)',
+    category: 'org',
+    description: 'Hosted web link for members to access passbook & chit ledger',
+    getValue: () =>
+      typeof window !== 'undefined' && window.location.origin
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_APP_URL || 'https://chitfund.app',
+  },
+  {
+    key: 'app_url',
+    label: 'App URL Short',
+    category: 'org',
+    description: 'Alias for App Portal web link',
+    getValue: () =>
+      typeof window !== 'undefined' && window.location.origin
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_APP_URL || 'https://chitfund.app',
+  },
+  {
     key: 'today_date',
     label: "Today's Date",
     category: 'org',
@@ -343,7 +363,7 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
   },
 ];
 
-// Standard Default Templates (Option A: Traditional & Respectful with Rupee symbols & Dividers)
+// Standard Default Templates (Option A: Traditional & Respectful with Rupee symbols, Dividers, & Portal Link)
 const DEFAULT_PRE_AUCTION_EN = `Dear Members,
 
 *{group_name} — Month {current_month} Auction Notice*
@@ -356,6 +376,9 @@ const DEFAULT_PRE_AUCTION_EN = `Dear Members,
 {member_count} Members × ₹{installment_due_raw} = *₹{total_chit_value_raw}*
 {laaba_seetu_notice}
 Please ensure your timely presence and participation.
+
+📲 *Track your chit details & live passbook:*
+{app_portal_url}
 
 Regards,
 *{org_signature}*
@@ -372,6 +395,9 @@ const DEFAULT_POST_AUCTION_EN = `Dear Members,
 • Winner : *{winner_name} ({winner_ticket})*
 • Net Winner Payout : *{net_payout}*
 • Next Auction Date : *{next_auction_date}*
+
+📲 *Track your chit details & live passbook:*
+{app_portal_url}
 
 Regards,
 *{org_signature}*
@@ -390,6 +416,9 @@ const DEFAULT_PRE_AUCTION_TA = `அன்புடையீர் வணக்�
 {laaba_seetu_notice}
 தாங்கள் தவறாமல் குறித்த நேரத்தில் கலந்துகொள்ள அன்புடன் வேண்டுகிறோம்.
 
+📲 *சீட்டு கணக்கு & பாஸ்புக் விவரங்களை பார்க்க:*
+{app_portal_url}
+
 இங்ஙனம்,
 *{org_signature}*
 தொடர்புக்கு: {org_phone}`;
@@ -404,6 +433,9 @@ const DEFAULT_POST_AUCTION_TA = `வணக்கம்,
 ━━━━━━━━━━━━━━━━━━━━
 • வெற்றி பெற்றவர் : *{winner_name} ({winner_ticket})*
 • அடுத்த ஏலத் தேதி : *{next_auction_date}*
+
+📲 *சீட்டு கணக்கு & பாஸ்புக் விவரங்களை பார்க்க:*
+{app_portal_url}
 
 நன்றி,
 *{org_signature}*
