@@ -1831,11 +1831,11 @@ export default function ReportsCenter() {
   };
 
   return (
-    <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200 w-full max-w-full overflow-x-hidden">
       
       {/* ── TOP 8 SUBTABS NAVIGATION BAR ── */}
-      <div className="bg-slate-100/80 border border-gray-200/80 rounded-3xl p-2 sm:p-2.5 shadow-2xs">
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar scroll-smooth">
+      <div className="bg-slate-100/90 border border-gray-200/80 rounded-2xl sm:rounded-3xl p-1.5 sm:p-2.5 shadow-2xs">
+        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar scroll-smooth py-0.5">
           {REPORT_SUBTABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeSubtab === tab.id;
@@ -1844,14 +1844,14 @@ export default function ReportsCenter() {
               <button
                 key={tab.id}
                 onClick={() => setActiveSubtab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs shrink-0 transition-all duration-150 active:scale-95 ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-xs shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
                   isActive
                     ? 'bg-blue-100/90 text-blue-900 border border-blue-200/80 shadow-2xs'
                     : 'bg-transparent text-gray-600 hover:text-gray-900 hover:bg-white/60'
                 }`}
               >
-                <Icon size={15} className={isActive ? 'text-blue-700' : 'text-gray-400'} />
-                <span className="leading-none">{tab.label}</span>
+                <Icon size={14} className={isActive ? 'text-blue-700' : 'text-gray-400'} />
+                <span className="leading-none whitespace-nowrap">{tab.label}</span>
               </button>
             );
           })}
@@ -1860,57 +1860,57 @@ export default function ReportsCenter() {
 
       {/* ── 1. MONTHLY SUBTAB ── */}
       {activeSubtab === 'monthly' && (
-        <div className="space-y-5 sm:space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           
           {/* Chit Group Selection Pill (ChitBase Style) */}
           {chitGroups.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5" ref={groupSliderRef}>
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5" ref={groupSliderRef}>
               {chitGroups.map((g) => {
                 const isSelected = g.id === (selectedGroup?.id || selectedGroupId);
                 return (
                   <button
                     key={g.id}
                     onClick={(e) => handleSelectGroup(g.id, e)}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 ${
+                    className={`inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
                       isSelected
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-2xs'
                     }`}
                   >
-                    <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-gray-300'}`} />
-                    <span>{g.name}</span>
+                    <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+                    <span className="whitespace-nowrap">{g.name}</span>
                   </button>
                 );
               })}
             </div>
           )}
 
-          {/* Month Selector Carousel (Auto-Centering, e.g. < ● Sep '26 M0 Launch  Oct '26 M1 (1st Auction)  Nov '26 M2 >) */}
-          <div className="flex items-center justify-between gap-2 py-1">
+          {/* Month Selector Carousel */}
+          <div className="flex items-center justify-between gap-1 sm:gap-2 py-0.5 sm:py-1">
             <button
               onClick={() => setSelectedMonth(prev => Math.max(0, prev - 1))}
               disabled={selectedMonth <= 0}
-              className="p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-white disabled:opacity-20 disabled:pointer-events-none transition-colors"
+              className="p-1.5 sm:p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-white disabled:opacity-20 disabled:pointer-events-none transition-colors shrink-0"
             >
-              <ChevronLeft size={20} />
+              <ChevronLeft size={18} />
             </button>
 
-            <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar px-2 py-1 scroll-smooth" ref={monthSliderRef}>
+            <div className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar px-1 sm:px-2 py-1 scroll-smooth" ref={monthSliderRef}>
               {monthList.map((m) => {
                 const isCurrent = m.num === selectedMonth;
                 return (
                   <button
                     key={m.num}
                     onClick={(e) => handleSelectMonth(m.num, e)}
-                    className={`flex items-center gap-1.5 px-4.5 py-2.5 rounded-full text-xs font-bold shrink-0 transition-all active:scale-95 ${
+                    className={`flex items-center gap-1 sm:gap-1.5 px-3.5 sm:px-4.5 py-1.5 sm:py-2.5 rounded-full text-xs font-bold shrink-0 transition-all active:scale-95 cursor-pointer ${
                       isCurrent
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200/80 shadow-2xs'
                     }`}
                   >
-                    {isCurrent && <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block mr-0.5" />}
+                    {isCurrent && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 inline-block mr-0.5" />}
                     <span>{m.dateLabel}</span>
-                    <span className={`text-[11px] font-mono ml-0.5 ${isCurrent ? 'text-gray-300' : 'text-gray-400'}`}>
+                    <span className={`text-[10px] sm:text-[11px] font-mono ml-0.5 ${isCurrent ? 'text-gray-300' : 'text-gray-400'}`}>
                       {m.code}
                     </span>
                   </button>
@@ -1921,97 +1921,97 @@ export default function ReportsCenter() {
             <button
               onClick={() => setSelectedMonth(prev => Math.min(totalDuration, prev + 1))}
               disabled={selectedMonth >= totalDuration}
-              className="p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-white disabled:opacity-20 disabled:pointer-events-none transition-colors"
+              className="p-1.5 sm:p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-white disabled:opacity-20 disabled:pointer-events-none transition-colors shrink-0"
             >
-              <ChevronRight size={20} />
+              <ChevronRight size={18} />
             </button>
           </div>
 
           {/* Statement Action Buttons (ChitBase Style) */}
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={handleDownloadPDF}
                 disabled={isGeneratingPDF}
-                className="flex-1 bg-[#1e293b] hover:bg-slate-900 text-white font-bold text-sm py-3.5 px-4 rounded-2xl shadow-xs flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] disabled:opacity-50"
+                className="flex-1 bg-[#1e293b] hover:bg-slate-900 text-white font-bold text-xs sm:text-sm py-3 sm:py-3.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl shadow-xs flex items-center justify-center gap-2 sm:gap-2.5 transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 {isGeneratingPDF ? (
                   <>
-                    <Loader2 size={17} className="animate-spin text-emerald-400" />
+                    <Loader2 size={16} className="animate-spin text-emerald-400" />
                     <span>Generating Crisp PDF...</span>
                   </>
                 ) : (
                   <>
-                    <FileText size={17} />
-                    <span>Month {selectedMonth === 0 ? '0 (Launch)' : selectedMonth} Statement (PDF)</span>
-                    <Download size={15} className="text-gray-400 ml-1" />
+                    <FileText size={16} />
+                    <span className="truncate">Month {selectedMonth === 0 ? '0 (Launch)' : selectedMonth} Statement (PDF)</span>
+                    <Download size={14} className="text-gray-400 ml-0.5 shrink-0" />
                   </>
                 )}
               </button>
 
               <button
                 onClick={() => setShowPreviewModal(true)}
-                className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs sm:text-sm py-3.5 px-4 rounded-2xl shadow-2xs flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
+                className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs sm:text-sm py-2.5 sm:py-3.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl shadow-2xs flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shrink-0 cursor-pointer"
                 title="Preview PDF document on screen"
               >
-                <Eye size={16} className="text-indigo-600" />
+                <Eye size={15} className="text-indigo-600" />
                 <span>Preview Document</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <button
                 onClick={handleShareText}
-                className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs sm:text-sm py-3 rounded-2xl shadow-2xs flex items-center justify-center gap-2 transition-all active:scale-95"
+                className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs sm:text-sm py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-2xs flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer"
               >
-                <Share2 size={15} className="text-gray-500" />
+                <Share2 size={14} className="text-gray-500" />
                 <span>Share Text</span>
               </button>
               <button
                 onClick={handleWhatsAppPDF}
                 disabled={isGeneratingPDF}
-                className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold text-xs sm:text-sm py-3 rounded-2xl shadow-2xs flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold text-xs sm:text-sm py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-2xs flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
               >
-                <Send size={15} />
+                <Send size={14} />
                 <span>WhatsApp PDF</span>
               </button>
             </div>
           </div>
 
-          {/* 4 Metric Summary Cards (ChitBase Style Pastel Palette) */}
-          <div className="grid grid-cols-2 gap-3.5 sm:gap-4">
-            <div className="bg-white border border-gray-200/80 rounded-3xl p-5 sm:p-6 space-y-1.5 shadow-2xs">
+          {/* 4 Metric Summary Cards */}
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+            <div className="bg-white border border-gray-200/80 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 space-y-1 shadow-2xs">
               <span className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wider block">EXPECTED</span>
-              <span className="text-xl sm:text-2xl font-extrabold text-gray-900 block leading-tight">
+              <span className="text-lg sm:text-2xl font-extrabold text-gray-900 block leading-tight font-mono">
                 {formatCurrency(monthlyStats.expected)}
               </span>
             </div>
 
-            <div className="bg-[#eaf8f0] border border-emerald-200/80 rounded-3xl p-5 sm:p-6 space-y-1.5 shadow-2xs">
+            <div className="bg-[#eaf8f0] border border-emerald-200/80 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 space-y-1 shadow-2xs">
               <span className="text-[10px] sm:text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">COLLECTED</span>
-              <span className="text-xl sm:text-2xl font-extrabold text-emerald-800 block leading-tight">
+              <span className="text-lg sm:text-2xl font-extrabold text-emerald-800 block leading-tight font-mono">
                 {formatCurrency(monthlyStats.collected)}
               </span>
             </div>
 
-            <div className="bg-[#fef9ea] border border-amber-200/80 rounded-3xl p-5 sm:p-6 space-y-1.5 shadow-2xs">
+            <div className="bg-[#fef9ea] border border-amber-200/80 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 space-y-1 shadow-2xs">
               <span className="text-[10px] sm:text-[11px] font-bold text-amber-700 uppercase tracking-wider block">PENDING</span>
-              <span className="text-xl sm:text-2xl font-extrabold text-amber-800 block leading-tight">
+              <span className="text-lg sm:text-2xl font-extrabold text-amber-800 block leading-tight font-mono">
                 {formatCurrency(monthlyStats.pending)}
               </span>
             </div>
 
-            <div className="bg-[#fef2f2] border border-rose-200/80 rounded-3xl p-5 sm:p-6 space-y-1.5 shadow-2xs">
+            <div className="bg-[#fef2f2] border border-rose-200/80 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 space-y-1 shadow-2xs">
               <span className="text-[10px] sm:text-[11px] font-bold text-rose-700 uppercase tracking-wider block">COLLECTION</span>
-              <span className="text-xl sm:text-2xl font-extrabold text-rose-800 block leading-tight">
+              <span className="text-lg sm:text-2xl font-extrabold text-rose-800 block leading-tight font-mono">
                 {monthlyStats.collectionPercent}%
               </span>
             </div>
           </div>
 
           {/* Progress Bar with Paid / Pending counters */}
-          <div className="bg-white border border-gray-200/80 rounded-3xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+          <div className="bg-white border border-gray-200/80 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+            <div className="flex-1 bg-gray-100 rounded-full h-2.5 sm:h-3 overflow-hidden">
               <div
                 className="bg-[#22c55e] h-full rounded-full transition-all duration-300"
                 style={{ width: `${Math.min(100, monthlyStats.collectionPercent)}%` }}
@@ -2024,23 +2024,24 @@ export default function ReportsCenter() {
             </div>
           </div>
 
-          {/* Member Status Breakdown List (ChitBase Style) */}
-          <div className="bg-white border border-gray-200/80 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
-            <div className="flex justify-end items-center border-b border-gray-100 pb-2.5">
-              <span className="text-xs text-gray-400 font-medium">Swipe left/right to switch month</span>
+          {/* Member Status Breakdown List */}
+          <div className="bg-white border border-gray-200/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3 sm:space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+              <span className="text-xs font-bold text-gray-700">Enrolled Members ({monthlyStats.memberRows.length})</span>
+              <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Swipe months above</span>
             </div>
 
             <div className="divide-y divide-gray-100">
               {monthlyStats.memberRows.length === 0 ? (
-                <div className="py-10 text-center text-xs text-gray-400">No members enrolled in this group.</div>
+                <div className="py-8 text-center text-xs text-gray-400">No members enrolled in this group.</div>
               ) : (
                 monthlyStats.memberRows.map((m, idx) => (
-                  <div key={m.id} className="py-4 flex items-center justify-between gap-4 hover:bg-slate-50/70 rounded-2xl px-3 transition-colors">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <span className="w-5 text-xs font-mono font-medium text-gray-400 shrink-0">{idx + 1}</span>
+                  <div key={m.id} className="py-3 sm:py-4 flex items-center justify-between gap-2.5 sm:gap-4 hover:bg-slate-50/70 rounded-xl sm:rounded-2xl px-2 sm:px-3 transition-colors">
+                    <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
+                      <span className="w-4 sm:w-5 text-[11px] sm:text-xs font-mono font-medium text-gray-400 shrink-0">{idx + 1}</span>
                       <div className="min-w-0 space-y-0.5">
-                        <span className="font-bold text-sm text-gray-900 block truncate leading-snug">{m.name}</span>
-                        <span className="text-xs text-gray-400 font-mono block">
+                        <span className="font-bold text-xs sm:text-sm text-gray-900 block truncate leading-snug">{m.name}</span>
+                        <span className="text-[10px] sm:text-xs text-gray-400 font-mono block">
                           {formatCurrency(m.paidTotal)} / {formatCurrency(m.expectedUpToMonth)}
                         </span>
                       </div>
@@ -2048,11 +2049,11 @@ export default function ReportsCenter() {
 
                     <div className="shrink-0 text-right">
                       {m.isPaid ? (
-                        <span className="text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 px-3 py-1 rounded-full">
+                        <span className="text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full">
                           Paid
                         </span>
                       ) : (
-                        <span className="text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 px-3 py-1 rounded-full">
+                        <span className="text-[10px] sm:text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full">
                           Late
                         </span>
                       )}
@@ -2066,27 +2067,27 @@ export default function ReportsCenter() {
         </div>
       )}
 
-      {/* ── 2. DEFAULTERS SUBTAB (Pixel-Perfect ChitBase Style) ── */}
+      {/* ── 2. DEFAULTERS SUBTAB ── */}
       {activeSubtab === 'defaulters' && (
-        <div className="space-y-5 sm:space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           
           {/* Chit Group Selection Pill */}
           {chitGroups.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5" ref={groupSliderRef}>
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5" ref={groupSliderRef}>
               {chitGroups.map((g) => {
                 const isSelected = g.id === (selectedGroup?.id || selectedGroupId);
                 return (
                   <button
                     key={g.id}
                     onClick={(e) => handleSelectGroup(g.id, e)}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 ${
+                    className={`inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
                       isSelected
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-2xs'
                     }`}
                   >
-                    <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-gray-300'}`} />
-                    <span>{g.name}</span>
+                    <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+                    <span className="whitespace-nowrap">{g.name}</span>
                   </button>
                 );
               })}
@@ -2094,31 +2095,31 @@ export default function ReportsCenter() {
           )}
 
           {/* Month Selector Carousel */}
-          <div className="flex items-center justify-between gap-2 py-1">
+          <div className="flex items-center justify-between gap-1 sm:gap-2 py-0.5 sm:py-1">
             <button
               onClick={() => setSelectedMonth(prev => Math.max(0, prev - 1))}
               disabled={selectedMonth <= 0}
-              className="p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-white disabled:opacity-20 disabled:pointer-events-none transition-colors"
+              className="p-1.5 sm:p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-white disabled:opacity-20 disabled:pointer-events-none transition-colors shrink-0"
             >
-              <ChevronLeft size={20} />
+              <ChevronLeft size={18} />
             </button>
 
-            <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar px-2 py-1 scroll-smooth" ref={monthSliderRef}>
+            <div className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar px-1 sm:px-2 py-1 scroll-smooth" ref={monthSliderRef}>
               {monthList.map((m) => {
                 const isCurrent = m.num === selectedMonth;
                 return (
                   <button
                     key={m.num}
                     onClick={(e) => handleSelectMonth(m.num, e)}
-                    className={`flex items-center gap-1.5 px-4.5 py-2.5 rounded-full text-xs font-bold shrink-0 transition-all active:scale-95 ${
+                    className={`flex items-center gap-1 sm:gap-1.5 px-3.5 sm:px-4.5 py-1.5 sm:py-2.5 rounded-full text-xs font-bold shrink-0 transition-all active:scale-95 cursor-pointer ${
                       isCurrent
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200/80 shadow-2xs'
                     }`}
                   >
-                    {isCurrent && <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block mr-0.5" />}
+                    {isCurrent && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 inline-block mr-0.5" />}
                     <span>{m.dateLabel}</span>
-                    <span className={`text-[11px] font-mono ml-0.5 ${isCurrent ? 'text-gray-300' : 'text-gray-400'}`}>
+                    <span className={`text-[10px] sm:text-[11px] font-mono ml-0.5 ${isCurrent ? 'text-gray-300' : 'text-gray-400'}`}>
                       {m.code}
                     </span>
                   </button>
@@ -2129,123 +2130,124 @@ export default function ReportsCenter() {
             <button
               onClick={() => setSelectedMonth(prev => Math.min(totalDuration, prev + 1))}
               disabled={selectedMonth >= totalDuration}
-              className="p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-white disabled:opacity-20 disabled:pointer-events-none transition-colors"
+              className="p-1.5 sm:p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-white disabled:opacity-20 disabled:pointer-events-none transition-colors shrink-0"
             >
-              <ChevronRight size={20} />
+              <ChevronRight size={18} />
             </button>
           </div>
 
           {/* Action Buttons */}
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={handleDownloadPDF}
                 disabled={isGeneratingPDF}
-                className="flex-1 bg-[#1e293b] hover:bg-slate-900 text-white font-bold text-sm py-3.5 px-4 rounded-2xl shadow-xs flex items-center justify-center gap-2.5 transition-all active:scale-[0.99] disabled:opacity-50"
+                className="flex-1 bg-[#1e293b] hover:bg-slate-900 text-white font-bold text-xs sm:text-sm py-3 sm:py-3.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl shadow-xs flex items-center justify-center gap-2 sm:gap-2.5 transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 {isGeneratingPDF ? (
                   <>
-                    <Loader2 size={17} className="animate-spin text-emerald-400" />
+                    <Loader2 size={16} className="animate-spin text-emerald-400" />
                     <span>Generating Defaulters PDF...</span>
                   </>
                 ) : (
                   <>
-                    <FileText size={17} />
-                    <span>Month {selectedMonth === 0 ? '0 (Launch)' : selectedMonth} Defaulters Report (PDF)</span>
-                    <Download size={15} className="text-gray-400 ml-1" />
+                    <FileText size={16} />
+                    <span className="truncate">Month {selectedMonth === 0 ? '0 (Launch)' : selectedMonth} Defaulters Report</span>
+                    <Download size={14} className="text-gray-400 ml-0.5 shrink-0" />
                   </>
                 )}
               </button>
 
               <button
                 onClick={() => setShowPreviewModal(true)}
-                className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs sm:text-sm py-3.5 px-4 rounded-2xl shadow-2xs flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
+                className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs sm:text-sm py-2.5 sm:py-3.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl shadow-2xs flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shrink-0 cursor-pointer"
                 title="Preview PDF document on screen"
               >
-                <Eye size={16} className="text-indigo-600" />
+                <Eye size={15} className="text-indigo-600" />
                 <span>Preview Document</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <button
                 onClick={handleShareText}
-                className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs sm:text-sm py-3 rounded-2xl shadow-2xs flex items-center justify-center gap-2 transition-all active:scale-95"
+                className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs sm:text-sm py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-2xs flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer"
               >
-                <Share2 size={15} className="text-gray-500" />
+                <Share2 size={14} className="text-gray-500" />
                 <span>Share Text</span>
               </button>
               <button
                 onClick={handleWhatsAppPDF}
                 disabled={isGeneratingPDF}
-                className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold text-xs sm:text-sm py-3 rounded-2xl shadow-2xs flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold text-xs sm:text-sm py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-2xs flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
               >
-                <Send size={15} />
+                <Send size={14} />
                 <span>WhatsApp PDF</span>
               </button>
             </div>
           </div>
 
-          {/* 3 Summary Cards (ChitBase Style Pastel Palette) */}
-          <div className="grid grid-cols-3 gap-3.5 sm:gap-4">
-            <div className="bg-[#fef2f2] border border-rose-200/80 rounded-3xl p-5 sm:p-6 space-y-1.5 shadow-2xs">
-              <span className="text-[10px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-wider block">CUMULATIVE</span>
-              <span className="text-xl sm:text-2xl font-black text-rose-800 block leading-tight">
+          {/* 3 Summary Cards */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="bg-[#fef2f2] border border-rose-200/80 rounded-2xl sm:rounded-3xl p-3 sm:p-6 space-y-0.5 sm:space-y-1 shadow-2xs">
+              <span className="text-[9px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-wider block">CUMULATIVE</span>
+              <span className="text-sm sm:text-2xl font-black text-rose-800 block leading-tight font-mono">
                 {formatCurrency(defaultersStats.cumulativeDues)}
               </span>
             </div>
 
-            <div className="bg-[#fef9ea] border border-amber-200/80 rounded-3xl p-5 sm:p-6 space-y-1.5 shadow-2xs">
-              <span className="text-[10px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-wider block">THIS MONTH</span>
-              <span className="text-xl sm:text-2xl font-black text-amber-900 block leading-tight">
+            <div className="bg-[#fef9ea] border border-amber-200/80 rounded-2xl sm:rounded-3xl p-3 sm:p-6 space-y-0.5 sm:space-y-1 shadow-2xs">
+              <span className="text-[9px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-wider block">THIS MONTH</span>
+              <span className="text-sm sm:text-2xl font-black text-amber-900 block leading-tight font-mono">
                 {formatCurrency(defaultersStats.thisMonthDues)}
               </span>
             </div>
 
-            <div className="bg-[#fef9ea] border border-amber-200/80 rounded-3xl p-5 sm:p-6 space-y-1.5 shadow-2xs">
-              <span className="text-[10px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-wider block">DEFAULTERS</span>
-              <span className="text-xl sm:text-2xl font-black text-amber-900 block leading-tight">
+            <div className="bg-[#fef9ea] border border-amber-200/80 rounded-2xl sm:rounded-3xl p-3 sm:p-6 space-y-0.5 sm:space-y-1 shadow-2xs">
+              <span className="text-[9px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-wider block">DEFAULTERS</span>
+              <span className="text-sm sm:text-2xl font-black text-amber-900 block leading-tight font-mono">
                 {defaultersStats.defaultersCount}
               </span>
             </div>
           </div>
 
           {/* Defaulters Member List Container */}
-          <div className="bg-white border border-gray-200/80 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
-            <div className="flex justify-end items-center border-b border-gray-100 pb-2.5">
-              <span className="text-xs text-gray-400 font-medium">Swipe left/right to switch month</span>
+          <div className="bg-white border border-gray-200/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3 sm:space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+              <span className="text-xs font-bold text-gray-700">Overdue List</span>
+              <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Ranked by dues</span>
             </div>
 
             <div className="divide-y divide-gray-100">
               {defaultersStats.defaultersList.length === 0 ? (
-                <div className="py-12 text-center space-y-2">
-                  <CheckCircle2 size={32} className="text-emerald-500 mx-auto" />
+                <div className="py-10 text-center space-y-2">
+                  <CheckCircle2 size={28} className="text-emerald-500 mx-auto" />
                   <span className="font-bold text-sm text-gray-800 block">No Overdue Defaulters!</span>
                   <p className="text-xs text-gray-400">All subscribers have paid their dues for {activeMonthInfo.dateLabel}.</p>
                 </div>
               ) : (
                 defaultersStats.defaultersList.map((d) => (
-                  <div key={d.id} className="py-4.5 flex items-center justify-between gap-4 hover:bg-slate-50/70 rounded-2xl px-3 transition-colors">
-                    <div className="flex items-start gap-3.5 min-w-0">
-                      <span className="w-5 text-sm font-mono font-bold text-gray-300 mt-0.5 shrink-0">{d.rank}</span>
-                      <div className="min-w-0 space-y-1">
-                        <span className="font-extrabold text-base text-gray-900 block truncate leading-tight">{d.name}</span>
-                        <div className="text-xs text-gray-500 font-medium flex flex-wrap items-center gap-1.5">
+                  <div key={d.id} className="py-3 sm:py-4.5 flex items-center justify-between gap-2.5 sm:gap-4 hover:bg-slate-50/70 rounded-xl sm:rounded-2xl px-2 sm:px-3 transition-colors">
+                    <div className="flex items-start gap-2.5 sm:gap-3.5 min-w-0">
+                      <span className="w-4 sm:w-5 text-xs font-mono font-bold text-gray-300 mt-0.5 shrink-0">{d.rank}</span>
+                      <div className="min-w-0 space-y-0.5 sm:space-y-1">
+                        <span className="font-extrabold text-xs sm:text-base text-gray-900 block truncate leading-tight">{d.name}</span>
+                        <div className="text-[10px] sm:text-xs text-gray-500 font-medium flex flex-wrap items-center gap-1 sm:gap-1.5">
                           <span>This month: <strong className="text-amber-800 font-mono">{formatCurrency(d.thisMonthDue)}</strong></span>
                         </div>
-                        <div className="text-xs font-bold text-rose-600 flex items-center gap-1">
-                          <span>{d.monthsOverdue} month{d.monthsOverdue > 1 ? 's' : ''} overdue</span>
+                        <div className="text-[10px] sm:text-xs font-bold text-rose-600 flex items-center gap-1">
+                          <span>{d.monthsOverdue}m overdue</span>
                           <span>|</span>
-                          <span>since {d.sinceDateLabel}</span>
+                          <span className="truncate">since {d.sinceDateLabel}</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="shrink-0 text-right space-y-0.5">
-                      <span className="text-lg sm:text-xl font-black text-rose-600 block leading-tight font-mono">
+                      <span className="text-sm sm:text-xl font-black text-rose-600 block leading-tight font-mono">
                         {formatCurrency(d.cumulativeDue)}
                       </span>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
                         TOTAL
                       </span>
                     </div>
@@ -2260,18 +2262,18 @@ export default function ReportsCenter() {
 
       {/* ── 3. OVERVIEW SUBTAB ── */}
       {activeSubtab === 'overview' && (
-        <div className="space-y-4 max-w-xl mx-auto animate-in fade-in duration-150">
+        <div className="space-y-3.5 sm:space-y-4 max-w-xl mx-auto w-full animate-in fade-in duration-150">
           
           {/* Card 1: Ask your data · in plain words */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-3.5">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3">
             {/* Header */}
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <Sparkles size={16} />
               </div>
-              <div className="flex items-center gap-1.5 text-sm">
+              <div className="flex items-center gap-1.5 text-xs sm:text-sm">
                 <span className="font-bold text-slate-800">Ask your data</span>
-                <span className="text-slate-400 font-medium text-xs">· in plain words</span>
+                <span className="text-slate-400 font-medium text-[11px] sm:text-xs">· in plain words</span>
               </div>
             </div>
 
@@ -2288,21 +2290,21 @@ export default function ReportsCenter() {
                 value={queryInput}
                 onChange={(e) => setQueryInput(e.target.value)}
                 placeholder="e.g. which chit is behind?"
-                className="w-full px-3.5 py-2 text-sm text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none"
+                className="w-full px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none"
               />
               <button
                 type="submit"
-                className="w-8 h-8 rounded-xl bg-emerald-500/90 hover:bg-emerald-600 text-white flex items-center justify-center shrink-0 transition-transform active:scale-95 shadow-2xs cursor-pointer"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/90 hover:bg-emerald-600 text-white flex items-center justify-center shrink-0 transition-transform active:scale-95 shadow-2xs cursor-pointer"
                 title="Submit question"
               >
-                <ArrowUp size={16} className="stroke-[2.5]" />
+                <ArrowUp size={15} className="stroke-[2.5]" />
               </button>
             </form>
 
             {/* AI Answer bubble if present */}
             {queryAnswer && (
-              <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-100 text-xs text-slate-700 space-y-1 relative animate-in fade-in duration-150">
-                <div className="flex items-center justify-between font-bold text-emerald-800 text-[11px]">
+              <div className="p-3 rounded-xl sm:rounded-2xl bg-emerald-50/80 border border-emerald-100 text-xs text-slate-700 space-y-1 relative animate-in fade-in duration-150">
+                <div className="flex items-center justify-between font-bold text-emerald-800 text-[10px] sm:text-[11px]">
                   <span>AI Insight</span>
                   <button 
                     onClick={() => setQueryAnswer(null)}
@@ -2311,12 +2313,12 @@ export default function ReportsCenter() {
                     <X size={13} />
                   </button>
                 </div>
-                <div className="leading-relaxed whitespace-pre-wrap">{queryAnswer}</div>
+                <div className="leading-relaxed whitespace-pre-wrap text-[11px] sm:text-xs">{queryAnswer}</div>
               </div>
             )}
 
             {/* Quick Suggestion Pills */}
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-0.5">
               {[
                 'Which chit is behind on collection?',
                 'How much is left to collect this month?',
@@ -2329,7 +2331,7 @@ export default function ReportsCenter() {
                     setQueryInput(pillText);
                     handleAskData(pillText);
                   }}
-                  className="px-3.5 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-medium transition-all active:scale-95 shadow-2xs cursor-pointer text-left"
+                  className="px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-[10px] sm:text-xs font-medium transition-all active:scale-95 shadow-2xs cursor-pointer text-left"
                 >
                   {pillText}
                 </button>
@@ -2338,36 +2340,36 @@ export default function ReportsCenter() {
           </div>
 
           {/* Card 2: Collected this month & 6-Month Trend */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3.5 sm:space-y-4">
             
             {/* Top row: Collected & Efficiency */}
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-xs font-semibold text-slate-500 block">Collected this month</span>
-                <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight block mt-0.5">
+                <span className="text-[11px] sm:text-xs font-semibold text-slate-500 block">Collected this month</span>
+                <span className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight block mt-0.5 font-mono">
                   ₹{overviewStats.totalCollectedThisMonth.toLocaleString('en-IN')}
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-2xl sm:text-3xl font-black text-rose-500 block">
+                <span className="text-xl sm:text-3xl font-black text-rose-500 block font-mono">
                   {overviewStats.overallEfficiency}%
                 </span>
-                <span className="text-xs font-semibold text-slate-400 block -mt-0.5">
+                <span className="text-[10px] sm:text-xs font-semibold text-slate-400 block -mt-0.5">
                   efficiency
                 </span>
               </div>
             </div>
 
             {/* Progress Bar */}
-            <div className="space-y-1.5">
-              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+            <div className="space-y-1">
+              <div className="w-full bg-slate-100 rounded-full h-2 sm:h-2.5 overflow-hidden">
                 <div
                   className="bg-rose-500 h-full rounded-full transition-all duration-300"
                   style={{ width: `${Math.min(100, overviewStats.overallEfficiency)}%` }}
                 />
               </div>
-              <div className="text-xs text-slate-500 font-medium flex items-center gap-1">
-                <span>₹{overviewStats.totalStillToCollect.toLocaleString('en-IN')} still to collect</span>
+              <div className="text-[10px] sm:text-xs text-slate-500 font-medium flex items-center gap-1 flex-wrap">
+                <span>₹{overviewStats.totalStillToCollect.toLocaleString('en-IN')} to collect</span>
                 <span>·</span>
                 <span>
                   <span className="font-bold text-rose-500">{overviewStats.groupsNeedingAttention}</span> need attention
@@ -2376,13 +2378,13 @@ export default function ReportsCenter() {
             </div>
 
             {/* Collection trend · last 6 months */}
-            <div className="pt-2 space-y-2">
-              <span className="text-xs font-semibold text-slate-500 block">
+            <div className="pt-1 space-y-1.5">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 block">
                 Collection trend <span className="text-slate-400 font-normal">· last 6 months</span>
               </span>
 
               {/* Smooth Bezier Curve Chart */}
-              <div className="w-full relative h-[110px]">
+              <div className="w-full relative h-[85px] sm:h-[110px]">
                 <svg
                   viewBox={`0 0 ${trendChartData.width} ${trendChartData.height}`}
                   className="w-full h-full overflow-visible"
@@ -2395,7 +2397,6 @@ export default function ReportsCenter() {
                     </linearGradient>
                   </defs>
 
-                  {/* Gradient Area under curve */}
                   {trendChartData.areaPath && (
                     <path
                       d={trendChartData.areaPath}
@@ -2403,7 +2404,6 @@ export default function ReportsCenter() {
                     />
                   )}
 
-                  {/* Emerald Curve Stroke */}
                   {trendChartData.path && (
                     <path
                       d={trendChartData.path}
@@ -2415,14 +2415,13 @@ export default function ReportsCenter() {
                     />
                   )}
 
-                  {/* X-Axis labels at bottom */}
                   {trendChartData.points.map((pt, idx) => (
                     <text
                       key={idx}
                       x={pt.x}
                       y={trendChartData.height - 4}
                       textAnchor="middle"
-                      className="text-[10px] fill-slate-400 font-medium"
+                      className="text-[9px] sm:text-[10px] fill-slate-400 font-medium"
                     >
                       {pt.label}
                     </text>
@@ -2432,11 +2431,11 @@ export default function ReportsCenter() {
             </div>
 
             {/* Bottom Alert Banner: Payouts still owed to winners */}
-            <div className="bg-rose-50/70 border border-rose-100 rounded-2xl p-3.5 flex items-center justify-between">
-              <span className="text-xs font-bold text-rose-600">
+            <div className="bg-rose-50/70 border border-rose-100 rounded-xl sm:rounded-2xl p-2.5 sm:p-3.5 flex items-center justify-between">
+              <span className="text-[11px] sm:text-xs font-bold text-rose-600">
                 Payouts still owed to winners
               </span>
-              <span className="text-sm font-black text-rose-600 font-mono">
+              <span className="text-xs sm:text-sm font-black text-rose-600 font-mono">
                 ₹{overviewStats.totalPayoutsStillOwed.toLocaleString('en-IN')}
               </span>
             </div>
@@ -2444,34 +2443,34 @@ export default function ReportsCenter() {
           </div>
 
           {/* Card 3: Per-Group Health Cards */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {overviewStats.groupCards.length === 0 ? (
-              <div className="bg-white border border-slate-200/90 rounded-3xl p-6 text-center text-xs text-slate-500">
+              <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-6 text-center text-xs text-slate-500">
                 No active chit groups found.
               </div>
             ) : (
               overviewStats.groupCards.map((g) => (
-                <div key={g.id} className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+                <div key={g.id} className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3.5">
                   
                   {/* Group Header */}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-base font-black text-slate-900 leading-tight">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h4 className="text-sm sm:text-base font-black text-slate-900 leading-tight truncate">
                         {g.name}
                       </h4>
-                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      <p className="text-[10px] sm:text-xs text-slate-500 font-medium mt-0.5">
                         {g.dateLabel} · M{g.currentMonth} · {g.memberCount} members
                       </p>
                     </div>
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50/60 px-2.5 py-1 rounded-full border border-emerald-100/80">
+                    <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold text-emerald-600 bg-emerald-50/60 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-emerald-100/80 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       {g.status || 'Active'}
                     </span>
                   </div>
 
                   {/* Metric 1: This month's collection */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-semibold">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] sm:text-xs font-semibold">
                       <span className="text-slate-600">This month's collection</span>
                       <span className="font-bold text-rose-500">{g.efficiency}%</span>
                     </div>
@@ -2481,15 +2480,15 @@ export default function ReportsCenter() {
                         style={{ width: `${Math.min(100, g.efficiency)}%` }}
                       />
                     </div>
-                    <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+                    <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-400 font-medium">
                       <span>Collected ₹{g.groupCollected.toLocaleString('en-IN')}</span>
                       <span>Expected ₹{g.groupExpected.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
 
                   {/* Metric 2: Auction progress */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-semibold">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] sm:text-xs font-semibold">
                       <span className="text-slate-600">Auction progress</span>
                       <span className="font-bold text-amber-500">{g.auctionProgressPercent}%</span>
                     </div>
@@ -2499,37 +2498,37 @@ export default function ReportsCenter() {
                         style={{ width: `${Math.min(100, g.auctionProgressPercent)}%` }}
                       />
                     </div>
-                    <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+                    <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-400 font-medium">
                       <span>{g.wonCount} won</span>
                       <span>{g.yetToLiftCount} yet to lift</span>
                     </div>
                   </div>
 
                   {/* Bottom 3-box Grid */}
-                  <div className="grid grid-cols-3 divide-x divide-slate-100 rounded-2xl bg-slate-50/60 border border-slate-100 overflow-hidden text-center">
-                    <div className="p-2.5">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  <div className="grid grid-cols-3 divide-x divide-slate-100 rounded-xl sm:rounded-2xl bg-slate-50/60 border border-slate-100 overflow-hidden text-center">
+                    <div className="p-2 sm:p-2.5">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                         Chit value
                       </span>
-                      <span className="text-xs sm:text-sm font-black text-slate-900 mt-0.5 block">
+                      <span className="text-[11px] sm:text-sm font-black text-slate-900 mt-0.5 block font-mono">
                         ₹{g.totalValue.toLocaleString('en-IN')}
                       </span>
                     </div>
 
-                    <div className="p-2.5">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Months done
+                    <div className="p-2 sm:p-2.5">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Months
                       </span>
-                      <span className="text-xs sm:text-sm font-black text-slate-900 mt-0.5 block">
+                      <span className="text-[11px] sm:text-sm font-black text-slate-900 mt-0.5 block font-mono">
                         {g.currentMonth}/{g.duration}
                       </span>
                     </div>
 
-                    <div className={`p-2.5 ${g.payoutDue > 0 ? 'bg-rose-50/70' : ''}`}>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <div className={`p-2 sm:p-2.5 ${g.payoutDue > 0 ? 'bg-rose-50/70' : ''}`}>
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                         Payout due
                       </span>
-                      <span className={`text-xs sm:text-sm font-black mt-0.5 block ${g.payoutDue > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                      <span className={`text-[11px] sm:text-sm font-black mt-0.5 block font-mono ${g.payoutDue > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
                         ₹{g.payoutDue.toLocaleString('en-IN')}
                       </span>
                     </div>
@@ -2545,13 +2544,13 @@ export default function ReportsCenter() {
 
       {/* ── 4. PERIOD SUBTAB ── */}
       {activeSubtab === 'period' && (
-        <div className="space-y-4 max-w-xl mx-auto animate-in fade-in duration-150">
+        <div className="space-y-3.5 sm:space-y-4 max-w-xl mx-auto w-full animate-in fade-in duration-150">
           
-          {/* Top Filter Card: Money moved between two dates */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+          {/* Top Filter Card */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3.5">
             {/* Title */}
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-              <Calendar size={17} className="text-slate-500" />
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-xs sm:text-sm">
+              <Calendar size={16} className="text-slate-500" />
               <span>Money moved between two dates</span>
             </div>
 
@@ -2571,7 +2570,7 @@ export default function ReportsCenter() {
                     key={p.id}
                     type="button"
                     onClick={() => handlePresetChange(p.id as any)}
-                    className={`px-3.5 py-1.5 rounded-full transition-all shrink-0 cursor-pointer ${
+                    className={`px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-xs transition-all shrink-0 cursor-pointer ${
                       isActive
                         ? 'bg-slate-900 text-white shadow-xs font-bold'
                         : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
@@ -2583,53 +2582,49 @@ export default function ReportsCenter() {
               })}
             </div>
 
-            {/* From & To Date Inputs */}
-            <div className="grid grid-cols-2 gap-3 pt-0.5">
+            {/* From & To Date Inputs (Stacked on mobile, 2-col on tablet/desktop) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 pt-0.5">
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-400 block">From</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={periodStartDate}
-                    onChange={(e) => {
-                      setPeriodStartDate(e.target.value);
-                      setPeriodPreset('custom');
-                    }}
-                    className="w-full px-3 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-2xs"
-                  />
-                </div>
+                <label className="text-[10px] sm:text-[11px] font-semibold text-slate-400 block">From</label>
+                <input
+                  type="date"
+                  value={periodStartDate}
+                  onChange={(e) => {
+                    setPeriodStartDate(e.target.value);
+                    setPeriodPreset('custom');
+                  }}
+                  className="w-full px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-2xs"
+                />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-400 block">To</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={periodEndDate}
-                    onChange={(e) => {
-                      setPeriodEndDate(e.target.value);
-                      setPeriodPreset('custom');
-                    }}
-                    className="w-full px-3 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-2xs"
-                  />
-                </div>
+                <label className="text-[10px] sm:text-[11px] font-semibold text-slate-400 block">To</label>
+                <input
+                  type="date"
+                  value={periodEndDate}
+                  onChange={(e) => {
+                    setPeriodEndDate(e.target.value);
+                    setPeriodPreset('custom');
+                  }}
+                  className="w-full px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-2xs"
+                />
               </div>
             </div>
 
             {/* Across Group Filter */}
-            <div className="space-y-1.5 pt-1">
-              <span className="text-[11px] font-semibold text-slate-400 block">Across</span>
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            <div className="space-y-1 pt-0.5">
+              <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 block">Across</span>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                 <button
                   type="button"
                   onClick={() => setPeriodGroupId('all')}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
                     periodGroupId === 'all'
                       ? 'bg-slate-900 text-white shadow-xs font-bold'
                       : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  <Globe size={13} />
+                  <Globe size={12} />
                   <span>All chits</span>
                 </button>
                 {chitGroups.map((g) => {
@@ -2639,7 +2634,7 @@ export default function ReportsCenter() {
                       key={g.id}
                       type="button"
                       onClick={() => setPeriodGroupId(g.id)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer ${
                         isSelected
                           ? 'bg-slate-900 text-white shadow-xs font-bold'
                           : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -2654,70 +2649,69 @@ export default function ReportsCenter() {
           </div>
 
           {/* Action Buttons: Share / WhatsApp / Download */}
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
             <button
               onClick={handleShareText}
-              className="py-2.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 px-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <Share2 size={15} /> Share
+              <Share2 size={14} /> <span>Share</span>
             </button>
             <button
               onClick={handleWhatsAppPDF}
-              className="py-2.5 px-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 px-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <Send size={15} /> WhatsApp
+              <Send size={14} /> <span>WhatsApp</span>
             </button>
             <button
               onClick={() => setShowPreviewModal(true)}
-              className="py-2.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 px-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <Download size={15} /> Download
+              <Download size={14} /> <span>PDF</span>
             </button>
           </div>
 
           {/* Hero Summary Card: Collected & Split Sub-Cards */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
-            {/* Top row: Collected */}
-            <div className="flex items-start justify-between">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3.5 sm:space-y-4">
+            <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                  <ArrowDownLeft size={16} />
+                  <ArrowDownLeft size={15} />
                   <span>Collected</span>
                 </div>
-                <span className="text-3xl sm:text-4xl font-black text-emerald-600 tracking-tight block mt-0.5 font-mono">
+                <span className="text-2xl sm:text-4xl font-black text-emerald-600 tracking-tight block mt-0.5 font-mono">
                   ₹{periodStats.totalCollected.toLocaleString('en-IN')}
                 </span>
-                <span className="text-xs text-slate-500 font-medium block mt-1">
-                  {periodDateLabel} · {periodStats.paymentCount} {periodStats.paymentCount === 1 ? 'payment' : 'payments'} from {periodStats.payingMembersCount} {periodStats.payingMembersCount === 1 ? 'member' : 'members'}
+                <span className="text-[10px] sm:text-xs text-slate-500 font-medium block mt-0.5">
+                  {periodDateLabel} · {periodStats.paymentCount} payments
                 </span>
               </div>
-              <span className="inline-block px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">
+              <span className="inline-block px-2.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-[10px] sm:text-xs font-bold shrink-0">
                 {periodStats.selectedGroupName}
               </span>
             </div>
 
-            {/* Split Sub-Cards (Paid out & Net flow) */}
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <div className="border border-slate-100 bg-slate-50/70 rounded-2xl p-3.5 space-y-1">
-                <div className="flex items-center gap-1.5 text-amber-500 text-xs font-bold">
-                  <div className="w-5 h-5 rounded-md bg-amber-50 flex items-center justify-center">
-                    <ArrowUpRight size={13} className="text-amber-600" />
+            {/* Split Sub-Cards */}
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-0.5">
+              <div className="border border-slate-100 bg-slate-50/70 rounded-xl sm:rounded-2xl p-3 sm:p-3.5 space-y-1">
+                <div className="flex items-center gap-1 text-amber-500 text-xs font-bold">
+                  <div className="w-4 h-4 rounded-md bg-amber-50 flex items-center justify-center">
+                    <ArrowUpRight size={12} className="text-amber-600" />
                   </div>
-                  <span className="text-slate-400 font-semibold text-[11px]">Paid out</span>
+                  <span className="text-slate-400 font-semibold text-[10px] sm:text-[11px]">Paid out</span>
                 </div>
-                <span className="text-base sm:text-lg font-black text-slate-900 block font-mono">
+                <span className="text-sm sm:text-lg font-black text-slate-900 block font-mono">
                   ₹{periodStats.totalPaidOut.toLocaleString('en-IN')}
                 </span>
               </div>
 
-              <div className="border border-rose-100 bg-rose-50/40 rounded-2xl p-3.5 space-y-1">
-                <div className="flex items-center gap-1.5 text-rose-500 text-xs font-bold">
-                  <div className="w-5 h-5 rounded-md bg-rose-100/80 flex items-center justify-center">
-                    <Wallet size={12} className="text-rose-600" />
+              <div className="border border-rose-100 bg-rose-50/40 rounded-xl sm:rounded-2xl p-3 sm:p-3.5 space-y-1">
+                <div className="flex items-center gap-1 text-rose-500 text-xs font-bold">
+                  <div className="w-4 h-4 rounded-md bg-rose-100/80 flex items-center justify-center">
+                    <Wallet size={11} className="text-rose-600" />
                   </div>
-                  <span className="text-slate-400 font-semibold text-[11px]">Net flow</span>
+                  <span className="text-slate-400 font-semibold text-[10px] sm:text-[11px]">Net flow</span>
                 </div>
-                <span className={`text-base sm:text-lg font-black block font-mono ${periodStats.netFlow < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                <span className={`text-sm sm:text-lg font-black block font-mono ${periodStats.netFlow < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                   {periodStats.netFlow < 0 ? '-' : ''}₹{Math.abs(periodStats.netFlow).toLocaleString('en-IN')}
                 </span>
               </div>
@@ -2725,25 +2719,25 @@ export default function ReportsCenter() {
           </div>
 
           {/* Card: Collected each month */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-3.5">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3">
             <div className="flex items-center gap-2 text-slate-800 font-bold text-xs">
-              <TrendingUp size={15} className="text-slate-500" />
+              <TrendingUp size={14} className="text-slate-500" />
               <span>Collected each month</span>
             </div>
 
-            <div className="space-y-2.5 pt-1">
+            <div className="space-y-2 pt-0.5">
               {periodStats.monthsInPeriod.map((m, idx) => {
                 const percent = periodStats.maxMonthVal > 0 ? (m.collected / periodStats.maxMonthVal) * 100 : 0;
                 return (
-                  <div key={idx} className="flex items-center gap-3 text-xs">
-                    <span className="w-16 font-semibold text-slate-600 shrink-0">{m.label}</span>
+                  <div key={idx} className="flex items-center gap-2 text-xs">
+                    <span className="w-14 sm:w-16 font-semibold text-slate-600 text-[11px] sm:text-xs shrink-0">{m.label}</span>
                     <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-emerald-500 h-full rounded-full transition-all duration-300"
                         style={{ width: `${percent}%` }}
                       />
                     </div>
-                    <span className="w-20 text-right font-bold text-slate-800 font-mono">
+                    <span className="w-16 sm:w-20 text-right font-bold text-slate-800 font-mono text-[11px] sm:text-xs">
                       ₹{m.collected.toLocaleString('en-IN')}
                     </span>
                   </div>
@@ -2753,17 +2747,17 @@ export default function ReportsCenter() {
           </div>
 
           {/* Card: How members paid */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-3.5">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3">
             <div className="flex items-center gap-2 text-slate-800 font-bold text-xs">
-              <CreditCard size={15} className="text-slate-500" />
+              <CreditCard size={14} className="text-slate-500" />
               <span>How members paid</span>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-0.5">
               {periodStats.paymentMethodsList.map((m, idx) => (
                 <div
                   key={idx}
-                  className="px-3.5 py-1.5 rounded-full border border-slate-200 bg-slate-50/70 text-xs font-bold text-slate-800 flex items-center gap-2 shadow-2xs"
+                  className="px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full border border-slate-200 bg-slate-50/70 text-[11px] sm:text-xs font-bold text-slate-800 flex items-center gap-1.5 shadow-2xs"
                 >
                   <span className="text-slate-600 font-medium">{m.method}</span>
                   <span className="font-mono">₹{m.amount.toLocaleString('en-IN')}</span>
@@ -2773,30 +2767,30 @@ export default function ReportsCenter() {
           </div>
 
           {/* Card: Top contributors */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-3.5">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3">
             <div className="flex items-center gap-2 text-slate-800 font-bold text-xs">
-              <Users size={15} className="text-slate-500" />
+              <Users size={14} className="text-slate-500" />
               <span>Top contributors</span>
             </div>
 
-            <div className="divide-y divide-slate-100 pt-1">
+            <div className="divide-y divide-slate-100 pt-0.5">
               {periodStats.topContributors.length === 0 ? (
-                <div className="py-3 text-center text-xs text-slate-400">
+                <div className="py-2 text-center text-xs text-slate-400">
                   No collections in this period.
                 </div>
               ) : (
                 periodStats.topContributors.map((c, idx) => (
-                  <div key={idx} className="py-2.5 flex items-center justify-between text-xs first:pt-0 last:pb-0">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-slate-400 font-bold w-3.5">{idx + 1}</span>
+                  <div key={idx} className="py-2 sm:py-2.5 flex items-center justify-between text-xs first:pt-0 last:pb-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 font-bold w-3">{idx + 1}</span>
                       <div>
-                        <span className="font-bold text-slate-900 block">{c.name}</span>
-                        <span className="text-[11px] text-slate-400 font-medium block">
-                          {c.paymentCount} {c.paymentCount === 1 ? 'payment' : 'payments'}
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm block">{c.name}</span>
+                        <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium block">
+                          {c.paymentCount} payments
                         </span>
                       </div>
                     </div>
-                    <span className="font-black text-emerald-600 font-mono">
+                    <span className="font-black text-emerald-600 font-mono text-xs sm:text-sm">
                       ₹{c.totalPaid.toLocaleString('en-IN')}
                     </span>
                   </div>
@@ -2806,30 +2800,30 @@ export default function ReportsCenter() {
           </div>
 
           {/* Card: Payouts made */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-3.5">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3">
             <div className="flex items-center gap-2 text-slate-800 font-bold text-xs">
-              <ArrowUpRight size={15} className="text-slate-500" />
+              <ArrowUpRight size={14} className="text-slate-500" />
               <span>Payouts made</span>
             </div>
 
-            <div className="divide-y divide-slate-100 pt-1">
+            <div className="divide-y divide-slate-100 pt-0.5">
               {periodStats.payoutsMadeList.length === 0 ? (
-                <div className="py-3 text-center text-xs text-slate-400">
+                <div className="py-2 text-center text-xs text-slate-400">
                   No payouts made in this period.
                 </div>
               ) : (
                 periodStats.payoutsMadeList.map((p, idx) => (
-                  <div key={idx} className="py-2.5 flex items-center justify-between text-xs first:pt-0 last:pb-0">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-slate-400 font-bold w-3.5">{idx + 1}</span>
+                  <div key={idx} className="py-2 sm:py-2.5 flex items-center justify-between text-xs first:pt-0 last:pb-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 font-bold w-3">{idx + 1}</span>
                       <div>
-                        <span className="font-bold text-slate-900 block">{p.name}</span>
-                        <span className="text-[11px] text-slate-400 font-medium block">
-                          {p.payoutCount} {p.payoutCount === 1 ? 'payout' : 'payouts'}
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm block">{p.name}</span>
+                        <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium block">
+                          {p.payoutCount} payouts
                         </span>
                       </div>
                     </div>
-                    <span className="font-black text-amber-600 font-mono">
+                    <span className="font-black text-amber-600 font-mono text-xs sm:text-sm">
                       ₹{p.totalPaid.toLocaleString('en-IN')}
                     </span>
                   </div>
@@ -2843,19 +2837,19 @@ export default function ReportsCenter() {
 
       {/* ── 5. EARNINGS SUBTAB ── */}
       {activeSubtab === 'earnings' && (
-        <div className="space-y-4 max-w-xl mx-auto animate-in fade-in duration-150">
+        <div className="space-y-3.5 sm:space-y-4 max-w-xl mx-auto w-full animate-in fade-in duration-150">
           
           {/* Top Chit Group Selector Pill */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5">
             <button
               onClick={() => setEarningsGroupId('all')}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
                 earningsGroupId === 'all'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-2xs'
               }`}
             >
-              <span className={`w-2.5 h-2.5 rounded-full ${earningsGroupId === 'all' ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+              <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${earningsGroupId === 'all' ? 'bg-emerald-400' : 'bg-gray-300'}`} />
               <span>All chits</span>
             </button>
             {chitGroups.map((g) => {
@@ -2864,21 +2858,21 @@ export default function ReportsCenter() {
                 <button
                   key={g.id}
                   onClick={() => setEarningsGroupId(g.id)}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
                     isSelected
                       ? 'bg-slate-900 text-white shadow-xs'
                       : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-2xs'
                   }`}
                 >
-                  <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+                  <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-gray-300'}`} />
                   <span>{g.name}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* Time Filter Pills: This month, This FY, All time */}
-          <div className="flex items-center gap-2">
+          {/* Time Filter Pills */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {[
               { id: 'this_month', label: 'This month' },
               { id: 'this_fy', label: 'This FY' },
@@ -2889,7 +2883,7 @@ export default function ReportsCenter() {
                 <button
                   key={p.id}
                   onClick={() => setEarningsTimeFilter(p.id as any)}
-                  className={`px-4.5 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                  className={`px-3.5 sm:px-4.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                     isActive
                       ? 'bg-slate-900 text-white shadow-xs'
                       : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -2902,36 +2896,35 @@ export default function ReportsCenter() {
           </div>
 
           {/* Hero Earnings Card */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-5">
-            {/* Header: YOU EARNED · ALL TIME */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-4 sm:space-y-5">
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-emerald-600 uppercase tracking-wider">
                 <TrendingUp size={14} className="stroke-[2.5]" />
                 <span>
                   YOU EARNED · {earningsTimeFilter === 'this_month' ? 'THIS MONTH' : earningsTimeFilter === 'this_fy' ? 'THIS FY' : 'ALL TIME'}
                 </span>
               </div>
-              <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight block mt-1 font-mono">
+              <span className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight block mt-1 font-mono">
                 ₹{earningsStats.totalEarned.toLocaleString('en-IN')}
               </span>
-              <p className="text-xs text-slate-400 font-medium mt-1 leading-relaxed">
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-1 leading-relaxed">
                 Money that has actually moved — not what a schedule projects.
               </p>
             </div>
 
             {/* Breakdown List */}
-            <div className="space-y-4 pt-1 border-t border-slate-100">
+            <div className="space-y-3 sm:space-y-4 pt-1 border-t border-slate-100">
               
-              {/* Row 1: Organizer Profit (Month 0) */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
-                    <Award size={18} />
+              {/* Row 1: Organizer Profit */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                    <Award size={16} />
                   </div>
-                  <div>
-                    <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">Organizer Profit (Month 0)</h5>
-                    <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-tight">
-                      Launch month collection pool retained exclusively by Organizer
+                  <div className="min-w-0">
+                    <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight truncate">Organizer Profit (M0)</h5>
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 leading-tight truncate">
+                      Launch month collection pool
                     </p>
                   </div>
                 </div>
@@ -2940,16 +2933,16 @@ export default function ReportsCenter() {
                 </span>
               </div>
 
-              {/* Row 2: Discount Pool (Kai Iruppu / Laaba Seetu) */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                    <Sparkles size={17} />
+              {/* Row 2: Discount Pool */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                    <Sparkles size={16} />
                   </div>
-                  <div>
-                    <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">Discount Pool (Laaba Seetu Reserve)</h5>
-                    <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-tight">
-                      Accumulating towards ₹0 free installment month for subscribers
+                  <div className="min-w-0">
+                    <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight truncate">Discount Pool (Laaba Seetu)</h5>
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 leading-tight truncate">
+                      Reserve towards ₹0 month
                     </p>
                   </div>
                 </div>
@@ -2959,15 +2952,15 @@ export default function ReportsCenter() {
               </div>
 
               {/* Row 3: Penalties */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                    <AlertTriangle size={17} className="text-slate-600" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                    <AlertTriangle size={16} className="text-slate-600" />
                   </div>
-                  <div>
-                    <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">Penalties</h5>
-                    <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-tight">
-                      Late fees and overdue charges collected
+                  <div className="min-w-0">
+                    <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight truncate">Penalties</h5>
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 leading-tight truncate">
+                      Late charges collected
                     </p>
                   </div>
                 </div>
@@ -2980,24 +2973,24 @@ export default function ReportsCenter() {
           </div>
 
           {/* Bottom BY CHIT Card */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-3">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-2.5 sm:space-y-3">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
               BY CHIT
             </span>
 
             <div className="divide-y divide-slate-100">
               {earningsStats.byChitList.length === 0 ? (
-                <div className="py-3 text-center text-xs text-slate-400">
+                <div className="py-2 text-center text-xs text-slate-400">
                   No earnings recorded for this selection.
                 </div>
               ) : (
                 earningsStats.byChitList.map((g) => (
-                  <div key={g.id} className="py-2.5 flex items-center justify-between first:pt-0 last:pb-0">
-                    <div>
-                      <span className="font-bold text-slate-900 text-sm block">{g.name}</span>
-                      <span className="text-[11px] text-slate-400 font-medium block mt-0.5">{g.subtitle}</span>
+                  <div key={g.id} className="py-2 sm:py-2.5 flex items-center justify-between first:pt-0 last:pb-0 gap-2">
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-900 text-xs sm:text-sm block truncate">{g.name}</span>
+                      <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium block mt-0.5 truncate">{g.subtitle}</span>
                     </div>
-                    <span className="font-black text-slate-900 font-mono text-sm">
+                    <span className="font-black text-slate-900 font-mono text-xs sm:text-sm shrink-0">
                       ₹{g.total.toLocaleString('en-IN')}
                     </span>
                   </div>
@@ -3011,24 +3004,24 @@ export default function ReportsCenter() {
 
       {/* ── 6. PAYOUTS SUBTAB ── */}
       {activeSubtab === 'payouts' && (
-        <div className="space-y-4 max-w-xl mx-auto animate-in fade-in duration-150">
+        <div className="space-y-3.5 sm:space-y-4 max-w-xl mx-auto w-full animate-in fade-in duration-150">
           
           {/* Top Chit Group Selector Pill */}
           {chitGroups.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5">
               {chitGroups.map((g) => {
                 const isSelected = g.id === (selectedGroup?.id || selectedGroupId);
                 return (
                   <button
                     key={g.id}
                     onClick={(e) => handleSelectGroup(g.id, e)}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
                       isSelected
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-2xs'
                     }`}
                   >
-                    <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+                    <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-gray-300'}`} />
                     <span>{g.name}</span>
                   </button>
                 );
@@ -3036,56 +3029,56 @@ export default function ReportsCenter() {
             </div>
           )}
 
-          {/* Action Buttons: Share Text & WhatsApp PDF */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Action Buttons */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <button
               onClick={handleShareText}
-              className="py-3 px-4 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 sm:py-3 px-3 sm:px-4 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <Share2 size={16} /> Share Text
+              <Share2 size={15} /> <span>Share Text</span>
             </button>
             <button
               onClick={handleWhatsAppPDF}
-              className="py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 sm:py-3 px-3 sm:px-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <Send size={16} /> WhatsApp PDF
+              <Send size={15} /> <span>WhatsApp PDF</span>
             </button>
           </div>
 
           {/* 3 Pastel Summary Metric Cards */}
-          <div className="grid grid-cols-3 gap-3">
-            {/* Card 1: WINNERS (Mint/Emerald) */}
-            <div className="border border-emerald-200/90 bg-emerald-50/60 rounded-3xl p-4 sm:p-5 shadow-2xs text-left space-y-1">
-              <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {/* Card 1: WINNERS */}
+            <div className="border border-emerald-200/90 bg-emerald-50/60 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-2xs text-left space-y-0.5 sm:space-y-1">
+              <span className="text-[9px] sm:text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">
                 WINNERS
               </span>
-              <span className="text-2xl sm:text-3xl font-black text-emerald-600 block font-mono">
+              <span className="text-lg sm:text-3xl font-black text-emerald-600 block font-mono">
                 {payoutsStats.winnersCount}
               </span>
             </div>
 
-            {/* Card 2: REMAINING (Soft Yellow/Amber) */}
-            <div className="border border-amber-200/90 bg-amber-50/50 rounded-3xl p-4 sm:p-5 shadow-2xs text-left space-y-1">
-              <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider block">
+            {/* Card 2: REMAINING */}
+            <div className="border border-amber-200/90 bg-amber-50/50 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-2xs text-left space-y-0.5 sm:space-y-1">
+              <span className="text-[9px] sm:text-[11px] font-bold text-amber-700 uppercase tracking-wider block">
                 REMAINING
               </span>
-              <span className="text-2xl sm:text-3xl font-black text-amber-700 block font-mono">
+              <span className="text-lg sm:text-3xl font-black text-amber-700 block font-mono">
                 {payoutsStats.remainingCount}
               </span>
             </div>
 
             {/* Card 3: OUTSTANDING */}
-            <div className={`border rounded-3xl p-4 sm:p-5 shadow-2xs text-left space-y-1 transition-colors ${
+            <div className={`border rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-2xs text-left space-y-0.5 sm:space-y-1 transition-colors ${
               payoutsStats.outstandingTotal > 0 
                 ? 'border-rose-200/90 bg-rose-50/50' 
                 : 'border-slate-200/90 bg-white'
             }`}>
-              <span className={`text-[11px] font-bold uppercase tracking-wider block ${
+              <span className={`text-[9px] sm:text-[11px] font-bold uppercase tracking-wider block truncate ${
                 payoutsStats.outstandingTotal > 0 ? 'text-rose-600' : 'text-slate-400'
               }`}>
                 OUTSTANDING
               </span>
-              <span className={`text-2xl sm:text-3xl font-black block font-mono ${
+              <span className={`text-sm sm:text-3xl font-black block font-mono ${
                 payoutsStats.outstandingTotal > 0 ? 'text-rose-600' : 'text-slate-900'
               }`}>
                 ₹{payoutsStats.outstandingTotal.toLocaleString('en-IN')}
@@ -3094,15 +3087,15 @@ export default function ReportsCenter() {
           </div>
 
           {/* Auction Progress Card */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-2.5">
-            <div className="flex items-center justify-between text-xs font-semibold">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between text-[11px] sm:text-xs font-semibold">
               <span className="text-slate-600">Auction Progress</span>
               <span className="font-bold text-slate-900">
-                {payoutsStats.winnersCount} of {payoutsStats.totalMembers} won ({payoutsStats.progressPercent}%)
+                {payoutsStats.winnersCount}/{payoutsStats.totalMembers} won ({payoutsStats.progressPercent}%)
               </span>
             </div>
 
-            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+            <div className="w-full bg-slate-100 rounded-full h-2 sm:h-2.5 overflow-hidden">
               <div
                 className="bg-amber-400 h-full rounded-full transition-all duration-300"
                 style={{ width: `${Math.min(100, payoutsStats.progressPercent)}%` }}
@@ -3111,37 +3104,37 @@ export default function ReportsCenter() {
           </div>
 
           {/* WINNER PAYOUTS List Card */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3 sm:space-y-4">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
               WINNER PAYOUTS
             </span>
 
             <div className="divide-y divide-slate-100">
               {payoutsStats.winnersList.length === 0 ? (
-                <div className="py-4 text-center text-xs text-slate-400">
+                <div className="py-3 text-center text-xs text-slate-400">
                   No auction prize disbursements recorded yet.
                 </div>
               ) : (
                 payoutsStats.winnersList.map((w) => (
-                  <div key={w.id} className="py-3.5 flex items-center justify-between first:pt-0 last:pb-0 gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                  <div key={w.id} className="py-3 sm:py-3.5 flex items-center justify-between first:pt-0 last:pb-0 gap-2 sm:gap-3">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                      <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 ${
                         w.status === 'Complete' 
                           ? 'bg-emerald-50 text-emerald-600' 
                           : w.status === 'Partial'
                           ? 'bg-amber-50 text-amber-600'
                           : 'bg-rose-50 text-rose-600'
                       }`}>
-                        <Trophy size={17} />
+                        <Trophy size={15} />
                       </div>
                       <div className="min-w-0">
-                        <h5 className="text-sm font-bold text-slate-900 leading-tight truncate">
+                        <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight truncate">
                           {w.winnerName}
                         </h5>
-                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 truncate">
                           {w.subtitle}
                         </p>
-                        <div className="flex flex-wrap items-center gap-2 text-xs font-medium mt-1">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium mt-1">
                           <span className="text-slate-400">Awarded ₹{w.awardedAmount.toLocaleString('en-IN')}</span>
                           {w.amountPaid > 0 && (
                             <span className="font-bold text-emerald-600 font-mono">Paid ₹{w.amountPaid.toLocaleString('en-IN')}</span>
@@ -3153,7 +3146,7 @@ export default function ReportsCenter() {
                       </div>
                     </div>
 
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold shrink-0 border ${
+                    <span className={`inline-block px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold shrink-0 border ${
                       w.status === 'Complete'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
                         : w.status === 'Partial'
@@ -3173,24 +3166,24 @@ export default function ReportsCenter() {
 
       {/* ── 7. MEMBER SUBTAB ── */}
       {activeSubtab === 'member' && (
-        <div className="space-y-4 max-w-xl mx-auto animate-in fade-in duration-150">
+        <div className="space-y-3.5 sm:space-y-4 max-w-xl mx-auto w-full animate-in fade-in duration-150">
           
           {/* Top Chit Group Selector Pill */}
           {chitGroups.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5">
               {chitGroups.map((g) => {
                 const isSelected = g.id === (selectedGroup?.id || selectedGroupId);
                 return (
                   <button
                     key={g.id}
                     onClick={(e) => handleSelectGroup(g.id, e)}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-bold shrink-0 transition-all duration-150 active:scale-95 cursor-pointer ${
                       isSelected
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-2xs'
                     }`}
                   >
-                    <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+                    <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-gray-300'}`} />
                     <span>{g.name}</span>
                   </button>
                 );
@@ -3200,9 +3193,9 @@ export default function ReportsCenter() {
 
           {/* Search Box for Member Selection */}
           <div className="relative">
-            <div className="relative flex items-center border border-gray-200 bg-white rounded-2xl shadow-2xs focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500 transition-all p-1">
-              <div className="pl-3 text-gray-400 flex items-center justify-center">
-                <Search size={16} />
+            <div className="relative flex items-center border border-gray-200 bg-white rounded-xl sm:rounded-2xl shadow-2xs focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500 transition-all p-1">
+              <div className="pl-2.5 sm:pl-3 text-gray-400 flex items-center justify-center">
+                <Search size={15} />
               </div>
               <input
                 type="text"
@@ -3213,7 +3206,7 @@ export default function ReportsCenter() {
                   setIsSearchDropdownOpen(true);
                 }}
                 placeholder="Search member name or ticket #..."
-                className="w-full px-3 py-2 text-sm text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none font-bold"
+                className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none font-bold"
               />
               {memberSearchQuery && (
                 <button
@@ -3222,9 +3215,9 @@ export default function ReportsCenter() {
                     setMemberSearchQuery('');
                     setIsSearchDropdownOpen(true);
                   }}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg mr-1 cursor-pointer"
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded-lg mr-1 cursor-pointer"
                 >
-                  <X size={15} />
+                  <X size={14} />
                 </button>
               )}
             </div>
@@ -3241,18 +3234,18 @@ export default function ReportsCenter() {
                       setMemberSearchQuery(m.profiles?.full_name || '');
                       setIsSearchDropdownOpen(false);
                     }}
-                    className="w-full px-4 py-2.5 text-left flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer"
+                    className="w-full px-3.5 sm:px-4 py-2 sm:py-2.5 text-left flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <div>
-                      <span className="text-sm font-bold text-slate-900 block leading-tight">
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 block leading-tight">
                         {m.profiles?.full_name || 'Subscriber'}
                       </span>
-                      <span className="text-[11px] text-slate-400 font-medium block mt-0.5">
+                      <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium block mt-0.5">
                         Ticket #{m.ticket_number} {m.profiles?.phone_number ? `· ${m.profiles.phone_number}` : ''}
                       </span>
                     </div>
                     {selectedMemberId === m.id && (
-                      <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                      <span className="text-[10px] sm:text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                         Selected
                       </span>
                     )}
@@ -3263,107 +3256,107 @@ export default function ReportsCenter() {
           </div>
 
           {/* Action Buttons: Share, WhatsApp, PDF */}
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
             <button
               onClick={handleShareText}
-              className="py-3 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 sm:py-3 px-2 sm:px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <Share2 size={15} /> <span>Share</span>
+              <Share2 size={14} /> <span>Share</span>
             </button>
             <button
               onClick={handleWhatsAppPDF}
-              className="py-3 px-3 bg-[#22c55e] hover:bg-[#16a34a] text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 sm:py-3 px-2 sm:px-3 bg-[#22c55e] hover:bg-[#16a34a] text-white rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <Send size={15} /> <span>WhatsApp</span>
+              <Send size={14} /> <span>WhatsApp</span>
             </button>
             <button
               onClick={() => setShowPreviewModal(true)}
-              className="py-3 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 sm:py-3 px-2 sm:px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <FileText size={15} /> <span>PDF</span>
+              <FileText size={14} /> <span>PDF</span>
             </button>
           </div>
 
           {/* 3 Pastel Summary Metric Cards */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {/* Card 1: TOTAL DUE */}
-            <div className="border border-slate-200/90 bg-white rounded-3xl p-4 sm:p-5 shadow-2xs text-left space-y-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+            <div className="border border-slate-200/90 bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-2xs text-left space-y-0.5 sm:space-y-1">
+              <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
                 TOTAL DUE
               </span>
-              <span className="text-xl sm:text-2xl font-black text-slate-900 block font-mono">
+              <span className="text-sm sm:text-2xl font-black text-slate-900 block font-mono">
                 {formatCurrency(memberStatementStats.totalDue)}
               </span>
             </div>
 
-            {/* Card 2: PAID (Mint Green) */}
-            <div className="border border-emerald-200/90 bg-emerald-50/60 rounded-3xl p-4 sm:p-5 shadow-2xs text-left space-y-1">
-              <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">
+            {/* Card 2: PAID */}
+            <div className="border border-emerald-200/90 bg-emerald-50/60 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-2xs text-left space-y-0.5 sm:space-y-1">
+              <span className="text-[9px] sm:text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">
                 PAID
               </span>
-              <span className="text-xl sm:text-2xl font-black text-emerald-600 block font-mono">
+              <span className="text-sm sm:text-2xl font-black text-emerald-600 block font-mono">
                 {formatCurrency(memberStatementStats.totalPaid)}
               </span>
             </div>
 
-            {/* Card 3: OWES (Soft Pink/Rose) */}
-            <div className="border border-rose-200/90 bg-rose-50/60 rounded-3xl p-4 sm:p-5 shadow-2xs text-left space-y-1">
-              <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider block">
+            {/* Card 3: OWES */}
+            <div className="border border-rose-200/90 bg-rose-50/60 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-2xs text-left space-y-0.5 sm:space-y-1">
+              <span className="text-[9px] sm:text-[11px] font-bold text-rose-600 uppercase tracking-wider block">
                 OWES
               </span>
-              <span className="text-xl sm:text-2xl font-black text-rose-600 block font-mono">
+              <span className="text-sm sm:text-2xl font-black text-rose-600 block font-mono">
                 {formatCurrency(memberStatementStats.totalOwes)}
               </span>
             </div>
           </div>
 
-          {/* Winner & Prize Payout Status Card (Detailed Entitlement Ledger) */}
+          {/* Winner & Prize Payout Status Card */}
           {memberStatementStats.hasWon && (
-            <div className="bg-[#fef9ea] border border-[#fde68a] rounded-3xl p-4 sm:p-5 space-y-3 shadow-2xs animate-in fade-in">
+            <div className="bg-[#fef9ea] border border-[#fde68a] rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 space-y-2.5 sm:space-y-3 shadow-2xs animate-in fade-in">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-amber-100/90 text-[#b45309] flex items-center justify-center shrink-0">
-                    <Trophy size={16} />
+                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-100/90 text-[#b45309] flex items-center justify-center shrink-0">
+                    <Trophy size={14} />
                   </div>
-                  <div>
-                    <h5 className="font-bold text-xs sm:text-sm text-slate-900 leading-tight">
-                      Won Auction · {memberStatementStats.winningDateLabel}
+                  <div className="min-w-0">
+                    <h5 className="font-bold text-xs sm:text-sm text-slate-900 leading-tight truncate">
+                      Won · {memberStatementStats.winningDateLabel}
                     </h5>
-                    <p className="text-[11px] text-amber-800 font-medium mt-0.5">
+                    <p className="text-[10px] sm:text-[11px] text-amber-800 font-medium mt-0.5 truncate">
                       {memberStatementStats.payoutDate 
-                        ? `Disbursed on ${memberStatementStats.payoutDate} via ${memberStatementStats.payoutMethod}` 
-                        : `Disbursal pending via ${memberStatementStats.payoutMethod}`}
+                        ? `Disbursed on ${memberStatementStats.payoutDate}` 
+                        : `Pending disbursal`}
                     </p>
                   </div>
                 </div>
 
-                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${
+                <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-bold border shrink-0 ${
                   memberStatementStats.payoutStatus === 'Settled'
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
                     : memberStatementStats.payoutStatus === 'Partial'
                     ? 'bg-amber-50 text-amber-700 border-amber-200/80'
                     : 'bg-rose-50 text-rose-700 border-rose-200/80'
                 }`}>
-                  {memberStatementStats.payoutStatus === 'Settled' ? 'Prize Settled' : memberStatementStats.payoutStatus === 'Partial' ? 'Partial Payout' : 'Payout Pending'}
+                  {memberStatementStats.payoutStatus === 'Settled' ? 'Settled' : memberStatementStats.payoutStatus === 'Partial' ? 'Partial' : 'Pending'}
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-amber-200/60 text-left">
-                <div className="bg-white/80 rounded-xl p-2.5 border border-amber-200/50">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">NET PRIZE POT</span>
-                  <span className="text-xs sm:text-sm font-black text-slate-900 block font-mono mt-0.5">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-1 border-t border-amber-200/60 text-left">
+                <div className="bg-white/80 rounded-lg sm:rounded-xl p-2 sm:p-2.5 border border-amber-200/50">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider block truncate">POT</span>
+                  <span className="text-[11px] sm:text-sm font-black text-slate-900 block font-mono mt-0.5">
                     {formatCurrency(memberStatementStats.netPrizePot)}
                   </span>
                 </div>
-                <div className="bg-white/80 rounded-xl p-2.5 border border-emerald-200/50">
-                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">DISBURSED</span>
-                  <span className="text-xs sm:text-sm font-black text-emerald-700 block font-mono mt-0.5">
+                <div className="bg-white/80 rounded-lg sm:rounded-xl p-2 sm:p-2.5 border border-emerald-200/50">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-emerald-700 uppercase tracking-wider block truncate">PAID</span>
+                  <span className="text-[11px] sm:text-sm font-black text-emerald-700 block font-mono mt-0.5">
                     {formatCurrency(memberStatementStats.prizePaid)}
                   </span>
                 </div>
-                <div className="bg-white/80 rounded-xl p-2.5 border border-rose-200/50">
-                  <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">PENDING</span>
-                  <span className="text-xs sm:text-sm font-black text-rose-700 block font-mono mt-0.5">
+                <div className="bg-white/80 rounded-lg sm:rounded-xl p-2 sm:p-2.5 border border-rose-200/50">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-rose-700 uppercase tracking-wider block truncate">PENDING</span>
+                  <span className="text-[11px] sm:text-sm font-black text-rose-700 block font-mono mt-0.5">
                     {formatCurrency(memberStatementStats.prizePending)}
                   </span>
                 </div>
@@ -3372,31 +3365,31 @@ export default function ReportsCenter() {
           )}
 
           {/* Monthly Payment Breakdown List Card */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3 sm:space-y-4">
             <div className="divide-y divide-slate-100">
               {memberStatementStats.monthRows.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400">
+                <div className="py-4 text-center text-xs text-slate-400">
                   No installment dues recorded for this subscriber yet.
                 </div>
               ) : (
                 memberStatementStats.monthRows.map((r) => (
-                  <div key={r.month} className="py-3.5 flex items-center justify-between first:pt-0 last:pb-0 gap-3">
-                    <div>
-                      <h5 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
+                  <div key={r.month} className="py-2.5 sm:py-3.5 flex items-center justify-between first:pt-0 last:pb-0 gap-2 sm:gap-3">
+                    <div className="min-w-0">
+                      <h5 className="text-xs sm:text-base font-bold text-slate-900 leading-tight truncate">
                         {r.dateLabel}
                       </h5>
-                      <p className="text-xs text-gray-400 font-mono font-medium mt-0.5">
+                      <p className="text-[10px] sm:text-xs text-gray-400 font-mono font-medium mt-0.5">
                         Paid {formatCurrency(r.paid)} / {formatCurrency(r.expected)}
                       </p>
                     </div>
 
-                    <div className="text-right space-y-1">
-                      <span className={`text-sm sm:text-base font-bold font-mono block leading-tight ${
+                    <div className="text-right space-y-0.5 sm:space-y-1 shrink-0">
+                      <span className={`text-xs sm:text-base font-bold font-mono block leading-tight ${
                         r.pendingDue > 0 ? 'text-rose-600' : 'text-slate-900'
                       }`}>
                         {formatCurrency(r.pendingDue > 0 ? r.pendingDue : r.paid)}
                       </span>
-                      <span className={`inline-block px-3 py-0.5 rounded-full text-[11px] font-bold border ${
+                      <span className={`inline-block px-2.5 sm:px-3 py-0.2 sm:py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold border ${
                         r.status === 'Paid'
                           ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                           : r.status === 'Late'
@@ -3417,11 +3410,11 @@ export default function ReportsCenter() {
 
       {/* ── 8. RELIABILITY SUBTAB ── */}
       {activeSubtab === 'reliability' && (
-        <div className="space-y-5 sm:space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           
-          {/* Chit Group Selection Pill (ChitBase Style) */}
+          {/* Chit Group Selection Pill */}
           {chitGroups.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5" ref={groupSliderRef}>
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5" ref={groupSliderRef}>
               {chitGroups.map((group) => {
                 const isSelected = selectedGroupId === group.id;
                 return (
@@ -3429,7 +3422,7 @@ export default function ReportsCenter() {
                     key={group.id}
                     type="button"
                     onClick={(e) => handleSelectGroup(group.id, e)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-xs whitespace-nowrap transition-all shrink-0 cursor-pointer shadow-2xs ${
+                    className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full font-bold text-xs whitespace-nowrap transition-all shrink-0 cursor-pointer shadow-2xs ${
                       isSelected
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'bg-white border border-gray-200/90 text-gray-600 hover:text-gray-900 hover:bg-slate-50'
@@ -3443,69 +3436,69 @@ export default function ReportsCenter() {
             </div>
           )}
 
-          {/* Action Buttons: Share / WhatsApp / PDF */}
-          <div className="grid grid-cols-3 gap-2.5">
+          {/* Action Buttons */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
             <button
               onClick={handleShareText}
-              className="py-3 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 sm:py-3 px-2 sm:px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <Share2 size={15} /> <span>Share</span>
+              <Share2 size={14} /> <span>Share</span>
             </button>
             <button
               onClick={handleWhatsAppPDF}
-              className="py-3 px-3 bg-[#22c55e] hover:bg-[#16a34a] text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 sm:py-3 px-2 sm:px-3 bg-[#22c55e] hover:bg-[#16a34a] text-white rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <Send size={15} /> <span>WhatsApp</span>
+              <Send size={14} /> <span>WhatsApp</span>
             </button>
             <button
               onClick={() => setShowPreviewModal(true)}
-              className="py-3 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="py-2.5 sm:py-3 px-2 sm:px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl sm:rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <FileText size={15} /> <span>PDF</span>
+              <FileText size={14} /> <span>PDF</span>
             </button>
           </div>
 
-          {/* Hero Card: Member reliability · who pays on time + 3 Pastel Metric Cards */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
-            <h4 className="text-sm sm:text-base font-bold text-slate-600">
+          {/* Hero Card: Member reliability */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-3 sm:space-y-4">
+            <h4 className="text-xs sm:text-base font-bold text-slate-600">
               Member reliability <span className="font-normal text-slate-400">· who pays on time</span>
             </h4>
 
             {/* 3 Pastel Summary Metric Cards */}
-            <div className="grid grid-cols-3 gap-3">
-              {/* Card 1: Reliable (Mint Green) */}
-              <div className="border border-[#bbf7d0] bg-[#eaf8f0] rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 text-left space-y-1">
-                <span className="text-[11px] sm:text-xs font-bold text-[#16a34a] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#16a34a]" /> Reliable
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              {/* Card 1: Reliable */}
+              <div className="border border-[#bbf7d0] bg-[#eaf8f0] rounded-xl sm:rounded-3xl p-2.5 sm:p-4 text-left space-y-0.5 sm:space-y-1">
+                <span className="text-[10px] sm:text-xs font-bold text-[#16a34a] flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#16a34a]" /> Reliable
                 </span>
-                <span className="text-2xl sm:text-3xl font-black text-[#0f172a] block font-mono">
+                <span className="text-lg sm:text-3xl font-black text-[#0f172a] block font-mono">
                   {reliabilityStats.reliableCount}
                 </span>
               </div>
 
-              {/* Card 2: Watch (Soft Yellow) */}
-              <div className="border border-[#fde68a] bg-[#fef9ea] rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 text-left space-y-1">
-                <span className="text-[11px] sm:text-xs font-bold text-[#b45309] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#b45309]" /> Watch
+              {/* Card 2: Watch */}
+              <div className="border border-[#fde68a] bg-[#fef9ea] rounded-xl sm:rounded-3xl p-2.5 sm:p-4 text-left space-y-0.5 sm:space-y-1">
+                <span className="text-[10px] sm:text-xs font-bold text-[#b45309] flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#b45309]" /> Watch
                 </span>
-                <span className="text-2xl sm:text-3xl font-black text-[#0f172a] block font-mono">
+                <span className="text-lg sm:text-3xl font-black text-[#0f172a] block font-mono">
                   {reliabilityStats.watchCount}
                 </span>
               </div>
 
-              {/* Card 3: At risk (Soft Pink/Rose) */}
-              <div className="border border-[#fecaca] bg-[#fef2f2] rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 text-left space-y-1">
-                <span className="text-[11px] sm:text-xs font-bold text-[#dc2626] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#dc2626]" /> At risk
+              {/* Card 3: At risk */}
+              <div className="border border-[#fecaca] bg-[#fef2f2] rounded-xl sm:rounded-3xl p-2.5 sm:p-4 text-left space-y-0.5 sm:space-y-1">
+                <span className="text-[10px] sm:text-xs font-bold text-[#dc2626] flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#dc2626]" /> At risk
                 </span>
-                <span className="text-2xl sm:text-3xl font-black text-[#0f172a] block font-mono">
+                <span className="text-lg sm:text-3xl font-black text-[#0f172a] block font-mono">
                   {reliabilityStats.atRiskCount}
                 </span>
               </div>
             </div>
 
             {/* Subtitle / Attention banner */}
-            <div className="text-xs font-medium text-slate-500 pt-0.5">
+            <div className="text-[11px] sm:text-xs font-medium text-slate-500 pt-0.5">
               {reliabilityStats.attentionCount > 0 ? (
                 <span>
                   <strong className="text-[#dc2626] font-bold">{reliabilityStats.attentionCount}</strong> members need attention — shown first.
@@ -3519,9 +3512,9 @@ export default function ReportsCenter() {
           </div>
 
           {/* Ranked Member Reliability Cards List */}
-          <div className="space-y-3">
+          <div className="space-y-2.5 sm:space-y-3">
             {reliabilityStats.memberList.length === 0 ? (
-              <div className="bg-white border border-slate-200/90 rounded-3xl p-8 text-center text-xs text-slate-400 shadow-2xs">
+              <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-6 text-center text-xs text-slate-400 shadow-2xs">
                 No members found in this chit group.
               </div>
             ) : (
@@ -3545,35 +3538,35 @@ export default function ReportsCenter() {
                       setSelectedMemberId(m.id);
                       setActiveSubtab('member');
                     }}
-                    className="bg-white border border-slate-200/90 hover:border-slate-300 rounded-3xl p-4 sm:p-5 shadow-2xs flex items-center justify-between gap-3 sm:gap-4 transition-all duration-150 cursor-pointer active:scale-[0.99] group"
+                    className="bg-white border border-slate-200/90 hover:border-slate-300 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-2xs flex items-center justify-between gap-2.5 sm:gap-4 transition-all duration-150 cursor-pointer active:scale-[0.99] group"
                   >
                     {/* Left Score Box */}
-                    <div className="w-12 sm:w-14 text-center shrink-0">
-                      <span className={`text-xl sm:text-2xl font-black block font-mono leading-none ${statusColor}`}>
+                    <div className="w-10 sm:w-14 text-center shrink-0">
+                      <span className={`text-lg sm:text-2xl font-black block font-mono leading-none ${statusColor}`}>
                         {m.score}
                       </span>
-                      <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 block mt-0.5">
+                      <span className="text-[9px] sm:text-[11px] font-semibold text-slate-400 block mt-0.5">
                         score
                       </span>
                     </div>
 
                     {/* Middle Details & Progress Track */}
                     <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-slate-900 text-sm sm:text-base leading-tight truncate">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <span className="font-bold text-slate-900 text-xs sm:text-base leading-tight truncate">
                           {m.name}
                         </span>
-                        <span className={`text-xs font-bold flex items-center gap-1 shrink-0 ${statusColor}`}>
+                        <span className={`text-[10px] sm:text-xs font-bold flex items-center gap-1 shrink-0 ${statusColor}`}>
                           <span className="w-1.5 h-1.5 rounded-full bg-current" /> {m.status}
                         </span>
                       </div>
 
-                      <div className="text-xs text-slate-400 font-medium">
-                        {m.onTimeCount}/{m.evaluatedMonthsCount} on time · {m.unpaidCount} unpaid · {m.avgLateDays}d late avg
+                      <div className="text-[10px] sm:text-xs text-slate-400 font-medium truncate">
+                        {m.onTimeCount}/{m.evaluatedMonthsCount} on time · {m.unpaidCount} unpaid · {m.avgLateDays}d late
                       </div>
 
                       {/* Score Track Bar */}
-                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mt-1.5">
+                      <div className="w-full bg-slate-100 rounded-full h-1 sm:h-1.5 overflow-hidden mt-1">
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${progressBg}`}
                           style={{ width: `${Math.max(3, m.score)}%` }}
@@ -3582,7 +3575,7 @@ export default function ReportsCenter() {
                     </div>
 
                     {/* Right Chevron */}
-                    <ChevronRight size={18} className="text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                    <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
                 );
               })
@@ -3594,56 +3587,67 @@ export default function ReportsCenter() {
 
       {/* ── MODAL: DOCUMENT PREVIEW & PRINT ── */}
       {showPreviewModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 z-50 animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-white w-full max-w-4xl h-[92dvh] max-h-[92dvh] rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden my-auto">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 md:p-6 z-50 animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl h-[100dvh] sm:h-[92dvh] max-h-[100dvh] sm:max-h-[92dvh] rounded-none sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden my-auto">
             {/* Modal Header */}
-            <div className="p-3.5 sm:p-5 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 shrink-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <FileText size={18} className="text-indigo-600 shrink-0" />
-                <h3 className="text-xs sm:text-base font-bold text-gray-900 truncate">
-                  {activeSubtab === 'reliability'
-                    ? `${selectedGroup?.name || 'Group'} Reliability Report PDF Preview`
-                    : activeSubtab === 'member'
-                    ? `${memberStatementStats.memberName} Statement PDF Preview`
-                    : activeSubtab === 'payouts'
-                    ? `${selectedGroup?.name || 'Group'} Payouts Report PDF Preview`
-                    : activeSubtab === 'period'
-                    ? `Period Report (${periodDateLabel}) PDF Preview`
-                    : activeSubtab === 'defaulters'
-                    ? `Month ${selectedMonth === 0 ? '0 (Launch)' : selectedMonth} Defaulters Report PDF Preview`
-                    : `Month ${selectedMonth === 0 ? '0 (Launch)' : selectedMonth} Statement PDF Preview`
-                  }
-                </h3>
+            <div className="p-3 sm:p-5 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 shrink-0">
+              <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText size={17} className="text-indigo-600 shrink-0" />
+                  <h3 className="text-xs sm:text-base font-bold text-gray-900 truncate">
+                    {activeSubtab === 'reliability'
+                      ? `${selectedGroup?.name || 'Group'} Reliability Report`
+                      : activeSubtab === 'member'
+                      ? `${memberStatementStats.memberName} Statement`
+                      : activeSubtab === 'payouts'
+                      ? `${selectedGroup?.name || 'Group'} Payouts Report`
+                      : activeSubtab === 'period'
+                      ? `Period Report (${periodDateLabel})`
+                      : activeSubtab === 'defaulters'
+                      ? `Month ${selectedMonth === 0 ? '0 (Launch)' : selectedMonth} Defaulters Report`
+                      : `Month ${selectedMonth === 0 ? '0 (Launch)' : selectedMonth} Statement`
+                    }
+                  </h3>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="sm:hidden p-1.5 text-gray-400 hover:text-gray-700 rounded-xl transition-colors cursor-pointer hover:bg-gray-200"
+                >
+                  <X size={18} />
+                </button>
               </div>
-              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+
+              <div className="flex items-center gap-1.5 sm:gap-2 justify-end shrink-0">
                 <button
                   type="button"
                   onClick={handlePrintPDF}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-none justify-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <Printer size={14} /> Print
+                  <Printer size={14} /> <span>Print</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadPDF}
                   disabled={isGeneratingPDF}
-                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-none justify-center px-3.5 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
                 >
-                  <Download size={14} /> Download PDF
+                  <Download size={14} /> <span>Download PDF</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowPreviewModal(false)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 rounded-xl transition-colors cursor-pointer hover:bg-gray-200"
+                  className="hidden sm:inline-flex p-1.5 text-gray-400 hover:text-gray-700 rounded-xl transition-colors cursor-pointer hover:bg-gray-200"
                 >
                   <X size={18} />
                 </button>
               </div>
             </div>
 
-            {/* Modal Content Scroll Area */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6 md:p-8 bg-slate-200/80 flex justify-center">
-              <div className="bg-white shadow-xl rounded-xl w-full max-w-[760px] h-fit">
+            {/* Modal Content Scroll Area with Horizontal Scroll for Mobile */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-2 sm:p-6 md:p-8 bg-slate-200/80 flex justify-center">
+              <div className="bg-white shadow-xl rounded-xl w-full max-w-[760px] min-w-[320px] h-fit my-auto">
                 {activeSubtab === 'reliability' ? (
                   <ReliabilityPDFView 
                     selectedGroup={selectedGroup}
