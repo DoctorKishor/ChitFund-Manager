@@ -15,7 +15,9 @@ import {
   RefreshCw,
   FileText,
   Eye,
-  Settings2
+  Settings2,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -54,20 +56,35 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
 
   // Configuration States
   const currentGroupMonth = (group.currentMonth !== undefined && group.currentMonth !== null) ? group.currentMonth : 1;
-  const [selectedMonth, setSelectedMonth] = useState<number>(currentGroupMonth);
+  const totalMembers = group.duration || group.memberCount || 20;
+  const baseMonthlyInstallment = Math.round(group.totalValue / (totalMembers || 1));
+
+  // Multi-Month vs Single Month Mode
+  const [collectionMode, setCollectionMode] = useState<'single' | 'multi'>('single');
+  const [selectedSingleMonth, setSelectedSingleMonth] = useState<number>(currentGroupMonth);
+  const [selectedMultiMonths, setSelectedMultiMonths] = useState<number[]>([
+    currentGroupMonth,
+    Math.min(totalMembers, currentGroupMonth + 1)
+  ]);
+
   const [prefillPayments, setPrefillPayments] = useState<boolean>(false);
   const [invocationTitle, setInvocationTitle] = useState<string>('OM NAMA SIVAYA');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
   const [loadingData, setLoadingData] = useState<boolean>(true);
 
-  // Raw fetched data
+  // Raw fetched database records
   const [members, setMembers] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
 
-  const totalMembers = group.duration || group.memberCount || 20;
-  const baseInstallment = Math.round(group.totalValue / (totalMembers || 1));
+  // Active selected months list
+  const activeMonthsList = useMemo(() => {
+    if (collectionMode === 'single') {
+      return [selectedSingleMonth];
+    }
+    return selectedMultiMonths.length > 0 ? [...selectedMultiMonths].sort((a, b) => a - b) : [selectedSingleMonth];
+  }, [collectionMode, selectedSingleMonth, selectedMultiMonths]);
 
-  // Compute month label and default auction date for the selected cycle
+  // Compute month label and default date for the selected cycles
   const computedMonthDetails = useMemo(() => {
     let baseDate = new Date();
     if (group.startDate) {
@@ -77,48 +94,63 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
       }
     }
 
-    // Target date for selected month cycle
-    const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + (selectedMonth || 0), group.auctionDayOfMonth || 10);
-    
-    const monthName = targetDate.toLocaleString('en-US', { month: 'long' }).toUpperCase();
-    const yearStr = targetDate.getFullYear().toString();
-    
-    // Previous month name if applicable
-    const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + (selectedMonth || 0) - 1, 1);
-    const prevMonthName = prevDate.toLocaleString('en-US', { month: 'long' }).toUpperCase();
+    if (collectionMode === 'single') {
+      // Target date for this specific month
+      const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + (selectedSingleMonth || 0), group.auctionDayOfMonth || 10);
+      const monthName = targetDate.toLocaleString('en-US', { month: 'long' }).toUpperCase();
+      
+      const dd = String(targetDate.getDate()).padStart(2, '0');
+      const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const yyyy = targetDate.getFullYear();
 
-    const dd = String(targetDate.getDate()).padStart(2, '0');
-    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const yyyy = targetDate.getFullYear();
+      const formattedDate = `${dd}.${mm}.${yyyy}`;
+      const headerCycleLabel = selectedSingleMonth === 0 
+        ? `${monthName} (LAUNCH MONTH)` 
+        : monthName;
 
-    const formattedDate = `${dd}.${mm}.${yyyy}`;
-    const headerCycleLabel = selectedMonth === 0 
-      ? `${monthName} (LAUNCH MONTH)` 
-      : `${prevMonthName}, ${monthName}`;
+      return {
+        headerCycleLabel,
+        formattedDate,
+      };
+    } else {
+      // Multi-Month Mode: Generate comma separated names (e.g. "OCTOBER, NOVEMBER")
+      const monthNames = activeMonthsList.map(mNum => {
+        const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + mNum, 1);
+        return d.toLocaleString('en-US', { month: 'long' }).toUpperCase();
+      });
 
-    return {
-      monthName,
-      headerCycleLabel,
-      formattedDate,
-    };
-  }, [group, selectedMonth]);
+      // Latest scheduled date among the selected months
+      const lastMonthNum = activeMonthsList[activeMonthsList.length - 1] ?? 1;
+      const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + lastMonthNum, group.auctionDayOfMonth || 10);
+      const dd = String(targetDate.getDate()).padStart(2, '0');
+      const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const yyyy = targetDate.getFullYear();
+
+      const formattedDate = `${dd}.${mm}.${yyyy}`;
+      const headerCycleLabel = monthNames.join(', ');
+
+      return {
+        headerCycleLabel,
+        formattedDate,
+      };
+    }
+  }, [group, collectionMode, selectedSingleMonth, activeMonthsList]);
 
   const [customHeaderCycle, setCustomHeaderCycle] = useState<string>('');
   const [customDateStr, setCustomDateStr] = useState<string>('');
 
-  // Keep custom inputs synchronized when month changes unless user overrides
+  // Keep custom inputs synchronized when month or mode changes
   useEffect(() => {
     setCustomHeaderCycle(computedMonthDetails.headerCycleLabel);
     setCustomDateStr(computedMonthDetails.formattedDate);
   }, [computedMonthDetails]);
 
-  // Fetch enrolled members and month transactions
+  // Fetch enrolled members and transactions
   useEffect(() => {
     async function loadData() {
       try {
         setLoadingData(true);
 
-        // 1. Fetch group members
         const { data: memData } = await supabase
           .from('group_members')
           .select(`
@@ -135,7 +167,6 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
           .eq('group_id', group.id)
           .order('ticket_number', { ascending: true });
 
-        // 2. Fetch transactions for this group
         const { data: txData } = await supabase
           .from('transactions')
           .select('*')
@@ -157,26 +188,31 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
   // Build rows for all tickets 1..totalMembers
   const checklistRows: MemberRow[] = useMemo(() => {
     const rows: MemberRow[] = [];
-    const monthRegex = new RegExp(`\\bMonth\\s+${selectedMonth}\\b`, 'i');
+    const monthCount = activeMonthsList.length;
 
     for (let t = 1; t <= totalMembers; t++) {
       const memRow = members.find(m => m.ticket_number === t);
       const prof = Array.isArray(memRow?.profiles) ? memRow?.profiles[0] : memRow?.profiles;
       const rawName = prof?.full_name || (memRow?.profile_id ? `MEMBER #${t}` : `TICKET #${t}`);
       const upperName = rawName.toUpperCase();
-      const due = memRow?.custom_installment ? Number(memRow.custom_installment) : baseInstallment;
+      
+      const singleDue = memRow?.custom_installment ? Number(memRow.custom_installment) : baseMonthlyInstallment;
+      const totalDue = singleDue * monthCount;
 
-      // Find matching payment if prefill is active
       let paidDate = '';
       let paidAmount: number | undefined = undefined;
       let balanceAmount: number | undefined = undefined;
       let isPaid = false;
 
       if (prefillPayments && memRow) {
-        const memberTxs = transactions.filter(tx => 
-          (tx.group_member_id === memRow.id || (memRow.profile_id && tx.profile_id === memRow.profile_id)) &&
-          (tx.notes ? monthRegex.test(tx.notes) : true)
-        );
+        // Match transactions belonging to any of the active months
+        const memberTxs = transactions.filter(tx => {
+          const isThisMember = tx.group_member_id === memRow.id || (memRow.profile_id && tx.profile_id === memRow.profile_id);
+          if (!isThisMember) return false;
+
+          if (!tx.notes) return true;
+          return activeMonthsList.some(mNum => new RegExp(`\\bMonth\\s+${mNum}\\b`, 'i').test(tx.notes));
+        });
 
         if (memberTxs.length > 0) {
           const totalPaid = memberTxs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
@@ -191,10 +227,10 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             }
           }
           paidAmount = totalPaid;
-          balanceAmount = Math.max(0, due - totalPaid);
-          isPaid = totalPaid >= due;
+          balanceAmount = Math.max(0, totalDue - totalPaid);
+          isPaid = totalPaid >= totalDue;
         } else {
-          balanceAmount = due;
+          balanceAmount = totalDue;
         }
       }
 
@@ -203,7 +239,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
         profileId: memRow?.profile_id,
         name: upperName,
         phone: prof?.phone_number || '',
-        dueAmount: due,
+        dueAmount: totalDue,
         paidDate,
         paidAmount,
         balanceAmount,
@@ -212,17 +248,248 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
     }
 
     return rows;
-  }, [members, transactions, selectedMonth, totalMembers, baseInstallment, prefillPayments]);
+  }, [members, transactions, activeMonthsList, totalMembers, baseMonthlyInstallment, prefillPayments]);
 
-  // Format currency helpers
+  const effectiveDuePerMember = useMemo(() => {
+    return baseMonthlyInstallment * activeMonthsList.length;
+  }, [baseMonthlyInstallment, activeMonthsList]);
+
+  // Format currency helper
   const formatINR = (val: number) => {
     return `RS ${val.toLocaleString('en-IN')}/-`;
   };
 
-  // Handle native browser print
+  // Toggle multi-month selection
+  const handleToggleMultiMonth = (mNum: number) => {
+    triggerHapticFeedback('light');
+    setSelectedMultiMonths(prev => {
+      if (prev.includes(mNum)) {
+        if (prev.length <= 1) return prev; // Keep at least one month
+        return prev.filter(m => m !== mNum);
+      } else {
+        return [...prev, mNum].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  // ── FOOLPROOF NATIVE IFRAME PRINT (Zero blank pages) ────────────────────────
   const handlePrint = () => {
     triggerHapticFeedback('light');
-    window.print();
+    const printContent = printableRef.current;
+    if (!printContent) return;
+
+    // Create an isolated hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) return;
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Payment Checklist - ${group.name}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 10mm 12mm;
+            }
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              color: #000000;
+              background: #ffffff;
+            }
+            .sheet-container {
+              width: 100%;
+              max-width: 100%;
+              margin: 0 auto;
+            }
+            .invocation {
+              font-size: 13px;
+              font-weight: 900;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              margin-bottom: 12px;
+              font-family: Georgia, serif;
+            }
+            .header-block {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              border-bottom: 2px solid #000000;
+              padding-bottom: 10px;
+              margin-bottom: 16px;
+            }
+            .header-left {
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+            }
+            .header-right {
+              text-align: right;
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+            }
+            .chit-amount {
+              font-size: 16px;
+              font-weight: 900;
+              letter-spacing: -0.2px;
+            }
+            .months-dur {
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+            }
+            .monthly-due {
+              font-size: 14px;
+              font-weight: 900;
+            }
+            .cycle-label {
+              font-size: 14px;
+              font-weight: 900;
+              text-transform: uppercase;
+              text-decoration: underline;
+              text-underline-offset: 3px;
+            }
+            .date-label {
+              font-size: 13px;
+              font-weight: 700;
+              text-decoration: underline;
+              text-underline-offset: 3px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              border: 1.5px solid #000000;
+            }
+            th {
+              border: 1px solid #000000;
+              padding: 6px 4px;
+              font-size: 11px;
+              font-weight: 900;
+              background: #ffffff;
+              text-align: center;
+            }
+            th.th-name {
+              text-align: left;
+              padding-left: 8px;
+            }
+            td {
+              border: 1px solid #000000;
+              font-size: 11px;
+              font-weight: 600;
+              padding: ${totalMembers <= 10 ? '10px 4px' : totalMembers <= 15 ? '7px 4px' : totalMembers <= 20 ? '5px 4px' : '4px 3px'};
+              vertical-align: middle;
+            }
+            td.td-sl {
+              text-align: center;
+              font-weight: 700;
+            }
+            td.td-name {
+              text-align: left;
+              padding-left: 8px;
+              font-weight: 900;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            td.td-num {
+              text-align: center;
+              font-weight: 700;
+            }
+            td.td-date {
+              text-align: center;
+              font-family: monospace;
+              font-size: 10px;
+            }
+            .footer-block {
+              margin-top: 20px;
+              padding-top: 10px;
+              border-top: 1px solid #666666;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-size: 10px;
+              color: #444444;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="sheet-container">
+            ${invocationTitle.trim() ? `<div class="invocation">${invocationTitle}</div>` : ''}
+            
+            <div class="header-block">
+              <div class="header-left">
+                <div class="chit-amount">CHIT AMOUNT - ${formatINR(group.totalValue)}</div>
+                <div class="months-dur">MONTHS - ${group.duration} MONTHS</div>
+                <div class="monthly-due">MONTHLY DUE - ${effectiveDuePerMember}${activeMonthsList.length > 1 ? ` (${activeMonthsList.length} MONTHS)` : ''}</div>
+              </div>
+              <div class="header-right">
+                <div class="cycle-label">${customHeaderCycle || computedMonthDetails.headerCycleLabel}</div>
+                <div class="date-label">${customDateStr || computedMonthDetails.formattedDate}</div>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 8%;">SL.NO.</th>
+                  <th class="th-name" style="width: 44%;">NAME</th>
+                  <th style="width: 14%;">AMOUNT</th>
+                  <th style="width: 12%;">DATE</th>
+                  <th style="width: 11%;">PAID</th>
+                  <th style="width: 11%;">BALANCE</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${checklistRows.map(row => `
+                  <tr>
+                    <td class="td-sl">${row.ticket}</td>
+                    <td class="td-name">${row.name}</td>
+                    <td class="td-num">${row.dueAmount}</td>
+                    <td class="td-date">${row.paidDate || ''}</td>
+                    <td class="td-num">${row.paidAmount !== undefined ? row.paidAmount : ''}</td>
+                    <td class="td-num">${row.balanceAmount !== undefined ? (row.balanceAmount === 0 ? '-' : row.balanceAmount) : ''}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+
+            <div class="footer-block">
+              <div>Group: <strong>${group.name}</strong> · Cycle: <strong>${activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `Months ${activeMonthsList.join(', ')}`}</strong></div>
+              <div>Organizer Signature: _________________________</div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 1500);
+    }, 250);
   };
 
   // Handle high-res PDF Download using jsPDF + html-to-image
@@ -234,7 +501,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
 
       const dataUrl = await toPng(printableRef.current, {
         quality: 1,
-        pixelRatio: 3, // High DPI for crystal clear print
+        pixelRatio: 3,
         backgroundColor: '#ffffff',
       });
 
@@ -259,17 +526,18 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
       pdf.addImage(img, 'PNG', margin, margin, printWidth, Math.min(printHeight, imgHeight));
       
       const cleanGroupName = group.name.replace(/[^a-zA-Z0-9_-]/g, '_');
-      pdf.save(`Payment_Checklist_${cleanGroupName}_Month_${selectedMonth}.pdf`);
+      const monthSuffix = activeMonthsList.length === 1 ? `Month_${activeMonthsList[0]}` : `Months_${activeMonthsList.join('_')}`;
+      pdf.save(`Payment_Checklist_${cleanGroupName}_${monthSuffix}.pdf`);
       triggerHapticFeedback('success');
     } catch (err) {
       console.error('Failed to generate PDF:', err);
-      alert('Failed to generate PDF. You can also use the regular Print button.');
+      alert('Failed to generate PDF. You can also use the Print Checklist button.');
     } finally {
       setIsGeneratingPdf(false);
     }
   };
 
-  // Dynamic row height calculation to ensure 100% single page fit regardless of ticket count (5, 10, 20, 24, 25)
+  // Dynamic row height padding for the screen preview
   const dynamicRowPadding = useMemo(() => {
     if (totalMembers <= 10) return 'py-3';
     if (totalMembers <= 15) return 'py-2.5';
@@ -279,15 +547,15 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
   }, [totalMembers]);
 
   return (
-    <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto">
+    <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       
       {/* ── MODAL CONTAINER ── */}
-      <div className="bg-gray-100 rounded-3xl w-full max-w-4xl max-h-[96dvh] flex flex-col shadow-2xl overflow-hidden my-auto border border-gray-300 print:border-none print:shadow-none print:max-h-none print:w-full print:rounded-none">
+      <div className="bg-gray-100 rounded-3xl w-full max-w-4xl max-h-[96dvh] flex flex-col shadow-2xl overflow-hidden my-auto border border-gray-300">
         
-        {/* 1. Modal Control Header (Hidden in Print) */}
-        <div className="p-4 sm:p-5 bg-white border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 print:hidden shrink-0">
+        {/* 1. Modal Control Header */}
+        <div className="p-4 sm:p-5 bg-white border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="p-1.5 bg-indigo-50 text-indigo-700 rounded-xl">
                 <FileText size={16} />
               </span>
@@ -297,6 +565,11 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-150">
                 A4 Single-Page Format
               </span>
+              {activeMonthsList.length > 1 && (
+                <span className="text-[10px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">
+                  {activeMonthsList.length} Months Combined
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
               Traditional physical monthly ledger checklist for <strong>{group.name}</strong>
@@ -333,80 +606,214 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
           </div>
         </div>
 
-        {/* 2. Interactive Options & Configuration Bar (Hidden in Print) */}
-        <div className="bg-white/80 border-b border-gray-200 px-4 sm:px-6 py-3.5 print:hidden shrink-0 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-            
-            {/* Month Cycle Selector */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                Target Month Cycle
-              </label>
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
-              >
-                <option value={0}>Month 0 (Launch Month)</option>
-                {Array.from({ length: totalMembers }).map((_, idx) => (
-                  <option key={idx + 1} value={idx + 1}>
-                    Month {idx + 1} {idx === 0 ? '(1st Auction)' : ''}
-                  </option>
-                ))}
-              </select>
+        {/* 2. Interactive Options & Configuration Bar */}
+        <div className="bg-white/90 border-b border-gray-200 px-4 sm:px-6 py-3.5 shrink-0 space-y-3">
+          
+          {/* Mode Selector Row (Single vs Multi Month) */}
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 bg-gray-50 border border-gray-200 p-2.5 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-800">Collection Duration:</span>
+              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setCollectionMode('single');
+                  }}
+                  className={`text-[11px] font-bold px-3 py-1 rounded-lg transition-all ${
+                    collectionMode === 'single'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Single Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setCollectionMode('multi');
+                  }}
+                  className={`text-[11px] font-bold px-3 py-1 rounded-lg transition-all ${
+                    collectionMode === 'multi'
+                      ? 'bg-purple-600 text-white shadow-2xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Collect 2+ Months
+                </button>
+              </div>
             </div>
 
-            {/* Header Cycle Label Input */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                Header Month Line
-              </label>
-              <input
-                type="text"
-                value={customHeaderCycle}
-                onChange={(e) => setCustomHeaderCycle(e.target.value)}
-                placeholder="e.g. SEPTEMBER, OCTOBER"
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
-              />
-            </div>
-
-            {/* Date String Input */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                Scheduled Date (DD.MM.YYYY)
-              </label>
-              <input
-                type="text"
-                value={customDateStr}
-                onChange={(e) => setCustomDateStr(e.target.value)}
-                placeholder="e.g. 13.09.2026"
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
-              />
-            </div>
-
-            {/* Invocation Title Input */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                Top Auspicious Title
-              </label>
-              <input
-                type="text"
-                value={invocationTitle}
-                onChange={(e) => setInvocationTitle(e.target.value)}
-                placeholder="OM NAMA SIVAYA"
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
-              />
-            </div>
-
+            {/* Quick Multi-Month Shortcuts */}
+            {collectionMode === 'multi' && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">Quick:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedMultiMonths([1, 2]);
+                    triggerHapticFeedback('light');
+                  }}
+                  className="text-[10px] font-bold bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 px-2 py-0.5 rounded-md transition-colors"
+                >
+                  M1 + M2
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const start = currentGroupMonth || 1;
+                    setSelectedMultiMonths([start, Math.min(totalMembers, start + 1)]);
+                    triggerHapticFeedback('light');
+                  }}
+                  className="text-[10px] font-bold bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 px-2 py-0.5 rounded-md transition-colors"
+                >
+                  Current + Next (2M)
+                </button>
+              </div>
+            )}
           </div>
 
+          {/* Month Selector Controls */}
+          {collectionMode === 'single' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Target Month Cycle
+                </label>
+                <select
+                  value={selectedSingleMonth}
+                  onChange={(e) => setSelectedSingleMonth(Number(e.target.value))}
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                >
+                  <option value={0}>Month 0 (Launch Month)</option>
+                  {Array.from({ length: totalMembers }).map((_, idx) => (
+                    <option key={idx + 1} value={idx + 1}>
+                      Month {idx + 1} {idx === 0 ? '(1st Auction)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Header Month Line
+                </label>
+                <input
+                  type="text"
+                  value={customHeaderCycle}
+                  onChange={(e) => setCustomHeaderCycle(e.target.value)}
+                  placeholder="e.g. OCTOBER"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Scheduled Date (DD.MM.YYYY)
+                </label>
+                <input
+                  type="text"
+                  value={customDateStr}
+                  onChange={(e) => setCustomDateStr(e.target.value)}
+                  placeholder="e.g. 13.09.2026"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Top Auspicious Title
+                </label>
+                <input
+                  type="text"
+                  value={invocationTitle}
+                  onChange={(e) => setInvocationTitle(e.target.value)}
+                  placeholder="OM NAMA SIVAYA"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                />
+              </div>
+            </div>
+          ) : (
+            /* Multi-Month Multi-Select Checkboxes Grid */
+            <div className="space-y-2.5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Select Months to Combine in Checklist ({activeMonthsList.length} Selected):
+                </label>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-gray-50 rounded-xl border border-gray-200">
+                  {Array.from({ length: totalMembers }).map((_, idx) => {
+                    const mNum = idx + 1;
+                    const isSelected = selectedMultiMonths.includes(mNum);
+                    return (
+                      <button
+                        key={mNum}
+                        type="button"
+                        onClick={() => handleToggleMultiMonth(mNum)}
+                        className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1 ${
+                          isSelected
+                            ? 'bg-purple-600 text-white border-purple-700 shadow-2xs'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        {isSelected && <Check size={11} />}
+                        <span>Month {mNum}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Header Month Line
+                  </label>
+                  <input
+                    type="text"
+                    value={customHeaderCycle}
+                    onChange={(e) => setCustomHeaderCycle(e.target.value)}
+                    placeholder="e.g. OCTOBER, NOVEMBER"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Scheduled Date (DD.MM.YYYY)
+                  </label>
+                  <input
+                    type="text"
+                    value={customDateStr}
+                    onChange={(e) => setCustomDateStr(e.target.value)}
+                    placeholder="e.g. 10.11.2026"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Top Auspicious Title
+                  </label>
+                  <input
+                    type="text"
+                    value={invocationTitle}
+                    onChange={(e) => setInvocationTitle(e.target.value)}
+                    placeholder="OM NAMA SIVAYA"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Prefill Payments Toggle */}
-          <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-gray-800">Pre-fill Recorded Payments:</span>
-              <span className="text-[11px] text-gray-500">
+              <span className="text-[11px] text-gray-500 hidden sm:inline">
                 {prefillPayments 
-                  ? 'Fills dates & paid amounts recorded in database' 
+                  ? `Fills dates & paid amounts for ${activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `${activeMonthsList.length} selected months`}` 
                   : 'Empty columns for blank handwritten paper tracking'}
               </span>
             </div>
@@ -439,13 +846,13 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
         </div>
 
         {/* 3. Printable Document Preview Canvas (Isomorphic to A4 Sheet) */}
-        <div className="p-4 sm:p-8 overflow-y-auto flex-1 flex justify-center bg-gray-200/70 print:p-0 print:bg-white print:overflow-visible">
+        <div className="p-4 sm:p-8 overflow-y-auto flex-1 flex justify-center bg-gray-200/70">
           
           {/* Exact A4 Sheet Simulation */}
           <div 
             ref={printableRef}
             id="printable-payment-checklist"
-            className="w-full max-w-[760px] bg-white text-black p-6 sm:p-10 shadow-lg border border-gray-300 print:shadow-none print:border-none print:p-0 print:max-w-none print:w-full font-sans leading-tight"
+            className="w-full max-w-[760px] bg-white text-black p-6 sm:p-10 shadow-lg border border-gray-300 font-sans leading-tight"
             style={{
               minHeight: '297mm',
               boxSizing: 'border-box',
@@ -469,7 +876,10 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                   MONTHS - {group.duration} MONTHS
                 </div>
                 <div className="text-xs sm:text-sm font-black tracking-wide">
-                  MONTHLY DUE - <span className="text-sm sm:text-base">{baseInstallment}</span>
+                  MONTHLY DUE - <span className="text-sm sm:text-base">{effectiveDuePerMember}</span>
+                  {activeMonthsList.length > 1 && (
+                    <span className="text-xs font-bold ml-1.5 text-gray-700">({activeMonthsList.length} MONTHS)</span>
+                  )}
                 </div>
               </div>
 
@@ -542,7 +952,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             {/* ── FOOTER SIGN-OFF ── */}
             <div className="mt-8 pt-4 flex justify-between items-center text-[10px] sm:text-[11px] text-gray-700 border-t border-gray-400">
               <div className="font-semibold">
-                Group: <strong>{group.name}</strong> · Cycle Month: <strong>Month {selectedMonth}</strong>
+                Group: <strong>{group.name}</strong> · Cycle: <strong>{activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `Months ${activeMonthsList.join(', ')}`}</strong>
               </div>
               <div className="font-bold">
                 Organizer Signature: _________________________
@@ -553,33 +963,6 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
         </div>
 
       </div>
-
-      {/* Global CSS for Clean Native Printing */}
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #printable-payment-checklist, #printable-payment-checklist * {
-            visibility: visible;
-          }
-          #printable-payment-checklist {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100% !important;
-            max-width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            border: none !important;
-            box-shadow: none !important;
-          }
-          @page {
-            size: A4 portrait;
-            margin: 10mm 12mm;
-          }
-        }
-      `}</style>
     </div>
   );
 }
