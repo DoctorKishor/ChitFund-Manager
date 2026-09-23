@@ -585,6 +585,11 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         fetchWorkspaceMembers(editingGroup.id);
       }
 
+      if (activeDashboardGroupId === editingGroup.id) {
+        fetchDashboardData(editingGroup.id);
+      }
+      await fetchGroups();
+
       setEditingGroup(null);
       triggerHapticFeedback('success');
     } catch (err: any) {
@@ -955,6 +960,10 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
 
   const handleSwapTicketSlots = (fromTicket: number, toTicket: number) => {
+    if (editGroupStatus !== 'draft') {
+      alert('🔒 Ticket numbers are locked because this chit group is active.\n\nTicket slot reordering is only permitted while the chit group is in Draft mode.');
+      return;
+    }
     if (fromTicket === toTicket || fromTicket < 1 || toTicket < 1 || toTicket > editGroupMemberCount) return;
     triggerHapticFeedback('light');
 
@@ -6657,14 +6666,25 @@ Thank you for your prompt payment! 🙏`;
                   {/* Top Members Header */}
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pb-3 border-b border-gray-150">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="text-sm font-bold text-gray-900">Members &amp; Tickets</h4>
                         <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-150 px-2 py-0.5 rounded-full">
                           {editGroupMembers.filter(m => m.profileId).length}/{editGroupMemberCount} Assigned
                         </span>
+                        {editGroupStatus === 'draft' ? (
+                          <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                            Draft (Reordering Open)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Lock size={10} /> Tickets Locked ({editGroupStatus.toUpperCase()})
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-gray-500 mt-0.5">
-                        ↕️ Drag cards or use arrows to reorder ticket slots
+                        {editGroupStatus === 'draft'
+                          ? '↕️ Drag cards or use arrows to reorder ticket slots (Draft mode only)'
+                          : '🔒 Ticket numbers cannot be changed once the chit group becomes active.'}
                       </p>
                     </div>
 
@@ -6721,6 +6741,7 @@ Thank you for your prompt payment! 🙏`;
                       const isTimingExpanded = expandedTimingTicketIds.includes(ticketNum);
                       const isBeingDragged = draggedTicketNum === ticketNum;
                       const isDragOver = dragOverTicketNum === ticketNum;
+                      const isDraft = editGroupStatus === 'draft';
                       const totalShares = member?.profileId
                         ? editGroupMembers.filter(m => m.profileId === member.profileId).length
                         : 0;
@@ -6732,23 +6753,27 @@ Thank you for your prompt payment! 🙏`;
                       return (
                         <div
                           key={ticketNum}
-                          draggable={true}
+                          draggable={isDraft}
                           onDragStart={(e) => {
+                            if (!isDraft) return;
                             setDraggedTicketNum(ticketNum);
                             e.dataTransfer.setData('text/plain', String(ticketNum));
                           }}
                           onDragOver={(e) => {
+                            if (!isDraft) return;
                             e.preventDefault();
                             if (dragOverTicketNum !== ticketNum) {
                               setDragOverTicketNum(ticketNum);
                             }
                           }}
                           onDragLeave={() => {
+                            if (!isDraft) return;
                             if (dragOverTicketNum === ticketNum) {
                               setDragOverTicketNum(null);
                             }
                           }}
                           onDrop={(e) => {
+                            if (!isDraft) return;
                             e.preventDefault();
                             if (draggedTicketNum !== null && draggedTicketNum !== ticketNum) {
                               handleSwapTicketSlots(draggedTicketNum, ticketNum);
@@ -6781,37 +6806,49 @@ Thank you for your prompt payment! 🙏`;
                             className="p-3 sm:p-3.5 flex items-center justify-between gap-2 cursor-pointer select-none"
                           >
                             <div className="flex items-center gap-2 min-w-0 flex-1">
-                              {/* Drag Handle */}
-                              <div
-                                title="Drag to reorder"
-                                onClick={(e) => e.stopPropagation()}
-                                className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-600 shrink-0 hidden sm:block"
-                              >
-                                <GripVertical size={16} />
-                              </div>
+                              {/* Drag Handle (Draft Only) or Lock Indicator (Active Groups) */}
+                              {isDraft ? (
+                                <div
+                                  title="Drag to reorder ticket"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-600 shrink-0 hidden sm:block"
+                                >
+                                  <GripVertical size={16} />
+                                </div>
+                              ) : (
+                                <div
+                                  title="Ticket order is locked for active groups"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="p-1 text-gray-300 shrink-0 hidden sm:block"
+                                >
+                                  <Lock size={13} />
+                                </div>
+                              )}
 
-                              {/* Mobile Reorder Buttons */}
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex flex-col gap-0.5 shrink-0 sm:hidden"
-                              >
-                                <button
-                                  type="button"
-                                  disabled={ticketNum === 1}
-                                  onClick={() => handleSwapTicketSlots(ticketNum, ticketNum - 1)}
-                                  className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20"
+                              {/* Mobile Reorder Buttons (Draft Mode Only) */}
+                              {isDraft && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex flex-col gap-0.5 shrink-0 sm:hidden"
                                 >
-                                  <ArrowUp size={11} />
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={ticketNum === editGroupMemberCount}
-                                  onClick={() => handleSwapTicketSlots(ticketNum, ticketNum + 1)}
-                                  className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20"
-                                >
-                                  <ArrowDown size={11} />
-                                </button>
-                              </div>
+                                  <button
+                                    type="button"
+                                    disabled={ticketNum === 1}
+                                    onClick={() => handleSwapTicketSlots(ticketNum, ticketNum - 1)}
+                                    className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20"
+                                  >
+                                    <ArrowUp size={11} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={ticketNum === editGroupMemberCount}
+                                    onClick={() => handleSwapTicketSlots(ticketNum, ticketNum + 1)}
+                                    className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20"
+                                  >
+                                    <ArrowDown size={11} />
+                                  </button>
+                                </div>
+                              )}
 
                               {/* Ticket Badge */}
                               <span className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
