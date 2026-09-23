@@ -32,7 +32,13 @@ import {
   Phone,
   Tag,
   AlertCircle,
-  Plus
+  Plus,
+  Smile,
+  CloudCheck,
+  Cloud,
+  CloudUpload,
+  RefreshCw,
+  Sliders
 } from 'lucide-react';
 
 interface GroupMetadata {
@@ -229,6 +235,35 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
   },
 ];
 
+// Curated Emoji Palette for Professional Chit Broadcasts
+const EMOJI_CATEGORIES = [
+  {
+    id: 'finance',
+    name: 'Money & Chit',
+    emojis: ['💰', '💵', '🪙', '💳', '🏦', '📈', '📊', '🏷️', '🧾', '💸', '💎'],
+  },
+  {
+    id: 'awards',
+    name: 'Winners & Celebration',
+    emojis: ['🏆', '🥇', '🥈', '🥉', '🎉', '🎊', '🌟', '⭐', '✨', '🚀', '🎯', '🔥', '👑'],
+  },
+  {
+    id: 'alerts',
+    name: 'Notices & Dates',
+    emojis: ['📢', '🔔', '⚠️', '⏰', '📅', '🗓️', '⏳', '🚨', '📌', '📍', '✉️', '📩'],
+  },
+  {
+    id: 'status',
+    name: 'Status & Checkmarks',
+    emojis: ['✅', '❌', '🟢', '🟡', '🔴', '🔒', '🔓', '🤝', '👍', '💯', 'ℹ️', '⚡'],
+  },
+  {
+    id: 'general',
+    name: 'Communication & People',
+    emojis: ['📱', '💬', '🗣️', '📞', '🇮🇳', '🏛️', '🏢', '👤', '👥', '👨‍💼', '📝', '📋'],
+  },
+];
+
 function formatINR(val: number): string {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -290,7 +325,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   // Template View Mode: 'edit' | 'preview' | 'split'
   const [viewMode, setViewMode] = useState<'edit' | 'preview' | 'split'>('split');
 
-  // Custom Templates per type (loaded from localStorage or defaults)
+  // Cloud Sync Status: 'synced' | 'saving' | 'error'
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'saving' | 'error'>('synced');
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Custom Templates per type (loaded from localStorage / Supabase or defaults)
   const [preAuctionTemplate, setPreAuctionTemplate] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('chit_template_pre_auction') || DEFAULT_PRE_AUCTION_TEMPLATE;
@@ -329,44 +368,117 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   const [suggestIndex, setSuggestIndex] = useState<number>(0);
   const [showInsertDropdown, setShowInsertDropdown] = useState<boolean>(false);
 
+  // Emoji Picker Popover State
+  const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
+  const [selectedEmojiCategory, setSelectedEmojiCategory] = useState<string>('finance');
+  const [emojiSearchTerm, setEmojiSearchTerm] = useState<string>('');
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const insertDropdownRef = useRef<HTMLDivElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
 
-  // Sync profile data when available
-  useEffect(() => {
-    if (profile?.fullName && !localStorage.getItem('chit_broadcast_signature')) {
-      setSignatureLine(`${profile.fullName}'s Chit Fund Organization`);
-    }
-    if (profile?.phoneNumber && !localStorage.getItem('chit_broadcast_phone')) {
-      setContactPhone(profile.phoneNumber);
-    }
-  }, [profile]);
-
-  // Persist signature and phone to localStorage
-  const handleSignatureChange = (val: string) => {
-    setSignatureLine(val);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('chit_broadcast_signature', val);
-    }
-  };
-
-  const handlePhoneChange = (val: string) => {
-    setContactPhone(val);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('chit_broadcast_phone', val);
-    }
-  };
-
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (insertDropdownRef.current && !insertDropdownRef.current.contains(event.target as Node)) {
         setShowInsertDropdown(false);
+      }
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // 1. Fetch Cloud Templates from Supabase public.system_settings
+  const fetchCloudTemplates = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'broadcast_templates')
+        .maybeSingle();
+
+      if (data?.value) {
+        const val = data.value;
+        if (val.pre_auction) {
+          setPreAuctionTemplate(val.pre_auction);
+          if (typeof window !== 'undefined') localStorage.setItem('chit_template_pre_auction', val.pre_auction);
+        }
+        if (val.post_auction) {
+          setPostAuctionTemplate(val.post_auction);
+          if (typeof window !== 'undefined') localStorage.setItem('chit_template_post_auction', val.post_auction);
+        }
+        if (val.org_signature) {
+          setSignatureLine(val.org_signature);
+          if (typeof window !== 'undefined') localStorage.setItem('chit_broadcast_signature', val.org_signature);
+        }
+        if (val.org_phone) {
+          setContactPhone(val.org_phone);
+          if (typeof window !== 'undefined') localStorage.setItem('chit_broadcast_phone', val.org_phone);
+        }
+        setCloudSyncStatus('synced');
+      }
+    } catch (err) {
+      console.warn('Note: Cloud templates fetch fallback to local storage:', err);
+    }
+  }, []);
+
+  // 2. Persist Custom Templates to Supabase
+  const persistToCloud = useCallback(async (
+    pre: string,
+    post: string,
+    sig: string,
+    phone: string
+  ) => {
+    try {
+      setCloudSyncStatus('saving');
+      const payload = {
+        pre_auction: pre,
+        post_auction: post,
+        org_signature: sig,
+        org_phone: phone,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase.from('system_settings').upsert({
+        key: 'broadcast_templates',
+        value: payload,
+        updated_at: new Date().toISOString(),
+        updated_by: profile?.id || null,
+      });
+
+      if (error) {
+        console.warn('Supabase template save note:', error.message);
+        setCloudSyncStatus('error');
+      } else {
+        setCloudSyncStatus('synced');
+      }
+    } catch (err) {
+      console.error('Failed to sync templates to cloud:', err);
+      setCloudSyncStatus('error');
+    }
+  }, [profile]);
+
+  // Debounced cloud saver
+  const triggerDebouncedCloudSave = useCallback((
+    pre: string,
+    post: string,
+    sig: string,
+    phone: string
+  ) => {
+    setCloudSyncStatus('saving');
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      persistToCloud(pre, post, sig, phone);
+    }, 800);
+  }, [persistToCloud]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchCloudTemplates();
+  }, [fetchCloudTemplates]);
 
   // Fetch active chit groups and winner details from Supabase
   const fetchGroups = async () => {
@@ -498,20 +610,36 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     if (templateType === 'pre-auction') {
       setPreAuctionTemplate(val);
       if (typeof window !== 'undefined') localStorage.setItem('chit_template_pre_auction', val);
+      triggerDebouncedCloudSave(val, postAuctionTemplate, signatureLine, contactPhone);
     } else {
       setPostAuctionTemplate(val);
       if (typeof window !== 'undefined') localStorage.setItem('chit_template_post_auction', val);
+      triggerDebouncedCloudSave(preAuctionTemplate, val, signatureLine, contactPhone);
     }
   };
 
+  const handleSignatureChange = (val: string) => {
+    setSignatureLine(val);
+    if (typeof window !== 'undefined') localStorage.setItem('chit_broadcast_signature', val);
+    triggerDebouncedCloudSave(preAuctionTemplate, postAuctionTemplate, val, contactPhone);
+  };
+
+  const handlePhoneChange = (val: string) => {
+    setContactPhone(val);
+    if (typeof window !== 'undefined') localStorage.setItem('chit_broadcast_phone', val);
+    triggerDebouncedCloudSave(preAuctionTemplate, postAuctionTemplate, signatureLine, val);
+  };
+
   const handleResetDefaultTemplate = () => {
-    if (confirm('Reset this template back to the standard default format?')) {
+    if (confirm('Reset this template back to the standard default format and sync to cloud?')) {
       if (templateType === 'pre-auction') {
         setPreAuctionTemplate(DEFAULT_PRE_AUCTION_TEMPLATE);
         if (typeof window !== 'undefined') localStorage.removeItem('chit_template_pre_auction');
+        triggerDebouncedCloudSave(DEFAULT_PRE_AUCTION_TEMPLATE, postAuctionTemplate, signatureLine, contactPhone);
       } else {
         setPostAuctionTemplate(DEFAULT_POST_AUCTION_TEMPLATE);
         if (typeof window !== 'undefined') localStorage.removeItem('chit_template_post_auction');
+        triggerDebouncedCloudSave(preAuctionTemplate, DEFAULT_POST_AUCTION_TEMPLATE, signatureLine, contactPhone);
       }
       triggerHapticFeedback('success');
     }
@@ -540,10 +668,9 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     return result;
   }, [activeRawTemplate, selectedMeta, signatureLine, contactPhone]);
 
-  // Insert a variable token into the textarea at the current cursor position
-  const insertVariableAtCursor = (varKey: string, replaceTrigger: boolean = false) => {
+  // Insert any text / emoji / variable into the textarea at current cursor position
+  const insertTextAtCursor = (insertedText: string, replaceTrigger: boolean = false) => {
     triggerHapticFeedback('light');
-    const token = `{${varKey}}`;
     const textarea = textareaRef.current;
 
     if (textarea) {
@@ -564,19 +691,20 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
         }
       }
 
-      const updated = text.substring(0, start) + token + text.substring(end);
+      const updated = text.substring(0, start) + insertedText + text.substring(end);
       handleTemplateChange(updated);
 
       setTimeout(() => {
         textarea.focus();
-        textarea.setSelectionRange(start + token.length, start + token.length);
+        textarea.setSelectionRange(start + insertedText.length, start + insertedText.length);
       }, 50);
     } else {
-      handleTemplateChange(activeRawTemplate + ' ' + token);
+      handleTemplateChange(activeRawTemplate + ' ' + insertedText);
     }
 
     setShowSuggestMenu(false);
     setShowInsertDropdown(false);
+    setShowEmojiPicker(false);
   };
 
   // Autocomplete Detection on Textarea keyup/change: Triggers on `{`, `<`, or `/`
@@ -594,7 +722,6 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
     if (lastTrigger !== -1 && lastTrigger >= cursorPos - 20) {
       const query = textBeforeCursor.slice(lastTrigger + 1);
-      // If no space, newline, or closing symbol
       if (!query.includes(' ') && !query.includes('\n') && !query.includes('}') && !query.includes('>')) {
         setSuggestFilter(query);
         setShowSuggestMenu(true);
@@ -618,7 +745,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
         e.preventDefault();
         const selectedVar = filteredSuggestVariables[suggestIndex];
         if (selectedVar) {
-          insertVariableAtCursor(selectedVar.key, true);
+          insertTextAtCursor(`{${selectedVar.key}}`, true);
         }
       } else if (e.key === 'Escape') {
         setShowSuggestMenu(false);
@@ -637,6 +764,16 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     );
   }, [suggestFilter]);
 
+  // Filtered emojis for Emoji Picker
+  const displayedEmojis = useMemo(() => {
+    if (emojiSearchTerm.trim()) {
+      const term = emojiSearchTerm.toLowerCase();
+      return EMOJI_CATEGORIES.flatMap((c) => c.emojis).filter((emoji) => emoji.includes(term));
+    }
+    const cat = EMOJI_CATEGORIES.find((c) => c.id === selectedEmojiCategory);
+    return cat ? cat.emojis : EMOJI_CATEGORIES[0].emojis;
+  }, [selectedEmojiCategory, emojiSearchTerm]);
+
   const handleCopyText = () => {
     navigator.clipboard.writeText(compiledBroadcastText);
     setCopied(true);
@@ -649,84 +786,88 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-5 sm:p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl shrink-0">
-            <MessageSquare size={24} />
-          </div>
-          <div>
-            <h2 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2">
-              <span>Communication &amp; WhatsApp Broadcaster</span>
-              <HelpTooltip text="Customize message templates with real-time dynamic variables and broadcast 1-click notices directly to subscribers via WhatsApp." />
-            </h2>
-            <p className="text-xs text-emerald-200/80 mt-0.5">
-              Template-driven broadcast engine with real-time dynamic variables substitution
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
-          <span className="text-xs font-bold px-3 py-1.5 bg-white/10 rounded-xl border border-white/10 flex items-center gap-1.5 backdrop-blur-xs">
-            <Sparkles size={14} className="text-emerald-400" />
-            1-Click WhatsApp Blast
-          </span>
-        </div>
-      </div>
-
-      {/* Organization Signature & Contact Settings Card */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-5 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-gray-100 pb-3">
+    <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200 pb-20 sm:pb-6">
+      
+      {/* ── Organization Signature & Contact Header Card ── */}
+      <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-gray-100 pb-2.5">
           <div className="flex items-center space-x-2">
-            <Building size={16} className="text-indigo-600" />
+            <Building size={16} className="text-indigo-600 shrink-0" />
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
               Organization Signature &amp; Contact Header
             </h4>
           </div>
-          <span className="text-[11px] text-gray-400">
-            Replaces <code className="text-indigo-600 font-bold">{'{org_signature}'}</code> and <code className="text-indigo-600 font-bold">{'{org_phone}'}</code>
-          </span>
+
+          <div className="flex items-center gap-2">
+            {/* Supabase Cloud Sync Status Pill */}
+            <span
+              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
+                cloudSyncStatus === 'synced'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : cloudSyncStatus === 'saving'
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200 animate-pulse'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}
+            >
+              {cloudSyncStatus === 'synced' ? (
+                <>
+                  <CheckCircle2 size={11} className="text-emerald-600" />
+                  <span>Cloud Synced (Supabase)</span>
+                </>
+              ) : cloudSyncStatus === 'saving' ? (
+                <>
+                  <RefreshCw size={11} className="animate-spin text-indigo-600" />
+                  <span>Saving to Cloud...</span>
+                </>
+              ) : (
+                <>
+                  <CloudUpload size={11} className="text-amber-600" />
+                  <span>Saved locally</span>
+                </>
+              )}
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1">
             <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
-              <FileText size={13} className="text-gray-500" />
-              <span>Organization Text Signature</span>
+              <FileText size={13} className="text-gray-400" />
+              <span>Signature Line <code className="text-indigo-600 font-mono font-normal">{'{org_signature}'}</code></span>
             </label>
             <input
               type="text"
               value={signatureLine}
               onChange={(e) => handleSignatureChange(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none font-semibold shadow-2xs"
+              className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-gray-900 focus:outline-none font-semibold shadow-2xs"
               placeholder="e.g. Dr. Kishor Anbazhakan's Chit Fund Organization"
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
-              <Phone size={13} className="text-gray-500" />
-              <span>Organizer Contact Phone</span>
+              <Phone size={13} className="text-gray-400" />
+              <span>Organizer Phone <code className="text-indigo-600 font-mono font-normal">{'{org_phone}'}</code></span>
             </label>
             <input
               type="tel"
               value={contactPhone}
               onChange={(e) => handlePhoneChange(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none font-mono font-semibold shadow-2xs"
+              className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-gray-900 focus:outline-none font-mono font-semibold shadow-2xs"
               placeholder="e.g. 9943609010"
             />
           </div>
         </div>
       </div>
 
-      {/* Main Broadcast Studio Card */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-5">
+      {/* ── Main Broadcast Studio Card ── */}
+      <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 shadow-2xs space-y-4 sm:space-y-5">
+        
         {/* Top Control Bar: Group Selector, Template Mode, and View Mode */}
-        <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 border-b border-gray-100 pb-5">
-          {/* Left: Group Selector */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="space-y-1 min-w-[220px]">
+        <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-3.5 border-b border-gray-100 pb-4">
+          {/* Left: Group Selector & Pills */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+            <div className="space-y-1 min-w-[200px] w-full sm:w-auto">
               <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
                 Target Chit Group
               </label>
@@ -744,28 +885,28 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             </div>
 
             {selectedMeta && (
-              <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-4">
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-4">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
                   {selectedMeta.currentMonth === 0 ? 'Month 0 (Launch)' : `Month ${selectedMeta.currentMonth}`}
                 </span>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700">
                   📅 {selectedMeta.formattedAuctionDate}
                 </span>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Due: {formatINR(selectedMeta.fixedInstallment)}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Right: Template Type Selector & View Modes */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Right: Template Type & View Mode Controls */}
+          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 pt-1 lg:pt-0">
             {/* Pre/Post Template Switch */}
-            <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200">
+            <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setTemplateType('pre-auction')}
-                className={`text-xs font-bold px-3.5 py-1.5 rounded-lg transition-all ${
+                className={`flex-1 sm:flex-initial text-xs font-bold px-3 py-1.5 rounded-lg transition-all text-center ${
                   templateType === 'pre-auction'
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'text-gray-600 hover:text-gray-900'
@@ -776,7 +917,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
               <button
                 type="button"
                 onClick={() => setTemplateType('post-auction')}
-                className={`text-xs font-bold px-3.5 py-1.5 rounded-lg transition-all ${
+                className={`flex-1 sm:flex-initial text-xs font-bold px-3 py-1.5 rounded-lg transition-all text-center ${
                   templateType === 'post-auction'
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'text-gray-600 hover:text-gray-900'
@@ -786,69 +927,73 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
               </button>
             </div>
 
-            {/* View Mode Toggle */}
-            <div className="hidden sm:flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200">
+            {/* Mobile / Desktop View Mode Segment */}
+            <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setViewMode('edit')}
-                title="Edit Template with Variables"
-                className={`p-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                title="Edit Template Source"
+                className={`flex-1 sm:flex-initial p-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                   viewMode === 'edit'
                     ? 'bg-white text-gray-900 shadow-xs'
                     : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
-                <Code2 size={14} />
+                <Code2 size={13} />
                 <span>Editor</span>
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('preview')}
                 title="Live Compiled Preview"
-                className={`p-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                className={`flex-1 sm:flex-initial p-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                   viewMode === 'preview'
                     ? 'bg-white text-gray-900 shadow-xs'
                     : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
-                <Eye size={14} />
+                <Eye size={13} />
                 <span>Preview</span>
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('split')}
                 title="Side-by-Side Split View"
-                className={`p-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                className={`hidden lg:flex p-1.5 px-2.5 rounded-lg text-xs font-bold transition-all items-center justify-center gap-1 ${
                   viewMode === 'split'
                     ? 'bg-white text-gray-900 shadow-xs'
                     : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
-                <Columns size={14} />
+                <Columns size={13} />
                 <span>Split View</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Workspace: Split or Single View */}
-        <div className={`grid gap-6 ${viewMode === 'split' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
-          {/* LEFT: Template Editor (LIGHT THEME) */}
+        {/* Workspace: Responsive Split or Single View */}
+        <div className={`grid gap-4 sm:gap-6 ${viewMode === 'split' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+          
+          {/* ── LEFT: Template Editor (LIGHT THEME) ── */}
           {(viewMode === 'edit' || viewMode === 'split') && (
             <div className="space-y-2 relative">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
                   <label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
                     <Code2 size={14} className="text-indigo-600" />
                     <span>Template Source Code</span>
                   </label>
 
-                  {/* Quick Insert Variable Popover Button */}
-                  <div className="relative" ref={dropdownRef}>
+                  {/* 1. Quick Insert Variable Popover Button */}
+                  <div className="relative" ref={insertDropdownRef}>
                     <button
                       type="button"
-                      onClick={() => setShowInsertDropdown(!showInsertDropdown)}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg transition-colors active:scale-95"
+                      onClick={() => {
+                        setShowInsertDropdown(!showInsertDropdown);
+                        setShowEmojiPicker(false);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-lg transition-colors active:scale-95"
                     >
                       <Plus size={12} />
                       <span>Insert Variable</span>
@@ -856,9 +1001,9 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                     </button>
 
                     {showInsertDropdown && (
-                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 w-80 max-h-80 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
+                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 w-72 sm:w-80 max-h-80 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
                         <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                          Select Variable to Insert
+                          Select Dynamic Variable
                         </div>
                         {BROADCAST_VARIABLES.map((v) => {
                           const liveVal = v.getValue(selectedMeta, signatureLine, contactPhone);
@@ -866,7 +1011,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                             <button
                               key={v.key}
                               type="button"
-                              onClick={() => insertVariableAtCursor(v.key, false)}
+                              onClick={() => insertTextAtCursor(`{${v.key}}`, false)}
                               className="w-full text-left p-2 rounded-xl text-xs hover:bg-indigo-50 transition-colors flex flex-col gap-0.5 group"
                             >
                               <div className="flex items-center justify-between">
@@ -879,7 +1024,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                               </div>
                               <div className="flex items-center justify-between text-[10px] text-gray-500">
                                 <span>{v.label}</span>
-                                <span className="font-semibold text-emerald-600 truncate max-w-[130px]" title={liveVal}>
+                                <span className="font-semibold text-emerald-600 truncate max-w-[120px]" title={liveVal}>
                                   {liveVal || '—'}
                                 </span>
                               </div>
@@ -889,10 +1034,61 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                       </div>
                     )}
                   </div>
+
+                  {/* 2. Emoji Picker Popover Button */}
+                  <div className="relative" ref={emojiPickerRef}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEmojiPicker(!showEmojiPicker);
+                        setShowInsertDropdown(false);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-lg transition-colors active:scale-95"
+                    >
+                      <Smile size={12} className="text-amber-600" />
+                      <span>Emojis</span>
+                    </button>
+
+                    {showEmojiPicker && (
+                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-3 w-72 sm:w-80 space-y-2 animate-in zoom-in-95 duration-100">
+                        {/* Emoji Category Tabs */}
+                        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-1">
+                          {EMOJI_CATEGORIES.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => setSelectedEmojiCategory(c.id)}
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-lg transition-all shrink-0 ${
+                                selectedEmojiCategory === c.id
+                                  ? 'bg-amber-600 text-white'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              {c.name}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Emoji Grid */}
+                        <div className="grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1 bg-gray-50 rounded-xl border border-gray-100">
+                          {displayedEmojis.map((emoji, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => insertTextAtCursor(emoji, false)}
+                              className="w-10 h-10 flex items-center justify-center text-xl hover:bg-white rounded-lg transition-all hover:scale-115 active:scale-90"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-gray-400 font-mono">
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-[10px] text-gray-400 font-mono">
                     {activeRawTemplate.length} chars
                   </span>
                   <button
@@ -910,17 +1106,17 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
               <div className="relative">
                 <textarea
                   ref={textareaRef}
-                  rows={14}
+                  rows={13}
                   value={activeRawTemplate}
                   onChange={handleTextareaInput}
                   onKeyDown={handleTextareaKeyDown}
                   placeholder="Type message template. Type { or < or / to insert live variables..."
-                  className="w-full bg-white text-gray-900 border border-gray-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-2xl p-4 text-xs font-mono leading-relaxed focus:outline-none resize-none shadow-2xs transition-all"
+                  className="w-full bg-white text-gray-900 border border-gray-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-2xl p-3.5 sm:p-4 text-xs font-mono leading-relaxed focus:outline-none resize-none shadow-2xs transition-all"
                 />
 
                 {/* Autocomplete Dropdown Popup when typing `{`, `<`, or `/` */}
                 {showSuggestMenu && filteredSuggestVariables.length > 0 && (
-                  <div className="absolute left-4 top-16 z-30 bg-white border border-gray-200 rounded-2xl shadow-2xl p-2 w-80 max-h-72 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
+                  <div className="absolute left-3 top-14 z-30 bg-white border border-gray-200 rounded-2xl shadow-2xl p-2 w-72 sm:w-80 max-h-72 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
                     <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 flex justify-between items-center">
                       <span>Insert Dynamic Variable</span>
                       <span className="text-[9px] lowercase font-normal text-indigo-600">Enter / Tab</span>
@@ -932,7 +1128,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                           key={v.key}
                           type="button"
                           onClick={() => {
-                            insertVariableAtCursor(v.key, true);
+                            insertTextAtCursor(`{${v.key}}`, true);
                           }}
                           onMouseEnter={() => setSuggestIndex(idx)}
                           className={`w-full text-left p-2 rounded-xl text-xs transition-colors flex flex-col gap-0.5 ${
@@ -951,8 +1147,8 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                           </div>
 
                           <div className="flex items-center justify-between text-[10px]">
-                            <span className="text-gray-500 font-medium truncate max-w-[130px]">{v.label}</span>
-                            <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded text-[10px] truncate max-w-[140px]" title={liveVal}>
+                            <span className="text-gray-500 font-medium truncate max-w-[120px]">{v.label}</span>
+                            <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded text-[10px] truncate max-w-[130px]" title={liveVal}>
                               Live: {liveVal || '—'}
                             </span>
                           </div>
@@ -964,19 +1160,19 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
               </div>
 
               {/* Helper Footer Hint */}
-              <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
+              <div className="flex items-center justify-between text-[11px] text-gray-500 pt-0.5">
                 <span>
-                  💡 Type <code className="bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 text-indigo-700 font-bold">{'{'}</code>, <code className="bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 text-indigo-700 font-bold">{'<'}</code>, or <code className="bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 text-indigo-700 font-bold">{'/'}</code> to open live variable autocomplete.
+                  💡 Type <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'{'}</code>, <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'<'}</code>, or <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'/'}</code> for live variable autocomplete.
                 </span>
 
-                <span className="text-[10px] text-emerald-600 font-bold">
-                  Auto-saved
+                <span className="text-[10px] text-emerald-600 font-bold hidden sm:inline">
+                  ☁️ Auto-synced to Supabase
                 </span>
               </div>
             </div>
           )}
 
-          {/* RIGHT: Live Compiled Preview */}
+          {/* ── RIGHT: Live Compiled Preview ── */}
           {(viewMode === 'preview' || viewMode === 'split') && (
             <div className="space-y-2">
               <div className="flex justify-between items-center">
@@ -985,30 +1181,30 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   <span>Live Compiled Preview (Ready for WhatsApp)</span>
                 </label>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                  ✓ Variables Live Substituted
+                  ✓ Real-time Substituted
                 </span>
               </div>
 
               {/* WhatsApp Simulated Bubble */}
-              <div className="bg-[#EFEAE2] border border-gray-300 rounded-2xl p-4 shadow-inner flex flex-col justify-between min-h-[320px]">
-                <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3 max-w-full text-xs text-gray-900 font-sans whitespace-pre-wrap leading-relaxed border border-emerald-100 relative">
+              <div className="bg-[#EFEAE2] border border-gray-300 rounded-2xl p-3.5 sm:p-4 shadow-inner flex flex-col justify-between min-h-[300px]">
+                <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-3 max-w-full text-xs text-gray-900 font-sans whitespace-pre-wrap leading-relaxed border border-emerald-100 relative">
                   <div className="absolute top-2 right-3 text-[10px] text-gray-400 font-mono">
                     {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                   <div>{compiledBroadcastText}</div>
                 </div>
 
-                <div className="pt-3 text-center text-[11px] text-gray-500">
-                  Preview showing dynamic data for <strong>{selectedMeta?.name || 'Chit Group'}</strong>
+                <div className="pt-2.5 text-center text-[10px] sm:text-[11px] text-gray-500">
+                  Live data for <strong>{selectedMeta?.name || 'Chit Group'}</strong>
                 </div>
               </div>
 
-              {/* Action Buttons: Copy & Share */}
-              <div className="flex flex-col sm:flex-row gap-2.5 sm:justify-end pt-2">
+              {/* Desktop Action Buttons */}
+              <div className="hidden sm:flex flex-row gap-2.5 justify-end pt-1">
                 <button
                   type="button"
                   onClick={handleCopyText}
-                  className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-800 text-xs font-bold px-5 py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all border border-gray-300 shadow-2xs"
+                  className="bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-800 text-xs font-bold px-5 py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all border border-gray-300 shadow-2xs"
                 >
                   {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
                   <span>{copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}</span>
@@ -1018,7 +1214,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   href={formatWhatsAppUrl()}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold px-6 py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md shadow-emerald-600/20 text-center"
+                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold px-6 py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md shadow-emerald-600/20 text-center"
                 >
                   <Send size={15} />
                   <span>Share via WhatsApp</span>
@@ -1027,6 +1223,28 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Mobile Sticky Bottom Action Bar ── */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 p-3 flex items-center gap-2 shadow-lg">
+        <button
+          type="button"
+          onClick={handleCopyText}
+          className="flex-1 bg-gray-100 active:bg-gray-200 text-gray-800 text-xs font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 border border-gray-300"
+        >
+          {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
+          <span>{copied ? 'Copied!' : 'Copy'}</span>
+        </button>
+
+        <a
+          href={formatWhatsAppUrl()}
+          target="_blank"
+          rel="noreferrer"
+          className="flex-2 bg-emerald-600 active:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 text-center"
+        >
+          <Send size={15} />
+          <span>Share WhatsApp</span>
+        </a>
       </div>
     </div>
   );
