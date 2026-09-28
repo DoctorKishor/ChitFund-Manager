@@ -132,21 +132,38 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [lastChangedWallet]);
 
   const updateBalance = async (wallet: WalletType, amount: number) => {
-    const newBal = (balances[wallet] || 0) + amount;
+    // Optimistic local update
+    const optimisticBal = (balances[wallet] || 0) + amount;
     setBalances((prev) => ({
       ...prev,
-      [wallet]: newBal,
+      [wallet]: optimisticBal,
     }));
     setLastChangedWallet(wallet);
 
     try {
-      await supabase
-        .from('global_treasury')
-        .upsert({
-          wallet_type: wallet,
-          current_balance: newBal,
-          last_updated_by: user?.id || null,
-        }, { onConflict: 'wallet_type' });
+      // 1. Call atomic PostgreSQL RPC to increment/decrement safely without race conditions
+      const { data, error } = await supabase.rpc('mutate_wallet_balance', {
+        p_wallet: wallet,
+        p_delta: amount,
+        p_user_id: user?.id || null,
+      });
+
+      if (error) {
+        console.warn('RPC mutate_wallet_balance error, falling back to direct upsert:', error.message);
+        // Fallback: direct upsert
+        await supabase
+          .from('global_treasury')
+          .upsert({
+            wallet_type: wallet,
+            current_balance: optimisticBal,
+            last_updated_by: user?.id || null,
+          }, { onConflict: 'wallet_type' });
+      } else if (data?.new_balance !== undefined) {
+        setBalances((prev) => ({
+          ...prev,
+          [wallet]: Number(data.new_balance),
+        }));
+      }
     } catch (err) {
       console.error('Error updating treasury balance in Supabase:', err);
     }

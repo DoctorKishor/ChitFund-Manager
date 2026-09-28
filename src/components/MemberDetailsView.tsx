@@ -356,8 +356,12 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         const expectedDue = isLaaba ? 0 : memberInst;
 
         // Month tag pattern e.g. "Month 0", "Month 1"
-        const monthPattern = new RegExp(`\\bMonth\\s+${m}\\b`, 'i');
-        const taggedTxs = groupTransactions.filter(t => t.notes && monthPattern.test(t.notes));
+        const monthPattern = new RegExp(`\\bMonth\\s+${m}\\b|\\bM${m}\\b`, 'i');
+        const taggedTxs = groupTransactions.filter(t => 
+          t.cycle_month !== null && t.cycle_month !== undefined
+            ? Number(t.cycle_month) === Number(m)
+            : (t.notes ? monthPattern.test(t.notes) : false)
+        );
         const taggedPaid = taggedTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
         monthDues.push({
@@ -640,6 +644,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
             type: 'collection',
             status: 'completed',
             amount: amt,
+            cycle_month: modalTargetMonth !== undefined ? modalTargetMonth : null,
             notes: finalNote,
             verification_proof_url: finalReceiptUrl,
             created_at: effectiveDateStr,

@@ -73,6 +73,7 @@ interface SubscriberTransaction {
   amount: number;
   walletType: string;
   status: string;
+  cycleMonth?: number | null;
   notes: string | null;
   createdAt: string;
 }
@@ -155,10 +156,12 @@ function getGroupPaymentStatus(
     const isLaaba = !!monthAuction?.isLaabaSeetu;
     const expectedDue = isLaaba ? 0 : grp.monthlyInstallment;
 
-    // Check transactions tagged with "Month <m>"
-    const monthPattern = new RegExp(`\\bMonth\\s+${m}\\b`, 'i');
-    const taggedTransactions = groupTransactions.filter(
-      (t) => t.notes && monthPattern.test(t.notes)
+    // Check transactions tagged with "Month <m>" or structured cycleMonth
+    const monthPattern = new RegExp(`\\bMonth\\s+${m}\\b|\\bM${m}\\b`, 'i');
+    const taggedTransactions = groupTransactions.filter((t) => 
+      t.cycleMonth !== null && t.cycleMonth !== undefined
+        ? Number(t.cycleMonth) === Number(m)
+        : (t.notes ? monthPattern.test(t.notes) : false)
     );
     const taggedPaid = taggedTransactions.reduce(
       (sum, t) => sum + Number(t.amount || 0),

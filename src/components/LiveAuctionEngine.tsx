@@ -926,42 +926,57 @@ export default function LiveAuctionEngine() {
     };
 
     try {
-      // 1. Update chit group month, pool, status, and reset live broadcast in Supabase
+      // 1. Execute atomic conclude_auction_cycle RPC in Supabase
       if (group.id) {
-        await supabase.from('chit_groups').update({
-          current_month: nextMonth,
-          kai_iruppu_pool: nextPool,
-          status: isCompleting ? 'completed' : 'active',
-          is_live_auction_active: false,
-          live_auction_started_at: null,
-          live_bid_stream: [],
-        }).eq('id', group.id);
-
-        // 2. Mark winning ticket as won in group_members
-        if (winnerId && !winnerId.startsWith('slot-')) {
-          await supabase.from('group_members').update({
-            has_won_regular: true
-          }).eq('id', winnerId);
-        }
-
-        // 3. Insert auction log
         const winningMember = members.find(m => m.id === winnerId);
-        if (winningMember?.profileId) {
-          await supabase.from('auction_logs').insert({
-            group_id: group.id,
-            month: group.currentMonth,
-            bid_stream: bids,
-            winning_bidder_id: winningMember.profileId,
-            winning_discount: highestBid,
-            is_laaba_seetu: isLaabaSeetuActive,
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('conclude_auction_cycle', {
+          p_group_id: group.id,
+          p_month: group.currentMonth,
+          p_next_month: nextMonth,
+          p_winner_member_id: (winnerId && !winnerId.startsWith('slot-')) ? winnerId : null,
+          p_winner_profile_id: winningMember?.profileId || null,
+          p_winning_discount: highestBid,
+          p_is_completing: isCompleting,
+          p_is_laaba_seetu: isLaabaSeetuActive,
+          p_next_pool: nextPool,
+          p_bid_stream: bids,
+          p_admin_id: profile?.id || null,
+        });
+
+        if (rpcErr) {
+          console.warn('conclude_auction_cycle RPC failed, executing direct fallback:', rpcErr.message);
+          // Fallback direct updates
+          await supabase.from('chit_groups').update({
+            current_month: nextMonth,
+            kai_iruppu_pool: nextPool,
+            status: isCompleting ? 'completed' : 'active',
+            is_live_auction_active: false,
+            live_auction_started_at: null,
+            live_bid_stream: [],
+          }).eq('id', group.id);
+
+          if (winnerId && !winnerId.startsWith('slot-')) {
+            await supabase.from('group_members').update({
+              has_won_regular: true
+            }).eq('id', winnerId);
+          }
+
+          if (winningMember?.profileId) {
+            await supabase.from('auction_logs').insert({
+              group_id: group.id,
+              month: group.currentMonth,
+              bid_stream: bids,
+              winning_bidder_id: winningMember.profileId,
+              winning_discount: highestBid,
+              is_laaba_seetu: isLaabaSeetuActive,
+            });
+          }
+
+          await supabase.from('security_audit_logs').insert({
+            action_description: `AUCTION CLOSED: Group "${group.name}" Month ${group.currentMonth} won by ${winningMember?.fullName || 'Member'} with discount ${formatCurrency(highestBid)}. Net Payout: ${formatCurrency(netPayout)}. Group advanced to Month ${nextMonth}.`,
+            target_table: 'auction_logs',
           });
         }
-
-        // 4. Record audit log
-        await supabase.from('security_audit_logs').insert({
-          action_description: `AUCTION CLOSED: Group "${group.name}" Month ${group.currentMonth} won by ${winningMember?.fullName || 'Member'} with discount ${formatCurrency(highestBid)}. Net Payout: ${formatCurrency(netPayout)}. Group advanced to Month ${nextMonth}.`,
-          target_table: 'auction_logs',
-        });
       }
 
       // Mark winner in local state

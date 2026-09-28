@@ -112,7 +112,7 @@ export default function QuickMemberCollectModal({
       // 3. Fetch collection transactions
       const { data: txsData } = await supabase
         .from('transactions')
-        .select('id, group_id, profile_id, group_member_id, amount, notes, type')
+        .select('id, group_id, profile_id, group_member_id, amount, notes, type, cycle_month')
         .in('group_id', activeGroups.map(g => g.id))
         .eq('type', 'collection');
 
@@ -128,12 +128,17 @@ export default function QuickMemberCollectModal({
               (memberId && t.group_member_id === memberId)
             );
             if (!matchesMember) return false;
-            if (!t.notes) return true;
+
+            if (t.cycle_month !== null && t.cycle_month !== undefined) {
+              return Number(t.cycle_month) === Number(mNum);
+            }
+
+            if (!t.notes) return false;
             const match = t.notes.match(/\bMonth\s+(\d+)\b/i) || t.notes.match(/\bM(\d+)\b/i);
             if (match) {
               return Number(match[1]) === Number(mNum);
             }
-            return true;
+            return false;
           })
           .reduce((sum, t) => sum + Number(t.amount || 0), 0);
       };

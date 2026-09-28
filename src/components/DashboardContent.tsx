@@ -1722,12 +1722,14 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   // Helper: compute total collections paid by member for a specific month
   const getMemberPaidAmountForMonth = (profileIdOrMemberId: string, month: number) => {
-    const monthPattern = new RegExp(`\\bMonth\\s+${month}\\b`, 'i');
+    const monthPattern = new RegExp(`\\bMonth\\s+${month}\\b|\\bM${month}\\b`, 'i');
     return dashboardTransactions
       .filter(t => 
         t.type === 'collection' && 
         (t.profile_id === profileIdOrMemberId || t.group_member_id === profileIdOrMemberId) &&
-        (t.notes ? monthPattern.test(t.notes) : true)
+        (t.cycle_month !== null && t.cycle_month !== undefined
+          ? Number(t.cycle_month) === Number(month)
+          : (t.notes ? monthPattern.test(t.notes) : false))
       )
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   };
@@ -1977,6 +1979,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           type: 'collection',
           status: 'completed',
           amount: item.amount,
+          cycle_month: item.month,
           notes: finalNote,
           verification_proof_url: finalReceiptUrl,
           created_at: effectiveDateStr,
@@ -2342,6 +2345,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
             type: 'payout',
             status: 'completed',
             amount: netCashAmount,
+            cycle_month: selectedDashboardMonth,
             wallet_type: disbursePayoutWallet,
             notes: noteText,
             verification_proof_url: finalReceiptUrl,
@@ -2367,6 +2371,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           type: 'collection',
           status: 'completed',
           amount: d.amount,
+          cycle_month: d.month,
           wallet_type: disbursePayoutWallet,
           notes: `Month ${d.month} installment auto-settled & deducted from Month ${selectedDashboardMonth} Winner Prize Payout — Ticket #${memberMatch?.ticket || 1} (${winnerName})`,
           created_at: effectiveDate,
@@ -2497,6 +2502,7 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
         type: 'collection',
         status: 'completed',
         amount: p.unpaidAmount,
+        cycle_month: selectedDashboardMonth,
         notes: `Month ${selectedDashboardMonth} collection payment - Ticket #${p.member.ticket} (${p.member.name}) [Bulk Mark All Paid]`,
         created_by: profile?.id || null,
       }));
@@ -4893,24 +4899,45 @@ Thank you for your prompt payment! 🙏`;
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setLocalGroups(prev => prev.map(grp =>
-                        grp.id === selectedWorkspaceGroup.id ? { ...grp, currentMonth: 1 } : grp
-                      ));
-                      const now = new Date();
-                      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                      setAuditLogs(prev => [
-                        {
-                          timestamp: `Today, ${timeStr}`,
-                          table: 'chit_groups',
-                          desc: `LAUNCH CONFIRMED for "${selectedWorkspaceGroup.name}" — ₹${selectedWorkspaceGroup.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit. Group advanced to Month 1.`,
-                          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
-                        },
-                        ...prev
-                      ]);
-                      alert(`✅ Launch confirmed! ₹${selectedWorkspaceGroup.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
+                    onClick={async () => {
+                      try {
+                        const { error } = await supabase
+                          .from('chit_groups')
+                          .update({ current_month: 1 })
+                          .eq('id', selectedWorkspaceGroup.id);
+
+                        if (error) {
+                          alert('Error advancing to Month 1: ' + error.message);
+                          return;
+                        }
+
+                        await supabase.from('security_audit_logs').insert({
+                          action_description: `LAUNCH CONFIRMED: "${selectedWorkspaceGroup.name}" — ₹${selectedWorkspaceGroup.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group advanced to Month 1.`,
+                          target_table: 'chit_groups'
+                        });
+
+                        setLocalGroups(prev => prev.map(grp =>
+                          grp.id === selectedWorkspaceGroup.id ? { ...grp, currentMonth: 1 } : grp
+                        ));
+
+                        const now = new Date();
+                        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                        setAuditLogs(prev => [
+                          {
+                            timestamp: `Today, ${timeStr}`,
+                            table: 'chit_groups',
+                            desc: `LAUNCH CONFIRMED for "${selectedWorkspaceGroup.name}" — ₹${selectedWorkspaceGroup.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit. Group advanced to Month 1.`,
+                            executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
+                          },
+                          ...prev
+                        ]);
+
+                        alert(`✅ Launch confirmed! ₹${selectedWorkspaceGroup.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
+                      } catch (err: any) {
+                        alert('Error updating group: ' + err.message);
+                      }
                     }}
-                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs shrink-0 active:scale-95 w-full sm:w-auto"
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs shrink-0 active:scale-95 w-full sm:w-auto cursor-pointer"
                   >
                     <Rocket size={14} /> Confirm Launch &amp; Roll to M1
                   </button>
@@ -5339,24 +5366,45 @@ Thank you for your prompt payment! 🙏`;
                             // Month-0 Launch: show a single Confirm Launch CTA spanning full width
                             <div className="pt-3 border-t border-gray-100">
                               <button
-                                onClick={() => {
-                                  setLocalGroups(prev => prev.map(grp =>
-                                    grp.id === g.id ? { ...grp, currentMonth: 1 } : grp
-                                  ));
-                                  const now = new Date();
-                                  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                                  setAuditLogs(prev => [
-                                    {
-                                      timestamp: `Today, ${timeStr}`,
-                                      table: 'chit_groups',
-                                      desc: `LAUNCH CONFIRMED for "${g.name}" — ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit. Group advanced to Month 1.`,
-                                      executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
-                                    },
-                                    ...prev
-                                  ]);
-                                  alert(`✅ Launch confirmed! ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
+                                onClick={async () => {
+                                  try {
+                                    const { error } = await supabase
+                                      .from('chit_groups')
+                                      .update({ current_month: 1 })
+                                      .eq('id', g.id);
+
+                                    if (error) {
+                                      alert('Error advancing to Month 1: ' + error.message);
+                                      return;
+                                    }
+
+                                    await supabase.from('security_audit_logs').insert({
+                                      action_description: `LAUNCH CONFIRMED: "${g.name}" — ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group advanced to Month 1.`,
+                                      target_table: 'chit_groups'
+                                    });
+
+                                    setLocalGroups(prev => prev.map(grp =>
+                                      grp.id === g.id ? { ...grp, currentMonth: 1 } : grp
+                                    ));
+
+                                    const now = new Date();
+                                    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                    setAuditLogs(prev => [
+                                      {
+                                        timestamp: `Today, ${timeStr}`,
+                                        table: 'chit_groups',
+                                        desc: `LAUNCH CONFIRMED for "${g.name}" — ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit. Group advanced to Month 1.`,
+                                        executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
+                                      },
+                                      ...prev
+                                    ]);
+
+                                    alert(`✅ Launch confirmed! ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
+                                  } catch (err: any) {
+                                    alert('Error updating group: ' + err.message);
+                                  }
                                 }}
-                                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95"
+                                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer"
                               >
                                 <Rocket size={13} /> Confirm Launch &amp; Roll to M1
                               </button>

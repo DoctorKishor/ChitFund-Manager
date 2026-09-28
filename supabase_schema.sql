@@ -103,6 +103,7 @@ create table public.transactions (
   voice_note_text text default null,
   verification_proof_url text default null,
   created_by uuid references public.profiles(id) on delete set null default auth.uid(),
+  cycle_month integer default null,
   created_at timestamp with time zone not null default timezone('utc'::text, now())
 );
 
@@ -721,6 +722,7 @@ begin
     'amount', t.amount,
     'walletType', t.wallet_type,
     'status', t.status,
+    'cycleMonth', t.cycle_month,
     'notes', t.notes,
     'createdAt', t.created_at
   ) order by t.created_at desc), '[]'::jsonb)
@@ -858,5 +860,145 @@ begin
   return result;
 end;
 $$;
+
+-- ==========================================
+-- 10. Atomic Mutation RPC Functions
+-- ==========================================
+
+-- Atomic treasury wallet mutation function
+create or replace function public.mutate_wallet_balance(
+  p_wallet text,
+  p_delta numeric,
+  p_user_id uuid default auth.uid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_new_bal numeric;
+begin
+  insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
+  values (p_wallet, 0, 0, p_user_id)
+  on conflict (wallet_type) do nothing;
+
+  update public.global_treasury
+  set current_balance = current_balance + p_delta,
+      last_updated_by = p_user_id
+  where wallet_type = p_wallet
+  returning current_balance into v_new_bal;
+
+  return jsonb_build_object(
+    'success', true,
+    'wallet', p_wallet,
+    'new_balance', v_new_bal,
+    'delta', p_delta
+  );
+end;
+$$;
+
+-- Atomic live bid append function
+create or replace function public.append_live_bid(
+  p_group_id uuid,
+  p_bid jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_updated_stream jsonb;
+begin
+  update public.chit_groups
+  set live_bid_stream = p_bid || coalesce(live_bid_stream, '[]'::jsonb)
+  where id = p_group_id
+  returning live_bid_stream into v_updated_stream;
+
+  return jsonb_build_object(
+    'success', true,
+    'live_bid_stream', v_updated_stream
+  );
+end;
+$$;
+
+-- Atomic auction conclusion function
+create or replace function public.conclude_auction_cycle(
+  p_group_id uuid,
+  p_month integer,
+  p_next_month integer,
+  p_winner_member_id uuid,
+  p_winner_profile_id uuid,
+  p_winning_discount numeric,
+  p_is_completing boolean,
+  p_is_laaba_seetu boolean,
+  p_next_pool numeric,
+  p_bid_stream jsonb default '[]'::jsonb,
+  p_admin_id uuid default auth.uid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_group_name text;
+  v_winner_name text;
+begin
+  select name into v_group_name from public.chit_groups where id = p_group_id;
+  select full_name into v_winner_name from public.profiles where id = p_winner_profile_id;
+
+  update public.chit_groups
+  set current_month = p_next_month,
+      kai_iruppu_pool = p_next_pool,
+      status = case when p_is_completing then 'completed' else 'active' end,
+      is_live_auction_active = false,
+      live_auction_started_at = null,
+      live_bid_stream = '[]'::jsonb
+  where id = p_group_id;
+
+  if p_winner_member_id is not null then
+    update public.group_members
+    set has_won_regular = true
+    where id = p_winner_member_id;
+  end if;
+
+  if p_winner_profile_id is not null then
+    insert into public.auction_logs (
+      group_id,
+      month,
+      bid_stream,
+      winning_bidder_id,
+      winning_discount,
+      is_laaba_seetu,
+      created_at
+    ) values (
+      p_group_id,
+      p_month,
+      p_bid_stream,
+      p_winner_profile_id,
+      p_winning_discount,
+      p_is_laaba_seetu,
+      now()
+    );
+  end if;
+
+  insert into public.security_audit_logs (
+    admin_id,
+    action_description,
+    target_table,
+    timestamp
+  ) values (
+    p_admin_id,
+    'AUCTION CLOSED: Group "' || coalesce(v_group_name, 'Group') || '" Month ' || p_month || ' won by ' || coalesce(v_winner_name, 'Subscriber') || ' with discount ₹' || p_winning_discount || '. Group advanced to Month ' || p_next_month,
+    'auction_logs',
+    now()
+  );
+
+  return jsonb_build_object('success', true);
+end;
+$$;
+
 
 
