@@ -159,6 +159,6 @@ Whenever an AI agent is requested to audit, debug, fine-tune, or add features to
 1. Inspect the live Supabase database using MCP tools or SQL scripts.
 2. If any schema disparity is found, execute the necessary DDL migration in Supabase and update `supabase_schema.sql`.
 3. If any frontend state or math disparity is found, fix the component code.
-4. Run `npm run build` in `frontend/` to ensure **0 TypeScript / compilation errors**.
+4. Run `npm run build` at repository root to ensure **0 TypeScript / compilation errors**.
 5. Commit and push all synchronized changes to GitHub `main`.
 
