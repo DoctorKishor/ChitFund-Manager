@@ -39,7 +39,10 @@ import {
   Ban,
   UserX,
   Wrench,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  EyeOff,
+  KeyRound
 } from 'lucide-react';
 
 interface ProfileRecord {
@@ -63,6 +66,7 @@ export default function UserAccessManager() {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [showPins, setShowPins] = useState<boolean>(false);
 
   // Modal State: Create Profile
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -76,6 +80,7 @@ export default function UserAccessManager() {
   const [editFullName, setEditFullName] = useState<string>('');
   const [editPhoneNumber, setEditPhoneNumber] = useState<string>('');
   const [editRole, setEditRole] = useState<string>('subscriber');
+  const [editMpin, setEditMpin] = useState<string>('1234');
   const [editIsBlocked, setEditIsBlocked] = useState<boolean>(false);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState<boolean>(false);
 
@@ -369,6 +374,7 @@ Access your digital passbook & auctions anytime:
     setEditFullName(p.full_name);
     setEditPhoneNumber(p.phone_number);
     setEditRole(p.role);
+    setEditMpin(p.mpin || '1234');
     setEditIsBlocked(p.is_blocked || false);
   };
 
@@ -378,9 +384,15 @@ Access your digital passbook & auctions anytime:
 
     const cleanName = editFullName.trim();
     const cleanPhone = normalizePhone(editPhoneNumber);
+    const cleanPin = editMpin.trim();
 
     if (!cleanName || cleanPhone.length !== 10) {
       alert('Please enter a valid full name and 10-digit mobile number.');
+      return;
+    }
+
+    if (cleanPin && (cleanPin.length < 4 || cleanPin.length > 6 || !/^\d+$/.test(cleanPin))) {
+      alert('PIN must be 4 to 6 numeric digits.');
       return;
     }
 
@@ -395,6 +407,7 @@ Access your digital passbook & auctions anytime:
           full_name: cleanName,
           phone_number: cleanPhone,
           role: editRole,
+          mpin: cleanPin || '1234',
           is_blocked: finalBlockedStatus,
         })
         .eq('id', editingProfile.id);
@@ -683,6 +696,19 @@ Access your digital passbook & auctions anytime:
                   <tr className="border-b border-gray-100 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
                     <th className="py-3 px-3">User Profile</th>
                     <th className="py-3 px-3">Phone Number</th>
+                    <th className="py-3 px-3">
+                      <div className="flex items-center gap-1.5">
+                        <span>MPIN</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowPins(!showPins)}
+                          title={showPins ? 'Hide All PINs' : 'Show All PINs'}
+                          className="p-0.5 text-gray-400 hover:text-indigo-600 transition-colors"
+                        >
+                          {showPins ? <EyeOff size={12} /> : <Eye size={12} />}
+                        </button>
+                      </div>
+                    </th>
                     <th className="py-3 px-3">Passbook QR</th>
                     <th className="py-3 px-3">Notice Acks</th>
                     <th className="py-3 px-3">Current Role</th>
@@ -693,7 +719,7 @@ Access your digital passbook & auctions anytime:
                 <tbody className="divide-y divide-gray-50 text-xs font-medium text-gray-700">
                   {filteredProfiles.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-xs text-gray-400">
+                      <td colSpan={8} className="py-12 text-center text-xs text-gray-400">
                         No users matching the selected search query or role filter.
                       </td>
                     </tr>
@@ -701,6 +727,7 @@ Access your digital passbook & auctions anytime:
                     filteredProfiles.map((p) => {
                       const meta = getRoleMeta(p.role);
                       const isCurrentAdmin = p.id === currentAdminProfile?.id;
+                      const isDefault = !p.mpin || p.mpin === '1234';
 
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
@@ -737,6 +764,24 @@ Access your digital passbook & auctions anytime:
                           {/* Phone */}
                           <td className="py-3.5 px-3 font-mono font-semibold text-gray-800">
                             {p.phone_number || '—'}
+                          </td>
+
+                          {/* Security PIN (MPIN) */}
+                          <td className="py-3.5 px-3 font-mono">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-800 text-[11px] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                {showPins ? (p.mpin || '1234') : '••••'}
+                              </span>
+                              {isDefault ? (
+                                <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded">
+                                  Default
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded">
+                                  Custom
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Passbook QR */}
@@ -1034,6 +1079,36 @@ Access your digital passbook & auctions anytime:
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* MPIN / Security PIN Management */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                    <KeyRound size={14} className="text-indigo-600" />
+                    <span>Passbook Security PIN (MPIN)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setEditMpin('1234')}
+                    className="text-[10px] font-bold text-amber-800 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-md transition-colors"
+                  >
+                    Reset to 1234
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  maxLength={6}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={editMpin}
+                  onChange={(e) => setEditMpin(e.target.value.replace(/\D/g, ''))}
+                  placeholder="4 to 6 digit PIN (Default 1234)"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold focus:outline-none focus:border-indigo-500"
+                />
+                <p className="text-[10px] text-gray-500">
+                  Subscribers use this PIN to authenticate on the member passbook portal alongside their phone number or QR key.
+                </p>
               </div>
 
               {/* Block Portal Access Toggle */}

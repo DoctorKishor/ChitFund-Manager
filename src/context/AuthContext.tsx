@@ -14,6 +14,8 @@ export interface UserProfile {
   email?: string;
   passbookToken?: string;
   isBlocked?: boolean;
+  mpin?: string;
+  isDefaultPin?: boolean;
 }
 
 interface AuthContextType {
@@ -22,6 +24,7 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateMpin: (oldPin: string, newPin: string) => Promise<{ success: boolean; error?: string }>;
   loginWithPassbookToken: (token: string) => Promise<{ success: boolean; error?: string }>;
   loginWithPhoneAndMpin: (phone: string, mpin: string) => Promise<{ success: boolean; error?: string }>;
 }
@@ -56,6 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
+        const userPin = data.mpin || '1234';
         setProfile({
           id: data.id,
           fullName: data.full_name || 'User',
@@ -64,6 +68,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: email || '',
           passbookToken: data.passbook_token || undefined,
           isBlocked: data.is_blocked || false,
+          mpin: userPin,
+          isDefaultPin: userPin === '1234',
         });
       } else {
         // Fallback: If auth user exists in Supabase Auth but profile row is delayed or missing,
@@ -80,6 +86,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           phoneNumber: fallbackPhone,
           role: fallbackRole,
           email: email || userObj?.email || '',
+          mpin: '1234',
+          isDefaultPin: true,
         });
 
         // Ensure profile exists in profiles table
@@ -88,10 +96,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           full_name: fallbackName,
           phone_number: fallbackPhone,
           role: fallbackRole,
+          mpin: '1234',
         });
       }
     } catch (err) {
       console.error('Failed to load profile:', err);
+    }
+  };
+
+  const updateMpin = async (oldPin: string, newPin: string): Promise<{ success: boolean; error?: string }> => {
+    if (!profile?.id) return { success: false, error: 'No active session found.' };
+    try {
+      const { data, error } = await supabase.rpc('update_subscriber_mpin', {
+        p_profile_id: profile.id,
+        p_old_mpin: oldPin,
+        p_new_mpin: newPin,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (!data || !data.success) {
+        return { success: false, error: data?.error || 'Failed to update PIN.' };
+      }
+
+      // Update local profile state
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              mpin: newPin,
+              isDefaultPin: newPin === '1234',
+            }
+          : null
+      );
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Error updating PIN' };
     }
   };
 
@@ -112,12 +155,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, error: data?.error || 'Invalid or unassigned Passbook QR code.' };
       }
 
+      const userPin = data.user.mpin || '1234';
       const subscriberProfile: UserProfile = {
         id: data.user.id,
         fullName: data.user.fullName || 'Subscriber',
         phoneNumber: data.user.phoneNumber || '',
         role: data.user.role || 'subscriber',
         passbookToken: data.user.passbookToken || cleanToken,
+        mpin: userPin,
+        isDefaultPin: data.user.isDefaultPin ?? (userPin === '1234'),
       };
 
       setProfile(subscriberProfile);
@@ -161,12 +207,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, error: data?.error || 'Login failed.' };
       }
 
+      const userPin = data.user.mpin || cleanMpin || '1234';
       const subscriberProfile: UserProfile = {
         id: data.user.id,
         fullName: data.user.fullName || 'Subscriber',
         phoneNumber: data.user.phoneNumber || '',
         role: (data.user.role as UserRole) || 'subscriber',
         passbookToken: data.user.passbookToken || undefined,
+        mpin: userPin,
+        isDefaultPin: data.user.isDefaultPin ?? (userPin === '1234'),
       };
 
       setProfile(subscriberProfile);
@@ -294,6 +343,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loading,
         signOut,
         refreshProfile,
+        updateMpin,
         loginWithPassbookToken,
         loginWithPhoneAndMpin,
       }}

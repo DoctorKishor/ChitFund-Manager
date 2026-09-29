@@ -30,7 +30,20 @@ import {
   ChevronUp,
   Info,
   Flame,
-  Gavel
+  Gavel,
+  Settings,
+  KeyRound,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  Check,
+  Smartphone,
+  User,
+  Shield,
+  QrCode,
+  Sliders,
+  Copy
 } from 'lucide-react';
 import AuctionCountdownBanner from '@/components/AuctionCountdownBanner';
 import AuctionCountdownStack from '@/components/AuctionCountdownStack';
@@ -326,11 +339,11 @@ function getChitMonthName(
 }
 
 export default function SubscriberPortal() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, updateMpin } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [activeTab, setActiveTab] = useState<'overview' | 'chits' | 'passbook' | 'auctions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'chits' | 'passbook' | 'auctions' | 'settings'>('overview');
   
   const [groups, setGroups] = useState<EnrolledGroup[]>([]);
   const [transactions, setTransactions] = useState<SubscriberTransaction[]>([]);
@@ -339,6 +352,27 @@ export default function SubscriberPortal() {
   const [selectedPassbookGroup, setSelectedPassbookGroup] = useState<string>('all');
 
   const [syncing, setSyncing] = useState(false);
+
+  // Settings Tab PIN Change States
+  const [currentPinInput, setCurrentPinInput] = useState<string>('');
+  const [newPinInput, setNewPinInput] = useState<string>('');
+  const [confirmPinInput, setConfirmPinInput] = useState<string>('');
+  const [showCurrentPin, setShowCurrentPin] = useState<boolean>(false);
+  const [showNewPin, setShowNewPin] = useState<boolean>(false);
+  const [showConfirmPin, setShowConfirmPin] = useState<boolean>(false);
+  const [isSavingPin, setIsSavingPin] = useState<boolean>(false);
+  const [pinSuccessMessage, setPinSuccessMessage] = useState<string | null>(null);
+  const [pinErrorMessage, setPinErrorMessage] = useState<string | null>(null);
+
+  // Default PIN Reminder Popup States
+  const [showDefaultPinModal, setShowDefaultPinModal] = useState<boolean>(false);
+  const [modalCurrentPin, setModalCurrentPin] = useState<string>('');
+  const [modalNewPin, setModalNewPin] = useState<string>('');
+  const [modalConfirmPin, setModalConfirmPin] = useState<string>('');
+  const [modalShowNewPin, setModalShowNewPin] = useState<boolean>(false);
+  const [modalShowConfirmPin, setModalShowConfirmPin] = useState<boolean>(false);
+  const [modalIsSaving, setModalIsSaving] = useState<boolean>(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   // Reschedule alert states
   const [rescheduleAcknowledgments, setRescheduleAcknowledgments] = useState<Record<string, { acknowledgedAt: string; lastRescheduledAt?: string }>>({});
@@ -356,6 +390,124 @@ export default function SubscriberPortal() {
     setExpandedBreakdownGroupIds((prev) =>
       prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
     );
+  };
+
+  // Check if subscriber is using default PIN (1234) and trigger reminder popup
+  useEffect(() => {
+    if (!profile) return;
+    const isDefault = profile.isDefaultPin || profile.mpin === '1234';
+    if (!isDefault) return;
+
+    if (typeof window !== 'undefined') {
+      const pref = localStorage.getItem('cf_pin_prompt_preference');
+      const dismissedThisSession = sessionStorage.getItem('cf_pin_prompt_dismissed_session');
+      if (pref !== 'never' && !dismissedThisSession) {
+        const timer = setTimeout(() => {
+          setShowDefaultPinModal(true);
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [profile?.isDefaultPin, profile?.mpin]);
+
+  const handleUpdatePinFromSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinErrorMessage(null);
+    setPinSuccessMessage(null);
+
+    const cleanNew = newPinInput.trim();
+    const cleanConfirm = confirmPinInput.trim();
+    const cleanCurrent = currentPinInput.trim();
+
+    if (!cleanNew || cleanNew.length < 4 || cleanNew.length > 6 || !/^\d+$/.test(cleanNew)) {
+      setPinErrorMessage('New PIN must be between 4 and 6 digits (numbers only).');
+      return;
+    }
+
+    if (cleanNew !== cleanConfirm) {
+      setPinErrorMessage('New PIN and Confirm PIN do not match.');
+      return;
+    }
+
+    if (cleanNew === '1234') {
+      setPinErrorMessage('Please choose a secure PIN other than the default 1234.');
+      return;
+    }
+
+    try {
+      setIsSavingPin(true);
+      const res = await updateMpin(cleanCurrent || (profile?.mpin || '1234'), cleanNew);
+      if (res.success) {
+        setPinSuccessMessage('Security PIN updated successfully! You can now use your new PIN to log in.');
+        setCurrentPinInput('');
+        setNewPinInput('');
+        setConfirmPinInput('');
+        // Clear any previous "never" preference if they explicitly set a custom PIN
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('cf_pin_prompt_preference');
+        }
+      } else {
+        setPinErrorMessage(res.error || 'Failed to update PIN.');
+      }
+    } catch (err: any) {
+      setPinErrorMessage(err.message || 'Error updating PIN.');
+    } finally {
+      setIsSavingPin(false);
+    }
+  };
+
+  const handleUpdatePinFromModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalError(null);
+
+    const cleanNew = modalNewPin.trim();
+    const cleanConfirm = modalConfirmPin.trim();
+
+    if (!cleanNew || cleanNew.length < 4 || cleanNew.length > 6 || !/^\d+$/.test(cleanNew)) {
+      setModalError('New PIN must be 4 to 6 numeric digits.');
+      return;
+    }
+
+    if (cleanNew !== cleanConfirm) {
+      setModalError('PIN and Confirmation do not match.');
+      return;
+    }
+
+    if (cleanNew === '1234') {
+      setModalError('Please pick a new PIN other than 1234.');
+      return;
+    }
+
+    try {
+      setModalIsSaving(true);
+      const res = await updateMpin('1234', cleanNew);
+      if (res.success) {
+        setShowDefaultPinModal(false);
+        setModalNewPin('');
+        setModalConfirmPin('');
+        alert('✅ Security PIN successfully updated! Your account is now secured.');
+      } else {
+        setModalError(res.error || 'Failed to update PIN.');
+      }
+    } catch (err: any) {
+      setModalError(err.message || 'Error updating PIN.');
+    } finally {
+      setModalIsSaving(false);
+    }
+  };
+
+  const handleDismissModalLater = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('cf_pin_prompt_dismissed_session', 'true');
+    }
+    setShowDefaultPinModal(false);
+  };
+
+  const handleDismissModalNever = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cf_pin_prompt_preference', 'never');
+    }
+    setShowDefaultPinModal(false);
   };
 
   // Initialize theme from localStorage
@@ -759,7 +911,7 @@ export default function SubscriberPortal() {
           </div>
         )}
 
-        {/* DESKTOP TABS (4 Streamlined Tabs at top) */}
+        {/* DESKTOP TABS (5 Streamlined Tabs at top) */}
         <div className={`hidden md:flex items-center gap-2 border-b pb-2 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
           <button
             onClick={() => setActiveTab('overview')}
@@ -800,6 +952,16 @@ export default function SubscriberPortal() {
             }`}
           >
             <Trophy size={13} /> Auctions ({auctions.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'settings'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Settings size={13} /> Settings &amp; Security
           </button>
         </div>
 
@@ -1789,6 +1951,251 @@ export default function SubscriberPortal() {
           </div>
         )}
 
+        {/* TAB 5: SETTINGS & SECURITY */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            {/* Header description */}
+            <div>
+              <h2 className={`text-base sm:text-lg font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                Account Settings &amp; Security
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Manage your passbook login PIN, profile information, and app display preferences.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Card 1: Change MPIN / Passcode */}
+              <div className={`rounded-2xl border p-5 shadow-sm space-y-4 ${
+                isDark ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+              }`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                      <KeyRound size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold">Security PIN (MPIN)</h3>
+                      <p className="text-[11px] text-slate-400">Used for signing in to your Passbook Portal</p>
+                    </div>
+                  </div>
+
+                  {profile?.isDefaultPin || profile?.mpin === '1234' ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1 shrink-0">
+                      <AlertTriangle size={11} /> Default 1234
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shrink-0">
+                      <ShieldCheck size={11} /> Custom PIN
+                    </span>
+                  )}
+                </div>
+
+                {/* Alerts */}
+                {pinSuccessMessage && (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                    <CheckCircle2 size={16} className="shrink-0" />
+                    <span>{pinSuccessMessage}</span>
+                  </div>
+                )}
+
+                {pinErrorMessage && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+                    <AlertCircle size={16} className="shrink-0" />
+                    <span>{pinErrorMessage}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleUpdatePinFromSettings} className="space-y-3 pt-1">
+                  {/* Current PIN */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      Current PIN {(!profile?.isDefaultPin && profile?.mpin !== '1234') ? '' : '(Default is 1234)'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showCurrentPin ? 'text' : 'password'}
+                        maxLength={6}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="Enter current PIN"
+                        value={currentPinInput}
+                        onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all outline-none focus:ring-2 focus:ring-indigo-500 ${
+                          isDark
+                            ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
+                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPin(!showCurrentPin)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                      >
+                        {showCurrentPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* New PIN */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      New 4 to 6 Digit PIN
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showNewPin ? 'text' : 'password'}
+                        maxLength={6}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="Enter 4-6 digit PIN"
+                        value={newPinInput}
+                        onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all outline-none focus:ring-2 focus:ring-indigo-500 ${
+                          isDark
+                            ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
+                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPin(!showNewPin)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                      >
+                        {showNewPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirm PIN */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      Confirm New PIN
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPin ? 'text' : 'password'}
+                        maxLength={6}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="Re-enter new PIN"
+                        value={confirmPinInput}
+                        onChange={(e) => setConfirmPinInput(e.target.value.replace(/\D/g, ''))}
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all outline-none focus:ring-2 focus:ring-indigo-500 ${
+                          isDark
+                            ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
+                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPin(!showConfirmPin)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                      >
+                        {showConfirmPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingPin || !newPinInput || !confirmPinInput}
+                    className="w-full mt-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    {isSavingPin ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" /> Saving New PIN...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck size={14} /> Update Security PIN
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* Card 2: Account Profile & Passbook Info */}
+              <div className="space-y-5">
+                <div className={`rounded-2xl border p-5 shadow-sm space-y-3.5 ${
+                  isDark ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                      <User size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold">Subscriber Profile</h3>
+                      <p className="text-[11px] text-slate-400">Verified membership account details</p>
+                    </div>
+                  </div>
+
+                  <div className={`rounded-xl p-3 border space-y-2 text-xs ${
+                    isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Full Name</span>
+                      <span className="font-bold">{profile?.fullName || 'Subscriber'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Phone Number</span>
+                      <span className="font-mono font-bold text-indigo-400">{profile?.phoneNumber || '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Account Type</span>
+                      <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 text-[10px] font-bold border border-indigo-500/20 uppercase">
+                        {profile?.role || 'Subscriber'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Passbook QR Token</span>
+                      <span className="font-mono text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                        <Check size={12} /> Active &amp; Verified
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 3: Display Preferences */}
+                <div className={`rounded-2xl border p-5 shadow-sm space-y-3.5 ${
+                  isDark ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center shrink-0">
+                      <Sliders size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold">Display &amp; Accessibility</h3>
+                      <p className="text-[11px] text-slate-400">Visual theme and text scaling options</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <span className="text-xs font-semibold block">Interface Theme</span>
+                      <span className="text-[10px] text-slate-400">
+                        Currently: {isDark ? '🌙 Dark Mode' : '☀️ Light Mode'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer ${
+                        isDark
+                          ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
+                          : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200 shadow-2xs'
+                      }`}
+                    >
+                      {isDark ? <Sun size={13} className="text-amber-400" /> : <Moon size={13} className="text-amber-700" />}
+                      <span>Switch to {isDark ? 'Light' : 'Dark'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
 
       {/* 4.5. AUCTION RESCHEDULE ALERT POPUP MODAL */}
@@ -1819,6 +2226,140 @@ export default function SubscriberPortal() {
           }
         }}
       />
+
+      {/* 4.7. DEFAULT PIN (1234) REMINDER MODAL POPUP */}
+      {showDefaultPinModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className={`w-full max-w-md border rounded-3xl p-6 shadow-2xl space-y-4 ${
+            isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 shadow-inner">
+                <Shield size={22} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
+                    Security Recommendation
+                  </span>
+                </div>
+                <h3 className="text-base font-black tracking-tight mt-1">Change Default PIN</h3>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  Your account is currently using the default PIN (<span className="font-mono font-bold text-amber-400">1234</span>). For your privacy and passbook protection, please set a private security PIN.
+                </p>
+              </div>
+            </div>
+
+            {modalError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdatePinFromModal} className="space-y-3 pt-1">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  New 4-6 Digit Security PIN
+                </label>
+                <div className="relative">
+                  <input
+                    type={modalShowNewPin ? 'text' : 'password'}
+                    maxLength={6}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="Enter new PIN (e.g. 5829)"
+                    value={modalNewPin}
+                    onChange={(e) => setModalNewPin(e.target.value.replace(/\D/g, ''))}
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      isDark
+                        ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setModalShowNewPin(!modalShowNewPin)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  >
+                    {modalShowNewPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  Confirm New PIN
+                </label>
+                <div className="relative">
+                  <input
+                    type={modalShowConfirmPin ? 'text' : 'password'}
+                    maxLength={6}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="Confirm new PIN"
+                    value={modalConfirmPin}
+                    onChange={(e) => setModalConfirmPin(e.target.value.replace(/\D/g, ''))}
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      isDark
+                        ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setModalShowConfirmPin(!modalShowConfirmPin)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  >
+                    {modalShowConfirmPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={modalIsSaving || !modalNewPin || !modalConfirmPin}
+                className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
+              >
+                {modalIsSaving ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin" /> Updating PIN...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={14} /> Set New PIN Now
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Actions for reminder dismissal */}
+            <div className={`pt-3 border-t flex items-center justify-between text-xs ${
+              isDark ? 'border-slate-800' : 'border-slate-200'
+            }`}>
+              <button
+                type="button"
+                onClick={handleDismissModalNever}
+                className="text-slate-400 hover:text-slate-300 text-[11px] underline underline-offset-2 transition-colors cursor-pointer"
+              >
+                Never remind again
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDismissModalLater}
+                className={`px-3 py-1.5 rounded-xl font-semibold text-[11px] transition-colors cursor-pointer ${
+                  isDark
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                Do it later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 5. TRANSACTION DETAIL POPUP MODAL */}
       {selectedTx && (
@@ -1883,8 +2424,8 @@ export default function SubscriberPortal() {
         </div>
       )}
 
-      {/* 6. FIXED MOBILE BOTTOM NAVIGATION BAR (4 Streamlined Tabs) */}
-      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-lg border-t px-3 py-1.5 flex items-center justify-around transition-colors ${
+      {/* 6. FIXED MOBILE BOTTOM NAVIGATION BAR (5 Streamlined Tabs) */}
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-lg border-t px-2 py-1.5 flex items-center justify-around transition-colors ${
         isDark ? 'bg-[#0c1220]/95 border-slate-800/90' : 'bg-white/95 border-slate-200 shadow-lg'
       }`}>
         <button
@@ -1893,7 +2434,7 @@ export default function SubscriberPortal() {
             activeTab === 'overview' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
-          <Layers size={18} />
+          <Layers size={17} />
           <span>Overview</span>
         </button>
 
@@ -1903,8 +2444,8 @@ export default function SubscriberPortal() {
             activeTab === 'chits' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
-          <Ticket size={18} />
-          <span>My Chits</span>
+          <Ticket size={17} />
+          <span>Chits</span>
         </button>
 
         <button
@@ -1913,7 +2454,7 @@ export default function SubscriberPortal() {
             activeTab === 'passbook' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
-          <History size={18} />
+          <History size={17} />
           <span>Passbook</span>
         </button>
 
@@ -1923,8 +2464,18 @@ export default function SubscriberPortal() {
             activeTab === 'auctions' ? 'text-indigo-500 scale-105' : 'text-slate-400'
           }`}
         >
-          <Trophy size={18} />
+          <Trophy size={17} />
           <span>Auctions</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all ${
+            activeTab === 'settings' ? 'text-indigo-500 scale-105' : 'text-slate-400'
+          }`}
+        >
+          <Settings size={17} />
+          <span>Settings</span>
         </button>
       </nav>
     </div>

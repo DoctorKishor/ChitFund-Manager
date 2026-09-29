@@ -39,7 +39,14 @@ import {
   ArrowDownLeft,
   Filter,
   QrCode,
-  Printer
+  Printer,
+  KeyRound,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  RefreshCw
 } from 'lucide-react';
 
 interface MemberDetailsViewProps {
@@ -63,6 +70,12 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
   const [memberTransactions, setMemberTransactions] = useState<any[]>([]);
   const [allChitGroups, setAllChitGroups] = useState<any[]>([]);
   const [auctionLogs, setAuctionLogs] = useState<any[]>([]);
+
+  // Member PIN admin visibility & reset states
+  const [showMemberPin, setShowMemberPin] = useState<boolean>(false);
+  const [isEditingPinModal, setIsEditingPinModal] = useState<boolean>(false);
+  const [customPinInput, setCustomPinInput] = useState<string>('');
+  const [isSavingPin, setIsSavingPin] = useState<boolean>(false);
 
   // Search and filter states for Payments subtab
   const [paymentSearch, setPaymentSearch] = useState<string>('');
@@ -828,6 +841,59 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
     window.open(`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  const handleResetPinToDefault = async () => {
+    if (!confirm(`Reset login PIN for ${memberName} back to default (1234)?`)) return;
+    try {
+      setIsSavingPin(true);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ mpin: '1234' })
+        .eq('id', memberId);
+
+      if (error) {
+        alert('Failed to reset PIN: ' + error.message);
+      } else {
+        setMemberProfile((prev: any) => prev ? { ...prev, mpin: '1234' } : prev);
+        if (onAddAuditLog) onAddAuditLog(`Reset login PIN to default 1234 for member ${memberName}`);
+        alert(`✅ Login PIN for ${memberName} reset to default 1234.`);
+      }
+    } catch (err: any) {
+      alert('Error resetting PIN: ' + err.message);
+    } finally {
+      setIsSavingPin(false);
+    }
+  };
+
+  const handleSaveCustomPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPin = customPinInput.trim();
+    if (!cleanPin || cleanPin.length < 4 || cleanPin.length > 6 || !/^\d+$/.test(cleanPin)) {
+      alert('PIN must be 4 to 6 numeric digits.');
+      return;
+    }
+    try {
+      setIsSavingPin(true);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ mpin: cleanPin })
+        .eq('id', memberId);
+
+      if (error) {
+        alert('Failed to update PIN: ' + error.message);
+      } else {
+        setMemberProfile((prev: any) => prev ? { ...prev, mpin: cleanPin } : prev);
+        if (onAddAuditLog) onAddAuditLog(`Updated login PIN for member ${memberName}`);
+        setIsEditingPinModal(false);
+        setCustomPinInput('');
+        alert(`✅ Security PIN updated successfully for ${memberName}.`);
+      }
+    } catch (err: any) {
+      alert('Error updating PIN: ' + err.message);
+    } finally {
+      setIsSavingPin(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       
@@ -883,12 +949,51 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     QR Unlinked
                   </span>
                 )}
+
+                {/* Security PIN Badge & Reveal Control */}
+                <div className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2 sm:px-2.5 py-0.5 rounded-full transition-colors">
+                  <KeyRound size={11} className="text-indigo-600 shrink-0" />
+                  <span className="text-[10px] sm:text-xs text-slate-500 font-medium">PIN:</span>
+                  <span className="text-[10px] sm:text-xs font-mono font-bold text-slate-900">
+                    {showMemberPin ? (memberProfile?.mpin || '1234') : '••••'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowMemberPin(!showMemberPin)}
+                    title={showMemberPin ? 'Hide PIN' : 'Reveal PIN'}
+                    className="p-0.5 text-slate-400 hover:text-slate-700 transition-colors"
+                  >
+                    {showMemberPin ? <EyeOff size={11} /> : <Eye size={11} />}
+                  </button>
+
+                  {(!memberProfile?.mpin || memberProfile?.mpin === '1234') ? (
+                    <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 rounded ml-0.5">
+                      Default
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 rounded ml-0.5">
+                      Custom
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Action Buttons: clean 2-column grid on mobile, inline row on desktop */}
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setCustomPinInput(memberProfile?.mpin || '1234');
+                setIsEditingPinModal(true);
+              }}
+              className="border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center"
+            >
+              <KeyRound size={14} className="shrink-0" />
+              <span>Manage PIN</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setIsPairingModalOpen(true)}
@@ -1946,6 +2051,101 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           />
         );
       })()}
+
+      {/* Admin Member PIN Management Modal */}
+      {isEditingPinModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-gray-200">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <KeyRound size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Manage Member PIN</h3>
+                  <p className="text-[11px] text-gray-500 font-medium">{memberName}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingPinModal(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Current PIN Status Card */}
+            <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">Current MPIN:</span>
+                <span className="font-mono font-bold text-indigo-700 text-sm bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
+                  {memberProfile?.mpin || '1234'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-gray-500">Status:</span>
+                <span className={`font-bold ${(!memberProfile?.mpin || memberProfile?.mpin === '1234') ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {(!memberProfile?.mpin || memberProfile?.mpin === '1234') ? 'Default PIN (1234)' : 'Custom Subscriber PIN'}
+                </span>
+              </div>
+            </div>
+
+            {/* Reset to Default Button */}
+            <button
+              type="button"
+              onClick={handleResetPinToDefault}
+              disabled={isSavingPin || memberProfile?.mpin === '1234'}
+              className="w-full py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-900 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={13} className={isSavingPin ? 'animate-spin' : ''} />
+              <span>Reset PIN to Default (1234)</span>
+            </button>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-gray-200"></div>
+              <span className="flex-shrink mx-2 text-[10px] text-gray-400 font-bold uppercase">Or Set Custom PIN</span>
+              <div className="flex-grow border-t border-gray-200"></div>
+            </div>
+
+            {/* Custom PIN Form */}
+            <form onSubmit={handleSaveCustomPin} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                  New 4 to 6 Digit PIN
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={customPinInput}
+                  onChange={(e) => setCustomPinInput(e.target.value.replace(/\D/g, ''))}
+                  placeholder="e.g. 5829"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 font-mono text-sm font-bold text-gray-900 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingPinModal(false)}
+                  className="flex-1 py-2 rounded-xl text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPin || !customPinInput}
+                  className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-xs cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {isSavingPin ? 'Saving...' : 'Save PIN'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

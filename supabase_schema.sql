@@ -378,7 +378,7 @@ returns jsonb as $$
 declare
   v_profile record;
 begin
-  select id, full_name, phone_number, role, passbook_token, mpin
+  select id, full_name, phone_number, role, passbook_token, coalesce(mpin, '1234') as mpin
   into v_profile
   from public.profiles
   where passbook_token = p_token;
@@ -398,7 +398,9 @@ begin
       'fullName', v_profile.full_name,
       'phoneNumber', v_profile.phone_number,
       'role', v_profile.role,
-      'passbookToken', v_profile.passbook_token
+      'passbookToken', v_profile.passbook_token,
+      'mpin', v_profile.mpin,
+      'isDefaultPin', (v_profile.mpin = '1234')
     )
   );
 end;
@@ -610,7 +612,9 @@ begin
       'fullName', v_profile.full_name,
       'phoneNumber', v_profile.phone_number,
       'role', v_profile.role,
-      'passbookToken', v_profile.passbook_token
+      'passbookToken', v_profile.passbook_token,
+      'mpin', v_profile.mpin,
+      'isDefaultPin', (v_profile.mpin = '1234')
     )
   );
 end;
@@ -633,6 +637,8 @@ begin
     'role', p.role,
     'passbookToken', p.passbook_token,
     'passbookIssuedAt', p.passbook_issued_at,
+    'mpin', coalesce(p.mpin, '1234'),
+    'isDefaultPin', (coalesce(p.mpin, '1234') = '1234'),
     'rescheduleAcknowledgments', coalesce(p.reschedule_acknowledgments, '{}'::jsonb)
   )
   into v_profile
@@ -978,6 +984,116 @@ begin
   return jsonb_build_object('success', true);
 end;
 $$;
+
+-- ==========================================
+-- 11. MPIN Security & Management RPCs
+-- ==========================================
+
+-- Subscriber Self-Service MPIN Update
+create or replace function public.update_subscriber_mpin(
+  p_profile_id uuid,
+  p_old_mpin text,
+  p_new_mpin text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_current_mpin text;
+  v_clean_new text;
+  v_profile_name text;
+begin
+  v_clean_new := trim(p_new_mpin);
+  if length(v_clean_new) < 4 or length(v_clean_new) > 6 or v_clean_new !~ '^\d+$' then
+    return jsonb_build_object('success', false, 'error', 'PIN must be a 4 to 6 digit numeric code.');
+  end if;
+
+  select full_name, coalesce(mpin, '1234')
+  into v_profile_name, v_current_mpin
+  from public.profiles
+  where id = p_profile_id;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Subscriber profile not found.');
+  end if;
+
+  -- Validate old PIN if provided
+  if p_old_mpin is not null and trim(p_old_mpin) <> '' and trim(p_old_mpin) <> v_current_mpin then
+    return jsonb_build_object('success', false, 'error', 'Current PIN is incorrect.');
+  end if;
+
+  update public.profiles
+  set mpin = v_clean_new
+  where id = p_profile_id;
+
+  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
+  values (
+    p_profile_id,
+    'PIN UPDATED: Subscriber ' || coalesce(v_profile_name, p_profile_id::text) || ' updated their login PIN.',
+    'profiles',
+    now()
+  );
+
+  return jsonb_build_object(
+    'success', true,
+    'message', 'Security PIN updated successfully.',
+    'new_mpin', v_clean_new
+  );
+end;
+$$;
+
+-- Administrative MPIN Reset / Override
+create or replace function public.admin_update_member_mpin(
+  p_profile_id uuid,
+  p_new_mpin text,
+  p_admin_id uuid default auth.uid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_clean_new text;
+  v_member_name text;
+  v_member_phone text;
+begin
+  v_clean_new := trim(p_new_mpin);
+  if length(v_clean_new) < 4 or length(v_clean_new) > 6 or v_clean_new !~ '^\d+$' then
+    return jsonb_build_object('success', false, 'error', 'PIN must be a 4 to 6 digit numeric code.');
+  end if;
+
+  select full_name, phone_number
+  into v_member_name, v_member_phone
+  from public.profiles
+  where id = p_profile_id;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Member profile not found.');
+  end if;
+
+  update public.profiles
+  set mpin = v_clean_new
+  where id = p_profile_id;
+
+  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
+  values (
+    p_admin_id,
+    'ADMIN PIN OVERRIDE: PIN for subscriber ' || coalesce(v_member_name, 'Member') || ' (' || coalesce(v_member_phone, '') || ') set to "' || v_clean_new || '".',
+    'profiles',
+    now()
+  );
+
+  return jsonb_build_object(
+    'success', true,
+    'message', 'Member PIN successfully updated to ' || v_clean_new,
+    'new_mpin', v_clean_new
+  );
+end;
+$$;
+
 
 
 

@@ -41,7 +41,10 @@ import {
   RefreshCw,
   Unlink,
   AlertTriangle,
-  Lock
+  Lock,
+  Eye,
+  EyeOff,
+  KeyRound
 } from 'lucide-react';
 
 interface MemberGroupInfo {
@@ -80,6 +83,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
   const [customRoles, setCustomRoles] = useState<CustomRoleRecord[]>([]);
   const [allChitGroups, setAllChitGroups] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [showPins, setShowPins] = useState<boolean>(false);
 
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -991,9 +995,9 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
                     {/* Passbook QR Status Strip */}
                     <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-gray-150 text-xs" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <QrCode size={14} className={member.passbookToken ? 'text-indigo-600' : 'text-gray-400'} />
-                        <span className="font-bold text-gray-700 text-[11px]">Passbook QR:</span>
+                        <span className="font-bold text-gray-700 text-[11px]">Passbook:</span>
                         {member.passbookToken ? (
                           <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md flex items-center gap-1">
                             Linked 🟢
@@ -1003,6 +1007,14 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             Unlinked
                           </span>
                         )}
+
+                        <span className="text-[10px] font-mono font-bold bg-white border border-gray-200 px-1.5 py-0.5 rounded text-slate-700 flex items-center gap-0.5">
+                          <KeyRound size={9} className="text-indigo-500" />
+                          <span>{member.mpin || '1234'}</span>
+                          {(!member.mpin || member.mpin === '1234') && (
+                            <span className="text-[8px] font-bold text-amber-600 ml-0.5">(Def)</span>
+                          )}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -1119,6 +1131,19 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   <tr>
                     <th className="py-4 px-6">Member Profile</th>
                     <th className="py-4 px-5">Phone</th>
+                    <th className="py-4 px-5">
+                      <div className="flex items-center gap-1.5">
+                        <span>MPIN</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowPins(!showPins)}
+                          title={showPins ? 'Hide All PINs' : 'Show All PINs'}
+                          className="p-0.5 text-gray-400 hover:text-indigo-600 transition-colors"
+                        >
+                          {showPins ? <EyeOff size={12} /> : <Eye size={12} />}
+                        </button>
+                      </div>
+                    </th>
                     <th className="py-4 px-5">Passbook QR Key</th>
                     <th className="py-4 px-5">Enrolled Chits &amp; Tickets</th>
                     <th className="py-4 px-5">Notice Acks</th>
@@ -1129,7 +1154,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 <tbody className="divide-y divide-gray-100 text-gray-700">
                   {filteredMembers.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-14 text-center text-gray-400 text-xs">
+                      <td colSpan={8} className="py-14 text-center text-gray-400 text-xs">
                         No members found matching your search. Use &quot;Add Member&quot; to enroll new subscribers.
                       </td>
                     </tr>
@@ -1139,6 +1164,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                       const meta = getRoleMeta(member.role);
                       const isCurrentAdmin = member.id === currentAdminProfile?.id;
                       const cleanPhone = normalizePhoneDigits(member.phoneNumber);
+                      const isDefaultPin = !member.mpin || member.mpin === '1234';
 
                       return (
                         <tr
@@ -1193,6 +1219,24 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 >
                                   <Phone size={11} />
                                 </a>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Security PIN (MPIN) */}
+                          <td className="py-4 px-5 font-mono" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-800 text-[11px] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                {showPins ? (member.mpin || '1234') : '••••'}
+                              </span>
+                              {isDefaultPin ? (
+                                <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded">
+                                  Default
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded">
+                                  Custom
+                                </span>
                               )}
                             </div>
                           </td>
