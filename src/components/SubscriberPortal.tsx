@@ -52,6 +52,7 @@ interface EnrolledGroup {
   ticketNumber: number;
   hasWonRegular: boolean;
   physicalBookSynced: boolean;
+  customInstallment?: number | null;
   monthlyInstallment: number;
   auctionDayOfMonth?: number | null;
   auctionTime?: string | null;
@@ -154,7 +155,7 @@ function getGroupPaymentStatus(
   for (let m = 0; m <= effectiveCurrentMonth; m++) {
     const monthAuction = groupAuctions.find((a) => a.month === m);
     const isLaaba = !!monthAuction?.isLaabaSeetu;
-    const expectedDue = isLaaba ? 0 : grp.monthlyInstallment;
+    const expectedDue = isLaaba ? 0 : (grp.customInstallment || grp.monthlyInstallment);
 
     // Check transactions tagged with "Month <m>" or structured cycleMonth
     const monthPattern = new RegExp(`\\bMonth\\s+${m}\\b|\\bM${m}\\b`, 'i');

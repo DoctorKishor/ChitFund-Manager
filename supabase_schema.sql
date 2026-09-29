@@ -595,41 +595,13 @@ begin
   end if;
 
   v_expected_mpin := coalesce(v_profile.mpin, '1234');
-  if p_mpin <> v_expected_mpin and p_mpin <> '1234' then
-    return jsonb_build_object('success', false, 'error', 'Incorrect 4-digit PIN. Default PIN is 1234.');
+  if p_mpin <> v_expected_mpin then
+    return jsonb_build_object('success', false, 'error', 'Incorrect 4-digit PIN.');
   end if;
 
   update public.profiles
   set passbook_last_scanned_at = now()
   where id = v_profile.id;
-
-  return jsonb_build_object(
-    'success', true,
-    'user', jsonb_build_object(
-      'id', v_profile.id,
-      'fullName', v_profile.full_name,
-      'phoneNumber', v_profile.phone_number,
-      'role', v_profile.role,
-      'passbookToken', v_profile.passbook_token
-    )
-  );
-end;
-$$ language plpgsql security definer set search_path = public;
-
--- Restore a subscriber session by their profile ID
-create or replace function public.authenticate_by_subscriber_id(p_id uuid)
-returns jsonb as $$
-declare
-  v_profile record;
-begin
-  select id, full_name, phone_number, role, passbook_token
-  into v_profile
-  from public.profiles
-  where id = p_id;
-
-  if not found then
-    return jsonb_build_object('success', false, 'error', 'Profile not found.');
-  end if;
 
   return jsonb_build_object(
     'success', true,
@@ -684,8 +656,9 @@ begin
     'startDate', cg.start_date,
     'ticketNumber', gm.ticket_number,
     'hasWonRegular', gm.has_won_regular,
+    'customInstallment', gm.custom_installment,
     'physicalBookSynced', coalesce(gm.physical_book_synced, false),
-    'monthlyInstallment', (cg.total_value / cg.member_count),
+    'monthlyInstallment', coalesce(gm.custom_installment, (cg.total_value / cg.member_count)),
     'auctionDayOfMonth', cg.auction_day_of_month,
     'auctionTime', cg.auction_time,
     'nextAuctionDate', cg.next_auction_date,
@@ -799,19 +772,25 @@ on conflict (key) do nothing;
 -- ==========================================
 -- 9. Secure Test Database Reset / Purge RPC
 -- ==========================================
-create or replace function public.reset_test_database(caller_id uuid default auth.uid())
+create or replace function public.reset_test_database()
 returns jsonb
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
+  v_caller_id uuid;
   caller_role text;
   result jsonb;
 begin
-  -- 1. Security Check: Only admins can invoke this database reset
-  select role into caller_role from public.profiles where id = caller_id;
-  if caller_role != 'admin' then
+  -- 1. Security Check: Only authenticated admins can invoke this database reset
+  v_caller_id := auth.uid();
+  if v_caller_id is null then
+    raise exception 'Unauthorized: Authentication session required.';
+  end if;
+
+  select role into caller_role from public.profiles where id = v_caller_id;
+  if caller_role is distinct from 'admin' then
     raise exception 'Unauthorized: Only an administrator can execute a database reset.';
   end if;
 
@@ -835,22 +814,22 @@ begin
   update public.global_treasury 
   set current_balance = 0, 
       pending_verification_balance = 0,
-      last_updated_by = caller_id;
+      last_updated_by = v_caller_id;
 
   -- Ensure all 4 default vaults exist in case any was missing
   insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
   values 
-    ('cash_in_hand', 0, 0, caller_id),
-    ('kishor_bank', 0, 0, caller_id),
-    ('dad_bank', 0, 0, caller_id),
-    ('mom_bank', 0, 0, caller_id)
+    ('cash_in_hand', 0, 0, v_caller_id),
+    ('kishor_bank', 0, 0, v_caller_id),
+    ('dad_bank', 0, 0, v_caller_id),
+    ('mom_bank', 0, 0, v_caller_id)
   on conflict (wallet_type) do update 
   set current_balance = 0, pending_verification_balance = 0;
 
   -- 7. Reset audit logs and record the purge event
   delete from public.security_audit_logs;
   insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
-  values (caller_id, 'SYSTEM RESET: Full test database cleared. All chit groups, transactions, auctions, and test members wiped.', 'all', timezone('utc'::text, now()));
+  values (v_caller_id, 'SYSTEM RESET: Full test database cleared. All chit groups, transactions, auctions, and test members wiped.', 'all', timezone('utc'::text, now()));
 
   result := jsonb_build_object(
     'success', true,

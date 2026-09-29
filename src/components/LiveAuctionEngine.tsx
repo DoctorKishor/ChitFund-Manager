@@ -705,13 +705,25 @@ export default function LiveAuctionEngine() {
           console.error('Error saving bids to localStorage:', err);
         }
       }
-      // Broadcast live bid stream to Supabase for all subscribers in real time
+      // Broadcast live bid stream atomically to Supabase for all subscribers in real time
       supabase
-        .from('chit_groups')
-        .update({ live_bid_stream: updated[selectedGroupId] })
-        .eq('id', selectedGroupId)
-        .then(({ error }) => {
-          if (error) console.error('Error syncing live_bid_stream:', error);
+        .rpc('append_live_bid', {
+          p_group_id: selectedGroupId,
+          p_bid: [newBid],
+        })
+        .then(({ data: rpcData, error: rpcErr }) => {
+          if (rpcErr) {
+            console.warn('append_live_bid RPC error, falling back to direct update:', rpcErr.message);
+            supabase
+              .from('chit_groups')
+              .update({ live_bid_stream: updated[selectedGroupId] })
+              .eq('id', selectedGroupId);
+          } else if (rpcData?.live_bid_stream) {
+            setGroupBidsMap(p => ({
+              ...p,
+              [selectedGroupId]: rpcData.live_bid_stream,
+            }));
+          }
         });
 
       return updated;
@@ -880,7 +892,7 @@ export default function LiveAuctionEngine() {
 
     const recordedMonth = group.currentMonth;
     const nextMonth = Math.min(group.durationMonths, group.currentMonth + 1);
-    const isCompleting = nextMonth >= group.durationMonths && group.currentMonth === group.durationMonths;
+    const isCompleting = nextMonth >= group.durationMonths;
     const nextPool = isLaabaSeetuActive 
       ? Math.max(0, group.kai_iruppu_pool - group.totalValue) + highestBid 
       : group.kai_iruppu_pool + highestBid;

@@ -29,7 +29,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PASSBOOK_SESSION_KEY = 'cf_passbook_token_session';
-const SUBSCRIBER_SESSION_KEY = 'cf_subscriber_session_id';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -127,7 +126,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Persist in localStorage for refresh persistence
       if (typeof window !== 'undefined') {
         localStorage.setItem(PASSBOOK_SESSION_KEY, cleanToken);
-        localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
       }
 
       return { success: true };
@@ -175,7 +173,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
 
       if (typeof window !== 'undefined') {
-        localStorage.setItem(SUBSCRIBER_SESSION_KEY, data.user.id);
         if (data.user.passbookToken) {
           localStorage.setItem(PASSBOOK_SESSION_KEY, data.user.passbookToken);
         }
@@ -194,17 +191,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await fetchProfile(user.id, user.email);
     } else if (profile?.passbookToken) {
       await loginWithPassbookToken(profile.passbookToken);
-    } else if (profile?.id) {
-      const { data } = await supabase.rpc('authenticate_by_subscriber_id', { p_id: profile.id });
-      if (data?.success && data?.user) {
-        setProfile({
-          id: data.user.id,
-          fullName: data.user.fullName || 'Subscriber',
-          phoneNumber: data.user.phoneNumber || '',
-          role: (data.user.role as UserRole) || 'subscriber',
-          passbookToken: data.user.passbookToken || undefined,
-        });
-      }
     }
   };
 
@@ -222,7 +208,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Clear any stale subscriber tokens from localStorage
           if (typeof window !== 'undefined') {
             localStorage.removeItem(PASSBOOK_SESSION_KEY);
-            localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
           }
           setUser(session.user);
           await fetchProfile(session.user.id, session.user.email);
@@ -242,29 +227,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               return;
             } else if (typeof window !== 'undefined') {
               localStorage.removeItem(PASSBOOK_SESSION_KEY);
-            }
-          }
-
-          // 3. Check Direct Subscriber Session ID in localStorage
-          const savedSubscriberId = localStorage.getItem(SUBSCRIBER_SESSION_KEY);
-          if (savedSubscriberId) {
-            const { data, error } = await supabase.rpc('authenticate_by_subscriber_id', {
-              p_id: savedSubscriberId,
-            });
-            if (!error && data?.success && data?.user && isMounted) {
-              setProfile({
-                id: data.user.id,
-                fullName: data.user.fullName || 'Subscriber',
-                phoneNumber: data.user.phoneNumber || '',
-                role: (data.user.role as UserRole) || 'subscriber',
-                passbookToken: data.user.passbookToken || undefined,
-              });
-              setUser(null);
-              initialAuthDone = true;
-              setLoading(false);
-              return;
-            } else if (typeof window !== 'undefined') {
-              localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
             }
           }
         }
@@ -296,13 +258,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session?.user) {
         if (typeof window !== 'undefined') {
           localStorage.removeItem(PASSBOOK_SESSION_KEY);
-          localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
         }
         setUser(session.user);
         await fetchProfile(session.user.id, session.user.email);
         setLoading(false);
       } else if (event === 'SIGNED_OUT') {
-        if (typeof window !== 'undefined' && !localStorage.getItem(PASSBOOK_SESSION_KEY) && !localStorage.getItem(SUBSCRIBER_SESSION_KEY)) {
+        if (typeof window !== 'undefined' && !localStorage.getItem(PASSBOOK_SESSION_KEY)) {
           setUser(null);
           setProfile(null);
           setLoading(false);
@@ -319,7 +280,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(PASSBOOK_SESSION_KEY);
-      localStorage.removeItem(SUBSCRIBER_SESSION_KEY);
     }
     await supabase.auth.signOut();
     setUser(null);

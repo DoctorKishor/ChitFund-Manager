@@ -577,10 +577,10 @@ export default function CashVaultLedger() {
             (selectedWalletFilter === 'mom_bank' && notes.includes('mom'))
           )) ||
           (tx.type === 'transfer' && (
-            (selectedWalletFilter === 'kishor_bank' && notes.includes('kishor')) ||
-            (selectedWalletFilter === 'dad_bank' && notes.includes('dad')) ||
-            (selectedWalletFilter === 'mom_bank' && notes.includes('mom')) ||
-            (selectedWalletFilter === 'cash_in_hand' && notes.includes('cash'))
+            (selectedWalletFilter === 'kishor_bank' && (notes.includes('kishor') || tx.wallet_type === 'kishor_bank')) ||
+            (selectedWalletFilter === 'dad_bank' && (notes.includes('dad') || notes.includes('anbazhakan') || tx.wallet_type === 'dad_bank')) ||
+            (selectedWalletFilter === 'mom_bank' && (notes.includes('mom') || notes.includes('parimalam') || tx.wallet_type === 'mom_bank')) ||
+            (selectedWalletFilter === 'cash_in_hand' && (notes.includes('cash') || tx.wallet_type === 'cash_in_hand'))
           ));
       }
 
@@ -880,9 +880,10 @@ export default function CashVaultLedger() {
       await updateBalance(transferSource, -amount);
       await updateBalance(transferDest, amount);
 
-      const notes = transferNotes.trim() 
-        ? `Transfer: ${transferNotes.trim()} (${WALLET_META[transferSource].name} -> ${WALLET_META[transferDest].name})`
-        : `Inter-Vault Transfer from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name}`;
+      const userNotes = transferNotes.trim();
+      const notes = userNotes 
+        ? `[Transfer: ${transferSource} -> ${transferDest}] ${userNotes} (${WALLET_META[transferSource].name} -> ${WALLET_META[transferDest].name})`
+        : `[Transfer: ${transferSource} -> ${transferDest}] Inter-Vault Transfer from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name}`;
 
       await supabase.from('transactions').insert([
         {
