@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy": "npx wrangler deploy"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
