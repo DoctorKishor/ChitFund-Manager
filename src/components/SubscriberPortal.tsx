@@ -603,7 +603,10 @@ export default function SubscriberPortal() {
               })
             );
           }
-          loadSubscriberData(true);
+          // Only trigger full data reload if structural parameters changed (month advanced, status completed, etc.)
+          if (payload.new && payload.old && (payload.new.current_month !== payload.old.current_month || payload.new.status !== payload.old.status)) {
+            loadSubscriberData(true);
+          }
         }
       )
       .on(

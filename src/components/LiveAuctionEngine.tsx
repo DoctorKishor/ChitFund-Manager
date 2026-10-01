@@ -51,6 +51,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { exportAuctionReportPdf, shareAuctionReportToWhatsApp } from '@/utils/auctionPdfExporter';
 import AuctionReportDocument, { AuctionReportData } from '@/components/AuctionReportDocument';
+import LiveViewersModal, { ActiveViewerInfo } from '@/components/LiveViewersModal';
 
 interface Member {
   id: string;
@@ -186,6 +187,9 @@ export default function LiveAuctionEngine() {
   const [stage, setStage] = useState<'overview' | 'studio'>('overview');
   const [isStartingLiveSession, setIsStartingLiveSession] = useState<boolean>(false);
   const [liveViewerCount, setLiveViewerCount] = useState<number>(0);
+  const [activeViewers, setActiveViewers] = useState<ActiveViewerInfo[]>([]);
+  const [showViewersModal, setShowViewersModal] = useState<boolean>(false);
+  const presenceChannelRef = useRef<any>(null);
 
   // Auction date override & schedule modal
   const [auctionDateOverride, setAuctionDateOverride] = useState<string | null>(null);
@@ -414,6 +418,7 @@ export default function LiveAuctionEngine() {
   useEffect(() => {
     if (!selectedGroupId || stage !== 'studio') {
       setLiveViewerCount(0);
+      setActiveViewers([]);
       return;
     }
 
@@ -422,22 +427,51 @@ export default function LiveAuctionEngine() {
         presence: {
           key: `admin_${selectedGroupId}`,
         },
+        broadcast: {
+          self: false,
+        },
       },
     });
+    presenceChannelRef.current = presenceChannel;
 
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState();
-        let subscriberViewers = 0;
+        const viewersList: ActiveViewerInfo[] = [];
+        const seenKeys = new Set<string>();
+
         Object.keys(state).forEach((key) => {
           const presences = (state[key] || []) as any[];
-          // Exclude admin key
-          const isSubscriber = presences.some((p) => p.role !== 'admin' && !key.startsWith('admin_'));
-          if (isSubscriber) {
-            subscriberViewers += 1;
-          }
+          presences.forEach((p: any) => {
+            const isSubscriber = p.role !== 'admin' && !key.startsWith('admin_');
+            if (isSubscriber) {
+              const uniqueKey = p.ticket_number ? `ticket-${p.ticket_number}` : (p.profile_id || key);
+              if (!seenKeys.has(uniqueKey)) {
+                seenKeys.add(uniqueKey);
+                // Look up matching member in current group members
+                const matchedMember = members.find(
+                  (m) => (p.ticket_number && m.ticketNumber === p.ticket_number) || 
+                         (p.profile_id && m.profileId === p.profile_id)
+                );
+
+                viewersList.push({
+                  key: uniqueKey,
+                  fullName: matchedMember?.fullName || p.name || `Subscriber (Ticket #${p.ticket_number || '?'})`,
+                  ticketNumber: matchedMember?.ticketNumber ?? p.ticket_number ?? null,
+                  profileId: matchedMember?.profileId || p.profile_id,
+                  hasWonRegular: matchedMember?.hasWonRegular ?? p.has_won_regular ?? false,
+                  joinedAt: p.joined_at,
+                  role: p.role || 'subscriber',
+                });
+              }
+            }
+          });
         });
-        setLiveViewerCount(subscriberViewers);
+
+        // Sort by ticket number
+        viewersList.sort((a, b) => (a.ticketNumber || 999) - (b.ticketNumber || 999));
+        setActiveViewers(viewersList);
+        setLiveViewerCount(viewersList.length);
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -449,9 +483,10 @@ export default function LiveAuctionEngine() {
       });
 
     return () => {
+      presenceChannelRef.current = null;
       supabase.removeChannel(presenceChannel);
     };
-  }, [selectedGroupId, stage]);
+  }, [selectedGroupId, stage, members]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -705,7 +740,22 @@ export default function LiveAuctionEngine() {
           console.error('Error saving bids to localStorage:', err);
         }
       }
-      // Broadcast live bid stream atomically to Supabase for all subscribers in real time
+      // 1. Instantaneous WebSocket broadcast (<20ms latency to all subscriber live floor arenas)
+      try {
+        presenceChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'new_bid',
+          payload: {
+            bid: newBid,
+            bids: updated[selectedGroupId],
+            groupId: selectedGroupId,
+          },
+        });
+      } catch (err) {
+        console.warn('Broadcast send error:', err);
+      }
+
+      // 2. Persist to PostgreSQL database asynchronously in background
       supabase
         .rpc('append_live_bid', {
           p_group_id: selectedGroupId,
@@ -756,7 +806,21 @@ export default function LiveAuctionEngine() {
           console.error('Error saving bids to localStorage:', err);
         }
       }
-      // Broadcast undo to Supabase
+      // 1. Instantaneous WebSocket broadcast of undo action
+      try {
+        presenceChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'bids_sync',
+          payload: {
+            bids: updatedStream,
+            groupId: selectedGroupId,
+          },
+        });
+      } catch (err) {
+        console.warn('Broadcast send error:', err);
+      }
+
+      // 2. Persist undo to database
       supabase
         .from('chit_groups')
         .update({ live_bid_stream: updatedStream })
@@ -1022,6 +1086,25 @@ export default function LiveAuctionEngine() {
         await fetchGroupDetails(group.id);
       }
 
+      // Broadcast auction conclusion event instantly over WebSockets
+      try {
+        presenceChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'session_state',
+          payload: {
+            groupId: group.id,
+            isLiveAuctionActive: false,
+            concluded: true,
+            winnerName: winnerName,
+            winnerTicket: winnerTicket,
+            highestBid: highestBid,
+            netPayout: netPayout,
+          },
+        });
+      } catch (err) {
+        console.warn('Broadcast error:', err);
+      }
+
       setConcludedReportData(concludedReport);
       setShowConcludedReportScreen(true);
       setShowCloseModal(false);
@@ -1067,6 +1150,23 @@ export default function LiveAuctionEngine() {
       });
 
       const startedAt = new Date().toISOString();
+      
+      // Instant broadcast of live session start
+      try {
+        presenceChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'session_state',
+          payload: {
+            groupId: group.id,
+            isLiveAuctionActive: true,
+            liveAuctionStartedAt: startedAt,
+            bids: currentSessionBids,
+          },
+        });
+      } catch (err) {
+        console.warn('Broadcast error:', err);
+      }
+
       setGroup(prev => prev ? ({ ...prev, is_live_auction_active: true, live_auction_started_at: startedAt }) : null);
       setAllGroups(prev => prev.map(g => g.id === group.id ? { ...g, is_live_auction_active: true, live_auction_started_at: startedAt } : g));
     } catch (err: any) {
@@ -1092,6 +1192,20 @@ export default function LiveAuctionEngine() {
           live_auction_started_at: null,
         })
         .eq('id', group.id);
+
+      // Instant broadcast of live session end
+      try {
+        presenceChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'session_state',
+          payload: {
+            groupId: group.id,
+            isLiveAuctionActive: false,
+          },
+        });
+      } catch (err) {
+        console.warn('Broadcast error:', err);
+      }
 
       setGroup(prev => prev ? ({ ...prev, is_live_auction_active: false, live_auction_started_at: null }) : null);
       setAllGroups(prev => prev.map(g => g.id === group.id ? { ...g, is_live_auction_active: false, live_auction_started_at: null } : g));
@@ -1693,25 +1807,30 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             </span>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {group.is_live_auction_active ? (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-500 text-white flex items-center gap-1 shadow-xs animate-pulse">
                   <Flame size={10} /> Live
                 </span>
 
-                {/* Real-Time Live Viewer Counter Badge */}
-                <span 
-                  className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold border transition-all ${
+                {/* Real-Time Live Viewer Counter Badge (Interactive Click to View Room List) */}
+                <button
+                  type="button"
+                  onClick={() => setShowViewersModal(true)}
+                  className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-extrabold border transition-all cursor-pointer hover:scale-105 active:scale-95 ${
                     liveViewerCount > 0 
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-xs' 
-                      : 'bg-gray-100 text-gray-500 border-gray-200'
+                      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 shadow-xs ring-1 ring-emerald-400/30' 
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-500 border-gray-200'
                   }`}
-                  title={`${liveViewerCount} active subscriber${liveViewerCount === 1 ? '' : 's'} viewing this live auction`}
+                  title="Click to see list of active live viewers"
                 >
-                  <Eye size={11} className={liveViewerCount > 0 ? 'text-emerald-600' : 'text-gray-400'} />
+                  <Eye size={12} className={liveViewerCount > 0 ? 'text-emerald-600 animate-pulse' : 'text-gray-400'} />
                   <span className="font-mono">{liveViewerCount}</span>
-                </span>
+                  <span className="hidden sm:inline font-sans text-[9px] text-emerald-600 font-bold">
+                    {liveViewerCount === 1 ? 'viewer' : 'viewers'}
+                  </span>
+                </button>
               </div>
             ) : (
               <span className="text-[9px] sm:text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-mono">
@@ -2644,6 +2763,17 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
 
       {/* ── HISTORICAL AUCTION RECORD DETAILS MODAL ─────────────────────────── */}
       {renderHistoricalModal()}
+
+      {/* ── LIVE VIEWERS MODAL ─────────────────────────────────────────────── */}
+      <LiveViewersModal
+        isOpen={showViewersModal}
+        onClose={() => setShowViewersModal(false)}
+        viewers={activeViewers}
+        totalMembers={group?.memberCount || 20}
+        groupName={group?.name}
+        month={group?.currentMonth}
+        isDark={false}
+      />
 
     </div>
   );
