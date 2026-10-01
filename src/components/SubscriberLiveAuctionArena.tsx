@@ -32,7 +32,6 @@ import {
 } from 'lucide-react';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import ConfettiEffect from '@/components/ConfettiEffect';
-import LiveViewersModal, { ActiveViewerInfo } from '@/components/LiveViewersModal';
 
 export interface LiveBidItem {
   id: string;
@@ -83,8 +82,9 @@ export default function SubscriberLiveAuctionArena({
   const [activeSubTab, setActiveSubTab] = useState<'ranking' | 'feed'>('ranking');
   const [newBidAnimationId, setNewBidAnimationId] = useState<string | null>(null);
   const [viewerCount, setViewerCount] = useState<number>(1);
-  const [activeViewers, setActiveViewers] = useState<ActiveViewerInfo[]>([]);
-  const [showViewersModal, setShowViewersModal] = useState<boolean>(false);
+  const [sessionStatus, setSessionStatus] = useState<'active' | 'paused' | 'concluded'>(() => {
+    return group.isLiveAuctionActive ? 'active' : 'paused';
+  });
   const [liveBids, setLiveBids] = useState<LiveBidItem[]>(() => {
     return Array.isArray(group.liveBidStream) ? group.liveBidStream : [];
   });
@@ -106,6 +106,9 @@ export default function SubscriberLiveAuctionArena({
   useEffect(() => {
     if (group.isLiveAuctionActive !== undefined) {
       setIsLiveActiveLocally(group.isLiveAuctionActive);
+      if (group.isLiveAuctionActive) {
+        setSessionStatus('active');
+      }
     }
   }, [group.isLiveAuctionActive]);
 
@@ -150,11 +153,20 @@ export default function SubscriberLiveAuctionArena({
         }
       })
       .on('broadcast', { event: 'session_state' }, (payload: any) => {
-        if (payload.payload?.isLiveAuctionActive !== undefined) {
-          setIsLiveActiveLocally(payload.payload.isLiveAuctionActive);
+        const p = payload.payload;
+        if (!p) return;
+        if (p.status === 'concluded' || p.concluded === true) {
+          setSessionStatus('concluded');
+          setIsLiveActiveLocally(false);
+        } else if (p.status === 'paused' || p.isLiveAuctionActive === false) {
+          setSessionStatus('paused');
+          setIsLiveActiveLocally(false);
+        } else if (p.isLiveAuctionActive === true) {
+          setSessionStatus('active');
+          setIsLiveActiveLocally(true);
         }
-        if (Array.isArray(payload.payload?.bids)) {
-          setLiveBids(payload.payload.bids);
+        if (Array.isArray(p.bids)) {
+          setLiveBids(p.bids);
         }
       })
       .on(
@@ -166,6 +178,15 @@ export default function SubscriberLiveAuctionArena({
           }
           if (payload.new?.is_live_auction_active !== undefined) {
             setIsLiveActiveLocally(payload.new.is_live_auction_active);
+            if (payload.new.is_live_auction_active) {
+              setSessionStatus('active');
+            } else {
+              if (payload.new.current_month > group.currentMonth || payload.new.status === 'completed') {
+                setSessionStatus('concluded');
+              } else {
+                setSessionStatus('paused');
+              }
+            }
           }
         }
       )
@@ -173,40 +194,15 @@ export default function SubscriberLiveAuctionArena({
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState();
-        const viewersList: ActiveViewerInfo[] = [];
-        const seenKeys = new Set<string>();
-
+        let subscriberViewers = 0;
         Object.keys(state).forEach((key) => {
           const presences = (state[key] || []) as any[];
-          presences.forEach((p: any) => {
-            const isSubscriber = p.role !== 'admin' && !key.startsWith('admin_');
-            if (isSubscriber) {
-              const uniqueKey = p.ticket_number ? `ticket-${p.ticket_number}` : (p.profile_id || key);
-              if (!seenKeys.has(uniqueKey)) {
-                seenKeys.add(uniqueKey);
-                // Look up matching member in group.members
-                const matchedMember = group.members?.find(
-                  (m) => (p.ticket_number && m.ticketNumber === p.ticket_number) ||
-                         (p.profile_id && m.profileId === p.profile_id)
-                );
-
-                viewersList.push({
-                  key: uniqueKey,
-                  fullName: matchedMember?.fullName || p.name || `Subscriber (Ticket #${p.ticket_number || '?'})`,
-                  ticketNumber: matchedMember?.ticketNumber ?? p.ticket_number ?? null,
-                  profileId: matchedMember?.profileId || p.profile_id,
-                  hasWonRegular: matchedMember?.hasWonRegular ?? p.has_won_regular ?? false,
-                  joinedAt: p.joined_at,
-                  role: p.role || 'subscriber',
-                });
-              }
-            }
-          });
+          const isSubscriber = presences.some((p) => p.role !== 'admin' && !key.startsWith('admin_'));
+          if (isSubscriber) {
+            subscriberViewers += 1;
+          }
         });
-
-        viewersList.sort((a, b) => (a.ticketNumber || 999) - (b.ticketNumber || 999));
-        setActiveViewers(viewersList);
-        setViewerCount(Math.max(1, viewersList.length));
+        setViewerCount(Math.max(1, subscriberViewers));
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -384,8 +380,93 @@ export default function SubscriberLiveAuctionArena({
 
   return (
     <div className="space-y-3 sm:space-y-4 animate-in fade-in duration-200">
-      {/* ── BROADCAST ENDED RICH SUMMARY & CELEBRATION OVERLAY ── */}
-      {(!isLiveActiveLocally || group.isLiveAuctionActive === false) && (
+      
+      {/* ── 1. SESSION PAUSED / STANDBY OVERLAY (When Admin Clicks "End Live" without Closing) ── */}
+      {sessionStatus === 'paused' && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className={`w-full max-w-md border rounded-3xl p-5 sm:p-6 shadow-2xl text-center space-y-4 my-auto animate-in zoom-in-95 duration-200 ${
+            isDark ? 'bg-slate-900 border-slate-700/80 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            <div className={`w-14 h-14 mx-auto rounded-2xl flex items-center justify-center border shadow-xs ${
+              isDark ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-amber-50 border-amber-300 text-amber-600'
+            }`}>
+              <Radio size={28} className="animate-pulse" />
+            </div>
+
+            <div>
+              <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                isDark ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'bg-amber-100 text-amber-800 border-amber-200'
+              }`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                Live Broadcast Paused
+              </span>
+              <h3 className="text-base sm:text-lg font-black mt-2">Live Session on Standby</h3>
+              <p className={`text-xs mt-1 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                The administrator has paused the live telecast for <strong>{group.groupName}</strong>. All logged bids remain securely saved.
+              </p>
+            </div>
+
+            {/* Current Top Bid Snapshot */}
+            {highestBid > 0 && topBidObj ? (
+              <div className={`p-3.5 rounded-2xl border text-left space-y-1.5 text-xs ${
+                isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div className="flex justify-between items-center">
+                  <span className={isDark ? 'text-slate-400 font-medium' : 'text-slate-500 font-medium'}>Leading Bid So Far:</span>
+                  <span className="font-mono font-bold text-rose-500 dark:text-rose-400">
+                    -{formatCurrency(highestBid)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className={isDark ? 'text-slate-400 font-medium' : 'text-slate-500 font-medium'}>Top Bidder:</span>
+                  <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                    {topBidObj.memberName} (#{topBidObj.ticketNumber})
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className={`p-3 rounded-2xl border text-xs text-left ${
+                isDark ? 'bg-slate-950/50 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'
+              }`}>
+                No bids were recorded prior to pausing.
+              </div>
+            )}
+
+            <div className={`p-3 rounded-2xl border text-xs text-left flex items-start gap-2 ${
+              isDark ? 'bg-slate-950/40 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'
+            }`}>
+              <Info size={15} className="text-amber-400 shrink-0 mt-0.5" />
+              <span>You may stay on this floor waiting for resumption, or return to the auction tab.</span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setSessionStatus('active')}
+                className={`flex-1 py-3 rounded-2xl text-xs sm:text-sm font-bold border transition-all cursor-pointer active:scale-95 ${
+                  isDark 
+                    ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200' 
+                    : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
+                }`}
+              >
+                Stay on Floor
+              </button>
+
+              <button
+                type="button"
+                onClick={onExit}
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-xs sm:text-sm shadow-md cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <LogOut size={15} />
+                <span>Exit to History</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 2. AUCTION CONCLUDED & WINNER SEALED OVERLAY (When Admin Clicks "Close Auction") ── */}
+      {sessionStatus === 'concluded' && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
           
           {/* VARIANT A: CURRENT SUBSCRIBER WON THE AUCTION */}
@@ -393,52 +474,56 @@ export default function SubscriberLiveAuctionArena({
             <div className="w-full max-w-lg space-y-4 my-auto animate-in zoom-in-95 duration-200">
               <ConfettiEffect durationMs={8000} particleCount={150} />
               
-              <div className={`relative overflow-hidden p-5 sm:p-7 rounded-3xl border shadow-2xl text-center space-y-4 sm:space-y-5 ${
+              <div className={`relative overflow-hidden p-5 sm:p-7 rounded-3xl border-2 shadow-2xl text-center space-y-4 sm:space-y-5 ${
                 isDark
-                  ? 'bg-gradient-to-b from-amber-950/70 via-slate-900 to-slate-950 border-amber-500/50 text-white'
-                  : 'bg-gradient-to-b from-amber-50 via-white to-white border-amber-400 text-slate-900'
+                  ? 'bg-gradient-to-b from-amber-950/80 via-slate-900 to-slate-950 border-amber-500/60 text-white shadow-amber-900/30'
+                  : 'bg-gradient-to-b from-amber-50/90 via-white to-white border-amber-400 text-slate-900 shadow-amber-900/10'
               }`}>
                 {/* Decorative radial glow */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
                 <div className="relative">
                   <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-3xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-950 flex items-center justify-center shadow-xl shadow-amber-500/30 animate-bounce">
-                    <Trophy size={36} className="sm:w-10 sm:h-10" />
+                    <Trophy size={36} className="sm:w-10 sm:h-10 text-slate-950" />
                   </div>
                   
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-500 dark:text-amber-300 text-[10px] sm:text-xs font-black uppercase tracking-wider mt-3">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider mt-3 border ${
+                    isDark 
+                      ? 'bg-amber-400/20 border-amber-400/40 text-amber-300' 
+                      : 'bg-amber-100 border-amber-300 text-amber-800'
+                  }`}>
                     <Sparkles size={13} /> Official Auction Winner
                   </span>
                   
-                  <h3 className="text-xl sm:text-3xl font-black mt-2 tracking-tight">
+                  <h3 className={`text-xl sm:text-3xl font-black mt-2 tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                     🎉 CONGRATULATIONS!
                   </h3>
-                  <p className="text-xs sm:text-sm font-extrabold text-amber-600 dark:text-amber-200 mt-1">
+                  <p className={`text-xs sm:text-sm font-extrabold mt-1 ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
                     You won the Month {group.currentMonth} auction!
                   </p>
-                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                  <p className={`text-[11px] font-mono mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                     Ticket #{group.ticketNumber} · {group.groupName}
                   </p>
                 </div>
 
                 {/* Net Take-Home Prize Pot Highlight Card */}
                 <div className={`p-4 sm:p-5 rounded-2xl border text-left space-y-3 ${
-                  isDark ? 'bg-slate-950/90 border-amber-500/30 shadow-inner' : 'bg-amber-50/70 border-amber-300/80 shadow-xs'
+                  isDark ? 'bg-slate-950/90 border-amber-500/30 shadow-inner' : 'bg-amber-50/70 border-amber-200 shadow-xs'
                 }`}>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-400 font-medium">Total Chit Pot:</span>
-                    <span className="font-bold font-mono text-slate-300 dark:text-slate-200">{formatCurrency(group.totalValue)}</span>
+                    <span className={isDark ? 'text-slate-400 font-medium' : 'text-slate-600 font-medium'}>Total Chit Pot:</span>
+                    <span className={`font-bold font-mono ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{formatCurrency(group.totalValue)}</span>
                   </div>
                   
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-400 font-medium">Your Winning Discount Bid:</span>
+                    <span className={isDark ? 'text-slate-400 font-medium' : 'text-slate-600 font-medium'}>Your Winning Discount Bid:</span>
                     <span className="font-mono font-bold text-rose-500 dark:text-rose-400">-{formatCurrency(highestBid)}</span>
                   </div>
 
                   <div className={`pt-3 border-t flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 ${
                     isDark ? 'border-slate-800' : 'border-amber-200'
                   }`}>
-                    <span className="text-xs font-black uppercase tracking-wider text-amber-500 dark:text-amber-300">
+                    <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
                       Your Net Take-Home Pot:
                     </span>
                     <span className="text-2xl sm:text-3xl font-mono font-black text-emerald-600 dark:text-emerald-400">
@@ -451,7 +536,7 @@ export default function SubscriberLiveAuctionArena({
                 <div className={`p-3.5 rounded-2xl border text-left flex items-start gap-2.5 text-xs ${
                   isDark 
                     ? 'bg-amber-500/10 border-amber-500/20 text-amber-200' 
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-900'
                 }`}>
                   <ShieldCheck size={18} className="text-amber-400 shrink-0 mt-0.5" />
                   <span className="leading-relaxed">
@@ -481,7 +566,7 @@ export default function SubscriberLiveAuctionArena({
                     className={`flex-1 py-3 sm:py-3.5 rounded-2xl font-bold text-xs sm:text-sm border cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2 ${
                       isDark 
                         ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-white' 
-                        : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
+                        : 'bg-slate-900 hover:bg-black border-slate-900 text-white'
                     }`}
                   >
                     <LogOut size={15} />
@@ -493,18 +578,22 @@ export default function SubscriberLiveAuctionArena({
           ) : (
             /* VARIANT B & C: SOMEONE ELSE WON */
             <div className={`w-full max-w-md border rounded-3xl p-5 sm:p-6 shadow-2xl text-center space-y-4 my-auto animate-in zoom-in-95 duration-200 ${
-              isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+              isDark ? 'bg-slate-900 border-slate-700/80 text-white' : 'bg-white border-slate-200 text-slate-900'
             }`}>
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center">
-                <Trophy size={28} className="text-amber-400" />
+              <div className={`w-14 h-14 mx-auto rounded-2xl border flex items-center justify-center ${
+                isDark ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400' : 'bg-indigo-50 border-indigo-200 text-indigo-700'
+              }`}>
+                <Trophy size={28} className="text-amber-500" />
               </div>
 
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                  isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-200'
+                }`}>
                   Month {group.currentMonth} Concluded
                 </span>
-                <h3 className="text-lg font-black mt-2">Live Auction Has Ended</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <h3 className={`text-lg font-black mt-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Live Auction Has Ended</h3>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   The bidding round for {group.groupName} has been sealed.
                 </p>
               </div>
@@ -512,19 +601,19 @@ export default function SubscriberLiveAuctionArena({
               {/* Winner Summary Card */}
               {topBidObj ? (
                 <div className={`p-3.5 rounded-2xl border text-left space-y-2 text-xs ${
-                  isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'
+                  isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
                 }`}>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400 font-medium">Round Winner:</span>
-                    <span className="font-bold flex items-center gap-1 text-slate-200 dark:text-slate-100">
-                      <Trophy size={12} className="text-amber-400 shrink-0" />
+                    <span className={isDark ? 'text-slate-400 font-medium' : 'text-slate-600 font-medium'}>Round Winner:</span>
+                    <span className={`font-bold flex items-center gap-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                      <Trophy size={12} className="text-amber-500 shrink-0" />
                       <span className="truncate">{topBidObj.memberName}</span>
-                      <span className="text-slate-400 font-mono">(#{topBidObj.ticketNumber})</span>
+                      <span className={isDark ? 'text-slate-400 font-mono' : 'text-slate-500 font-mono'}>(#{topBidObj.ticketNumber})</span>
                     </span>
                   </div>
                   
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400 font-medium">Winning Discount:</span>
+                    <span className={isDark ? 'text-slate-400 font-medium' : 'text-slate-600 font-medium'}>Winning Discount:</span>
                     <span className="font-mono font-bold text-rose-500 dark:text-rose-400">
                       -{formatCurrency(highestBid)}
                     </span>
@@ -533,42 +622,50 @@ export default function SubscriberLiveAuctionArena({
                   <div className={`pt-2 border-t flex justify-between items-baseline ${
                     isDark ? 'border-slate-800' : 'border-slate-200'
                   }`}>
-                    <span className="text-slate-400 font-semibold">Winner Net Take-Home:</span>
-                    <span className="text-sm sm:text-base font-mono font-black text-emerald-500 dark:text-emerald-400">
+                    <span className={isDark ? 'text-slate-400 font-semibold' : 'text-slate-600 font-semibold'}>Winner Net Take-Home:</span>
+                    <span className="text-sm sm:text-base font-mono font-black text-emerald-600 dark:text-emerald-400">
                       {formatCurrency(netPayout)}
                     </span>
                   </div>
                 </div>
               ) : (
-                <div className="p-3 bg-slate-800/40 rounded-xl text-xs text-slate-400">
+                <div className={`p-3 rounded-xl text-xs ${
+                  isDark ? 'bg-slate-800/60 text-slate-300' : 'bg-slate-100 text-slate-600'
+                }`}>
                   No bids were recorded in this live round.
                 </div>
               )}
 
               {/* Personalized Eligibility vs Already-Won Notification */}
               {isEligibleFuture ? (
-                <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 text-left space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-xs font-black text-indigo-400">
-                    <Sparkles size={14} className="text-indigo-400" />
+                <div className={`p-3.5 rounded-2xl border text-left space-y-1.5 ${
+                  isDark ? 'bg-indigo-950/60 border-indigo-500/30' : 'bg-indigo-50/80 border-indigo-200'
+                }`}>
+                  <div className={`flex items-center gap-1.5 text-xs font-black ${isDark ? 'text-indigo-400' : 'text-indigo-700'}`}>
+                    <Sparkles size={14} />
                     <span>🍀 Better luck next time!</span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                  <p className={`text-[11px] leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                     You are eligible to bid in <strong>Month {Math.min(group.durationMonths, group.currentMonth + 1)}</strong>. Keep an eye on the schedule for the next live round!
                   </p>
                   {isNextMonthLaabaSeetu && (
-                    <div className="pt-2 mt-1 border-t border-indigo-500/20 text-[11px] text-amber-300 font-bold flex items-center gap-1.5">
+                    <div className={`pt-2 mt-1 border-t text-[11px] font-bold flex items-center gap-1.5 ${
+                      isDark ? 'border-indigo-500/30 text-amber-300' : 'border-indigo-200 text-amber-800'
+                    }`}>
                       <PartyPopper size={13} className="shrink-0" />
                       <span>Next month is <strong>Laaba Seetu (லாப சீட்டு)</strong> with <strong>₹0 due</strong>!</span>
                     </div>
                   )}
                 </div>
               ) : alreadyWonPast ? (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-left space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
-                    <Crown size={14} className="text-amber-400" />
+                <div className={`p-3.5 rounded-2xl border text-left space-y-1 ${
+                  isDark ? 'bg-amber-950/50 border-amber-500/30' : 'bg-amber-50 border-amber-200'
+                }`}>
+                  <div className={`flex items-center gap-1.5 text-xs font-bold ${isDark ? 'text-amber-400' : 'text-amber-800'}`}>
+                    <Crown size={14} />
                     <span>Prize Already Received</span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                  <p className={`text-[11px] leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                     You have already won your chit pot in a previous round for this group. Thank you for following the live proceedings!
                   </p>
                 </div>
@@ -621,21 +718,19 @@ export default function SubscriberLiveAuctionArena({
                 <span>Live Bidding Floor</span>
               </span>
 
-              {/* Live Viewer Counter Button (Clickable to open viewers modal) */}
-              <button
-                type="button"
-                onClick={() => setShowViewersModal(true)}
-                className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold border transition-all cursor-pointer hover:scale-105 active:scale-95 ${
+              {/* Live Viewer Counter Badge (Static for subscribers, Admin only has modal) */}
+              <div
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold border ${
                   isDark 
-                    ? 'bg-emerald-950/40 hover:bg-emerald-900/50 border-emerald-500/40 text-emerald-400' 
-                    : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-800'
+                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' 
+                    : 'bg-emerald-50 border-emerald-300 text-emerald-800'
                 }`}
-                title="Click to view all live viewers"
+                title={`${viewerCount} subscriber${viewerCount === 1 ? '' : 's'} viewing this live auction`}
               >
-                <Eye size={12} className={isDark ? 'text-emerald-400 animate-pulse' : 'text-emerald-600 animate-pulse'} />
+                <Eye size={11} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
                 <span className="font-mono">{viewerCount}</span>
-                <span>{viewerCount === 1 ? 'Viewer' : 'Viewers'}</span>
-              </button>
+                <span>{viewerCount === 1 ? 'Viewing' : 'Viewing'}</span>
+              </div>
 
               <span className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-md border font-mono ${
                 isDark 
@@ -1105,17 +1200,6 @@ export default function SubscriberLiveAuctionArena({
           )}
         </div>
       )}
-
-      {/* ── LIVE VIEWERS MODAL ── */}
-      <LiveViewersModal
-        isOpen={showViewersModal}
-        onClose={() => setShowViewersModal(false)}
-        viewers={activeViewers}
-        totalMembers={group.memberCount || 20}
-        groupName={group.groupName}
-        month={group.currentMonth}
-        isDark={isDark}
-      />
     </div>
   );
 }

@@ -1193,7 +1193,7 @@ export default function LiveAuctionEngine() {
         })
         .eq('id', group.id);
 
-      // Instant broadcast of live session end
+      // Instant broadcast of live session pause/standby
       try {
         presenceChannelRef.current?.send({
           type: 'broadcast',
@@ -1201,6 +1201,8 @@ export default function LiveAuctionEngine() {
           payload: {
             groupId: group.id,
             isLiveAuctionActive: false,
+            status: 'paused',
+            concluded: false,
           },
         });
       } catch (err) {
