@@ -1,8 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f2f3f8; /* Light gray base */
-  --foreground: #111827; /* Dark slate text */
+  /* Midnight Cyber-Fintech Design System Tokens (from Figma 64du8N06PrqF7hekhaTR5z) */
+  --bg-app: #141332;
+  --bg-card: #1D1D41;
+  --bg-card-secondary: #27264E;
+  --border-card: #27264E;
+  --border-subtle: #222E58;
+  --accent-purple: #6359E9;
+  --accent-purple-glow: #6F64FF;
+  --accent-cyan: #64CFF6;
+  --accent-pink: #9C2CF3;
+  --accent-blue: #3A6FF9;
+  --status-success: #02B15A;
+  --status-danger: #E41414;
+  --text-white: #FFFFFF;
+  --text-muted: #AEABD8;
+  --text-secondary: #8C89B4;
+  --background: #141332;
+  --foreground: #FFFFFF;
 }
 
 @theme inline {
@@ -11,32 +27,33 @@
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+  background-color: #141332;
+  color: #FFFFFF;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
 }
 
-/* Custom Scrollbar for High-Density Panel Scroll */
+/* Custom Scrollbar for Midnight Theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #141332;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #27264E;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #6359E9;
 }
 
 /* Keyframes for RLS flash alert */

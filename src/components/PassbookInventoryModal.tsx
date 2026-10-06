@@ -224,20 +224,20 @@ export default function PassbookInventoryModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 font-sans overflow-y-auto">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90dvh] my-auto">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 font-sans overflow-y-auto">
+        <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90dvh] my-auto text-white">
           
           {/* Header */}
-          <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
+          <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+              <div className="p-2.5 rounded-xl bg-[#6359E9]/10 border border-[#6359E9]/20 text-[#6359E9] shrink-0">
                 <Layers size={20} />
               </div>
               <div className="min-w-0">
                 <h3 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
                   Blank Passbook QR Batches
                 </h3>
-                <p className="text-[11px] sm:text-xs text-slate-400 truncate">
+                <p className="text-[11px] sm:text-xs text-[#AEABD8] truncate">
                   Generate A4 sticker sheets in bulk &amp; manage inventory batches
                 </p>
               </div>
@@ -245,36 +245,36 @@ export default function PassbookInventoryModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+              className="p-2 rounded-xl text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors shrink-0"
             >
               <X size={18} />
             </button>
           </div>
 
           {/* Stats Bar */}
-          <div className="grid grid-cols-3 gap-3 p-5 bg-slate-950/50 border-b border-slate-800">
-            <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Pool</span>
+          <div className="grid grid-cols-3 gap-3 p-5 bg-[#141332] border-b border-[#27264E]">
+            <div className="p-3.5 rounded-2xl bg-[#1D1D41] border border-[#27264E]">
+              <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Total Pool</span>
               <span className="text-xl font-black text-white">{totalCount}</span>
             </div>
-            <div className="p-3.5 rounded-2xl bg-slate-900 border border-emerald-500/30">
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">Available (Ready)</span>
-              <span className="text-xl font-black text-emerald-400">{unassignedCount}</span>
+            <div className="p-3.5 rounded-2xl bg-[#1D1D41] border border-[#02B15A]/30">
+              <span className="text-[10px] font-bold text-[#02B15A] uppercase tracking-wider block">Available (Ready)</span>
+              <span className="text-xl font-black text-[#02B15A]">{unassignedCount}</span>
             </div>
-            <div className="p-3.5 rounded-2xl bg-slate-900 border border-indigo-500/30">
-              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">Paired to Books</span>
-              <span className="text-xl font-black text-indigo-400">{assignedCount}</span>
+            <div className="p-3.5 rounded-2xl bg-[#1D1D41] border border-[#6359E9]/30">
+              <span className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider block">Paired to Books</span>
+              <span className="text-xl font-black text-[#64CFF6]">{assignedCount}</span>
             </div>
           </div>
 
           {/* Batch Generator Form */}
-          <div className="p-5 border-b border-slate-800 bg-indigo-950/20">
+          <div className="p-5 border-b border-[#27264E] bg-[#141332]/60">
             <form onSubmit={handleCreateBatch} className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Sparkles size={14} className="text-indigo-400" /> Generate New Batch
+                  <Sparkles size={14} className="text-[#64CFF6]" /> Generate New Batch
                 </span>
-                <span className="text-[11px] text-slate-400">66 stickers = Exactly 1 full A4 sheet</span>
+                <span className="text-[11px] text-[#AEABD8]">66 stickers = Exactly 1 full A4 sheet</span>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -285,7 +285,7 @@ export default function PassbookInventoryModal({
                     placeholder="Batch Code (e.g. BATCH_2026_01)"
                     value={batchCode}
                     onChange={(e) => setBatchCode(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+                    className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3.5 py-2 text-xs text-white placeholder-[#AEABD8]/40 focus:outline-none focus:border-[#6359E9] font-mono"
                   />
                 </div>
                 <div className="w-full sm:w-32">
@@ -296,13 +296,13 @@ export default function PassbookInventoryModal({
                     required
                     value={batchCount}
                     onChange={(e) => setBatchCount(Number(e.target.value))}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-[#6359E9]"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isGeneratingBatch}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-indigo-600/30 shrink-0"
+                  className="px-4 py-2 rounded-xl bg-[#6359E9] hover:bg-[#6F64FF] active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-[#6359E9]/30 shrink-0"
                 >
                   {isGeneratingBatch ? <RefreshCw className="animate-spin" size={14} /> : <Plus size={14} />}
                   <span>Generate Batch</span>
@@ -314,14 +314,14 @@ export default function PassbookInventoryModal({
           {/* Batches List */}
           <div className="p-5 overflow-y-auto flex-1 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider">
                 Batches ({batchSummaries.length})
               </span>
               {unassignedCount > 0 && (
                 <button
                   type="button"
                   onClick={handleDeleteAllUnassigned}
-                  className="text-xs font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                  className="text-xs font-semibold text-[#E41414] hover:text-red-400 flex items-center gap-1 transition-colors"
                 >
                   <Trash2 size={13} /> Clear All Unassigned ({unassignedCount})
                 </button>
@@ -329,11 +329,11 @@ export default function PassbookInventoryModal({
             </div>
 
             {loading ? (
-              <div className="py-12 flex justify-center items-center text-slate-500 text-xs">
-                <RefreshCw size={20} className="animate-spin mr-2" /> Loading batches...
+              <div className="py-12 flex justify-center items-center text-[#AEABD8] text-xs">
+                <RefreshCw size={20} className="animate-spin mr-2 text-[#6359E9]" /> Loading batches...
               </div>
             ) : batchSummaries.length === 0 ? (
-              <div className="py-12 text-center text-slate-500 text-xs bg-slate-950/40 rounded-2xl border border-slate-800">
+              <div className="py-12 text-center text-[#AEABD8] text-xs bg-[#141332] rounded-2xl border border-[#27264E]">
                 No passbook batches generated yet. Use the form above to generate your first batch!
               </div>
             ) : (
@@ -341,10 +341,10 @@ export default function PassbookInventoryModal({
                 {batchSummaries.map((batch) => (
                   <div
                     key={batch.batch_code}
-                    className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-700 transition-colors"
+                    className="p-3.5 rounded-2xl bg-[#141332] border border-[#27264E] flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[#6359E9]/50 transition-colors"
                   >
                     <div className="flex items-start sm:items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-[#6359E9]/10 border border-[#6359E9]/20 flex items-center justify-center text-[#64CFF6] shrink-0">
                         <PackageCheck size={18} />
                       </div>
                       <div>
@@ -352,16 +352,16 @@ export default function PassbookInventoryModal({
                           <span className="font-mono text-xs font-bold text-white">
                             {batch.batch_code}
                           </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-400 font-medium">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1D1D41] border border-[#27264E] text-[#AEABD8] font-medium">
                             {batch.total} Total Stickers
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
-                          <span className="text-emerald-400 font-semibold">{batch.unassigned} Ready</span>
+                        <div className="flex items-center gap-2 mt-1 text-[11px] text-[#AEABD8]">
+                          <span className="text-[#02B15A] font-semibold">{batch.unassigned} Ready</span>
                           <span>•</span>
-                          <span className="text-indigo-400">{batch.assigned} Paired</span>
+                          <span className="text-[#64CFF6]">{batch.assigned} Paired</span>
                           <span>•</span>
-                          <span className="text-slate-500 flex items-center gap-1">
+                          <span className="text-[#AEABD8]/70 flex items-center gap-1">
                             <Calendar size={11} /> {new Date(batch.created_at).toLocaleDateString()}
                           </span>
                         </div>
@@ -375,8 +375,8 @@ export default function PassbookInventoryModal({
                         disabled={batch.unassigned === 0}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
                           batch.unassigned > 0
-                            ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm shadow-indigo-600/30'
-                            : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'
+                            ? 'bg-[#6359E9] hover:bg-[#6F64FF] text-white shadow-sm shadow-[#6359E9]/30'
+                            : 'bg-[#1D1D41] text-[#AEABD8]/40 border border-[#27264E] cursor-not-allowed'
                         }`}
                       >
                         <Printer size={13} />
@@ -390,8 +390,8 @@ export default function PassbookInventoryModal({
                         title={batch.unassigned === 0 ? 'All stickers in this batch are paired' : 'Delete unassigned QR codes'}
                         className={`p-2 rounded-xl text-xs transition-colors ${
                           batch.unassigned > 0
-                            ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/20'
-                            : 'text-slate-700 border border-slate-800/60 cursor-not-allowed'
+                            ? 'text-[#E41414] hover:text-red-400 hover:bg-[#E41414]/10 border border-[#E41414]/20'
+                            : 'text-[#AEABD8]/30 border border-[#27264E]/60 cursor-not-allowed'
                         }`}
                       >
                         {deletingBatch === batch.batch_code ? (
@@ -408,11 +408,11 @@ export default function PassbookInventoryModal({
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex justify-end">
+          <div className="p-4 border-t border-[#27264E] bg-[#141332]/60 flex justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors"
             >
               Close
             </button>

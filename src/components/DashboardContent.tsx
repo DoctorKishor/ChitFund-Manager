@@ -17,6 +17,7 @@ import QuickPersonalDrawModal from './QuickPersonalDrawModal';
 import QuickAtmWithdrawalModal from './QuickAtmWithdrawalModal';
 import PaymentChecklistPrintModal from './PaymentChecklistPrintModal';
 import { PaymentReceiptModal } from './PaymentReceiptModal';
+import TopStatusRibbon from './TopStatusRibbon';
 import SlideToConfirm from './SlideToConfirm';
 import { HelpTooltip } from './HelpTooltip';
 import { triggerHapticFeedback } from '../utils/haptics';
@@ -3222,21 +3223,24 @@ Thank you for your prompt payment! 🙏`;
 
         return (
           <div className="space-y-4 sm:space-y-6">
+            {/* ── Top Multi-Vault Treasury Showcase (Figma Signature Cards) ── */}
+            <TopStatusRibbon />
+
             {/* ⚠️ HIGH-PRIORITY ALERT BANNER: Pending Physical Cash Box Verification */}
             {pendingAtmRelocations.length > 0 && (
-              <div className="bg-gradient-to-r from-amber-50 via-amber-100/50 to-orange-50 border-2 border-amber-300/90 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-sm space-y-2.5 sm:space-y-3 animate-in fade-in zoom-in-95 duration-200">
+              <div className="bg-[#1D1D41] border border-amber-500/40 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-xl shadow-amber-500/5 space-y-2.5 sm:space-y-3 animate-in fade-in zoom-in-95 duration-200">
                 {/* Banner Header: Sleek single-line layout on mobile */}
-                <div className="flex items-center justify-between gap-2 border-b border-amber-200/70 pb-2 sm:pb-2.5">
+                <div className="flex items-center justify-between gap-2 border-b border-[#27264E] pb-2 sm:pb-2.5">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs animate-pulse">
                       <AlertCircle size={15} />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="text-xs sm:text-sm font-black text-amber-950 uppercase tracking-tight truncate">
+                        <h3 className="text-xs sm:text-sm font-black text-amber-300 uppercase tracking-tight truncate">
                           Pending Cash Box Verification
                         </h3>
-                        <span className="text-[9px] sm:text-[10px] font-black bg-amber-500 text-white px-1.5 py-0.5 rounded-full shadow-2xs shrink-0">
+                        <span className="text-[9px] sm:text-[10px] font-black bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded-full shadow-2xs shrink-0">
                           {pendingAtmRelocations.length} Pending
                         </span>
                       </div>
@@ -3247,17 +3251,17 @@ Thank you for your prompt payment! 🙏`;
                     <button
                       type="button"
                       onClick={() => setActiveTab('cash')}
-                      className="text-[10px] sm:text-xs font-bold text-amber-900 hover:text-black bg-white/90 hover:bg-white px-2.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-amber-300 transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                      className="text-[10px] sm:text-xs font-bold text-amber-300 hover:text-white bg-[#27264E] hover:bg-[#3A3A5A] px-2.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-amber-500/30 transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
                       title="Open Treasury"
                     >
-                      <Banknote size={13} className="text-indigo-600" />
+                      <Banknote size={13} className="text-[#64CFF6]" />
                       <span className="hidden xs:inline sm:inline">Treasury</span>
                       <ArrowRight size={11} />
                     </button>
                   )}
                 </div>
 
-                <p className="text-[10px] sm:text-xs text-amber-900/80 font-medium leading-tight">
+                <p className="text-[10px] sm:text-xs text-[#AEABD8] font-medium leading-tight">
                   Bank balance was debited for ATM cash withdrawal. Confirm once physical currency notes are placed inside the Physical Cash Box:
                 </p>
 
@@ -3282,17 +3286,17 @@ Thank you for your prompt payment! 🙏`;
                     return (
                       <div
                         key={item.id}
-                        className="bg-white border border-amber-200/90 rounded-xl sm:rounded-2xl p-2.5 sm:p-3.5 flex items-center justify-between gap-2.5 shadow-2xs hover:border-amber-400 transition-colors"
+                        className="bg-[#141332] border border-[#27264E] rounded-xl sm:rounded-2xl p-2.5 sm:p-3.5 flex items-center justify-between gap-2.5 shadow-2xs hover:border-amber-400/50 transition-colors"
                       >
                         <div className="min-w-0 space-y-0.5">
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs">{sourceIcon}</span>
-                            <span className="text-xs font-extrabold text-gray-800 truncate">{sourceName}</span>
+                            <span className="text-xs font-extrabold text-white truncate">{sourceName}</span>
                           </div>
-                          <div className="text-base sm:text-xl font-black text-gray-900 font-mono tracking-tight leading-none">
+                          <div className="text-base sm:text-xl font-black text-white font-mono tracking-tight leading-none">
                             ₹{Number(item.amount || 0).toLocaleString('en-IN')}
                           </div>
-                          <div className="text-[9px] sm:text-[10px] text-gray-400 font-mono flex items-center gap-1 mt-0.5">
+                          <div className="text-[9px] sm:text-[10px] text-[#AEABD8] font-mono flex items-center gap-1 mt-0.5">
                             <Clock size={9} />
                             <span>Debited on {dateStr}, {timeStr}</span>
                           </div>
@@ -3302,7 +3306,7 @@ Thank you for your prompt payment! 🙏`;
                           type="button"
                           onClick={() => handleConfirmAtmInflowFromDashboard(item)}
                           disabled={isVerifying}
-                          className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs px-3 sm:px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
+                          className="bg-[#02B15A] hover:bg-[#029B4F] active:scale-95 text-white font-black text-xs px-3 sm:px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
                         >
                           {isVerifying ? (
                             <RefreshCw size={12} className="animate-spin" />
@@ -3319,14 +3323,14 @@ Thank you for your prompt payment! 🙏`;
             )}
 
             {/* Top Chit Groups Pill Switcher Bar */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-2.5 sm:p-3 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-2.5 sm:p-3 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
               <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none flex-nowrap scroll-smooth">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider shrink-0 px-1.5 sm:px-2 flex items-center gap-1.5">
-                  <Briefcase size={13} className="text-indigo-600" />
+                <span className="text-[11px] font-bold text-[#AEABD8] uppercase tracking-wider shrink-0 px-1.5 sm:px-2 flex items-center gap-1.5">
+                  <Briefcase size={13} className="text-[#64CFF6]" />
                   Chits:
                 </span>
                 {localGroups.filter(g => g.status !== 'deleted').length === 0 ? (
-                  <span className="text-xs text-gray-400 italic">No active chit groups found</span>
+                  <span className="text-xs text-[#AEABD8] italic">No active chit groups found</span>
                 ) : (
                   localGroups.filter(g => g.status !== 'deleted').map((group) => {
                     const isSelected = (activeGroup?.id === group.id);
@@ -3344,28 +3348,28 @@ Thank you for your prompt payment! 🙏`;
                           setActiveDashboardGroupId(group.id);
                           setSelectedDashboardMonth(group.currentMonth !== undefined && group.currentMonth !== null ? group.currentMonth : 0);
                         }}
-                        className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border whitespace-nowrap active:scale-95 ${
+                        className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border whitespace-nowrap active:scale-95 cursor-pointer ${
                           isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs ring-2 ring-indigo-500/20'
-                            : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                            ? 'bg-[#6359E9] text-white border-[#6F64FF] shadow-[0_4px_15px_rgba(99,89,233,0.4)] ring-2 ring-[#6359E9]/30'
+                            : 'bg-[#27264E] hover:bg-[#323062] text-[#AEABD8] hover:text-white border-transparent'
                         }`}
                       >
                         <span className={`w-2 h-2 rounded-full ${
                           group.status === 'active' 
-                            ? isSelected ? 'bg-emerald-400' : 'bg-emerald-500'
+                            ? 'bg-[#02B15A]' 
                             : group.status === 'draft' 
-                            ? isSelected ? 'bg-amber-300' : 'bg-amber-500'
-                            : isSelected ? 'bg-blue-300' : 'bg-blue-500'
+                            ? 'bg-[#FFBB38]' 
+                            : 'bg-[#64CFF6]'
                         }`} />
-                        <span className={isSelected ? 'text-white font-bold' : 'text-gray-800 font-bold'}>{group.name}</span>
+                        <span className={isSelected ? 'text-white font-bold' : 'text-slate-200 font-bold'}>{group.name}</span>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ${
-                          isSelected ? 'bg-indigo-700 text-white' : 'bg-gray-200/70 text-gray-700'
+                          isSelected ? 'bg-[#5044D4] text-white' : 'bg-[#141332] text-[#AEABD8]'
                         }`}>
                           {formatCurrency(group.totalValue)}
                         </span>
                         {(group.kaiIruppuPool || 0) > 0 && (
                           <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold flex items-center gap-1 ${
-                            isSelected ? 'bg-amber-400 text-amber-950 shadow-2xs' : 'bg-amber-50 text-amber-800 border border-amber-200'
+                            isSelected ? 'bg-[#FFBB38] text-slate-950 shadow-2xs' : 'bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30'
                           }`} title={`Kai Iruppu Pool: ${formatCurrency(group.kaiIruppuPool)}`}>
                             <span>💰 {formatCurrency(group.kaiIruppuPool)}</span>
                           </span>
@@ -3379,7 +3383,7 @@ Thank you for your prompt payment! 🙏`;
               {/* Action Button: Create New Group */}
               <button
                 onClick={() => setShowWizard(true)}
-                className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-xl transition-all shrink-0 shadow-2xs active:scale-95 w-full sm:w-auto"
+                className="flex items-center justify-center gap-1.5 bg-[#6359E9] hover:bg-[#6F64FF] text-white text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-xl transition-all shrink-0 shadow-[0_4px_15px_rgba(99,89,233,0.35)] active:scale-95 w-full sm:w-auto cursor-pointer"
               >
                 <Plus size={14} />
                 <span>New Group</span>
@@ -3388,11 +3392,11 @@ Thank you for your prompt payment! 🙏`;
 
             {/* Horizontal Month Carousel Navigator */}
             {activeGroup && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-2 sm:p-3 shadow-2xs flex items-center justify-between gap-1.5 sm:gap-2">
+              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-2 sm:p-3 shadow-lg flex items-center justify-between gap-1.5 sm:gap-2">
                 <button
                   onClick={() => setSelectedDashboardMonth(prev => Math.max(0, prev - 1))}
                   disabled={selectedDashboardMonth <= 0}
-                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0 active:scale-95"
+                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl border border-[#27264E] text-[#AEABD8] hover:bg-[#27264E] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0 active:scale-95 cursor-pointer"
                   aria-label="Previous month"
                 >
                   <ChevronLeft size={16} />
@@ -3415,27 +3419,27 @@ Thank you for your prompt payment! 🙏`;
                           }
                         }}
                         onClick={() => setSelectedDashboardMonth(mNum)}
-                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border whitespace-nowrap active:scale-95 ${
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border whitespace-nowrap active:scale-95 cursor-pointer ${
                           isSelected
                             ? mNum === 0
-                              ? 'bg-amber-600 text-white border-amber-700 shadow-xs ring-2 ring-amber-500/20'
-                              : 'bg-gray-900 text-white border-black shadow-xs ring-2 ring-gray-900/10'
+                              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md ring-2 ring-amber-400/30'
+                              : 'bg-[#6359E9] text-white border-[#6F64FF] shadow-[0_4px_15px_rgba(99,89,233,0.4)] ring-2 ring-[#6359E9]/30'
                             : isOngoingCurrent
                             ? mNum === 0
-                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300 ring-1 ring-amber-200'
-                              : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
-                            : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200'
+                              ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/40'
+                              : 'bg-[#27264E] hover:bg-[#323062] text-[#64CFF6] border-[#64CFF6]/40'
+                            : 'bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]'
                         }`}
                       >
                         {isSelected ? (
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#02B15A]" />
                         ) : mNum === 0 ? (
                           <span className="text-[10px]">👑</span>
                         ) : null}
                         <span>{label}</span>
                         {isOngoingCurrent && (
                           <span className={`text-[9px] uppercase tracking-wider px-1 py-0.2 rounded font-semibold ${
-                            isSelected ? 'bg-white/20 text-white' : mNum === 0 ? 'bg-amber-200/80 text-amber-900' : 'bg-indigo-200/60 text-indigo-800'
+                            isSelected ? 'bg-black/30 text-white' : mNum === 0 ? 'bg-amber-500/30 text-amber-300' : 'bg-[#64CFF6]/20 text-[#64CFF6]'
                           }`}>
                             Current
                           </span>
@@ -3448,7 +3452,7 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   onClick={() => setSelectedDashboardMonth(prev => Math.min(totalDuration, prev + 1))}
                   disabled={selectedDashboardMonth >= totalDuration}
-                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0 active:scale-95"
+                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl border border-[#27264E] text-[#AEABD8] hover:bg-[#27264E] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0 active:scale-95 cursor-pointer"
                   aria-label="Next month"
                 >
                   <ChevronRight size={16} />
@@ -3458,32 +3462,32 @@ Thank you for your prompt payment! 🙏`;
 
             {/* ── Compact Kai Iruppu (கை இருப்பு) Auction Accumulated Pool Ribbon ── */}
             {activeGroup && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-3 sm:px-4 sm:py-3 shadow-2xs space-y-2.5">
+              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3 sm:px-4 sm:py-3 shadow-lg space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   {/* Left: Pool Amount & Label */}
                   <div className="flex items-center gap-2.5 flex-wrap">
-                    <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 text-[#FFBB38] flex items-center justify-center shrink-0">
                       <Coins size={16} />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#FFBB38] bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.2 rounded">
                           கை இருப்பு · Kai Iruppu Pool
                         </span>
                         {isLaabaActive && (
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded flex items-center gap-1">
+                          <span className="bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded flex items-center gap-1">
                             <Sparkles size={10} /> Laaba Seetu Active
                           </span>
                         )}
                       </div>
                       <div className="flex items-baseline gap-1.5 mt-0.5">
-                        <span className="text-base sm:text-lg font-black text-gray-900 font-mono tracking-tight">
+                        <span className="text-base sm:text-lg font-black text-white font-mono tracking-tight">
                           {formatCurrency(activeKaiIruppuPool)}
                         </span>
-                        <span className="text-xs text-gray-400 font-mono">
+                        <span className="text-xs text-[#AEABD8] font-mono">
                           / {formatCurrency(totalChitVal)}
                         </span>
-                        <span className="text-[10px] text-gray-400 font-medium hidden md:inline">
+                        <span className="text-[10px] text-[#AEABD8] font-medium hidden md:inline">
                           ({isLaabaActive ? 'Threshold Reached!' : `${formatCurrency(remainingToLaaba)} to free month`})
                         </span>
                       </div>
@@ -3493,13 +3497,13 @@ Thank you for your prompt payment! 🙏`;
                   {/* Middle / Right: Slim Progress & Breakdown Button */}
                   <div className="flex items-center gap-3 sm:gap-4 shrink-0 justify-between sm:justify-end">
                     <div className="flex items-center gap-2 min-w-[140px] sm:min-w-[180px]">
-                      <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden border border-gray-200">
+                      <div className="flex-1 bg-[#141332] rounded-full h-2 overflow-hidden border border-[#27264E]">
                         <div
-                          className="bg-gradient-to-r from-amber-500 to-emerald-500 h-full rounded-full transition-all duration-500"
+                          className="bg-gradient-to-r from-[#FFBB38] via-[#6359E9] to-[#02B15A] h-full rounded-full transition-all duration-500"
                           style={{ width: `${Math.max(activeKaiIruppuPool > 0 ? 5 : 0, laabaGoalPct)}%` }}
                         />
                       </div>
-                      <span className="text-[11px] font-bold font-mono text-gray-600 shrink-0">
+                      <span className="text-[11px] font-bold font-mono text-[#AEABD8] shrink-0">
                         {laabaGoalPct}%
                       </span>
                     </div>
@@ -3508,7 +3512,7 @@ Thank you for your prompt payment! 🙏`;
                       <button
                         type="button"
                         onClick={() => setShowKaiIruppuBreakdown(prev => !prev)}
-                        className="flex items-center gap-1 text-[11px] font-bold text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-2.5 py-1.5 rounded-xl transition-all shrink-0 active:scale-95 cursor-pointer"
+                        className="flex items-center gap-1 text-[11px] font-bold text-[#AEABD8] hover:text-white bg-[#27264E] hover:bg-[#323062] border border-[#3A3A5A] px-2.5 py-1.5 rounded-xl transition-all shrink-0 active:scale-95 cursor-pointer"
                         title="Toggle monthly auction discounts history"
                       >
                         <span>History ({completedGroupAuctions.length})</span>
@@ -3520,10 +3524,10 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* Compact Expandable Discount History */}
                 {showKaiIruppuBreakdown && (
-                  <div className="pt-2 border-t border-gray-100 space-y-2 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between text-[11px] text-gray-500">
-                      <span className="font-bold text-gray-700">Monthly Auction Discount Contributions:</span>
-                      <span>Total: <strong className="text-gray-900 font-mono">{formatCurrency(totalDiscountsRecorded)}</strong></span>
+                  <div className="pt-2 border-t border-[#27264E] space-y-2 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between text-[11px] text-[#AEABD8]">
+                      <span className="font-bold text-white">Monthly Auction Discount Contributions:</span>
+                      <span>Total: <strong className="text-[#02B15A] font-mono">{formatCurrency(totalDiscountsRecorded)}</strong></span>
                     </div>
                     <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-nowrap scrollbar-none">
                       {completedGroupAuctions.map((log) => {
@@ -3531,11 +3535,11 @@ Thank you for your prompt payment! 🙏`;
                         return (
                           <div
                             key={log.id || log.month}
-                            className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 shrink-0 flex items-center gap-2 text-xs"
+                            className="bg-[#141332] border border-[#27264E] rounded-xl px-3 py-1.5 shrink-0 flex items-center gap-2 text-xs"
                           >
-                            <span className="font-extrabold text-indigo-700">M{log.month}</span>
-                            <span className="text-gray-600 font-medium truncate max-w-[120px]">{log.winner_name || 'Subscriber'}</span>
-                            <span className="font-black font-mono text-emerald-600">+{formatCurrency(disc)}</span>
+                            <span className="font-extrabold text-[#64CFF6]">M{log.month}</span>
+                            <span className="text-[#AEABD8] font-medium truncate max-w-[120px]">{log.winner_name || 'Subscriber'}</span>
+                            <span className="font-black font-mono text-[#02B15A]">+{formatCurrency(disc)}</span>
                           </div>
                         );
                       })}
@@ -3547,14 +3551,14 @@ Thank you for your prompt payment! 🙏`;
 
             {/* Collection Progress Hero Card (Single Full-Width Card) */}
             {activeGroup && (
-              <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-7 shadow-2xs relative overflow-hidden space-y-5 sm:space-y-6">
+              <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-5 sm:p-7 shadow-xl relative overflow-hidden space-y-5 sm:space-y-6">
                 <div className="flex flex-col lg:flex-row justify-between lg:items-start gap-4 sm:gap-6">
                   <div>
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span className={`text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-lg border ${
                         selectedDashboardMonth === 0
-                          ? 'bg-amber-50 text-amber-800 border-amber-200'
-                          : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                          : 'bg-[#6359E9]/15 text-[#64CFF6] border-[#6359E9]/30'
                       }`}>
                         {selectedDashboardMonth === 0 ? (
                           <>👑 {activeGroup.name} · Month 0 (Launch Month — Organizer Profit Phase)</>
@@ -3563,34 +3567,34 @@ Thank you for your prompt payment! 🙏`;
                         )}
                       </span>
                       {isLaaba && selectedDashboardMonth > 0 && (
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1">
+                        <span className="bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1">
                           <Sparkles size={11} /> Laaba Seetu Active
                         </span>
                       )}
                     </div>
                     
                     <div className="flex items-baseline gap-2.5 mt-2">
-                      <span className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight leading-none">
+                      <span className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none">
                         {formatCurrency(actualCollectionsTotal)}
                       </span>
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      <span className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider">
                         COLLECTED
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 sm:gap-5 mt-2.5 text-xs text-gray-500 font-medium">
-                      <span>Target: <strong className="text-gray-900 font-bold">{formatCurrency(targetCollectionsTotal)}</strong></span>
-                      <span className="text-gray-300 hidden sm:inline">•</span>
-                      <span>Pending: <strong className="text-amber-600 font-bold">{formatCurrency(pendingCollectionsTotal)}</strong></span>
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-5 mt-2.5 text-xs text-[#AEABD8] font-medium">
+                      <span>Target: <strong className="text-white font-bold">{formatCurrency(targetCollectionsTotal)}</strong></span>
+                      <span className="text-[#27264E] hidden sm:inline">•</span>
+                      <span>Pending: <strong className="text-[#FFBB38] font-bold">{formatCurrency(pendingCollectionsTotal)}</strong></span>
                     </div>
                   </div>
 
                   {/* Actions & Paid Progress */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    <div className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-center flex items-center justify-between sm:block shadow-2xs">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Paid Members</span>
-                      <div className="text-base font-black text-gray-900 sm:mt-0.5">
-                        <span className="text-emerald-600">{paidList.length}</span> / {dashboardGroupMembers.length}
+                    <div className="bg-[#141332] border border-[#27264E] rounded-2xl px-4 py-2.5 text-center flex items-center justify-between sm:block shadow-2xs">
+                      <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Paid Members</span>
+                      <div className="text-base font-black text-white sm:mt-0.5">
+                        <span className="text-[#02B15A]">{paidList.length}</span> / {dashboardGroupMembers.length}
                       </div>
                     </div>
 
@@ -3598,7 +3602,7 @@ Thank you for your prompt payment! 🙏`;
                       <button
                         onClick={handleMarkAllPaid}
                         disabled={isMarkingAllPaid || pendingList.length === 0}
-                        className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-xs disabled:opacity-40 disabled:pointer-events-none active:scale-95"
+                        className="flex items-center justify-center gap-1.5 bg-[#02B15A] hover:bg-[#029B4F] text-white font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#02B15A]/20 disabled:opacity-40 disabled:pointer-events-none active:scale-95 cursor-pointer"
                       >
                         <CheckCheck size={14} />
                         <span className="truncate">{isMarkingAllPaid ? 'Recording...' : 'Mark All Paid'}</span>
@@ -3612,10 +3616,10 @@ Thank you for your prompt payment! 🙏`;
                             setRemindModalTab('individual');
                             setShowRemindModal(true);
                           }}
-                          className="flex items-center justify-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-2xs active:scale-95"
+                          className="flex items-center justify-center gap-1.5 bg-[#27264E] hover:bg-[#323062] text-[#64CFF6] border border-[#64CFF6]/30 font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer"
                           title="Send individual or group WhatsApp reminders to pending members"
                         >
-                          <Send size={13} className="text-emerald-600" />
+                          <Send size={13} className="text-[#64CFF6]" />
                           <span className="truncate">Remind All ({pendingList.length})</span>
                         </button>
                       )}
@@ -3625,10 +3629,10 @@ Thank you for your prompt payment! 🙏`;
                         <button
                           onClick={handleRevertMonth}
                           disabled={isClosingMonth}
-                          className="flex items-center justify-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-xs border border-gray-200 active:scale-95"
+                          className="flex items-center justify-center gap-1.5 bg-[#27264E] hover:bg-[#323062] text-[#AEABD8] hover:text-white font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-xs border border-[#3A3A5A] active:scale-95 cursor-pointer"
                           title={`Roll back active cycle to Month ${(activeGroup.currentMonth ?? 1) - 1}`}
                         >
-                          <RotateCcw size={13} className="text-gray-500" />
+                          <RotateCcw size={13} className="text-[#AEABD8]" />
                           <span className="truncate">Revert to M{(activeGroup.currentMonth ?? 1) - 1}</span>
                         </button>
                       )}
@@ -3637,7 +3641,7 @@ Thank you for your prompt payment! 🙏`;
                         <button
                           onClick={handleCloseMonth}
                           disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
-                          className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs disabled:opacity-40 disabled:pointer-events-none active:scale-95"
+                          className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 bg-[#FFBB38] hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-amber-500/20 disabled:opacity-40 disabled:pointer-events-none active:scale-95 cursor-pointer"
                         >
                           <Rocket size={14} />
                           <span className="truncate">{isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M1'}</span>
@@ -3646,7 +3650,7 @@ Thank you for your prompt payment! 🙏`;
                         <button
                           onClick={handleCloseMonth}
                           disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
-                          className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs disabled:opacity-40 disabled:pointer-events-none active:scale-95"
+                          className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#6359E9]/30 disabled:opacity-40 disabled:pointer-events-none active:scale-95 cursor-pointer"
                         >
                           <ArrowRight size={14} />
                           <span className="truncate">{isClosingMonth ? 'Closing...' : 'Close Month'}</span>
@@ -3658,14 +3662,14 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* Smooth Progress Bar */}
                 <div className="space-y-2 pt-1">
-                  <div className="w-full bg-gray-100 rounded-full h-3.5 overflow-hidden p-0.5 border border-gray-200">
+                  <div className="w-full bg-[#141332] rounded-full h-3.5 overflow-hidden p-0.5 border border-[#27264E]">
                     <div
-                      className="bg-gradient-to-r from-indigo-600 to-emerald-500 h-full rounded-full transition-all duration-500 shadow-xs"
+                      className="bg-gradient-to-r from-[#6359E9] via-[#64CFF6] to-[#02B15A] h-full rounded-full transition-all duration-500 shadow-xs"
                       style={{ width: `${completionPct}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-xs text-gray-500 font-semibold">
-                    <span>{completionPct}% Collected</span>
+                  <div className="flex justify-between text-xs text-[#AEABD8] font-semibold">
+                    <span className="text-white font-bold">{completionPct}% Collected</span>
                     <span>{pendingList.length} members remaining</span>
                   </div>
                 </div>
@@ -3674,32 +3678,32 @@ Thank you for your prompt payment! 🙏`;
                 {(() => {
                   if (selectedDashboardMonth === 0) {
                     return (
-                      <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="bg-[#141332] border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-[#FFBB38] border border-amber-500/40 flex items-center justify-center shrink-0 shadow-xs">
                             <Rocket size={20} />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-extrabold text-amber-950 uppercase tracking-wider">
+                              <span className="text-xs font-extrabold text-[#FFBB38] uppercase tracking-wider">
                                 Month 0: Launch Month — Organizer Profit Phase
                               </span>
-                              <span className="bg-amber-200 text-amber-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
                                 No Auction
                               </span>
                             </div>
-                            <p className="text-xs text-amber-800 mt-0.5">
-                              The full <strong>{formatCurrency(totalChitVal)}</strong> collected pool is reserved and allocated directly to the Organizer as <strong>Organizer Profit</strong>.
+                            <p className="text-xs text-[#AEABD8] mt-0.5">
+                              The full <strong className="text-white">{formatCurrency(totalChitVal)}</strong> collected pool is reserved and allocated directly to the Organizer as <strong className="text-white">Organizer Profit</strong>.
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-amber-200">
+                        <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#27264E]">
                           {(() => {
                             const { display } = getGroupAuctionDate(activeGroup.id, 0);
                             return (
-                              <span className="text-xs text-amber-900 font-bold flex items-center gap-1.5 bg-white/70 border border-amber-200 px-3 py-1.5 rounded-xl shadow-2xs">
-                                <CalendarDays size={13} className="text-amber-700" />
+                              <span className="text-xs text-amber-300 font-bold flex items-center gap-1.5 bg-[#27264E] border border-amber-500/30 px-3 py-1.5 rounded-xl shadow-2xs">
+                                <CalendarDays size={13} className="text-[#FFBB38]" />
                                 <span>{display}</span>
                               </span>
                             );
@@ -3711,16 +3715,16 @@ Thank you for your prompt payment! 🙏`;
 
                   if (!currentMonthAuction) {
                     return (
-                      <div className="bg-gray-50 border border-dashed border-gray-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="bg-[#141332] border border-dashed border-[#27264E] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-gray-200 text-gray-500 flex items-center justify-center shrink-0">
+                          <div className="w-9 h-9 rounded-xl bg-[#27264E] text-[#64CFF6] flex items-center justify-center shrink-0">
                             <Trophy size={16} />
                           </div>
                           <div>
-                            <div className="text-xs font-bold text-gray-700">
+                            <div className="text-xs font-bold text-white">
                               Auction for Month {selectedDashboardMonth} has not taken place yet
                             </div>
-                            <p className="text-[11px] text-gray-400">
+                            <p className="text-[11px] text-[#AEABD8]">
                               Conduct live bidding in the Live Auction Engine to declare this month's winning subscriber and unlock prize disbursal.
                             </p>
                           </div>
@@ -3730,9 +3734,9 @@ Thank you for your prompt payment! 🙏`;
                           {(() => {
                             const { display } = getGroupAuctionDate(activeGroup.id, selectedDashboardMonth);
                             return (
-                              <span className="text-xs text-indigo-700 font-bold flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl">
-                                <CalendarDays size={13} className="text-indigo-600" />
-                                <span>Scheduled: <strong>{display}</strong></span>
+                              <span className="text-xs text-[#64CFF6] font-bold flex items-center gap-1.5 bg-[#27264E] border border-[#64CFF6]/30 px-3 py-1.5 rounded-xl">
+                                <CalendarDays size={13} className="text-[#64CFF6]" />
+                                <span>Scheduled: <strong className="text-white">{display}</strong></span>
                               </span>
                             );
                           })()}
@@ -3768,38 +3772,38 @@ Thank you for your prompt payment! 🙏`;
                   const isPartial = totalPrizeDisbursed > 0 && remainingPrizeDue > 0;
 
                   return (
-                    <div className={`rounded-2xl border-2 p-4 sm:p-5 shadow-sm space-y-4 transition-all ${
+                    <div className={`rounded-2xl border p-4 sm:p-5 shadow-lg space-y-4 transition-all ${
                       isSettled 
-                        ? 'bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-white border-emerald-300' 
+                        ? 'bg-[#141332] border-[#02B15A]/40' 
                         : isPartial
-                        ? 'bg-gradient-to-br from-amber-50/70 via-yellow-50/40 to-white border-amber-300'
-                        : 'bg-gradient-to-br from-rose-50/60 via-indigo-50/40 to-white border-rose-300'
+                        ? 'bg-[#141332] border-amber-500/40'
+                        : 'bg-[#141332] border-[#6359E9]/40'
                     }`}>
                       {/* Top Header: Winner Badge & Disbursal Status */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-gray-200/70 pb-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-[#27264E] pb-3">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
-                            isSettled ? 'bg-emerald-600 text-white' : isPartial ? 'bg-amber-600 text-white' : 'bg-indigo-600 text-white'
+                            isSettled ? 'bg-[#02B15A] text-white' : isPartial ? 'bg-amber-500 text-slate-950' : 'bg-[#6359E9] text-white'
                           }`}>
                             <Trophy size={20} />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#AEABD8]">
                                 Month {selectedDashboardMonth} Auction Winner
                               </span>
                               {winnerTicketNum && (
-                                <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.2 rounded-md">
+                                <span className="text-[10px] font-bold bg-[#27264E] text-[#64CFF6] px-2 py-0.2 rounded-md border border-[#3A3A5A]">
                                   Ticket #{winnerTicketNum}
                                 </span>
                               )}
                             </div>
-                            <div className="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
+                            <div className="text-base sm:text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
                               <span>{winnerName}</span>
                               {winnerPhone && (
                                 <a 
                                   href={`tel:${normalizePhone(winnerPhone)}`} 
-                                  className="text-gray-400 hover:text-emerald-600 transition-colors p-1"
+                                  className="text-[#AEABD8] hover:text-[#02B15A] transition-colors p-1"
                                   title={`Call ${winnerName}`}
                                 >
                                   <Phone size={13} />
@@ -3812,15 +3816,15 @@ Thank you for your prompt payment! 🙏`;
                         {/* Disbursal Status Badge */}
                         <div className="flex items-center gap-2 shrink-0">
                           {isSettled ? (
-                            <span className="bg-emerald-600 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5">
+                            <span className="bg-[#02B15A] text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5">
                               <CheckCheck size={14} /> Fully Disbursed
                             </span>
                           ) : isPartial ? (
-                            <span className="bg-amber-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5">
+                            <span className="bg-amber-500 text-slate-950 font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5">
                               <AlertCircle size={14} /> Partially Disbursed
                             </span>
                           ) : (
-                            <span className="bg-rose-600 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 animate-pulse">
+                            <span className="bg-[#E41414] text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 animate-pulse">
                               <AlertCircle size={14} /> Disbursal Pending
                             </span>
                           )}
@@ -3829,47 +3833,47 @@ Thank you for your prompt payment! 🙏`;
 
                       {/* Financial Figures Grid */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                        <div className="bg-white/90 border border-gray-200/80 rounded-xl p-3 shadow-2xs">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Winning Discount</span>
-                          <span className="text-sm sm:text-base font-extrabold text-indigo-700 font-mono">
+                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 shadow-2xs">
+                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Winning Discount</span>
+                          <span className="text-sm sm:text-base font-extrabold text-[#64CFF6] font-mono">
                             {formatCurrency(winningBid)}
                           </span>
-                          <span className="text-[9px] text-emerald-700 font-bold block mt-0.5 flex items-center gap-1">
-                            <Sparkles size={10} className="text-amber-500 shrink-0" />
+                          <span className="text-[9px] text-[#02B15A] font-bold block mt-0.5 flex items-center gap-1">
+                            <Sparkles size={10} className="text-[#FFBB38] shrink-0" />
                             <span>Pooled to Kai Iruppu</span>
                           </span>
                         </div>
 
-                        <div className="bg-white/90 border border-gray-200/80 rounded-xl p-3 shadow-2xs">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Net Prize Pot Due</span>
-                          <span className="text-sm sm:text-base font-extrabold text-gray-900 font-mono">
+                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 shadow-2xs">
+                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Net Prize Pot Due</span>
+                          <span className="text-sm sm:text-base font-extrabold text-white font-mono">
                             {formatCurrency(netPrizePot)}
                           </span>
-                          <span className="text-[9px] text-gray-400 block mt-0.5">Total Chit − Winning Bid</span>
+                          <span className="text-[9px] text-[#AEABD8] block mt-0.5">Total Chit − Winning Bid</span>
                         </div>
 
-                        <div className="bg-white/90 border border-gray-200/80 rounded-xl p-3 shadow-2xs">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Disbursed So Far</span>
-                          <span className={`text-sm sm:text-base font-extrabold font-mono ${totalPrizeDisbursed > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 shadow-2xs">
+                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Disbursed So Far</span>
+                          <span className={`text-sm sm:text-base font-extrabold font-mono ${totalPrizeDisbursed > 0 ? 'text-[#02B15A]' : 'text-[#AEABD8]'}`}>
                             {formatCurrency(totalPrizeDisbursed)}
                           </span>
-                          <span className="text-[9px] text-gray-400 block mt-0.5">{monthPayoutTxs.length} transfer(s)</span>
+                          <span className="text-[9px] text-[#AEABD8] block mt-0.5">{monthPayoutTxs.length} transfer(s)</span>
                         </div>
 
                         <div className={`border rounded-xl p-3 shadow-2xs ${
-                          remainingPrizeDue > 0 ? 'bg-rose-50/80 border-rose-200' : 'bg-emerald-50/80 border-emerald-200'
+                          remainingPrizeDue > 0 ? 'bg-[#1D1D41] border-[#E41414]/30' : 'bg-[#1D1D41] border-[#02B15A]/30'
                         }`}>
                           <span className={`text-[10px] font-bold uppercase tracking-wider block ${
-                            remainingPrizeDue > 0 ? 'text-rose-700' : 'text-emerald-700'
+                            remainingPrizeDue > 0 ? 'text-[#FF6B6B]' : 'text-[#02B15A]'
                           }`}>
                             {remainingPrizeDue > 0 ? 'Balance Pending' : 'Balance Settled'}
                           </span>
                           <span className={`text-sm sm:text-base font-extrabold font-mono ${
-                            remainingPrizeDue > 0 ? 'text-rose-700' : 'text-emerald-700'
+                            remainingPrizeDue > 0 ? 'text-[#FF6B6B]' : 'text-[#02B15A]'
                           }`}>
                             {formatCurrency(remainingPrizeDue)}
                           </span>
-                          <span className="text-[9px] text-gray-500 block mt-0.5">
+                          <span className="text-[9px] text-[#AEABD8] block mt-0.5">
                             {remainingPrizeDue === 0 ? '✓ Zero balance' : 'Pay to winner'}
                           </span>
                         </div>
@@ -3882,14 +3886,14 @@ Thank you for your prompt payment! 🙏`;
                           {remainingPrizeDue > 0 ? (
                             <button
                               onClick={() => handleOpenDisburseModal(remainingPrizeDue)}
-                              className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer"
+                              className="flex items-center justify-center gap-1.5 bg-[#02B15A] hover:bg-[#029B4F] text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#02B15A]/20 active:scale-95 cursor-pointer"
                             >
                               <Banknote size={15} />
                               <span>Disburse Prize ({formatCurrency(remainingPrizeDue)})</span>
                             </button>
                           ) : (
-                            <div className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-100/80 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-xl shadow-2xs">
-                              <CheckCheck size={14} className="text-emerald-700" />
+                            <div className="flex items-center gap-1.5 px-3.5 py-2 bg-[#02B15A]/15 border border-[#02B15A]/30 text-[#02B15A] text-xs font-bold rounded-xl shadow-2xs">
+                              <CheckCheck size={14} className="text-[#02B15A]" />
                               <span>Prize Pot Fully Disbursed</span>
                             </div>
                           )}
@@ -3907,25 +3911,25 @@ Thank you for your prompt payment! 🙏`;
                               remainingPrizeDue,
                               monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
                             )}
-                            className="flex items-center justify-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs active:scale-95"
+                            className="flex items-center justify-center gap-1.5 bg-[#27264E] hover:bg-[#323062] text-[#64CFF6] border border-[#64CFF6]/30 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer"
                             title="Generate & Send WhatsApp Payout Receipt"
                           >
-                            <Send size={13} className="text-emerald-700" />
+                            <Send size={13} className="text-[#64CFF6]" />
                             <span>WhatsApp Receipt</span>
                           </button>
                         </div>
 
                         {/* Recent Disbursals Miniature Tag */}
                         {monthPayoutTxs.length > 0 && (
-                          <div className="flex items-center gap-2 overflow-x-auto text-[11px] text-gray-600">
-                            <span className="font-bold text-gray-400 uppercase text-[9px]">Receipts:</span>
+                          <div className="flex items-center gap-2 overflow-x-auto text-[11px] text-[#AEABD8]">
+                            <span className="font-bold text-[#AEABD8] uppercase text-[9px]">Receipts:</span>
                             {monthPayoutTxs.map((tx, idx) => (
-                              <span key={tx.id || idx} className="bg-white border border-gray-200 px-2.5 py-1 rounded-lg font-medium shrink-0 flex items-center gap-1.5 shadow-2xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                <strong>{formatCurrency(tx.amount)}</strong>
-                                <span className="text-gray-400 capitalize">({tx.wallet_type?.replace(/_/g, ' ')})</span>
+                              <span key={tx.id || idx} className="bg-[#1D1D41] border border-[#27264E] px-2.5 py-1 rounded-lg font-medium shrink-0 flex items-center gap-1.5 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#02B15A]" />
+                                <strong className="text-white">{formatCurrency(tx.amount)}</strong>
+                                <span className="text-[#AEABD8] capitalize">({tx.wallet_type?.replace(/_/g, ' ')})</span>
                                 {tx.verification_proof_url && (
-                                  <a href={tx.verification_proof_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800" title="View attached receipt">
+                                  <a href={tx.verification_proof_url} target="_blank" rel="noopener noreferrer" className="text-[#64CFF6] hover:underline" title="View attached receipt">
                                     <Paperclip size={11} />
                                   </a>
                                 )}
@@ -3942,13 +3946,13 @@ Thank you for your prompt payment! 🙏`;
 
             {/* "Yet to Pay" Section (Pending Member Action Cards) */}
             {activeGroup && (
-              <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-3.5">
+              <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-xl">
+                <div className="flex justify-between items-center border-b border-[#27264E] pb-3.5">
                   <div>
-                    <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                      <Users size={18} className="text-indigo-600" />
+                    <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                      <Users size={18} className="text-[#64CFF6]" />
                       <span>{pendingList.length} yet to pay</span>
-                      <span className="text-xs font-normal text-gray-500 hidden sm:inline">
+                      <span className="text-xs font-normal text-[#AEABD8] hidden sm:inline">
                         ({partialCount} partial · {unpaidCount} unpaid)
                       </span>
                       <HelpTooltip text="Subscribers with unpaid or partial dues for the selected month cycle." />
@@ -3962,28 +3966,28 @@ Thank you for your prompt payment! 🙏`;
                           setRemindModalTab('individual');
                           setShowRemindModal(true);
                         }}
-                        className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-xl transition-all active:scale-95 shadow-2xs"
+                        className="flex items-center gap-1.5 text-xs font-bold text-[#64CFF6] bg-[#27264E] hover:bg-[#323062] border border-[#64CFF6]/30 px-3 py-1.5 rounded-xl transition-all active:scale-95 shadow-2xs cursor-pointer"
                       >
-                        <Send size={13} className="text-emerald-600" />
+                        <Send size={13} className="text-[#64CFF6]" />
                         <span>Remind All</span>
                       </button>
                     )}
-                    <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg">
+                    <span className="bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg">
                       Month {selectedDashboardMonth} Dues
                     </span>
                   </div>
                 </div>
 
                 {loadingDashboardData ? (
-                  <div className="py-10 text-center text-gray-400 text-xs flex items-center justify-center gap-2">
-                    <RefreshCw size={15} className="animate-spin text-indigo-600" />
+                  <div className="py-10 text-center text-[#AEABD8] text-xs flex items-center justify-center gap-2">
+                    <RefreshCw size={15} className="animate-spin text-[#64CFF6]" />
                     <span>Loading subscriber dues...</span>
                   </div>
                 ) : pendingList.length === 0 ? (
-                  <div className="py-10 text-center bg-emerald-50/50 border border-emerald-100 rounded-2xl space-y-1.5">
-                    <CheckCircle2 size={28} className="mx-auto text-emerald-600" />
-                    <p className="text-sm font-bold text-emerald-900">All subscribers have paid for Month {selectedDashboardMonth}!</p>
-                    <p className="text-xs text-emerald-600 font-medium">Total collected: {formatCurrency(actualCollectionsTotal)}</p>
+                  <div className="py-10 text-center bg-[#141332] border border-[#02B15A]/30 rounded-2xl space-y-1.5">
+                    <CheckCircle2 size={28} className="mx-auto text-[#02B15A]" />
+                    <p className="text-sm font-bold text-white">All subscribers have paid for Month {selectedDashboardMonth}!</p>
+                    <p className="text-xs text-[#02B15A] font-medium">Total collected: {formatCurrency(actualCollectionsTotal)}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
@@ -3992,46 +3996,46 @@ Thank you for your prompt payment! 🙏`;
                       return (
                         <div
                           key={member.id}
-                          className="bg-gray-50/80 hover:bg-white border border-gray-200/90 hover:border-gray-300 rounded-2xl p-4 sm:p-4.5 flex items-center justify-between gap-3 sm:gap-4 transition-all shadow-2xs"
+                          className="bg-[#141332] hover:bg-[#1D1D41] border border-[#27264E] hover:border-[#6359E9] rounded-2xl p-4 sm:p-4.5 flex items-center justify-between gap-3 sm:gap-4 transition-all shadow-md group"
                         >
                           <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
                             {/* Avatar */}
-                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-2xs">
+                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#9C2CF3] to-[#3A6FF9] text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-md">
                               {initial}
                             </div>
 
                             <div className="min-w-0 flex-1 space-y-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-gray-900 text-sm leading-snug">{member.name}</span>
-                                <span className="text-[10px] font-bold bg-gray-200/80 text-gray-700 px-2 py-0.5 rounded-md font-mono shrink-0">
+                                <span className="font-bold text-white text-sm leading-snug">{member.name}</span>
+                                <span className="text-[10px] font-bold bg-[#27264E] text-[#64CFF6] px-2 py-0.5 rounded-md font-mono shrink-0 border border-[#3A3A5A]">
                                   #{member.ticket}
                                 </span>
                               </div>
 
                               <div className="flex items-center gap-2 text-xs leading-normal flex-wrap">
                                 {member.status === 'partial' ? (
-                                  <span className="text-amber-800 font-extrabold bg-amber-100/80 border border-amber-200 px-2 py-0.5 rounded-md text-[9px] uppercase tracking-wider shrink-0">
+                                  <span className="text-amber-300 font-extrabold bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md text-[9px] uppercase tracking-wider shrink-0">
                                     Partial
                                   </span>
                                 ) : (
-                                  <span className="text-rose-800 font-extrabold bg-rose-100/80 border border-rose-200 px-2 py-0.5 rounded-md text-[9px] uppercase tracking-wider shrink-0">
+                                  <span className="text-[#FF6B6B] font-extrabold bg-[#E41414]/15 border border-[#E41414]/30 px-2 py-0.5 rounded-md text-[9px] uppercase tracking-wider shrink-0">
                                     Unpaid
                                   </span>
                                 )}
-                                <span className="text-gray-500 font-medium whitespace-nowrap">
-                                  Due: <strong className="text-gray-900 font-extrabold">{formatCurrency(member.remaining)}</strong>
+                                <span className="text-[#AEABD8] font-medium whitespace-nowrap">
+                                  Due: <strong className="text-white font-extrabold">{formatCurrency(member.remaining)}</strong>
                                 </span>
                                 {member.paid > 0 && (
-                                  <span className="text-emerald-600 font-medium hidden sm:inline">
+                                  <span className="text-[#02B15A] font-medium hidden sm:inline">
                                     (Paid: {formatCurrency(member.paid)})
                                   </span>
                                 )}
                               </div>
 
                               {member.status === 'partial' && (
-                                <div className="w-28 sm:w-32 bg-gray-200 rounded-full h-1.5 overflow-hidden mt-1.5">
+                                <div className="w-28 sm:w-32 bg-[#27264E] rounded-full h-1.5 overflow-hidden mt-1.5">
                                   <div
-                                    className="bg-amber-500 h-full rounded-full"
+                                    className="bg-amber-400 h-full rounded-full"
                                     style={{ width: `${Math.min(100, (member.paid / member.effectiveDue) * 100)}%` }}
                                   />
                                 </div>
@@ -4057,7 +4061,7 @@ Thank you for your prompt payment! 🙏`;
                                 setPaymentNote('');
                                 setPaymentReceiptUrl('');
                               }}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-xs shrink-0 flex items-center gap-1.5 active:scale-95"
+                              className="bg-[#02B15A] hover:bg-[#029B4F] text-white font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#02B15A]/20 shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer"
                             >
                               <Coins size={13} />
                               <span>Record</span>
@@ -4071,10 +4075,10 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* Collapsible Paid Members Section */}
                 {paidList.length > 0 && (
-                  <div className="pt-2 border-t border-gray-100">
+                  <div className="pt-2 border-t border-[#27264E]">
                     <button
                       onClick={() => setHidePaidMembers(!hidePaidMembers)}
-                      className="text-xs font-bold text-gray-600 hover:text-gray-900 flex items-center gap-1.5 py-1 active:scale-95"
+                      className="text-xs font-bold text-[#AEABD8] hover:text-white flex items-center gap-1.5 py-1 active:scale-95 cursor-pointer"
                     >
                       {hidePaidMembers ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                       <span>{hidePaidMembers ? 'Show' : 'Hide'} Paid Members ({paidList.length})</span>
@@ -4092,15 +4096,15 @@ Thank you for your prompt payment! 🙏`;
                           return (
                             <div
                               key={member.id}
-                              className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-2.5 flex items-center justify-between text-xs hover:border-emerald-300 transition-colors"
+                              className="bg-[#141332] border border-[#02B15A]/20 rounded-xl p-2.5 flex items-center justify-between text-xs hover:border-[#02B15A]/50 transition-colors"
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-                                <span className="font-semibold text-gray-900 truncate">{member.name}</span>
-                                <span className="text-[10px] text-gray-500 font-mono">#{member.ticket}</span>
+                                <CheckCircle2 size={15} className="text-[#02B15A] shrink-0" />
+                                <span className="font-semibold text-white truncate">{member.name}</span>
+                                <span className="text-[10px] text-[#AEABD8] font-mono">#{member.ticket}</span>
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="font-bold text-emerald-700 mr-0.5">
+                                <span className="font-bold text-[#02B15A] mr-0.5">
                                   {formatCurrency(member.paid)} paid
                                 </span>
                                 {memTx && (
@@ -4112,7 +4116,7 @@ Thank you for your prompt payment! 🙏`;
                                         setViewingReceiptTx({ tx: memTx, member });
                                       }}
                                       title="Share Receipt PNG"
-                                      className="p-1 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100 rounded-md transition-colors cursor-pointer"
+                                      className="p-1 text-[#02B15A] hover:text-white hover:bg-[#02B15A]/20 rounded-md transition-colors cursor-pointer"
                                     >
                                       <Share2 size={12} />
                                     </button>
@@ -4120,7 +4124,7 @@ Thank you for your prompt payment! 🙏`;
                                       type="button"
                                       onClick={() => handleOpenEditPayment(memTx)}
                                       title="Edit payment receipt"
-                                      className="p-1 text-emerald-700 hover:text-indigo-700 hover:bg-emerald-100 rounded-md transition-colors cursor-pointer"
+                                      className="p-1 text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#27264E] rounded-md transition-colors cursor-pointer"
                                     >
                                       <Edit3 size={12} />
                                     </button>
@@ -4139,26 +4143,26 @@ Thank you for your prompt payment! 🙏`;
 
             {/* Payments Breakdown Ledger & WhatsApp Sharing */}
             {activeGroup && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-5 space-y-3 sm:space-y-4 shadow-2xs">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-5 space-y-3 sm:space-y-4 shadow-xl">
+                <div className="flex justify-between items-center border-b border-[#27264E] pb-3">
                   <div>
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                      <Banknote size={16} className="text-indigo-600" />
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Banknote size={16} className="text-[#64CFF6]" />
                       <span>Payments Breakdown Ledger</span>
                       <HelpTooltip text={`Live payment receipts logged for Month ${selectedDashboardMonth}. Includes instant WhatsApp sharing and receipt editing.`} />
                     </h3>
                   </div>
-                  <span className="text-xs font-bold text-gray-500 shrink-0">
+                  <span className="text-xs font-bold text-[#AEABD8] shrink-0">
                     {currentMonthTransactions.length} receipts
                   </span>
                 </div>
 
                 {currentMonthTransactions.length === 0 ? (
-                  <div className="py-6 text-center text-gray-400 text-xs">
+                  <div className="py-6 text-center text-[#AEABD8] text-xs">
                     No payment receipts logged for Month {selectedDashboardMonth} yet. Use "Record" above to log collections.
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-[#27264E]">
                     {currentMonthTransactions.map((tx) => {
                       const matchedMember = dashboardGroupMembers.find(m => m.profileId === tx.profile_id || m.id === tx.group_member_id);
                       const memberName = matchedMember?.name || 'Subscriber';
@@ -4168,15 +4172,15 @@ Thank you for your prompt payment! 🙏`;
                         : 'Today';
 
                       return (
-                        <div key={tx.id} className="py-2.5 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-gray-50/50 rounded-lg px-2">
+                        <div key={tx.id} className="py-2.5 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#27264E]/40 rounded-xl px-2.5 transition-colors">
                           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                            <div className="w-8 h-8 rounded-lg bg-[#27264E] border border-[#3A3A5A] text-[#64CFF6] flex items-center justify-center font-bold text-xs shrink-0">
                               #{ticketNum}
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                <span className="text-xs font-bold text-gray-900 truncate">{memberName}</span>
-                                <span className="text-[10px] font-mono bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded shrink-0">
+                                <span className="text-xs font-bold text-white truncate">{memberName}</span>
+                                <span className="text-[10px] font-mono bg-[#141332] text-[#AEABD8] px-1.5 py-0.2 rounded shrink-0 border border-[#27264E]">
                                   {tx.wallet_type === 'kishor_bank'
                                     ? 'KISHOR BANK (UPI)'
                                     : tx.wallet_type === 'dad_bank'
@@ -4186,12 +4190,12 @@ Thank you for your prompt payment! 🙏`;
                                     : 'CASH IN HAND'}
                                 </span>
                                 {tx.verification_proof_url && (
-                                  <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded flex items-center gap-0.5 shrink-0">
+                                  <span className="text-[9px] font-bold bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 px-1 py-0.2 rounded flex items-center gap-0.5 shrink-0">
                                     <Paperclip size={9} /> Receipt
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 text-[10px] text-gray-400 flex-wrap">
+                              <div className="flex items-center gap-2 text-[10px] text-[#AEABD8] flex-wrap">
                                 <span>{dateStr}</span>
                                 {tx.notes && (() => {
                                   const clean = tx.notes.replace(/\[Batch:[^\]]+\]/g, '').trim();
@@ -4199,9 +4203,9 @@ Thank you for your prompt payment! 🙏`;
                                   const total = batchMatch ? parseFloat(batchMatch[2]) : null;
                                   return (
                                     <>
-                                      {clean && <span className="text-gray-500 italic max-w-[150px] sm:max-w-xs truncate">· {clean}</span>}
+                                      {clean && <span className="text-[#AEABD8]/80 italic max-w-[150px] sm:max-w-xs truncate">· {clean}</span>}
                                       {total && total !== Number(tx.amount) && (
-                                        <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                                        <span className="text-[9px] font-bold text-[#64CFF6] bg-[#27264E] border border-[#3A3A5A] px-1.5 py-0.2 rounded">
                                           Part of {formatCurrency(total)} Batch
                                         </span>
                                       )}
@@ -4213,7 +4217,7 @@ Thank you for your prompt payment! 🙏`;
                           </div>
 
                           <div className="flex items-center gap-2 justify-between sm:justify-end shrink-0 pt-1 sm:pt-0">
-                            <span className="text-xs font-bold text-emerald-600 mr-1">
+                            <span className="text-xs font-bold text-[#02B15A] mr-1">
                               +{formatCurrency(Number(tx.amount || 0))}
                             </span>
 
@@ -4227,7 +4231,7 @@ Thank you for your prompt payment! 🙏`;
                                     setViewingReceiptTx({ tx, member: matchedMember });
                                   }}
                                   title="Share Receipt PNG"
-                                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors active:scale-95 cursor-pointer shadow-2xs"
+                                  className="flex items-center gap-1 text-[11px] font-bold text-[#02B15A] bg-[#02B15A]/15 hover:bg-[#02B15A]/25 border border-[#02B15A]/30 px-2.5 py-1 rounded-lg transition-colors active:scale-95 cursor-pointer shadow-2xs"
                                 >
                                   <Share2 size={12} />
                                   <span className="text-[10px]">Share</span>
@@ -4239,7 +4243,7 @@ Thank you for your prompt payment! 🙏`;
                                 type="button"
                                 onClick={() => handleOpenEditPayment(tx)}
                                 title="Edit payment"
-                                className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-lg transition-colors active:scale-95"
+                                className="p-1.5 text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#27264E] border border-[#27264E] hover:border-[#64CFF6]/40 rounded-lg transition-colors active:scale-95 cursor-pointer"
                               >
                                 <Edit3 size={13} />
                               </button>
@@ -4249,7 +4253,7 @@ Thank you for your prompt payment! 🙏`;
                                 type="button"
                                 onClick={() => handleDeletePayment(tx)}
                                 title="Delete payment receipt"
-                                className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-200 hover:border-rose-200 rounded-lg transition-colors active:scale-95"
+                                className="p-1.5 text-[#AEABD8] hover:text-[#FF6B6B] hover:bg-[#E41414]/15 border border-[#27264E] hover:border-[#E41414]/40 rounded-lg transition-colors active:scale-95 cursor-pointer"
                               >
                                 <Trash2 size={13} />
                               </button>
@@ -4265,26 +4269,26 @@ Thank you for your prompt payment! 🙏`;
 
             {/* Unified Quick Record & Edit Payment Modal */}
             {(recordingPaymentMember || editingTransaction) && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+              <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
                 <form
                   onSubmit={editingTransaction ? handleSavePaymentEdit : handleRecordQuickPayment}
-                  className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 w-full max-w-md space-y-3.5 sm:space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto"
+                  className="bg-[#1D1D41] rounded-3xl border border-[#27264E] p-4 sm:p-6 w-full max-w-md space-y-3.5 sm:space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto text-white"
                 >
                   {/* Modal Header */}
-                  <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                  <div className="flex justify-between items-center border-b border-[#27264E] pb-3">
                     <div className="flex items-center gap-2.5">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                         editingTransaction 
-                          ? 'bg-indigo-100 text-indigo-800' 
-                          : 'bg-emerald-100 text-emerald-800'
+                          ? 'bg-[#6359E9]/20 text-[#64CFF6]' 
+                          : 'bg-[#02B15A]/20 text-[#02B15A]'
                       }`}>
                         {editingTransaction ? <Edit3 size={16} /> : <Coins size={16} />}
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-gray-900">
+                        <h4 className="text-sm font-bold text-white">
                           {editingTransaction ? 'Edit payment' : 'Record Installment Payment'}
                         </h4>
-                        <p className="text-[10px] text-gray-500">
+                        <p className="text-[10px] text-[#AEABD8]">
                           {editingTransaction 
                             ? `Receipt #${editingTransaction.id.slice(0, 8)} · Month ${selectedDashboardMonth}`
                             : `Month ${selectedDashboardMonth} · ${activeGroup?.name}`}
@@ -4297,7 +4301,7 @@ Thank you for your prompt payment! 🙏`;
                         setRecordingPaymentMember(null);
                         setEditingTransaction(null);
                       }}
-                      className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                      className="text-[#AEABD8] hover:text-white p-1 rounded-lg hover:bg-[#27264E] transition-colors cursor-pointer"
                     >
                       <X size={16} />
                     </button>
@@ -4312,28 +4316,28 @@ Thank you for your prompt payment! 🙏`;
                     const ticketNum = matchedMember?.ticket || (recordingPaymentMember ? recordingPaymentMember.ticket : '?');
 
                     return (
-                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex justify-between items-center text-xs">
+                      <div className="bg-[#141332] border border-[#27264E] rounded-xl p-3 flex justify-between items-center text-xs">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#9C2CF3] to-[#3A6FF9] text-white font-bold text-xs flex items-center justify-center shrink-0">
                             {subscriberName.charAt(0).toUpperCase()}
                           </div>
                           <div className="truncate">
-                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Subscriber</span>
-                            <span className="font-bold text-gray-900 truncate block">{subscriberName}</span>
-                            <span className="text-gray-500 text-[10px] font-mono">#{ticketNum}</span>
+                            <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Subscriber</span>
+                            <span className="font-bold text-white truncate block">{subscriberName}</span>
+                            <span className="text-[#64CFF6] text-[10px] font-mono">#{ticketNum}</span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
                           {recordingPaymentMember ? (
                             <>
-                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                              <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
                                 {recordingPaymentMember.totalPendingToday > recordingPaymentMember.remaining ? 'Total Due Today' : 'Remaining Due'}
                               </span>
-                              <span className="font-extrabold text-amber-600 text-sm">
+                              <span className="font-extrabold text-[#FFBB38] text-sm">
                                 {formatCurrency(recordingPaymentMember.totalPendingToday > 0 ? recordingPaymentMember.totalPendingToday : recordingPaymentMember.remaining)}
                               </span>
                               {recordingPaymentMember.totalPendingToday > recordingPaymentMember.remaining && (
-                                <span className="text-[9px] text-gray-500 font-medium block">
+                                <span className="text-[9px] text-[#AEABD8] font-medium block">
                                   (M{selectedDashboardMonth} Due: {formatCurrency(recordingPaymentMember.remaining)})
                                 </span>
                               )}
@@ -4344,11 +4348,11 @@ Thank you for your prompt payment! 🙏`;
                               const batchTotal = match ? parseFloat(match[2]) : null;
                               return (
                                 <>
-                                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Logged Amount</span>
+                                  <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Logged Amount</span>
                                   <div className="flex items-center gap-1.5 justify-end flex-wrap">
-                                    <span className="font-bold text-indigo-600">{formatCurrency(Number(editingTransaction.amount || 0))}</span>
+                                    <span className="font-bold text-[#64CFF6]">{formatCurrency(Number(editingTransaction.amount || 0))}</span>
                                     {batchTotal && batchTotal !== Number(editingTransaction.amount) && (
-                                      <span className="text-[9.5px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.2 rounded">
+                                      <span className="text-[9.5px] font-extrabold bg-[#27264E] text-[#64CFF6] border border-[#3A3A5A] px-1.5 py-0.2 rounded">
                                         Part of {formatCurrency(batchTotal)} Total
                                       </span>
                                     )}
@@ -4362,13 +4366,13 @@ Thank you for your prompt payment! 🙏`;
                     );
                   })()}
 
-                  {/* Payment Amount Input (Large Centered High-Legibility Input for Parents) */}
+                  {/* Payment Amount Input (Large Centered High-Legibility Input) */}
                   <div className="space-y-1.5 text-center">
-                    <label className="text-[11px] text-gray-500 font-extrabold uppercase tracking-wider block">
+                    <label className="text-[11px] text-[#AEABD8] font-extrabold uppercase tracking-wider block">
                       Payment Amount (₹)
                     </label>
                     <div className="relative max-w-[320px] mx-auto">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-400 select-none">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-[#AEABD8] select-none">
                         ₹
                       </span>
                       <input
@@ -4377,20 +4381,20 @@ Thank you for your prompt payment! 🙏`;
                         placeholder="0"
                         value={quickPaymentAmount}
                         onChange={(e) => setQuickPaymentAmount(e.target.value)}
-                        className="w-full bg-white border-2 border-gray-200 focus:border-indigo-600 rounded-2xl pl-10 pr-6 py-3.5 text-2xl sm:text-3xl font-black text-gray-900 tracking-tight shadow-xs text-center focus:outline-none transition-all"
+                        className="w-full bg-[#141332] border-2 border-[#27264E] focus:border-[#6359E9] rounded-2xl pl-10 pr-6 py-3.5 text-2xl sm:text-3xl font-black text-white tracking-tight shadow-xs text-center focus:outline-none transition-all"
                       />
                     </div>
                   </div>
 
                   {/* Payment Distribution Preview Card */}
                   {recordingPaymentMember && parseFloat(quickPaymentAmount) > 0 && (
-                    <div className="space-y-2 bg-slate-50 border border-gray-200 rounded-xl p-3 animate-in fade-in duration-150">
-                      <div className="flex justify-between items-center border-b border-gray-200 pb-1.5">
-                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Coins size={12} className="text-emerald-600" />
+                    <div className="space-y-2 bg-[#141332] border border-[#27264E] rounded-xl p-3 animate-in fade-in duration-150">
+                      <div className="flex justify-between items-center border-b border-[#27264E] pb-1.5">
+                        <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Coins size={12} className="text-[#02B15A]" />
                           <span>How this payment applies:</span>
                         </span>
-                        <span className="text-xs font-black text-gray-900">
+                        <span className="text-xs font-black text-white">
                           Total: {formatCurrency(parseFloat(quickPaymentAmount))}
                         </span>
                       </div>
@@ -4423,10 +4427,10 @@ Thank you for your prompt payment! 🙏`;
                                 : `${monthName} '${yearShort} (M${alloc.month})`;
 
                               const badgeStyle = alloc.type === 'arrear'
-                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                ? 'bg-[#02B15A]/20 text-[#02B15A] border-[#02B15A]/30'
                                 : alloc.type === 'current'
-                                  ? 'bg-indigo-100 text-indigo-800 border-indigo-200'
-                                  : 'bg-purple-100 text-purple-800 border-purple-200';
+                                  ? 'bg-[#6359E9]/20 text-[#64CFF6] border-[#6359E9]/30'
+                                  : 'bg-purple-500/20 text-purple-300 border-purple-500/30';
 
                               const typeName = alloc.type === 'arrear'
                                 ? 'Old Dues Cleared'
@@ -4437,20 +4441,20 @@ Thank you for your prompt payment! 🙏`;
                               return (
                                 <div
                                   key={alloc.month}
-                                  className="flex items-center justify-between text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-2 shadow-2xs"
+                                  className="flex items-center justify-between text-xs bg-[#1D1D41] border border-[#27264E] rounded-lg px-2.5 py-2 shadow-2xs"
                                 >
                                   <div className="flex items-center gap-2">
-                                    <span className="font-extrabold text-gray-900">{formattedMonthLabel}</span>
+                                    <span className="font-extrabold text-white">{formattedMonthLabel}</span>
                                     <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${badgeStyle}`}>
                                       {typeName}
                                     </span>
                                     {alloc.statusAfter === 'partial' && (
-                                      <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                      <span className="text-[9px] font-bold text-[#FFBB38] bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30">
                                         Partial (Remaining: {formatCurrency(Math.max(0, alloc.due - (alloc.priorPaid + alloc.amount)))})
                                       </span>
                                     )}
                                   </div>
-                                  <span className="font-black text-gray-900">
+                                  <span className="font-black text-white">
                                     {formatCurrency(alloc.amount)}
                                   </span>
                                 </div>
@@ -4464,7 +4468,7 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* 4-Wallet Selector (Receiving Account / Vault) */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Receiving Account / Vault</label>
+                    <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Receiving Account / Vault</label>
                     <div className="grid grid-cols-2 gap-2">
                       {[
                         { id: 'cash_in_hand', label: 'Cash in Hand', icon: Banknote },
@@ -4479,13 +4483,13 @@ Thank you for your prompt payment! 🙏`;
                             key={w.id}
                             type="button"
                             onClick={() => setPaymentWalletType(w.id)}
-                            className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all text-left ${
+                            className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer ${
                               isSelected
-                                ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-500/20 shadow-xs'
-                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700'
+                                ? 'bg-[#6359E9] border-[#6F64FF] text-white shadow-md shadow-[#6359E9]/30'
+                                : 'bg-[#141332] border-[#27264E] hover:bg-[#27264E] text-[#AEABD8] hover:text-white'
                             }`}
                           >
-                            <Icon size={14} className={isSelected ? 'text-indigo-600' : 'text-gray-500'} />
+                            <Icon size={14} className={isSelected ? 'text-white' : 'text-[#64CFF6]'} />
                             <span className="truncate">{w.label}</span>
                           </button>
                         );
@@ -4495,7 +4499,7 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* Date Selector (Today / Yesterday / Custom) */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Date</label>
+                    <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Date</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { id: 'today', label: 'Today' },
@@ -4508,10 +4512,10 @@ Thank you for your prompt payment! 🙏`;
                             key={d.id}
                             type="button"
                             onClick={() => setPaymentDateType(d.id as any)}
-                            className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
+                            className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
                               isSelected
-                                ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
-                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700'
+                                ? 'bg-[#6359E9] border-[#6F64FF] text-white shadow-md shadow-[#6359E9]/30'
+                                : 'bg-[#141332] border-[#27264E] hover:bg-[#27264E] text-[#AEABD8] hover:text-white'
                             }`}
                           >
                             {d.label}
@@ -4526,7 +4530,7 @@ Thank you for your prompt payment! 🙏`;
                           type="date"
                           value={customPaymentDate}
                           onChange={(e) => setCustomPaymentDate(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                          className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none"
                         />
                       </div>
                     )}
@@ -4534,36 +4538,36 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* Note (optional) */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Note (optional)</label>
+                    <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Note (optional)</label>
                     <input
                       type="text"
                       placeholder="e.g. Paid via GPay / Handed cash to Dad"
                       value={paymentNote}
                       onChange={(e) => setPaymentNote(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-medium text-gray-900 focus:outline-none"
+                      className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-medium text-white placeholder-[#AEABD8]/60 focus:outline-none"
                     />
                   </div>
 
                   {/* Receipt Photo Attachment */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Receipt Attachment</label>
+                    <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Receipt Attachment</label>
                     {paymentReceiptUrl ? (
-                      <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                      <div className="flex items-center justify-between p-2.5 bg-[#02B15A]/15 border border-[#02B15A]/30 rounded-xl">
                         <div className="flex items-center gap-2.5">
                           <img
                             src={paymentReceiptUrl}
                             alt="Receipt preview"
-                            className="w-10 h-10 object-cover rounded-lg border border-emerald-300"
+                            className="w-10 h-10 object-cover rounded-lg border border-[#02B15A]"
                           />
                           <div className="text-left">
-                            <span className="text-xs font-bold text-emerald-900 block">Receipt Attached</span>
-                            <span className="text-[10px] text-emerald-700">Photo ready</span>
+                            <span className="text-xs font-bold text-white block">Receipt Attached</span>
+                            <span className="text-[10px] text-[#02B15A]">Photo ready</span>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => setPaymentReceiptUrl('')}
-                          className="text-rose-600 hover:text-rose-800 text-xs font-bold px-2 py-1 rounded-lg hover:bg-rose-50"
+                          className="text-[#FF6B6B] hover:text-white text-xs font-bold px-2 py-1 rounded-lg hover:bg-[#E41414]/20 cursor-pointer"
                         >
                           Remove
                         </button>
@@ -4579,9 +4583,9 @@ Thank you for your prompt payment! 🙏`;
                         />
                         <label
                           htmlFor="dashboard-receipt-upload"
-                          className="flex items-center justify-center gap-2 border border-dashed border-gray-300 hover:border-gray-400 bg-gray-50/70 hover:bg-gray-100 rounded-xl py-2.5 px-3 text-xs text-gray-600 font-semibold cursor-pointer transition-colors"
+                          className="flex items-center justify-center gap-2 border border-dashed border-[#27264E] hover:border-[#6359E9] bg-[#141332] hover:bg-[#27264E]/60 rounded-xl py-2.5 px-3 text-xs text-[#AEABD8] hover:text-white font-semibold cursor-pointer transition-colors"
                         >
-                          <Paperclip size={14} className="text-gray-500" />
+                          <Paperclip size={14} className="text-[#64CFF6]" />
                           <span>Attach receipt photo</span>
                         </label>
                       </div>
@@ -4595,7 +4599,7 @@ Thank you for your prompt payment! 🙏`;
                         type="button"
                         onClick={() => handleDeletePayment(editingTransaction)}
                         disabled={isProcessingPayment}
-                        className="w-full sm:w-auto text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                        className="w-full sm:w-auto text-[#FF6B6B] hover:text-white hover:bg-[#E41414]/20 border border-[#E41414]/30 px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
                       >
                         <Trash2 size={13} />
                         <span>Delete</span>
@@ -4609,14 +4613,14 @@ Thank you for your prompt payment! 🙏`;
                           setRecordingPaymentMember(null);
                           setEditingTransaction(null);
                         }}
-                        className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-all text-center"
+                        className="w-full sm:w-auto border border-[#27264E] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-all text-center cursor-pointer"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={isProcessingPayment}
-                        className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        className="w-full sm:w-auto bg-[#02B15A] hover:bg-[#029B4F] text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-all shadow-md shadow-[#02B15A]/20 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                       >
                         <Check size={14} />
                         <span>
@@ -4670,14 +4674,14 @@ Thank you for your prompt payment! 🙏`;
             })()}
 
             {/* Live System Activity and Audit Log */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
-              <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <ShieldAlert size={16} className="text-indigo-650" />
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-5 space-y-4 shadow-xl">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <ShieldAlert size={16} className="text-[#64CFF6]" />
                 Live System Audit Log
               </h4>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left text-gray-600">
-                  <thead className="text-[10px] text-gray-500 uppercase bg-gray-50 rounded-lg">
+                <table className="w-full text-xs text-left text-[#AEABD8]">
+                  <thead className="text-[10px] text-[#AEABD8] uppercase bg-[#141332] rounded-lg border-b border-[#27264E]">
                     <tr>
                       <th className="py-2.5 px-3">Timestamp</th>
                       <th className="py-2.5 px-3">Table</th>
@@ -4685,24 +4689,24 @@ Thank you for your prompt payment! 🙏`;
                       <th className="py-2.5 px-3 text-right">Executor</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-[#27264E]">
                     {auditLogs.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="py-6 text-center text-gray-400 text-xs">
+                        <td colSpan={4} className="py-6 text-center text-[#AEABD8] text-xs">
                           No transactions logged yet. Real database transactions will appear here live.
                         </td>
                       </tr>
                     ) : (
                       auditLogs.map((log, index) => (
-                        <tr key={index} className="hover:bg-gray-50/50">
-                          <td className="py-3 px-3 font-medium text-gray-400">{log.timestamp}</td>
+                        <tr key={index} className="hover:bg-[#27264E]/40 transition-colors">
+                          <td className="py-3 px-3 font-medium text-[#AEABD8]">{log.timestamp}</td>
                           <td className="py-3 px-3">
-                            <span className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-mono">
+                            <span className="bg-[#27264E] text-[#64CFF6] px-1.5 py-0.5 rounded font-mono border border-[#3A3A5A]">
                               {log.table}
                             </span>
                           </td>
-                          <td className="py-3 px-3 text-gray-700">{log.desc}</td>
-                          <td className="py-3 px-3 text-right font-medium text-indigo-600">{log.executor}</td>
+                          <td className="py-3 px-3 text-white">{log.desc}</td>
+                          <td className="py-3 px-3 text-right font-medium text-[#64CFF6]">{log.executor}</td>
                         </tr>
                       ))
                     )}
@@ -4795,88 +4799,88 @@ Thank you for your prompt payment! 🙏`;
             <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200">
               
               {/* Workspace Top Navigation Bar */}
-              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => setSelectedWorkspaceGroupId(null)}
-                    className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs w-fit active:scale-95"
+                    className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs w-fit active:scale-95"
                   >
                     <ArrowLeft size={14} /> Back to Directory
                   </button>
-                  <div className="h-5 w-px bg-gray-200 hidden sm:block"></div>
+                  <div className="h-5 w-px bg-[#27264E] hidden sm:block"></div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`w-2.5 h-2.5 rounded-full ${
-                      selectedWorkspaceGroup.status === 'draft' ? 'bg-amber-500' : selectedWorkspaceGroup.status === 'completed' ? 'bg-purple-500' : 'bg-green-500 animate-pulse'
+                      selectedWorkspaceGroup.status === 'draft' ? 'bg-[#FFBB38]' : selectedWorkspaceGroup.status === 'completed' ? 'bg-[#9C2CF3]' : 'bg-[#02B15A] animate-pulse'
                     }`}></span>
-                    <h3 className="text-sm sm:text-base font-bold text-gray-900 truncate max-w-[180px] sm:max-w-none">{selectedWorkspaceGroup.name}</h3>
+                    <h3 className="text-sm sm:text-base font-bold text-white truncate max-w-[180px] sm:max-w-none">{selectedWorkspaceGroup.name}</h3>
                     <span className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${
                       selectedWorkspaceGroup.status === 'draft'
-                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        ? 'bg-[#FFBB38]/10 text-[#FFBB38] border-[#FFBB38]/30'
                         : selectedWorkspaceGroup.status === 'completed'
-                          ? 'bg-purple-50 text-purple-700 border-purple-200'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          ? 'bg-[#9C2CF3]/10 text-[#C084FC] border-[#9C2CF3]/30'
+                          : 'bg-[#02B15A]/10 text-[#02B15A] border-[#02B15A]/30'
                     }`}>
                       {selectedWorkspaceGroup.status ? selectedWorkspaceGroup.status.toUpperCase() : 'ACTIVE'}
                     </span>
-                    <span className="text-[9px] sm:text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-150 px-2 py-0.5 rounded">
+                    <span className="text-[9px] sm:text-[10px] font-bold bg-[#6359E9]/15 text-[#64CFF6] border border-[#6359E9]/30 px-2 py-0.5 rounded">
                       Month {selectedWorkspaceGroup.currentMonth} of {selectedWorkspaceGroup.duration}
                     </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#27264E]">
                   <button
                     type="button"
                     onClick={() => openEditGroupModal(selectedWorkspaceGroup)}
-                    className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors active:scale-95"
+                    className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors active:scale-95"
                   >
-                    <Edit3 size={13} className="text-gray-500" /> Edit Details
+                    <Edit3 size={13} className="text-[#AEABD8]" /> Edit Details
                   </button>
                   <button
                     type="button"
                     onClick={() => openSoftDeleteModal(selectedWorkspaceGroup)}
-                    className="border border-red-200 bg-red-50/60 hover:bg-red-100 text-red-700 font-bold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs active:scale-95"
+                    className="border border-[#E41414]/30 bg-[#E41414]/10 hover:bg-[#E41414]/20 text-[#E41414] font-bold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs active:scale-95"
                     title="Move group to Recycle Bin"
                   >
-                    <Trash2 size={13} className="text-red-600" /> Move to Bin
+                    <Trash2 size={13} className="text-[#E41414]" /> Move to Bin
                   </button>
                 </div>
               </div>
 
               {/* Group Key Metric Statistics (2x2 on mobile, 4 on desktop) */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-                <div className="bg-white border border-gray-200 p-3 sm:p-3.5 rounded-2xl shadow-2xs">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block truncate">Total Pool Value</span>
-                  <span className="text-base sm:text-lg font-bold text-gray-900 mt-0.5 block truncate">{formatCurrency(selectedWorkspaceGroup.totalValue)}</span>
-                  <span className="text-[10px] text-gray-400 truncate block">{selectedWorkspaceGroup.duration} Tickets</span>
+                <div className="bg-[#1D1D41] border border-[#27264E] p-3 sm:p-3.5 rounded-2xl shadow-2xs">
+                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block truncate">Total Pool Value</span>
+                  <span className="text-base sm:text-lg font-bold text-white mt-0.5 block truncate">{formatCurrency(selectedWorkspaceGroup.totalValue)}</span>
+                  <span className="text-[10px] text-[#AEABD8]/70 truncate block">{selectedWorkspaceGroup.duration} Tickets</span>
                 </div>
 
-                <div className="bg-white border border-gray-200 p-3 sm:p-3.5 rounded-2xl shadow-2xs">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block truncate">Monthly Installment</span>
-                  <span className="text-base sm:text-lg font-bold text-indigo-600 mt-0.5 block truncate">
+                <div className="bg-[#1D1D41] border border-[#27264E] p-3 sm:p-3.5 rounded-2xl shadow-2xs">
+                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block truncate">Monthly Installment</span>
+                  <span className="text-base sm:text-lg font-bold text-[#64CFF6] mt-0.5 block truncate">
                     {formatCurrency(selectedWorkspaceGroup.totalValue / selectedWorkspaceGroup.duration)}
                   </span>
-                  <span className="text-[10px] text-gray-400 truncate block">per member</span>
+                  <span className="text-[10px] text-[#AEABD8]/70 truncate block">per member</span>
                 </div>
 
-                <div className="bg-white border border-gray-200 p-3 sm:p-3.5 rounded-2xl shadow-2xs">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block truncate">Accumulated Pool</span>
-                  <span className="text-base sm:text-lg font-bold text-emerald-600 mt-0.5 block truncate">
+                <div className="bg-[#1D1D41] border border-[#27264E] p-3 sm:p-3.5 rounded-2xl shadow-2xs">
+                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block truncate">Accumulated Pool</span>
+                  <span className="text-base sm:text-lg font-bold text-[#02B15A] mt-0.5 block truncate">
                     {formatCurrency(selectedWorkspaceGroup.kaiIruppuPool || 0)}
                   </span>
-                  <span className="text-[10px] text-emerald-700 font-medium truncate block">Kai Iruppu</span>
+                  <span className="text-[10px] text-[#02B15A] font-medium truncate block">Kai Iruppu</span>
                 </div>
 
-                <div className="bg-white border border-gray-200 p-3 sm:p-3.5 rounded-2xl shadow-2xs">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block truncate">Scheduled Auction</span>
-                  <span className="text-xs sm:text-xs font-bold text-gray-800 mt-1 block truncate">
+                <div className="bg-[#1D1D41] border border-[#27264E] p-3 sm:p-3.5 rounded-2xl shadow-2xs">
+                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block truncate">Scheduled Auction</span>
+                  <span className="text-xs sm:text-xs font-bold text-white mt-1 block truncate">
                     {getGroupAuctionDate(selectedWorkspaceGroup.id).display}
                   </span>
                   <button
                     type="button"
                     onClick={() => setScheduleModalGroup(selectedWorkspaceGroup)}
-                    className="text-[9px] font-bold text-indigo-600 hover:underline mt-0.5 block cursor-pointer"
+                    className="text-[9px] font-bold text-[#64CFF6] hover:underline mt-0.5 block cursor-pointer"
                   >
                     Configure Schedule →
                   </button>
@@ -4885,15 +4889,15 @@ Thank you for your prompt payment! 🙏`;
 
               {/* Month 0 / Launch Status Banner */}
               {selectedWorkspaceGroup.currentMonth === 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="bg-[#1D1D41] border border-[#FFBB38]/40 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                      <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#FFBB38] animate-pulse"></span>
+                      <h4 className="text-xs font-bold text-[#FFBB38] uppercase tracking-wider">
                         Month 0: Launch Month — Organizer Profit Phase
                       </h4>
                     </div>
-                    <p className="text-xs text-amber-800">
+                    <p className="text-xs text-[#AEABD8]">
                       All {selectedWorkspaceGroup.duration} member installments are pooled and allocated directly to the Organizer as Organizer Profit ({formatCurrency(selectedWorkspaceGroup.totalValue)}).
                     </p>
                   </div>
@@ -4937,7 +4941,7 @@ Thank you for your prompt payment! 🙏`;
                         alert('Error updating group: ' + err.message);
                       }
                     }}
-                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs shrink-0 active:scale-95 w-full sm:w-auto cursor-pointer"
+                    className="bg-gradient-to-r from-[#FFBB38] to-[#E5A82E] text-[#141332] font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shrink-0 active:scale-95 w-full sm:w-auto cursor-pointer"
                   >
                     <Rocket size={14} /> Confirm Launch &amp; Roll to M1
                   </button>
@@ -4960,14 +4964,14 @@ Thank you for your prompt payment! 🙏`;
               />
 
               {/* Enrolled Member Ticket Roster Matrix */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-5 space-y-3 sm:space-y-4 shadow-2xs">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-gray-150 pb-3">
+              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-5 space-y-3 sm:space-y-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[#27264E] pb-3">
                   <div>
-                    <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                      <Users size={16} className="text-indigo-600" />
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Users size={16} className="text-[#64CFF6]" />
                       Enrolled Ticket Matrix
                     </h4>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-xs text-[#AEABD8] mt-0.5">
                       Live status of assigned tickets and auction winning eligibility
                     </p>
                   </div>
@@ -4978,25 +4982,25 @@ Thank you for your prompt payment! 🙏`;
                         triggerHapticFeedback('light');
                         setPrintChecklistGroup(selectedWorkspaceGroup);
                       }}
-                      className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-800 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
                       title="Print monthly payment checklist sheet / PDF"
                     >
-                      <Printer size={13} className="text-gray-600" />
+                      <Printer size={13} className="text-[#AEABD8]" />
                       <span>Print Checklist</span>
                     </button>
 
-                    <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-3 py-1.5 rounded-xl w-fit border border-gray-200">
+                    <span className="text-[10px] font-bold bg-[#141332] text-[#AEABD8] px-3 py-1.5 rounded-xl w-fit border border-[#27264E]">
                       Total: {workspaceMembers.length} / {selectedWorkspaceGroup.duration} Tickets
                     </span>
                   </div>
                 </div>
 
                 {loadingWorkspaceMembers ? (
-                  <div className="py-8 text-center text-xs text-gray-400 flex items-center justify-center gap-2">
-                    <RefreshCw size={14} className="animate-spin text-indigo-600" /> Loading enrolled ticket matrix from Supabase...
+                  <div className="py-8 text-center text-xs text-[#AEABD8] flex items-center justify-center gap-2">
+                    <RefreshCw size={14} className="animate-spin text-[#6359E9]" /> Loading enrolled ticket matrix from Supabase...
                   </div>
                 ) : workspaceMembers.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <div className="py-8 text-center text-xs text-[#AEABD8] bg-[#141332] rounded-xl border border-dashed border-[#27264E]">
                     No individual member tickets linked to this group yet.
                   </div>
                 ) : (
@@ -5006,29 +5010,29 @@ Thank you for your prompt payment! 🙏`;
                         key={member.id} 
                         className={`p-3 sm:p-3.5 rounded-2xl border transition-all space-y-2 ${
                           member.hasWon
-                            ? 'bg-gray-50/80 border-gray-200 opacity-80'
-                            : 'bg-white border-gray-200 shadow-2xs hover:border-gray-300'
+                            ? 'bg-[#141332]/60 border-[#27264E] opacity-70'
+                            : 'bg-[#141332] border-[#27264E] shadow-2xs hover:border-[#6359E9]/40'
                         }`}
                       >
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-xs font-bold w-7 h-7 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-150 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold w-7 h-7 rounded-xl bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 flex items-center justify-center shrink-0">
                               #{member.ticket}
                             </span>
                             <div className="min-w-0">
-                              <strong className="text-xs text-gray-900 block truncate max-w-[140px] sm:max-w-[170px]">{member.name}</strong>
-                              <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5 truncate">
+                              <strong className="text-xs text-white block truncate max-w-[140px] sm:max-w-[170px]">{member.name}</strong>
+                              <span className="text-[10px] text-[#AEABD8] flex items-center gap-1 mt-0.5 truncate">
                                 <Phone size={10} className="shrink-0" /> {member.phone || 'No phone'}
                               </span>
                             </div>
                           </div>
 
                           {member.hasWon ? (
-                            <span className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-0.5 rounded-full shrink-0">
+                            <span className="text-[9px] font-bold text-[#FFBB38] bg-[#FFBB38]/10 border border-[#FFBB38]/30 px-2.5 py-0.5 rounded-full shrink-0">
                               Won
                             </span>
                           ) : (
-                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full shrink-0">
+                            <span className="text-[9px] font-bold text-[#02B15A] bg-[#02B15A]/10 border border-[#02B15A]/30 px-2.5 py-0.5 rounded-full shrink-0">
                               Eligible
                             </span>
                           )}
@@ -5044,18 +5048,18 @@ Thank you for your prompt payment! 🙏`;
             /* 2. DIRECTORY VIEW */
             <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-200">
                {/* Summary Header banner */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-4">
+              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-4">
                 <div>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900">Chit Groups Directory</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Active Groups: <strong className="text-gray-700">{localGroups.filter(g => g.status !== 'deleted' && (g.status === 'active' || (!g.status && g.active))).length}</strong> · Total Value: <strong className="text-indigo-600">{formatCurrency(localGroups.filter(g => g.status !== 'deleted').reduce((acc, g) => acc + g.totalValue, 0))}</strong>
+                  <h3 className="text-sm sm:text-base font-bold text-white">Chit Groups Directory</h3>
+                  <p className="text-xs text-[#AEABD8] mt-0.5">
+                    Active Groups: <strong className="text-white">{localGroups.filter(g => g.status !== 'deleted' && (g.status === 'active' || (!g.status && g.active))).length}</strong> · Total Value: <strong className="text-[#64CFF6]">{formatCurrency(localGroups.filter(g => g.status !== 'deleted').reduce((acc, g) => acc + g.totalValue, 0))}</strong>
                   </p>
                 </div>
 
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => setShowWizard(true)}
-                    className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 sm:py-2 rounded-xl transition-all shadow-xs active:scale-95 w-full sm:w-auto text-center"
+                    className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-4 py-2 sm:py-2 rounded-xl transition-all shadow-[0_4px_15px_rgba(99,89,233,0.35)] active:scale-95 w-full sm:w-auto text-center cursor-pointer"
                   >
                     + New Group
                   </button>
@@ -5066,50 +5070,50 @@ Thank you for your prompt payment! 🙏`;
               <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-1 flex-nowrap sm:flex-wrap">
                 <button
                   onClick={() => setGroupFilter('all')}
-                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 ${
+                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 cursor-pointer ${
                     groupFilter === 'all'
-                      ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs ring-2 ring-indigo-500/20'
-                      : 'bg-white border-gray-200 text-gray-600 hover:text-gray-900'
+                      ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-md ring-2 ring-[#6359E9]/30'
+                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
                   }`}
                 >
                   All ({localGroups.filter(g => g.status !== 'deleted').length})
                 </button>
                 <button
                   onClick={() => setGroupFilter('active')}
-                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 ${
+                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 cursor-pointer ${
                     groupFilter === 'active'
-                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs ring-2 ring-emerald-500/20'
-                      : 'bg-white border-gray-200 text-gray-600 hover:text-gray-900'
+                      ? 'bg-[#02B15A] text-white border-[#02B15A] shadow-md ring-2 ring-[#02B15A]/30'
+                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
                   }`}
                 >
                   Active ({localGroups.filter(g => g.status !== 'deleted' && (g.status === 'active' || (!g.status && g.active))).length})
                 </button>
                 <button
                   onClick={() => setGroupFilter('draft')}
-                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 ${
+                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 cursor-pointer ${
                     groupFilter === 'draft'
-                      ? 'bg-amber-600 text-white border-amber-700 shadow-2xs ring-2 ring-amber-500/20'
-                      : 'bg-white border-gray-200 text-gray-600 hover:text-gray-900'
+                      ? 'bg-[#FFBB38] text-[#141332] border-[#FFBB38] shadow-md ring-2 ring-[#FFBB38]/30'
+                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
                   }`}
                 >
                   Draft ({localGroups.filter(g => g.status === 'draft').length})
                 </button>
                 <button
                   onClick={() => setGroupFilter('completed')}
-                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 ${
+                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 cursor-pointer ${
                     groupFilter === 'completed'
-                      ? 'bg-purple-600 text-white border-purple-700 shadow-2xs ring-2 ring-purple-500/20'
-                      : 'bg-white border-gray-200 text-gray-600 hover:text-gray-900'
+                      ? 'bg-[#9C2CF3] text-white border-[#9C2CF3] shadow-md ring-2 ring-[#9C2CF3]/30'
+                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
                   }`}
                 >
                   Completed ({localGroups.filter(g => g.status === 'completed').length})
                 </button>
                 <button
                   onClick={() => setGroupFilter('bin')}
-                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 flex items-center gap-1.5 ${
+                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 flex items-center gap-1.5 cursor-pointer ${
                     groupFilter === 'bin'
-                      ? 'bg-rose-600 text-white border-rose-700 shadow-2xs ring-2 ring-rose-500/20'
-                      : 'bg-rose-50/50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                      ? 'bg-[#E41414] text-white border-[#E41414] shadow-md ring-2 ring-[#E41414]/30'
+                      : 'bg-[#1D1D41] border-[#E41414]/30 text-[#E41414] hover:bg-[#E41414]/15'
                   }`}
                 >
                   <Trash2 size={12} />
@@ -5120,19 +5124,19 @@ Thank you for your prompt payment! 🙏`;
               {/* ── RECYCLE BIN VIEW ── */}
               {groupFilter === 'bin' ? (
                 <div className="space-y-3">
-                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                  <div className="bg-[#1D1D41] border border-[#E41414]/30 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-rose-100 border border-rose-200 text-rose-700 flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-[#E41414]/20 border border-[#E41414]/40 text-[#E41414] flex items-center justify-center shrink-0">
                         <Trash2 size={20} />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-rose-950 flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
                           Recycle Bin
-                          <span className="text-[10px] font-extrabold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] font-extrabold bg-[#E41414]/20 text-[#E41414] px-2 py-0.5 rounded-full">
                             {localGroups.filter(g => g.status === 'deleted').length} Groups
                           </span>
                         </h4>
-                        <p className="text-xs text-rose-800 mt-0.5">
+                        <p className="text-xs text-[#AEABD8] mt-0.5">
                           Soft-deleted groups are securely preserved here. You can restore them to Draft anytime or permanently purge them.
                         </p>
                       </div>
@@ -5141,49 +5145,49 @@ Thank you for your prompt payment! 🙏`;
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {localGroups.filter(g => g.status === 'deleted').length === 0 ? (
-                      <div className="col-span-full py-12 px-6 bg-white border border-dashed border-gray-200 rounded-2xl text-center flex flex-col items-center justify-center space-y-2 shadow-2xs">
-                        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center">
+                      <div className="col-span-full py-12 px-6 bg-[#1D1D41] border border-dashed border-[#27264E] rounded-2xl text-center flex flex-col items-center justify-center space-y-2 shadow-2xs">
+                        <div className="w-12 h-12 rounded-2xl bg-[#E41414]/10 text-[#E41414] flex items-center justify-center">
                           <Trash2 size={24} />
                         </div>
-                        <h4 className="text-sm font-bold text-gray-900">Recycle Bin is Empty</h4>
-                        <p className="text-xs text-gray-500">No deleted chit groups found.</p>
+                        <h4 className="text-sm font-bold text-white">Recycle Bin is Empty</h4>
+                        <p className="text-xs text-[#AEABD8]">No deleted chit groups found.</p>
                       </div>
                     ) : (
                       localGroups
                         .filter(g => g.status === 'deleted')
                         .map((g) => (
-                          <div key={g.id} className="bg-white border-2 border-rose-150 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs hover:border-rose-300 transition-colors flex flex-col justify-between">
+                          <div key={g.id} className="bg-[#1D1D41] border-2 border-[#E41414]/30 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs hover:border-[#E41414]/60 transition-colors flex flex-col justify-between">
                             <div className="space-y-3">
                               <div className="flex justify-between items-start">
                                 <div className="flex flex-col space-y-1 min-w-0">
                                   <div className="flex items-center space-x-2">
-                                    <span className="w-2 h-2 rounded-full shrink-0 bg-rose-500"></span>
-                                    <h4 className="text-xs sm:text-sm font-bold text-gray-900 truncate max-w-[150px] sm:max-w-[180px]">{g.name}</h4>
+                                    <span className="w-2 h-2 rounded-full shrink-0 bg-[#E41414]"></span>
+                                    <h4 className="text-xs sm:text-sm font-bold text-white truncate max-w-[150px] sm:max-w-[180px]">{g.name}</h4>
                                   </div>
                                   <div>
-                                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border inline-block bg-rose-50 text-rose-700 border-rose-200">
+                                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border inline-block bg-[#E41414]/10 text-[#E41414] border-[#E41414]/30">
                                       IN RECYCLE BIN
                                     </span>
                                   </div>
                                 </div>
-                                <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
+                                <div className="p-1.5 rounded-lg bg-[#E41414]/15 text-[#E41414]">
                                   <Trash2 size={15} />
                                 </div>
                               </div>
 
-                              <div className="bg-rose-50/60 border border-rose-150 rounded-xl p-2.5 space-y-1 text-[11px] text-rose-950">
+                              <div className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 space-y-1 text-[11px] text-white">
                                 <div className="flex justify-between">
-                                  <span className="text-rose-700 font-medium">Total Pool:</span>
-                                  <strong className="font-bold text-gray-900">{formatCurrency(g.totalValue)}</strong>
+                                  <span className="text-[#AEABD8] font-medium">Total Pool:</span>
+                                  <strong className="font-bold text-white">{formatCurrency(g.totalValue)}</strong>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="text-rose-700 font-medium">Duration:</span>
+                                  <span className="text-[#AEABD8] font-medium">Duration:</span>
                                   <strong>{g.duration} Months ({g.memberCount || g.duration} Tickets)</strong>
                                 </div>
                                 {g.deletedAt && (
-                                  <div className="flex justify-between pt-1 border-t border-rose-200/60 text-[10px]">
-                                    <span className="text-rose-600">Deleted:</span>
-                                    <span className="font-medium text-rose-800">
+                                  <div className="flex justify-between pt-1 border-t border-[#27264E] text-[10px]">
+                                    <span className="text-[#AEABD8]">Deleted:</span>
+                                    <span className="font-medium text-[#E41414]">
                                       {new Date(g.deletedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                   </div>
@@ -5191,12 +5195,12 @@ Thank you for your prompt payment! 🙏`;
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
+                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#27264E]">
                               <button
                                 type="button"
                                 disabled={isRestoringGroupId === g.id}
                                 onClick={() => handleRestoreGroup(g)}
-                                className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+                                className="bg-[#02B15A]/15 hover:bg-[#02B15A]/25 border border-[#02B15A]/40 text-[#02B15A] font-bold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                               >
                                 {isRestoringGroupId === g.id ? (
                                   <RefreshCw size={13} className="animate-spin" />
@@ -5208,7 +5212,7 @@ Thank you for your prompt payment! 🙏`;
                               <button
                                 type="button"
                                 onClick={() => openPermanentDeleteModal(g)}
-                                className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+                                className="bg-[#E41414]/15 hover:bg-[#E41414]/25 border border-[#E41414]/40 text-[#E41414] font-bold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                               >
                                 <Trash2 size={13} />
                                 <span>Delete Perm</span>
@@ -5229,19 +5233,19 @@ Thank you for your prompt payment! 🙏`;
                     if (groupFilter === 'completed') return g.status === 'completed';
                     return g.status === 'active' || (!g.status && g.active);
                   }).length === 0 ? (
-                    <div className="col-span-full py-12 px-6 bg-white border border-gray-200 rounded-2xl text-center flex flex-col items-center justify-center space-y-3 shadow-2xs">
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <div className="col-span-full py-12 px-6 bg-[#1D1D41] border border-[#27264E] rounded-2xl text-center flex flex-col items-center justify-center space-y-3 shadow-2xs">
+                      <div className="w-12 h-12 rounded-2xl bg-[#6359E9]/20 text-[#64CFF6] flex items-center justify-center">
                         <Briefcase size={24} />
                       </div>
                       <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-gray-900">No Groups in this Category</h4>
-                        <p className="text-xs text-gray-500 max-w-sm">
+                        <h4 className="text-sm font-bold text-white">No Groups in this Category</h4>
+                        <p className="text-xs text-[#AEABD8] max-w-sm">
                           There are no chit groups with status <strong>{groupFilter}</strong> currently.
                         </p>
                       </div>
                       <button
                         onClick={() => setShowWizard(true)}
-                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-xs active:scale-95"
+                        className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
                       >
                         + Create First Group
                       </button>
@@ -5259,24 +5263,24 @@ Thank you for your prompt payment! 🙏`;
                       const progressPercent = (g.currentMonth / g.duration) * 100;
                       
                       return (
-                        <div key={g.id} className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 shadow-2xs hover:border-gray-300 transition-colors flex flex-col justify-between">
+                        <div key={g.id} className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 shadow-sm hover:border-[#6359E9]/50 transition-colors flex flex-col justify-between">
                           <div className="space-y-3">
                             {/* Card Top */}
                             <div className="flex justify-between items-start">
                               <div className="flex flex-col space-y-1 min-w-0">
                                 <div className="flex items-center space-x-2">
                                   <span className={`w-2 h-2 rounded-full shrink-0 ${
-                                    g.status === 'draft' ? 'bg-amber-500' : g.status === 'completed' ? 'bg-purple-500' : 'bg-green-500 animate-pulse'
+                                    g.status === 'draft' ? 'bg-[#FFBB38]' : g.status === 'completed' ? 'bg-[#9C2CF3]' : 'bg-[#02B15A] animate-pulse'
                                   }`}></span>
-                                  <h4 className="text-xs sm:text-sm font-bold text-gray-900 truncate max-w-[150px] sm:max-w-[180px]">{g.name}</h4>
+                                  <h4 className="text-xs sm:text-sm font-bold text-white truncate max-w-[150px] sm:max-w-[180px]">{g.name}</h4>
                                 </div>
                                 <div>
                                   <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border inline-block ${
                                     g.status === 'draft'
-                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      ? 'bg-[#FFBB38]/10 text-[#FFBB38] border-[#FFBB38]/30'
                                       : g.status === 'completed'
-                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        ? 'bg-[#9C2CF3]/10 text-[#C084FC] border-[#9C2CF3]/30'
+                                        : 'bg-[#02B15A]/10 text-[#02B15A] border-[#02B15A]/30'
                                   }`}>
                                     {g.status ? g.status.toUpperCase() : 'ACTIVE'}
                                   </span>
@@ -5289,7 +5293,7 @@ Thank you for your prompt payment! 🙏`;
                                   type="button"
                                   title="Edit chit details"
                                   onClick={() => openEditGroupModal(g)}
-                                  className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors active:scale-95"
+                                  className="p-1.5 rounded-lg text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#27264E] transition-colors active:scale-95 cursor-pointer"
                                 >
                                   <Edit3 size={14} />
                                 </button>
@@ -5297,7 +5301,7 @@ Thank you for your prompt payment! 🙏`;
                                   type="button"
                                   title="Move to Recycle Bin"
                                   onClick={() => openSoftDeleteModal(g)}
-                                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors active:scale-95"
+                                  className="p-1.5 rounded-lg text-[#AEABD8] hover:text-[#E41414] hover:bg-[#E41414]/10 transition-colors active:scale-95 cursor-pointer"
                                 >
                                   <Trash2 size={14} />
                                 </button>
@@ -5307,18 +5311,18 @@ Thank you for your prompt payment! 🙏`;
                             {/* Horizontal Progress bar — or Launch Month badge */}
                             {g.currentMonth === 0 ? (
                               <div className="flex items-center gap-2 py-1">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
-                                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Launch Month — Organizer Profit Phase</span>
+                                <span className="w-2 h-2 rounded-full bg-[#FFBB38] animate-pulse shrink-0"></span>
+                                <span className="text-[10px] font-bold text-[#FFBB38] uppercase tracking-wider">Launch Month — Organizer Profit Phase</span>
                               </div>
                             ) : (
                               <div className="space-y-1">
-                                <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                                <div className="flex justify-between text-[9px] text-[#AEABD8] font-bold uppercase tracking-wider">
                                   <span>Progress</span>
                                   <span>Month {g.currentMonth} of {g.duration}</span>
                                 </div>
-                                <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                <div className="w-full bg-[#141332] rounded-full h-1.5 overflow-hidden">
                                   <div 
-                                    className="bg-indigo-600 h-full rounded-full transition-all duration-300"
+                                    className="bg-gradient-to-r from-[#6359E9] to-[#64CFF6] h-full rounded-full transition-all duration-300"
                                     style={{ width: `${progressPercent}%` }}
                                   ></div>
                                 </div>
@@ -5326,19 +5330,19 @@ Thank you for your prompt payment! 🙏`;
                             )}
 
                             {/* Metadata Tracks */}
-                            <div className="space-y-1.5 text-[10px] sm:text-[11px] text-gray-500">
+                            <div className="space-y-1.5 text-[10px] sm:text-[11px] text-[#AEABD8]">
                               <div className="flex justify-between">
                                 <span>Total Pool:</span>
-                                <strong className="text-gray-900">{formatCurrency(g.totalValue)}</strong>
+                                <strong className="text-white">{formatCurrency(g.totalValue)}</strong>
                               </div>
                               <div className="flex justify-between">
                                 <span>Monthly Installment:</span>
-                                <strong className="text-indigo-600">{formatCurrency(g.totalValue / g.duration)}</strong>
+                                <strong className="text-[#64CFF6]">{formatCurrency(g.totalValue / g.duration)}</strong>
                               </div>
                               {g.currentMonth === 0 && (
                                 <div className="flex justify-between">
                                   <span>Organizer Profit:</span>
-                                  <strong className="text-amber-600">{formatCurrency(g.totalValue)}</strong>
+                                  <strong className="text-[#FFBB38]">{formatCurrency(g.totalValue)}</strong>
                                 </div>
                               )}
                               {(() => {
@@ -5347,10 +5351,10 @@ Thank you for your prompt payment! 🙏`;
                                   <div className="flex justify-between items-center">
                                     <span>Auction Date:</span>
                                     <div className="flex items-center gap-1">
-                                      <strong className={isOverride ? 'text-amber-600' : 'text-gray-700'}>{display}</strong>
+                                      <strong className={isOverride ? 'text-[#FFBB38]' : 'text-white'}>{display}</strong>
                                       <button
                                         onClick={() => setScheduleModalGroup(g)}
-                                        className="text-[8px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded hover:bg-indigo-100 transition-colors cursor-pointer"
+                                        className="text-[8px] font-bold text-[#64CFF6] bg-[#6359E9]/20 border border-[#6359E9]/30 px-1 py-0.5 rounded hover:bg-[#6359E9]/40 transition-colors cursor-pointer"
                                       >
                                         Edit
                                       </button>
@@ -5364,7 +5368,7 @@ Thank you for your prompt payment! 🙏`;
                           {/* Footer Split Button containers */}
                           {g.currentMonth === 0 ? (
                             // Month-0 Launch: show a single Confirm Launch CTA spanning full width
-                            <div className="pt-3 border-t border-gray-100">
+                            <div className="pt-3 border-t border-[#27264E]">
                               <button
                                 onClick={async () => {
                                   try {
@@ -5404,20 +5408,20 @@ Thank you for your prompt payment! 🙏`;
                                     alert('Error updating group: ' + err.message);
                                   }
                                 }}
-                                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer"
+                                className="w-full bg-gradient-to-r from-[#FFBB38] to-[#E5A82E] text-[#141332] font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
                               >
                                 <Rocket size={13} /> Confirm Launch &amp; Roll to M1
                               </button>
                             </div>
                           ) : (
-                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
+                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#27264E]">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setSelectedWorkspaceGroupId(g.id);
                                   fetchWorkspaceMembers(g.id);
                                 }}
-                                className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 text-indigo-700 font-bold text-xs py-2 rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95"
+                                className="bg-[#6359E9]/20 hover:bg-[#6359E9]/35 border border-[#6359E9]/40 text-[#64CFF6] font-bold text-xs py-2 rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
                               >
                                 <Briefcase size={12} /> Workspace
                               </button>
@@ -5425,11 +5429,11 @@ Thank you for your prompt payment! 🙏`;
                                 type="button"
                                 disabled={isDuplicatingGroupId === g.id}
                                 onClick={() => handleDuplicateGroup(g)}
-                                className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-60"
+                                className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-60"
                               >
                                 {isDuplicatingGroupId === g.id ? (
                                   <>
-                                    <RefreshCw size={12} className="animate-spin text-indigo-600" />
+                                    <RefreshCw size={12} className="animate-spin text-[#64CFF6]" />
                                     <span>Cloning...</span>
                                   </>
                                 ) : (
@@ -5453,20 +5457,20 @@ Thank you for your prompt payment! 🙏`;
             <div className="space-y-3.5 sm:space-y-5 animate-in fade-in duration-200">
               
               {/* Setup Wizard Progress Navigation Bar */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 sm:gap-3">
+              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 sm:gap-3 text-white">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <div className="p-1.5 bg-[#6359E9]/15 text-[#64CFF6] border border-[#6359E9]/30 rounded-lg">
                       <Sparkles size={15} />
                     </div>
-                    <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider">Chit Setup Wizard</h3>
+                    <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">Chit Setup Wizard</h3>
                   </div>
                   <button
                     onClick={() => {
                       triggerHapticFeedback('light');
                       setShowWizard(false);
                     }}
-                    className="text-[11px] text-gray-400 hover:text-gray-700 underline font-semibold transition-colors py-1 px-1.5"
+                    className="text-[11px] text-[#AEABD8] hover:text-white underline font-semibold transition-colors py-1 px-1.5"
                   >
                     Exit Wizard
                   </button>
@@ -5484,25 +5488,25 @@ Thank you for your prompt payment! 🙏`;
                     }}
                     className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl transition-all ${
                       wizardStep === 1 
-                        ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200' 
-                        : 'hover:bg-gray-50 text-gray-500'
+                        ? 'bg-[#6359E9]/20 text-white ring-1 ring-[#6359E9]/40' 
+                        : 'hover:bg-[#27264E] text-[#AEABD8]'
                     }`}
                   >
                     <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                       wizardStep === 1 
-                        ? 'bg-indigo-600 text-white shadow-xs' 
+                        ? 'bg-[#6359E9] text-white shadow-xs' 
                         : wizardStep > 1 
-                          ? 'bg-emerald-500 text-white' 
-                          : 'bg-gray-200 text-gray-500'
+                          ? 'bg-[#02B15A] text-white' 
+                          : 'bg-[#141332] text-[#AEABD8]'
                     }`}>
                       {wizardStep > 1 ? <Check size={11} /> : '1'}
                     </span>
-                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 1 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>
+                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 1 ? 'font-bold text-white' : 'font-semibold text-[#AEABD8]'}`}>
                       <span className="hidden sm:inline">1. </span>Basic<span className="hidden md:inline"> & Schedule</span>
                     </span>
                   </button>
                   
-                  <div className="flex-1 sm:w-4 h-px bg-gray-200"></div>
+                  <div className="flex-1 sm:w-4 h-px bg-[#27264E]"></div>
 
                   {/* Step 2 Pill */}
                   <button
@@ -5514,25 +5518,25 @@ Thank you for your prompt payment! 🙏`;
                     }}
                     className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl transition-all ${
                       wizardStep === 2 
-                        ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200' 
-                        : 'hover:bg-gray-50 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed'
+                        ? 'bg-[#6359E9]/20 text-white ring-1 ring-[#6359E9]/40' 
+                        : 'hover:bg-[#27264E] text-[#AEABD8] disabled:opacity-40 disabled:cursor-not-allowed'
                     }`}
                   >
                     <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                       wizardStep === 2 
-                        ? 'bg-indigo-600 text-white shadow-xs' 
+                        ? 'bg-[#6359E9] text-white shadow-xs' 
                         : wizardStep > 2 
-                          ? 'bg-emerald-500 text-white' 
-                          : 'bg-gray-200 text-gray-500'
+                          ? 'bg-[#02B15A] text-white' 
+                          : 'bg-[#141332] text-[#AEABD8]'
                     }`}>
                       {wizardStep > 2 ? <Check size={11} /> : '2'}
                     </span>
-                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 2 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>
+                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 2 ? 'font-bold text-white' : 'font-semibold text-[#AEABD8]'}`}>
                       <span className="hidden sm:inline">2. </span>Members
                     </span>
                   </button>
 
-                  <div className="flex-1 sm:w-4 h-px bg-gray-200"></div>
+                  <div className="flex-1 sm:w-4 h-px bg-[#27264E]"></div>
 
                   {/* Step 3 Pill */}
                   <button
@@ -5544,18 +5548,18 @@ Thank you for your prompt payment! 🙏`;
                     }}
                     className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl transition-all ${
                       wizardStep === 3 
-                        ? 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200' 
-                        : 'hover:bg-gray-50 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed'
+                        ? 'bg-[#6359E9]/20 text-white ring-1 ring-[#6359E9]/40' 
+                        : 'hover:bg-[#27264E] text-[#AEABD8] disabled:opacity-40 disabled:cursor-not-allowed'
                     }`}
                   >
                     <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                       wizardStep === 3 
-                        ? 'bg-indigo-600 text-white shadow-xs' 
-                        : 'bg-gray-200 text-gray-500'
+                        ? 'bg-[#6359E9] text-white shadow-xs' 
+                        : 'bg-[#141332] text-[#AEABD8]'
                     }`}>
                       3
                     </span>
-                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 3 ? 'font-bold text-indigo-950' : 'font-semibold'}`}>
+                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 3 ? 'font-bold text-white' : 'font-semibold text-[#AEABD8]'}`}>
                       <span className="hidden sm:inline">3. </span>Review<span className="hidden md:inline"> & Launch</span>
                     </span>
                   </button>
@@ -5567,15 +5571,15 @@ Thank you for your prompt payment! 🙏`;
                 <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-150">
                   
                   {/* Step 1 Main Form Card */}
-                  <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs">
-                    <div className="border-b border-gray-150 pb-3 flex items-center justify-between gap-2">
-                      <h4 className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs">
+                    <div className="border-b border-[#27264E] pb-3 flex items-center justify-between gap-2">
+                      <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
                         <span>Step 1: Chit Parameters &amp; Schedule</span>
                       </h4>
                       <button
                         type="button"
                         onClick={handleAutoGenerateName}
-                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shrink-0 active:scale-95"
+                        className="text-[11px] font-bold text-[#64CFF6] hover:text-white bg-[#64CFF6]/10 hover:bg-[#64CFF6]/20 border border-[#64CFF6]/30 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shrink-0 active:scale-95"
                       >
                         <Sparkles size={12} /> Auto-Name
                       </button>
@@ -5585,8 +5589,8 @@ Thank you for your prompt payment! 🙏`;
                       
                       {/* 1. Group Name */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                          Group Name <span className="text-rose-500">*</span>
+                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
+                          Group Name <span className="text-rose-400">*</span>
                         </label>
                         <div className="relative">
                           <input
@@ -5595,13 +5599,13 @@ Thank you for your prompt payment! 🙏`;
                             placeholder="e.g. G-2L-10M-OCT26"
                             value={newGroupName}
                             onChange={(e) => setNewGroupName(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none transition-colors"
+                            className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-white placeholder:text-[#AEABD8]/50 focus:outline-none transition-colors"
                           />
                           {newGroupName && (
                             <button
                               type="button"
                               onClick={() => setNewGroupName('')}
-                              className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 p-0.5"
+                              className="absolute right-2.5 top-2.5 text-[#AEABD8] hover:text-white p-0.5"
                             >
                               <X size={13} />
                             </button>
@@ -5611,18 +5615,18 @@ Thank you for your prompt payment! 🙏`;
 
                       {/* 2. Total Pool Value */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                          Total Pool Value (₹) <span className="text-rose-500">*</span>
+                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
+                          Total Pool Value (₹) <span className="text-rose-400">*</span>
                         </label>
                         <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">₹</span>
+                          <span className="absolute left-3 top-2.5 text-xs font-bold text-[#AEABD8]">₹</span>
                           <input
                             type="number"
                             required
                             placeholder="100000"
                             value={newGroupValue}
                             onChange={(e) => setNewGroupValue(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl pl-7 pr-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none transition-colors"
+                            className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-7 pr-3.5 py-2.5 text-xs font-bold text-white placeholder:text-[#AEABD8]/50 focus:outline-none transition-colors"
                           />
                         </div>
                         {/* Target Presets */}
@@ -5644,8 +5648,8 @@ Thank you for your prompt payment! 🙏`;
                                 }}
                                 className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border ${
                                   isSelected
-                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-200'
-                                    : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
+                                    ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs ring-2 ring-[#6359E9]/40'
+                                    : 'bg-[#141332] hover:bg-[#1D1D41] border-[#27264E] text-[#AEABD8]'
                                 }`}
                               >
                                 {preset.label}
@@ -5657,8 +5661,8 @@ Thank you for your prompt payment! 🙏`;
 
                       {/* 3. Duration & Member Count */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                          Duration / Tickets (Months) <span className="text-rose-500">*</span>
+                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
+                          Duration / Tickets (Months) <span className="text-rose-400">*</span>
                         </label>
                         <div className="relative">
                           <input
@@ -5669,7 +5673,7 @@ Thank you for your prompt payment! 🙏`;
                             placeholder="20"
                             value={newGroupDuration}
                             onChange={(e) => handleDurationChange(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none transition-colors"
+                            className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-bold text-white placeholder:text-[#AEABD8]/50 focus:outline-none transition-colors"
                           />
                         </div>
                         {/* Duration Presets */}
@@ -5686,8 +5690,8 @@ Thank you for your prompt payment! 🙏`;
                                 }}
                                 className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border ${
                                   isSelected
-                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-200'
-                                    : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
+                                    ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs ring-2 ring-[#6359E9]/40'
+                                    : 'bg-[#141332] hover:bg-[#1D1D41] border-[#27264E] text-[#AEABD8]'
                                 }`}
                               >
                                 {val}m
@@ -5700,12 +5704,12 @@ Thank you for your prompt payment! 🙏`;
                     </div>
 
                     {/* Schedule Row */}
-                    <div className="border-t border-gray-150 pt-3.5 grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5">
+                    <div className="border-t border-[#27264E] pt-3.5 grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5">
                       
                       {/* Launch Date */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
-                          Launch Date (Month 0) <span className="text-rose-500">*</span>
+                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
+                          Launch Date (Month 0) <span className="text-rose-400">*</span>
                         </label>
                         <div className="relative">
                           <input
@@ -5713,14 +5717,14 @@ Thank you for your prompt payment! 🙏`;
                             required
                             value={newGroupStartDate}
                             onChange={(e) => setNewGroupStartDate(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none font-semibold"
+                            className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none font-semibold"
                           />
                         </div>
                       </div>
 
                       {/* Recurring Auction Rule Dropdown */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
                           Monthly Auction Rule
                         </label>
                         <select
@@ -5731,10 +5735,10 @@ Thank you for your prompt payment! 🙏`;
                             updateLaunchDateFromRule(day, newGroupStartDate);
                             triggerHapticFeedback('light');
                           }}
-                          className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3 py-2.5 text-xs text-gray-900 font-semibold focus:outline-none"
+                          className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3 py-2.5 text-xs text-white font-semibold focus:outline-none"
                         >
                           {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
-                            <option key={day} value={day}>
+                            <option key={day} value={day} className="bg-[#1D1D41] text-white">
                               1st Sunday on/after {day}th {day === 10 ? '(Default)' : ''}
                             </option>
                           ))}
@@ -5743,14 +5747,14 @@ Thank you for your prompt payment! 🙏`;
 
                       {/* Recurring Auction Time */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
                           Auction Bidding Time
                         </label>
                         <input
                           type="time"
                           value={newGroupAuctionTime}
                           onChange={(e) => setNewGroupAuctionTime(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-semibold focus:outline-none"
+                          className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs text-white font-semibold focus:outline-none"
                         />
                       </div>
 
@@ -5759,45 +5763,45 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* Dynamic Real-time Chit Math Breakdown Card */}
                   {Number(newGroupValue) > 0 && Number(newGroupDuration) > 0 && (
-                    <div className="bg-gradient-to-br from-indigo-50/70 via-indigo-50/30 to-purple-50/50 border border-indigo-150 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-2.5">
+                    <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-2.5">
                       <div className="flex items-center justify-between">
-                        <h5 className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                          <Coins size={14} className="text-indigo-600" />
+                        <h5 className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <Coins size={14} className="text-[#6359E9]" />
                           Financial Projections
                         </h5>
-                        <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-100/60 px-2 py-0.5 rounded-md">
+                        <span className="text-[10px] font-semibold text-[#6359E9] bg-[#6359E9]/15 border border-[#6359E9]/30 px-2 py-0.5 rounded-md">
                           {newGroupDuration} Tickets
                         </span>
                       </div>
 
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
-                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-2.5 sm:p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Monthly Due</span>
-                          <strong className="text-sm sm:text-base font-extrabold text-indigo-700 mt-0.5 block">
+                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#AEABD8] block">Monthly Due</span>
+                          <strong className="text-sm sm:text-base font-extrabold text-[#6359E9] mt-0.5 block">
                             {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}
                           </strong>
-                          <span className="text-[10px] text-gray-500">per member / mo</span>
+                          <span className="text-[10px] text-[#AEABD8]">per member / mo</span>
                         </div>
 
-                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-2.5 sm:p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Month 0 Launch</span>
-                          <strong className="text-sm sm:text-base font-extrabold text-amber-700 mt-0.5 block">
+                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#AEABD8] block">Month 0 Launch</span>
+                          <strong className="text-sm sm:text-base font-extrabold text-[#FFBB38] mt-0.5 block">
                             {formatCurrency(Number(newGroupValue))}
                           </strong>
-                          <span className="text-[10px] text-amber-600 font-semibold">Organizer Profit</span>
+                          <span className="text-[10px] text-[#FFBB38] font-semibold">Organizer Profit</span>
                         </div>
 
-                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-2.5 sm:p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Total Lifecycle</span>
-                          <strong className="text-sm sm:text-base font-extrabold text-gray-900 mt-0.5 block">
+                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#AEABD8] block">Total Lifecycle</span>
+                          <strong className="text-sm sm:text-base font-extrabold text-white mt-0.5 block">
                             {Number(newGroupDuration) + 1} Months
                           </strong>
-                          <span className="text-[10px] text-gray-500">M0 to M{newGroupDuration}</span>
+                          <span className="text-[10px] text-[#AEABD8]">M0 to M{newGroupDuration}</span>
                         </div>
 
-                        <div className="bg-white/80 border border-indigo-100 rounded-xl p-2.5 sm:p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">1st Live Auction (M1)</span>
-                          <strong className="text-xs sm:text-sm font-extrabold text-gray-900 mt-0.5 block truncate">
+                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#AEABD8] block">1st Live Auction (M1)</span>
+                          <strong className="text-xs sm:text-sm font-extrabold text-white mt-0.5 block truncate">
                             {(() => {
                               const targetDate = computeNextAuctionDateTime({
                                 auction_day_of_month: newGroupAuctionDay,
@@ -5810,7 +5814,7 @@ Thank you for your prompt payment! 🙏`;
                               return targetDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
                             })()}
                           </strong>
-                          <span className="text-[10px] text-gray-500">{formatTime12h(newGroupAuctionTime)}</span>
+                          <span className="text-[10px] text-[#AEABD8]">{formatTime12h(newGroupAuctionTime)}</span>
                         </div>
                       </div>
                     </div>
@@ -5825,7 +5829,7 @@ Thank you for your prompt payment! 🙏`;
                         triggerHapticFeedback('light');
                         setWizardStep(2);
                       }}
-                      className="bg-gray-900 hover:bg-black disabled:bg-gray-300 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all w-full sm:w-auto cursor-pointer disabled:cursor-not-allowed"
+                      className="bg-[#6359E9] hover:bg-[#6F64FF] disabled:bg-[#27264E] disabled:text-[#AEABD8]/40 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all w-full sm:w-auto cursor-pointer disabled:cursor-not-allowed"
                     >
                       <span>Proceed to Step 2: Assign Members</span>
                       <ArrowRight size={14} />
@@ -5836,20 +5840,20 @@ Thank you for your prompt payment! 🙏`;
 
               {/* ── STEP 2: ASSIGN GROUP MEMBERS ── */}
               {wizardStep === 2 && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs animate-in fade-in duration-150">
+                <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs animate-in fade-in duration-150">
                   
                   {/* Step 2 Header & Quick Actions Bar */}
-                  <div className="border-b border-gray-150 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="border-b border-[#27264E] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-xs sm:text-sm font-bold text-gray-900">
+                      <h4 className="text-xs sm:text-sm font-bold text-white">
                         Step 2: Assign Subscribers ({enrollments.filter(e => e.name !== '').length}/{newGroupDuration})
                       </h4>
                       {enrollments.every(e => e.name !== '') ? (
-                        <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="text-[10px] font-bold bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                           <Check size={11} /> 100% Enrolled
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold bg-[#FFBB38]/15 text-[#FFBB38] border border-[#FFBB38]/30 px-2 py-0.5 rounded-full">
                           {enrollments.filter(e => !e.name).length} Open
                         </span>
                       )}
@@ -5860,7 +5864,7 @@ Thank you for your prompt payment! 🙏`;
                         <button
                           type="button"
                           onClick={handleClearAllSlots}
-                          className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 font-bold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors active:scale-95"
+                          className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors active:scale-95"
                         >
                           <RotateCcw size={12} />
                           <span>Clear</span>
@@ -5875,7 +5879,7 @@ Thank you for your prompt payment! 🙏`;
                           setNewMemberPhone('');
                           setShowCreateMemberModal(true);
                         }}
-                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-xs active:scale-95"
+                        className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-xs active:scale-95"
                       >
                         <UserPlus size={13} />
                         <span>+ Register</span>
@@ -5884,16 +5888,16 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Fast Search & Auto-Suggest Combobox */}
-                  <div className="bg-gray-50/90 border border-gray-200 rounded-2xl p-2.5 sm:p-3 space-y-1.5">
+                  <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-2.5 sm:p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block flex items-center gap-1">
+                      <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block flex items-center gap-1">
                         <Search size={11} /> Search &amp; Assign {targetSlotForAssign !== null ? `(Slot #${targetSlotForAssign + 1})` : ''}
                       </label>
                       {targetSlotForAssign !== null && (
                         <button
                           type="button"
                           onClick={() => setTargetSlotForAssign(null)}
-                          className="text-[10px] text-gray-500 hover:text-gray-900 underline font-semibold"
+                          className="text-[10px] text-[#AEABD8] hover:text-white underline font-semibold"
                         >
                           Cancel Slot #{targetSlotForAssign + 1}
                         </button>
@@ -5908,7 +5912,7 @@ Thank you for your prompt payment! 🙏`;
 
                       return (
                         <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-gray-400">
+                          <span className="absolute left-3 top-2.5 text-[#AEABD8]">
                             <Search size={13} />
                           </span>
                           <input
@@ -5960,7 +5964,7 @@ Thank you for your prompt payment! 🙏`;
                                 setIsSearchDropdownOpen(false);
                               }
                             }}
-                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-10 py-2 text-xs font-semibold text-gray-900 focus:outline-none shadow-2xs"
+                            className="w-full bg-[#1D1D41] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-10 py-2 text-xs font-semibold text-white placeholder:text-[#AEABD8]/50 focus:outline-none shadow-2xs"
                           />
                           {memberSearchQuery && (
                             <button
@@ -5969,7 +5973,7 @@ Thank you for your prompt payment! 🙏`;
                                 setMemberSearchQuery('');
                                 setIsSearchDropdownOpen(false);
                               }}
-                              className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 p-1"
+                              className="absolute right-2 top-2 text-[#AEABD8] hover:text-white p-1"
                             >
                               <X size={13} />
                             </button>
@@ -5977,7 +5981,7 @@ Thank you for your prompt payment! 🙏`;
 
                           {/* Dropdown Suggestions */}
                           {isSearchDropdownOpen && memberSearchQuery.trim().length > 0 && (
-                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-gray-100">
+                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-[#1D1D41] border border-[#27264E] rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-[#27264E]">
                               {/* Create Option (Index 0) */}
                               <div
                                 onClick={() => {
@@ -5988,15 +5992,15 @@ Thank you for your prompt payment! 🙏`;
                                 }}
                                 className={`p-2.5 cursor-pointer flex items-center justify-between text-xs transition-colors ${
                                   dropdownHighlightedIndex === 0
-                                    ? 'bg-indigo-100/90 text-indigo-950 font-bold ring-1 ring-inset ring-indigo-400'
-                                    : 'hover:bg-indigo-50 text-indigo-600 font-semibold bg-indigo-50/40'
+                                    ? 'bg-[#6359E9]/20 text-white font-bold ring-1 ring-inset ring-[#6359E9]'
+                                    : 'hover:bg-[#141332] text-[#64CFF6] font-semibold bg-[#64CFF6]/10'
                                 }`}
                               >
                                 <span className="flex items-center gap-1.5">
                                   <UserPlus size={14} />
                                   Create &quot;{memberSearchQuery}&quot;
                                 </span>
-                                <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                                <span className="text-[10px] bg-[#6359E9] text-white px-2 py-0.5 rounded font-semibold flex items-center gap-1">
                                   {dropdownHighlightedIndex === 0 && <span>↵</span>} + New
                                 </span>
                               </div>
@@ -6018,25 +6022,25 @@ Thank you for your prompt payment! 🙏`;
                                     }}
                                     className={`p-2.5 flex items-center justify-between text-xs transition-colors ${
                                       isAlreadyEnrolled
-                                        ? 'bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
+                                        ? 'bg-[#141332] text-[#AEABD8]/40 cursor-not-allowed opacity-60'
                                         : isHighlighted
-                                          ? 'bg-indigo-50 text-indigo-950 font-bold ring-1 ring-inset ring-indigo-300'
-                                          : 'hover:bg-gray-50 cursor-pointer text-gray-800'
+                                          ? 'bg-[#6359E9]/20 text-white font-bold ring-1 ring-inset ring-[#6359E9]'
+                                          : 'hover:bg-[#141332] cursor-pointer text-white'
                                     }`}
                                   >
                                     <div>
                                       <span className="font-bold block">{member.name}</span>
-                                      <span className="text-[10px] text-gray-400">{member.phone}</span>
+                                      <span className="text-[10px] text-[#AEABD8]">{member.phone}</span>
                                     </div>
                                     <div>
                                       {isAlreadyEnrolled ? (
-                                        <span className="text-[9px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded">Enrolled</span>
+                                        <span className="text-[9px] font-bold text-[#AEABD8] bg-[#141332] px-2 py-0.5 rounded border border-[#27264E]">Enrolled</span>
                                       ) : isHighlighted ? (
-                                        <span className="text-[10px] font-bold text-white bg-indigo-600 px-2.5 py-0.5 rounded shadow-sm">
+                                        <span className="text-[10px] font-bold text-white bg-[#6359E9] px-2.5 py-0.5 rounded shadow-sm">
                                           ↵ Assign
                                         </span>
                                       ) : (
-                                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded hover:bg-indigo-100">
+                                        <span className="text-[10px] font-bold text-[#64CFF6] bg-[#64CFF6]/10 border border-[#64CFF6]/30 px-2 py-0.5 rounded hover:bg-[#64CFF6]/20">
                                           Assign →
                                         </span>
                                       )}
@@ -6054,10 +6058,10 @@ Thank you for your prompt payment! 🙏`;
                   {/* Group Enrollment Slots Grid */}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      <h5 className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider">
                         Enrolled Tickets ({enrollments.filter(e => e.name !== '').length}/{newGroupDuration})
                       </h5>
-                      <span className="text-[10px] text-gray-400">
+                      <span className="text-[10px] text-[#AEABD8]">
                         {enrollments.some(e => e.name === '') ? 'Tap slot to assign' : '✓ All tickets assigned'}
                       </span>
                     </div>
@@ -6070,10 +6074,10 @@ Thank you for your prompt payment! 🙏`;
                             key={index} 
                             className={`flex gap-2.5 items-center p-2.5 sm:p-3 rounded-xl border transition-all ${
                               slot.name 
-                                ? 'bg-white border-gray-200 shadow-2xs hover:border-gray-300' 
+                                ? 'bg-[#141332] border-[#27264E] shadow-2xs hover:border-[#6359E9]/40' 
                                 : isTargeted
-                                  ? 'border-indigo-500 bg-indigo-50/40 ring-2 ring-indigo-200'
-                                  : 'border-dashed border-gray-250 bg-gray-50/60 hover:bg-gray-100/70 hover:border-indigo-300 cursor-pointer'
+                                  ? 'border-[#6359E9] bg-[#6359E9]/15 ring-2 ring-[#6359E9]/40'
+                                  : 'border-dashed border-[#27264E] bg-[#141332]/40 hover:bg-[#141332] hover:border-[#6359E9]/40 cursor-pointer'
                             }`}
                             onClick={() => {
                               if (!slot.name) {
@@ -6085,10 +6089,10 @@ Thank you for your prompt payment! 🙏`;
                           >
                             <span className={`text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
                               slot.name
-                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-150'
+                                ? 'bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40'
                                 : isTargeted
-                                  ? 'bg-indigo-600 text-white'
-                                  : 'bg-gray-200 text-gray-500'
+                                  ? 'bg-[#6359E9] text-white'
+                                  : 'bg-[#27264E] text-[#AEABD8]'
                             }`}>
                               {index + 1}
                             </span>
@@ -6096,9 +6100,9 @@ Thank you for your prompt payment! 🙏`;
                             {slot.name ? (
                               <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                                 <div className="truncate">
-                                  <span className="text-xs font-bold text-gray-900 block truncate">{slot.name}</span>
-                                  <span className="text-[10px] text-gray-500 block truncate flex items-center gap-1 mt-0.5">
-                                    <Phone size={10} className="text-gray-400 shrink-0" />
+                                  <span className="text-xs font-bold text-white block truncate">{slot.name}</span>
+                                  <span className="text-[10px] text-[#AEABD8] block truncate flex items-center gap-1 mt-0.5">
+                                    <Phone size={10} className="text-[#AEABD8]/70 shrink-0" />
                                     {slot.phone}
                                   </span>
                                 </div>
@@ -6110,17 +6114,17 @@ Thank you for your prompt payment! 🙏`;
                                     handleClearSlot(index);
                                   }}
                                   title="Unassign member"
-                                  className="text-red-600 hover:text-red-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-red-200 shrink-0 bg-red-50/50 hover:bg-red-50 transition-colors flex items-center gap-1 active:scale-95"
+                                  className="text-rose-400 hover:text-rose-300 text-[10px] font-bold px-2 py-1 rounded-lg border border-rose-500/30 shrink-0 bg-rose-500/10 hover:bg-rose-500/20 transition-colors flex items-center gap-1 active:scale-95"
                                 >
                                   <Trash2 size={10} /> Clear
                                 </button>
                               </div>
                             ) : (
                               <div className="flex-1 min-w-0 flex items-center justify-between">
-                                <span className={`text-xs font-semibold truncate ${isTargeted ? 'text-indigo-700' : 'text-gray-400'}`}>
+                                <span className={`text-xs font-semibold truncate ${isTargeted ? 'text-[#64CFF6]' : 'text-[#AEABD8]/60'}`}>
                                   {isTargeted ? 'Selected' : 'Open Slot'}
                                 </span>
-                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg shrink-0">
+                                <span className="text-[10px] font-bold text-[#64CFF6] bg-[#64CFF6]/10 border border-[#64CFF6]/30 px-2 py-0.5 rounded-lg shrink-0">
                                   + Fill
                                 </span>
                               </div>
@@ -6132,17 +6136,17 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Master Member Directory */}
-                  <div className="space-y-2 border-t border-gray-150 pt-3.5">
+                  <div className="space-y-2 border-t border-[#27264E] pt-3.5">
                     <div className="flex items-center justify-between">
-                      <h5 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                      <h5 className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider">
                         Master Directory ({masterDirectory.length})
                       </h5>
-                      <span className="text-[10px] text-gray-400">Tap to assign to open slot</span>
+                      <span className="text-[10px] text-[#AEABD8]">Tap to assign to open slot</span>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
                       {masterDirectory.length === 0 ? (
-                        <div className="col-span-full py-4 text-center text-xs text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                        <div className="col-span-full py-4 text-center text-xs text-[#AEABD8] bg-[#141332] rounded-xl border border-dashed border-[#27264E]">
                           No subscribers found. Tap <strong>&quot;+ Register&quot;</strong> to add one.
                         </div>
                       ) : (
@@ -6157,20 +6161,20 @@ Thank you for your prompt payment! 🙏`;
                               onClick={() => handleAssignExistingMember(member)}
                               className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all relative active:scale-95 flex flex-col justify-between ${
                                 isAlreadyAdded 
-                                  ? 'bg-gray-50 border-gray-200 opacity-50 cursor-not-allowed' 
-                                  : 'bg-white hover:bg-indigo-50/50 border-gray-200 hover:border-indigo-300 shadow-2xs'
+                                  ? 'bg-[#141332]/40 border-[#27264E] opacity-50 cursor-not-allowed' 
+                                  : 'bg-[#141332] hover:bg-[#1D1D41] border-[#27264E] hover:border-[#6359E9] shadow-2xs'
                               }`}
                             >
                               <div className="flex items-start justify-between gap-1 w-full">
-                                <span className="text-xs sm:text-sm font-bold text-gray-900 block truncate">{member.name}</span>
+                                <span className="text-xs sm:text-sm font-bold text-white block truncate">{member.name}</span>
                                 {isAlreadyAdded && (
-                                  <span className="text-[8px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded shrink-0">
+                                  <span className="text-[8px] font-bold text-[#02B15A] bg-[#02B15A]/15 border border-[#02B15A]/30 px-1.5 py-0.5 rounded shrink-0">
                                     Enrolled
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] sm:text-[11px] text-gray-500 block truncate mt-1 flex items-center gap-1">
-                                <Phone size={10} className="text-gray-400 shrink-0" />
+                              <span className="text-[10px] sm:text-[11px] text-[#AEABD8] block truncate mt-1 flex items-center gap-1">
+                                <Phone size={10} className="text-[#AEABD8]/70 shrink-0" />
                                 {member.phone}
                               </span>
                             </button>
@@ -6181,23 +6185,23 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Navigation Step 2 Buttons */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-gray-150">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-[#27264E]">
                     <button
                       type="button"
                       onClick={() => {
                         triggerHapticFeedback('light');
                         setWizardStep(1);
                       }}
-                      className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
+                      className="border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
                     >
                       <ArrowLeft size={13} className="inline mr-1" /> Back
                     </button>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-                      <span className="text-[11px] text-gray-500 font-medium text-center sm:text-right">
-                        <strong>{enrollments.filter(e => e.name && e.name.trim() !== '').length}/{newGroupDuration}</strong> tickets
+                      <span className="text-[11px] text-[#AEABD8] font-medium text-center sm:text-right">
+                        <strong className="text-white">{enrollments.filter(e => e.name && e.name.trim() !== '').length}/{newGroupDuration}</strong> tickets
                         {enrollments.some(e => !e.name || e.name.trim() === '') && (
-                          <span className="text-amber-600 font-bold ml-1.5">(Draft)</span>
+                          <span className="text-[#FFBB38] font-bold ml-1.5">(Draft)</span>
                         )}
                       </span>
                       <button
@@ -6206,7 +6210,7 @@ Thank you for your prompt payment! 🙏`;
                           triggerHapticFeedback('light');
                           setWizardStep(3);
                         }}
-                        className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
+                        className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
                       >
                         <span>Proceed to Review</span>
                         <ArrowRight size={14} />
@@ -6218,16 +6222,16 @@ Thank you for your prompt payment! 🙏`;
 
               {/* ── STEP 3: REVIEW & LAUNCH PLAN ── */}
               {wizardStep === 3 && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs animate-in fade-in duration-150">
-                  <div className="border-b border-gray-150 pb-3 flex items-center justify-between gap-2">
-                    <h4 className="text-xs sm:text-sm font-bold text-gray-900">Step 3: Review &amp; Launch</h4>
+                <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs animate-in fade-in duration-150">
+                  <div className="border-b border-[#27264E] pb-3 flex items-center justify-between gap-2">
+                    <h4 className="text-xs sm:text-sm font-bold text-white">Step 3: Review &amp; Launch</h4>
                     <div>
                       {enrollments.every(e => e.name !== '') ? (
-                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center gap-1">
                           <CheckCircle2 size={12} /> Active Launch
                         </span>
                       ) : (
-                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-[#FFBB38]/15 text-[#FFBB38] border border-[#FFBB38]/30">
                           Draft ({enrollments.filter(e => !e.name).length} Open)
                         </span>
                       )}
@@ -6236,61 +6240,61 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* Summary Metric Cards */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 sm:p-3">
-                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Group</span>
-                      <strong className="text-gray-900 mt-0.5 block truncate text-xs sm:text-sm font-bold">{newGroupName}</strong>
+                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
+                      <span className="text-[#AEABD8] block text-[10px] uppercase font-bold">Group</span>
+                      <strong className="text-white mt-0.5 block truncate text-xs sm:text-sm font-bold">{newGroupName}</strong>
                     </div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 sm:p-3">
-                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Pool Value</span>
-                      <strong className="text-indigo-600 mt-0.5 block truncate text-xs sm:text-sm font-extrabold">{formatCurrency(Number(newGroupValue))}</strong>
+                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
+                      <span className="text-[#AEABD8] block text-[10px] uppercase font-bold">Pool Value</span>
+                      <strong className="text-[#64CFF6] mt-0.5 block truncate text-xs sm:text-sm font-extrabold">{formatCurrency(Number(newGroupValue))}</strong>
                     </div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 sm:p-3">
-                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Lifecycle</span>
-                      <strong className="text-gray-900 mt-0.5 block truncate text-xs sm:text-sm font-bold">{Number(newGroupDuration) + 1} Months (M0-M{newGroupDuration})</strong>
+                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
+                      <span className="text-[#AEABD8] block text-[10px] uppercase font-bold">Lifecycle</span>
+                      <strong className="text-white mt-0.5 block truncate text-xs sm:text-sm font-bold">{Number(newGroupDuration) + 1} Months (M0-M{newGroupDuration})</strong>
                     </div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 sm:p-3">
-                      <span className="text-gray-400 block text-[10px] uppercase font-bold">Monthly Due</span>
-                      <strong className="text-emerald-700 mt-0.5 block truncate text-xs sm:text-sm font-extrabold">
+                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
+                      <span className="text-[#AEABD8] block text-[10px] uppercase font-bold">Monthly Due</span>
+                      <strong className="text-[#02B15A] mt-0.5 block truncate text-xs sm:text-sm font-extrabold">
                         {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))} / member
                       </strong>
                     </div>
                   </div>
 
                   {/* Operational Timeline Preview Box */}
-                  <div className="bg-gradient-to-br from-gray-50 via-indigo-50/20 to-gray-50 border border-gray-200 rounded-2xl p-3 sm:p-4 space-y-2.5">
-                    <h5 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                      <CalendarDays size={14} className="text-indigo-600" />
+                  <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3 sm:p-4 space-y-2.5">
+                    <h5 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <CalendarDays size={14} className="text-[#6359E9]" />
                       Timeline
                     </h5>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
                       
                       {/* Month 0 Card */}
-                      <div className="bg-white border border-amber-200 rounded-xl p-2.5 sm:p-3 space-y-1">
+                      <div className="bg-[#1D1D41] border border-[#FFBB38]/40 rounded-xl p-2.5 sm:p-3 space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-amber-900 flex items-center gap-1">
-                            <Rocket size={12} className="text-amber-600" /> Month 0: Launch
+                          <span className="font-extrabold text-[#FFBB38] flex items-center gap-1">
+                            <Rocket size={12} className="text-[#FFBB38]" /> Month 0: Launch
                           </span>
-                          <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                          <span className="text-[9px] font-bold bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30 px-1.5 py-0.5 rounded">
                             Organizer Profit
                           </span>
                         </div>
-                        <p className="text-[11px] text-gray-600">
+                        <p className="text-[11px] text-[#AEABD8]">
                           {newGroupStartDate} · All {newGroupDuration} members pay first installment ({formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}). No auction held.
                         </p>
                       </div>
 
                       {/* Month 1 Card */}
-                      <div className="bg-white border border-indigo-200 rounded-xl p-2.5 sm:p-3 space-y-1">
+                      <div className="bg-[#1D1D41] border border-[#6359E9]/40 rounded-xl p-2.5 sm:p-3 space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-indigo-950 flex items-center gap-1">
-                            <Trophy size={12} className="text-indigo-600" /> Month 1: 1st Auction
+                          <span className="font-extrabold text-white flex items-center gap-1">
+                            <Trophy size={12} className="text-[#6359E9]" /> Month 1: 1st Auction
                           </span>
-                          <span className="text-[9px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
+                          <span className="text-[9px] font-bold bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 px-1.5 py-0.5 rounded">
                             Live Bidding
                           </span>
                         </div>
-                        <p className="text-[11px] text-gray-600">
+                        <p className="text-[11px] text-[#AEABD8]">
                           {newGroupAuctionDay}th of next month · {formatTime12h(newGroupAuctionTime)}. Winning discount accumulates to <code>kai_iruppu_pool</code>.
                         </p>
                       </div>
@@ -6300,35 +6304,35 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* Enrolled Subscribers Grid */}
                   <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                    <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">
                       Enrolled Subscribers ({enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration})
                     </span>
                     <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
                       {enrollments.map((slot, index) => (
                         <span key={index} className={`border text-[11px] px-2.5 py-1 rounded-lg shadow-2xs flex items-center gap-1.5 ${
                           slot.name 
-                            ? 'bg-white border-gray-200 text-gray-800 font-semibold' 
-                            : 'bg-amber-50/50 border-amber-200 text-amber-700 italic'
+                            ? 'bg-[#141332] border-[#27264E] text-white font-semibold' 
+                            : 'bg-[#FFBB38]/10 border-[#FFBB38]/30 text-[#FFBB38] italic'
                         }`}>
-                          <span className="w-3.5 h-3.5 rounded-full bg-gray-100 text-gray-600 text-[8px] font-bold flex items-center justify-center">
+                          <span className="w-3.5 h-3.5 rounded-full bg-[#27264E] text-[#AEABD8] text-[8px] font-bold flex items-center justify-center">
                             {index + 1}
                           </span>
                           <span>{slot.name || 'Open Slot'}</span>
-                          {slot.phone && <span className="text-[10px] text-gray-400">({slot.phone})</span>}
+                          {slot.phone && <span className="text-[10px] text-[#AEABD8]">({slot.phone})</span>}
                         </span>
                       ))}
                     </div>
                   </div>
 
                   {/* Navigation Step 3 Buttons */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-gray-150">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-[#27264E]">
                     <button
                       type="button"
                       onClick={() => {
                         triggerHapticFeedback('light');
                         setWizardStep(2);
                       }}
-                      className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
+                      className="border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
                     >
                       <ArrowLeft size={13} className="inline mr-1" /> Back to Members
                     </button>
@@ -6338,8 +6342,8 @@ Thank you for your prompt payment! 🙏`;
                       onClick={handleCreateGroup}
                       className={`font-bold text-xs px-7 py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs active:scale-95 cursor-pointer ${
                         isCreatingGroup
-                          ? 'bg-gray-400 text-white cursor-not-allowed'
-                          : 'bg-gray-900 hover:bg-black text-white'
+                          ? 'bg-[#27264E] text-[#AEABD8] cursor-not-allowed'
+                          : 'bg-[#6359E9] hover:bg-[#6F64FF] text-white'
                       }`}
                     >
                       {isCreatingGroup ? (
@@ -6375,23 +6379,23 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── UPGRADED CHITBASE-INSPIRED CHIT GROUP SETTINGS MODAL ──────── */}
       {editingGroup && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden my-auto">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden my-auto">
             
             {/* 1. Modal Top Bar */}
-            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between bg-white z-10">
+            <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between bg-[#1D1D41] z-10">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setEditingGroup(null)}
-                  className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm"
+                  className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm"
                 >
                   <ArrowLeft size={13} /> Back
                 </button>
                 <div>
-                  <h3 className="text-base font-bold text-gray-900">Edit Chit Group</h3>
-                  <p className="text-[11px] text-gray-500 font-medium">
-                    {formatCurrency(editGroupValue)} · {editGroupMemberCount} Members · <span className="capitalize font-semibold text-indigo-600">{editGroupStatus}</span>
+                  <h3 className="text-base font-bold text-white">Edit Chit Group</h3>
+                  <p className="text-[11px] text-[#AEABD8] font-medium">
+                    {formatCurrency(editGroupValue)} · {editGroupMemberCount} Members · <span className="capitalize font-semibold text-[#64CFF6]">{editGroupStatus}</span>
                   </p>
                 </div>
               </div>
@@ -6399,21 +6403,21 @@ Thank you for your prompt payment! 🙏`;
               <button 
                 type="button" 
                 onClick={() => setEditingGroup(null)}
-                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                className="text-[#AEABD8] hover:text-white p-1.5 rounded-full hover:bg-[#141332] transition-colors"
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* 2. Top Tab Switcher */}
-            <div className="flex border-b border-gray-150 bg-gray-50/70 px-5 pt-2 gap-2">
+            <div className="flex border-b border-[#27264E] bg-[#141332] px-5 pt-2 gap-2">
               <button
                 type="button"
                 onClick={() => setEditActiveTab('details')}
                 className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 ${
                   editActiveTab === 'details'
-                    ? 'bg-white text-indigo-600 border-indigo-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-800 border-transparent'
+                    ? 'bg-[#1D1D41] text-white border-[#6359E9] shadow-sm'
+                    : 'text-[#AEABD8] hover:text-white border-transparent'
                 }`}
               >
                 <Briefcase size={14} /> Chit Details
@@ -6423,12 +6427,12 @@ Thank you for your prompt payment! 🙏`;
                 onClick={() => setEditActiveTab('members')}
                 className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 ${
                   editActiveTab === 'members'
-                    ? 'bg-white text-indigo-600 border-indigo-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-800 border-transparent'
+                    ? 'bg-[#1D1D41] text-white border-[#6359E9] shadow-sm'
+                    : 'text-[#AEABD8] hover:text-white border-transparent'
                 }`}
               >
                 <Users size={14} /> Members
-                <span className="bg-indigo-50 text-indigo-700 text-[10px] px-1.5 py-0.2 rounded-full font-extrabold border border-indigo-100">
+                <span className="bg-[#6359E9]/20 text-[#64CFF6] text-[10px] px-1.5 py-0.2 rounded-full font-extrabold border border-[#6359E9]/40">
                   {editGroupMembers.length}
                 </span>
               </button>
@@ -6443,36 +6447,36 @@ Thank you for your prompt payment! 🙏`;
                   {/* Section A: Name & Status */}
                   <div className="space-y-3">
                     <div>
-                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">Chit details</span>
-                      <h4 className="text-xs font-bold text-gray-500 uppercase mt-0.5">Name &amp; status</h4>
+                      <span className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider block">Chit details</span>
+                      <h4 className="text-xs font-bold text-[#AEABD8] uppercase mt-0.5">Name &amp; status</h4>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-gray-700 block">Chit Name *</label>
+                      <label className="text-[11px] font-bold text-[#AEABD8] block">Chit Name *</label>
                       <input
                         type="text"
                         required
                         value={editGroupName}
                         onChange={(e) => setEditGroupName(e.target.value)}
                         placeholder="e.g. Sample Test Group"
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none transition-colors"
+                        className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-white focus:outline-none transition-colors"
                       />
                     </div>
 
                     {/* Status 3-Pills */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-gray-700 block">Status</label>
+                      <label className="text-[11px] font-bold text-[#AEABD8] block">Status</label>
                       <div className="grid grid-cols-3 gap-2.5">
                         <button
                           type="button"
                           onClick={() => setEditGroupStatus('draft')}
                           className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                             editGroupStatus === 'draft'
-                              ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-sm'
-                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                              ? 'bg-[#FFBB38]/20 border-[#FFBB38] text-[#FFBB38] shadow-sm'
+                              : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
                           }`}
                         >
-                          <Edit3 size={14} className={editGroupStatus === 'draft' ? 'text-amber-600' : 'text-gray-400'} />
+                          <Edit3 size={14} className={editGroupStatus === 'draft' ? 'text-[#FFBB38]' : 'text-[#AEABD8]'} />
                           Draft
                         </button>
                         <button
@@ -6480,11 +6484,11 @@ Thank you for your prompt payment! 🙏`;
                           onClick={() => setEditGroupStatus('active')}
                           className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                             editGroupStatus === 'active'
-                              ? 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-sm ring-1 ring-emerald-400'
-                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                              ? 'bg-[#02B15A]/20 border-[#02B15A] text-[#02B15A] shadow-sm ring-1 ring-[#02B15A]'
+                              : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
                           }`}
                         >
-                          <CheckCircle2 size={14} className={editGroupStatus === 'active' ? 'text-emerald-600' : 'text-gray-400'} />
+                          <CheckCircle2 size={14} className={editGroupStatus === 'active' ? 'text-[#02B15A]' : 'text-[#AEABD8]'} />
                           Active
                         </button>
                         <button
@@ -6492,15 +6496,15 @@ Thank you for your prompt payment! 🙏`;
                           onClick={() => setEditGroupStatus('completed')}
                           className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                             editGroupStatus === 'completed'
-                              ? 'bg-purple-50 border-purple-300 text-purple-900 shadow-sm'
-                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                              ? 'bg-[#6359E9]/20 border-[#6359E9] text-white shadow-sm ring-1 ring-[#6359E9]'
+                              : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
                           }`}
                         >
-                          <Trophy size={14} className={editGroupStatus === 'completed' ? 'text-purple-600' : 'text-gray-400'} />
+                          <Trophy size={14} className={editGroupStatus === 'completed' ? 'text-[#64CFF6]' : 'text-[#AEABD8]'} />
                           Completed
                         </button>
                       </div>
-                      <p className="text-[10px] text-gray-500 italic mt-1">
+                      <p className="text-[10px] text-[#AEABD8] italic mt-1">
                         {editGroupStatus === 'draft' && 'Draft mode: Enrollment open, no auction bids or treasury postings yet.'}
                         {editGroupStatus === 'active' && 'Active: In-progress chit fund for monthly collections and live auctions.'}
                         {editGroupStatus === 'completed' && 'Completed: All monthly cycles and winner payouts concluded.'}
@@ -6509,40 +6513,40 @@ Thank you for your prompt payment! 🙏`;
 
                     {/* Active Month Selector */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-gray-700 block">Current Active Month *</label>
+                      <label className="text-[11px] font-bold text-[#AEABD8] block">Current Active Month *</label>
                       <select
                         value={editGroupCurrentMonth}
                         onChange={(e) => setEditGroupCurrentMonth(parseInt(e.target.value) || 0)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-900 focus:outline-none"
+                        className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-white focus:outline-none"
                       >
-                        <option value={0}>Month 0 (Launch Month — Organizer Profit Phase)</option>
+                        <option value={0} className="bg-[#1D1D41] text-white">Month 0 (Launch Month — Organizer Profit Phase)</option>
                         {Array.from({ length: editGroupMemberCount }).map((_, idx) => (
-                          <option key={idx + 1} value={idx + 1}>
+                          <option key={idx + 1} value={idx + 1} className="bg-[#1D1D41] text-white">
                             Month {idx + 1} {idx === 0 ? '(1st Live Auction)' : ''}
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-[10px] text-[#AEABD8]">
                         Directly controls the ongoing monthly cycle. You can advance or revert this anytime.
                       </p>
                     </div>
                   </div>
 
-                  <hr className="border-gray-150" />
+                  <hr className="border-[#27264E]" />
 
                   {/* Section B: Size & Timing */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <h4 className="text-xs font-bold text-gray-900">Size &amp; timing</h4>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase">Key fields</span>
+                      <h4 className="text-xs font-bold text-white">Size &amp; timing</h4>
+                      <span className="text-[10px] text-[#AEABD8] font-bold uppercase">Key fields</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Member Shares Stepper */}
-                      <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-2">
+                      <div className="p-3.5 bg-[#141332] border border-[#27264E] rounded-2xl space-y-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-gray-800">Member shares *</span>
-                          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                          <span className="text-xs font-bold text-white">Member shares *</span>
+                          <div className="flex items-center gap-1.5 bg-[#1D1D41] border border-[#27264E] rounded-xl p-1 shadow-sm">
                             <button
                               type="button"
                               onClick={() => {
@@ -6550,7 +6554,7 @@ Thank you for your prompt payment! 🙏`;
                                   setEditGroupMemberCount(prev => prev - 1);
                                 }
                               }}
-                              className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-sm"
+                              className="w-7 h-7 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-sm"
                             >
                               <Minus size={13} />
                             </button>
@@ -6563,27 +6567,27 @@ Thank you for your prompt payment! 🙏`;
                                 const val = Math.max(1, parseInt(e.target.value) || 1);
                                 setEditGroupMemberCount(val);
                               }}
-                              className="w-10 text-center font-bold text-xs text-gray-900 focus:outline-none"
+                              className="w-10 text-center font-bold text-xs text-white bg-transparent focus:outline-none"
                             />
                             <button
                               type="button"
                               onClick={() => setEditGroupMemberCount(prev => prev + 1)}
-                              className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-sm"
+                              className="w-7 h-7 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-sm"
                             >
                               <Plus size={13} />
                             </button>
                           </div>
                         </div>
-                        <span className="text-[11px] text-gray-500 block">
+                        <span className="text-[11px] text-[#AEABD8] block">
                           {editGroupMembers.length} of {editGroupMemberCount} assigned
                         </span>
                       </div>
 
                       {/* Duration Stepper (Synced 1:1) */}
-                      <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-2">
+                      <div className="p-3.5 bg-[#141332] border border-[#27264E] rounded-2xl space-y-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-gray-800">Duration (Months) *</span>
-                          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                          <span className="text-xs font-bold text-white">Duration (Months) *</span>
+                          <div className="flex items-center gap-1.5 bg-[#1D1D41] border border-[#27264E] rounded-xl p-1 shadow-sm">
                             <button
                               type="button"
                               onClick={() => {
@@ -6591,23 +6595,23 @@ Thank you for your prompt payment! 🙏`;
                                   setEditGroupMemberCount(prev => prev - 1);
                                 }
                               }}
-                              className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-sm"
+                              className="w-7 h-7 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-sm"
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="w-10 text-center font-bold text-xs text-gray-900">
+                            <span className="w-10 text-center font-bold text-xs text-white">
                               {editGroupMemberCount}
                             </span>
                             <button
                               type="button"
                               onClick={() => setEditGroupMemberCount(prev => prev + 1)}
-                              className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-sm"
+                              className="w-7 h-7 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-sm"
                             >
                               <Plus size={13} />
                             </button>
                           </div>
                         </div>
-                        <span className="text-[11px] text-gray-500 block">
+                        <span className="text-[11px] text-[#AEABD8] block">
                           {editGroupMemberCount} planned, {editGroupMemberCount} months
                         </span>
                       </div>
@@ -6615,13 +6619,13 @@ Thank you for your prompt payment! 🙏`;
 
                     {/* Validation Badges */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-emerald-900">
-                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                      <div className="p-3 bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl flex items-start gap-2.5 text-white">
+                        <CheckCircle2 size={16} className="text-[#02B15A] shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider block">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#02B15A] block">
                             SHARES LIVE {editGroupMembers.length} / {editGroupMemberCount}
                           </span>
-                          <p className="text-[11px] text-emerald-800 mt-0.5">
+                          <p className="text-[11px] text-[#AEABD8] mt-0.5">
                             {editGroupMembers.length === editGroupMemberCount 
                               ? 'Share count matches the members assigned.' 
                               : `${editGroupMemberCount - editGroupMembers.length} tickets need member assignment.`}
@@ -6629,13 +6633,13 @@ Thank you for your prompt payment! 🙏`;
                         </div>
                       </div>
 
-                      <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-emerald-900">
-                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                      <div className="p-3 bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl flex items-start gap-2.5 text-white">
+                        <CheckCircle2 size={16} className="text-[#02B15A] shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider block">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#02B15A] block">
                             MONTHS LIVE {editGroupMemberCount} / {editGroupMemberCount}
                           </span>
-                          <p className="text-[11px] text-emerald-800 mt-0.5">
+                          <p className="text-[11px] text-[#AEABD8] mt-0.5">
                             Duration and monthly plan are ready.
                           </p>
                         </div>
@@ -6644,35 +6648,35 @@ Thank you for your prompt payment! 🙏`;
 
                     {/* Start Month Picker */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-gray-700 block">Start Month *</label>
+                      <label className="text-[11px] font-bold text-[#AEABD8] block">Start Month *</label>
                       <input
                         type="date"
                         value={editGroupStartDate}
                         onChange={(e) => setEditGroupStartDate(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                        className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none"
                       />
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-[10px] text-[#AEABD8]">
                         Changing the start month shifts dashboard months only before this chit has payments, lifts, or closed months.
                       </p>
                     </div>
                   </div>
 
-                  <hr className="border-gray-150" />
+                  <hr className="border-[#27264E]" />
 
                   {/* Section C: Set up the money */}
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-sm font-bold text-gray-900">Set up the money</h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Summary of monthly contributions, Organizer profit, and Laaba Seetu</p>
+                      <h4 className="text-sm font-bold text-white">Set up the money</h4>
+                      <p className="text-[11px] text-[#AEABD8] mt-0.5">Summary of monthly contributions, Organizer profit, and Laaba Seetu</p>
                     </div>
 
                     {/* Total Chit Value Input */}
-                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-2">
-                      <label className="text-[11px] font-bold text-gray-700 block">
+                    <div className="p-4 bg-[#141332] border border-[#27264E] rounded-2xl space-y-2">
+                      <label className="text-[11px] font-bold text-[#AEABD8] block">
                         Total chit value — the prize pot (₹) *
                       </label>
                       <div className="relative">
-                        <span className="absolute left-3.5 top-2.5 text-gray-400 font-bold text-sm">₹</span>
+                        <span className="absolute left-3.5 top-2.5 text-[#AEABD8] font-bold text-sm">₹</span>
                         <input
                           type="number"
                           min={1000}
@@ -6680,76 +6684,76 @@ Thank you for your prompt payment! 🙏`;
                           required
                           value={editGroupValue}
                           onChange={(e) => setEditGroupValue(Math.max(1000, parseInt(e.target.value) || 0))}
-                          className="w-full bg-white border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-2 text-sm font-bold text-gray-900 focus:outline-none"
+                          className="w-full bg-[#1D1D41] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-3 py-2 text-sm font-bold text-white focus:outline-none"
                         />
                       </div>
-                      <p className="text-[10px] text-gray-500 font-medium">
+                      <p className="text-[10px] text-[#AEABD8] font-medium">
                         Roughly {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))} per member each month.
                       </p>
                     </div>
 
                     {/* 3-Stage Formula Flow */}
-                    <div className="p-3 bg-white border border-gray-200 rounded-2xl flex items-center justify-around text-center shadow-sm">
+                    <div className="p-3 bg-[#141332] border border-[#27264E] rounded-2xl flex items-center justify-around text-center shadow-sm">
                       <div>
-                        <span className="text-[9px] font-bold text-gray-400 uppercase block">MEMBERS</span>
-                        <strong className="text-xs font-extrabold text-gray-800">{editGroupMemberCount}</strong>
+                        <span className="text-[9px] font-bold text-[#AEABD8] uppercase block">MEMBERS</span>
+                        <strong className="text-xs font-extrabold text-white">{editGroupMemberCount}</strong>
                       </div>
-                      <ArrowRight size={14} className="text-gray-300" />
+                      <ArrowRight size={14} className="text-[#27264E]" />
                       <div>
-                        <span className="text-[9px] font-bold text-gray-400 uppercase block">EACH PAYS / MO</span>
-                        <strong className="text-xs font-extrabold text-indigo-600">
+                        <span className="text-[9px] font-bold text-[#AEABD8] uppercase block">EACH PAYS / MO</span>
+                        <strong className="text-xs font-extrabold text-[#6359E9]">
                           {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}
                         </strong>
                       </div>
-                      <ArrowRight size={14} className="text-gray-300" />
+                      <ArrowRight size={14} className="text-[#27264E]" />
                       <div>
-                        <span className="text-[9px] font-bold text-gray-400 uppercase block">WINNER TAKES</span>
-                        <strong className="text-xs font-extrabold text-amber-600">
+                        <span className="text-[9px] font-bold text-[#AEABD8] uppercase block">WINNER TAKES</span>
+                        <strong className="text-xs font-extrabold text-[#FFBB38]">
                           {formatCurrency(editGroupValue)}
                         </strong>
                       </div>
                     </div>
 
                     {/* Step 1 Card: How much does each member pay */}
-                    <div className="p-4 bg-white border border-gray-200 rounded-2xl space-y-3 shadow-sm">
+                    <div className="p-4 bg-[#141332] border border-[#27264E] rounded-2xl space-y-3 shadow-sm">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-indigo-900 text-white text-[10px] font-bold flex items-center justify-center">1</span>
-                          <h5 className="text-xs font-bold text-gray-900">How much does each member pay every month?</h5>
+                          <span className="w-5 h-5 rounded-full bg-[#6359E9] text-white text-[10px] font-bold flex items-center justify-center">1</span>
+                          <h5 className="text-xs font-bold text-white">How much does each member pay every month?</h5>
                         </div>
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                           <Check size={11} /> All set
                         </span>
                       </div>
 
-                      <div className="p-3 bg-emerald-50/50 border border-emerald-150 rounded-xl text-xs text-emerald-900 font-medium">
-                        Everyone pays <strong>{formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}</strong> every month — that&apos;s a <strong>{formatCurrency(editGroupValue)}</strong> pot collected each month.
+                      <div className="p-3 bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl text-xs text-white font-medium">
+                        Everyone pays <strong className="text-[#02B15A]">{formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}</strong> every month — that&apos;s a <strong className="text-[#64CFF6]">{formatCurrency(editGroupValue)}</strong> pot collected each month.
                       </div>
                     </div>
 
                     {/* Step 2 Card: Month 0 Organizer Profit */}
-                    <div className="p-4 bg-white border border-gray-200 rounded-2xl space-y-2 shadow-sm">
+                    <div className="p-4 bg-[#141332] border border-[#27264E] rounded-2xl space-y-2 shadow-sm">
                       <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">2</span>
-                        <h5 className="text-xs font-bold text-gray-900">Month 0 Launch Month (Organizer Profit)</h5>
+                        <span className="w-5 h-5 rounded-full bg-[#FFBB38] text-black text-[10px] font-bold flex items-center justify-center">2</span>
+                        <h5 className="text-xs font-bold text-white">Month 0 Launch Month (Organizer Profit)</h5>
                       </div>
-                      <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-xl text-xs text-amber-900">
-                        <p className="font-semibold">Launch Month Allocation:</p>
-                        <p className="text-[11px] text-amber-800 mt-0.5">
+                      <div className="p-3 bg-[#FFBB38]/10 border border-[#FFBB38]/30 rounded-xl text-xs text-white">
+                        <p className="font-semibold text-[#FFBB38]">Launch Month Allocation:</p>
+                        <p className="text-[11px] text-[#AEABD8] mt-0.5">
                           All {editGroupMemberCount} members pay their first installment (<strong>{formatCurrency(editGroupValue)}</strong> total), which is taken directly by the Organizer as <strong>Organizer Profit</strong>. No auction occurs in Month 0.
                         </p>
                       </div>
                     </div>
 
                     {/* Step 3 Card: Laaba Seetu Bonus Month */}
-                    <div className="p-4 bg-white border border-gray-200 rounded-2xl space-y-2 shadow-sm">
+                    <div className="p-4 bg-[#141332] border border-[#27264E] rounded-2xl space-y-2 shadow-sm">
                       <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex items-center justify-center">3</span>
-                        <h5 className="text-xs font-bold text-gray-900">Laaba Seetu (லாப சீட்டு — Profit Month)</h5>
+                        <span className="w-5 h-5 rounded-full bg-[#02B15A] text-white text-[10px] font-bold flex items-center justify-center">3</span>
+                        <h5 className="text-xs font-bold text-white">Laaba Seetu (லாப சீட்டு — Profit Month)</h5>
                       </div>
-                      <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl text-xs text-emerald-950 space-y-1">
-                        <p className="font-semibold">Threshold: When Kai Iruppu Pool &ge; {formatCurrency(editGroupValue)}</p>
-                        <p className="text-[11px] text-emerald-800">
+                      <div className="p-3 bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl text-xs text-white space-y-1">
+                        <p className="font-semibold text-[#02B15A]">Threshold: When Kai Iruppu Pool &ge; {formatCurrency(editGroupValue)}</p>
+                        <p className="text-[11px] text-[#AEABD8]">
                           Subscribers pay <strong>₹0 installment due</strong>. The prize pot is funded entirely by accumulated auction discounts, and auction bidding continues normally!
                         </p>
                       </div>
@@ -6757,61 +6761,61 @@ Thank you for your prompt payment! 🙏`;
 
                   </div>
 
-                  <hr className="border-gray-150" />
+                  <hr className="border-[#27264E]" />
 
                   {/* Section D: REVIEW — Does this look right? */}
-                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">REVIEW — does this look right?</span>
+                  <div className="p-4 bg-[#141332] border border-[#27264E] rounded-2xl space-y-3">
+                    <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">REVIEW — does this look right?</span>
                     <div className="space-y-1.5 text-xs">
-                      <div className="flex justify-between py-1 border-b border-gray-200">
-                        <span className="text-gray-500">Members</span>
-                        <strong className="text-gray-900">{editGroupMemberCount}</strong>
+                      <div className="flex justify-between py-1 border-b border-[#27264E]">
+                        <span className="text-[#AEABD8]">Members</span>
+                        <strong className="text-white">{editGroupMemberCount}</strong>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-gray-200">
-                        <span className="text-gray-500">Each member pays / month</span>
-                        <strong className="text-gray-900">{formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}</strong>
+                      <div className="flex justify-between py-1 border-b border-[#27264E]">
+                        <span className="text-[#AEABD8]">Each member pays / month</span>
+                        <strong className="text-white">{formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}</strong>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-gray-200">
-                        <span className="text-gray-500">Collected each month</span>
-                        <strong className="text-gray-900">{formatCurrency(editGroupValue)}</strong>
+                      <div className="flex justify-between py-1 border-b border-[#27264E]">
+                        <span className="text-[#AEABD8]">Collected each month</span>
+                        <strong className="text-white">{formatCurrency(editGroupValue)}</strong>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-gray-200">
-                        <span className="text-gray-500">Prize pot — winner takes</span>
-                        <strong className="text-amber-600">{formatCurrency(editGroupValue)}</strong>
+                      <div className="flex justify-between py-1 border-b border-[#27264E]">
+                        <span className="text-[#AEABD8]">Prize pot — winner takes</span>
+                        <strong className="text-[#FFBB38]">{formatCurrency(editGroupValue)}</strong>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-gray-200">
-                        <span className="text-gray-500">Monthly draws</span>
-                        <strong className="text-gray-900">{editGroupMemberCount} · from {editGroupStartDate || 'Active cycle'}</strong>
+                      <div className="flex justify-between py-1 border-b border-[#27264E]">
+                        <span className="text-[#AEABD8]">Monthly draws</span>
+                        <strong className="text-white">{editGroupMemberCount} · from {editGroupStartDate || 'Active cycle'}</strong>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-gray-200">
-                        <span className="text-gray-500">Organizer Profit</span>
-                        <strong className="text-amber-600">{formatCurrency(editGroupValue)} (Month 0)</strong>
+                      <div className="flex justify-between py-1 border-b border-[#27264E]">
+                        <span className="text-[#AEABD8]">Organizer Profit</span>
+                        <strong className="text-[#FFBB38]">{formatCurrency(editGroupValue)} (Month 0)</strong>
                       </div>
                     </div>
 
-                    <div className="pt-2 flex items-center gap-1.5 text-emerald-700 text-xs font-bold">
+                    <div className="pt-2 flex items-center gap-1.5 text-[#02B15A] text-xs font-bold">
                       <CheckCircle2 size={14} /> The money adds up — collection matches the pot.
                     </div>
                   </div>
 
                   {/* Section E: Advanced & Danger Zone */}
-                  <div className="border border-gray-200 rounded-2xl overflow-hidden">
+                  <div className="border border-[#27264E] rounded-2xl overflow-hidden">
                     <button
                       type="button"
                       onClick={() => setIsAdvancedExpanded(prev => !prev)}
-                      className="w-full p-3.5 bg-gray-50 hover:bg-gray-100/80 flex justify-between items-center text-xs font-bold text-gray-700 transition-colors"
+                      className="w-full p-3.5 bg-[#141332] hover:bg-[#1D1D41] flex justify-between items-center text-xs font-bold text-white transition-colors"
                     >
                       <span>ADVANCED</span>
-                      <span className="text-indigo-600 text-[11px] font-bold">
+                      <span className="text-[#64CFF6] text-[11px] font-bold">
                         {isAdvancedExpanded ? 'Hide' : 'Show'}
                       </span>
                     </button>
 
                     {isAdvancedExpanded && (
-                      <div className="p-4 bg-red-50/50 border-t border-red-100 space-y-3">
-                        <span className="text-[10px] font-extrabold text-red-700 uppercase tracking-wider block">DANGER ZONE</span>
+                      <div className="p-4 bg-rose-500/10 border-t border-rose-500/30 space-y-3">
+                        <span className="text-[10px] font-extrabold text-rose-400 uppercase tracking-wider block">DANGER ZONE</span>
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                          <p className="text-xs text-red-800">
+                          <p className="text-xs text-rose-300">
                             Permanently delete this chit group and all its enrolled tickets &amp; auction data.
                           </p>
                           <button
@@ -6823,9 +6827,9 @@ Thank you for your prompt payment! 🙏`;
                               setDeletePhraseInput('');
                               setDeleteSliderVal(0);
                             }}
-                            className="border border-red-300 bg-white hover:bg-red-50 text-red-700 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm shrink-0 self-start sm:self-auto"
+                            className="border border-rose-500/40 bg-[#1D1D41] hover:bg-rose-500/20 text-rose-300 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm shrink-0 self-start sm:self-auto"
                           >
-                            <Trash2 size={13} className="text-red-600" /> Delete Group
+                            <Trash2 size={13} className="text-rose-400" /> Delete Group
                           </button>
                         </div>
                       </div>
@@ -6837,24 +6841,24 @@ Thank you for your prompt payment! 🙏`;
                 /* TAB 2: MEMBERS MANAGEMENT (ChitBase Architecture) */
                 <div className="space-y-3.5">
                   {/* Top Members Header */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pb-3 border-b border-gray-150">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pb-3 border-b border-[#27264E]">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-sm font-bold text-gray-900">Members &amp; Tickets</h4>
-                        <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-150 px-2 py-0.5 rounded-full">
+                        <h4 className="text-sm font-bold text-white">Members &amp; Tickets</h4>
+                        <span className="text-[10px] font-bold bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40 px-2 py-0.5 rounded-full">
                           {editGroupMembers.filter(m => m.profileId).length}/{editGroupMemberCount} Assigned
                         </span>
                         {editGroupStatus === 'draft' ? (
-                          <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] font-bold bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/40 px-2 py-0.5 rounded-full">
                             Draft (Reordering Open)
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="text-[10px] font-bold bg-[#141332] text-[#AEABD8] border border-[#27264E] px-2 py-0.5 rounded-full flex items-center gap-1">
                             <Lock size={10} /> Tickets Locked ({editGroupStatus.toUpperCase()})
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
+                      <p className="text-[11px] text-[#AEABD8] mt-0.5">
                         {editGroupStatus === 'draft'
                           ? '↕️ Drag cards or use arrows to reorder ticket slots (Draft mode only)'
                           : '🔒 Ticket numbers cannot be changed once the chit group becomes active.'}
@@ -6873,19 +6877,19 @@ Thank you for your prompt payment! 🙏`;
                             setExpandedEditTicketIds(Array.from({ length: editGroupMemberCount }, (_, i) => i + 1));
                           }
                         }}
-                        className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-semibold text-[11px] px-2.5 py-1.5 rounded-xl transition-colors shrink-0"
+                        className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white font-semibold text-[11px] px-2.5 py-1.5 rounded-xl transition-colors shrink-0"
                       >
                         {expandedEditTicketIds.length > 0 ? 'Collapse All' : 'Expand All'}
                       </button>
 
                       <div className="relative">
-                        <Search size={12} className="absolute left-2.5 top-2.5 text-gray-400" />
+                        <Search size={12} className="absolute left-2.5 top-2.5 text-[#AEABD8]" />
                         <input
                           type="text"
                           placeholder="Filter..."
                           value={editMemberSearchQuery}
                           onChange={(e) => setEditMemberSearchQuery(e.target.value)}
-                          className="bg-gray-50 border border-gray-200 rounded-xl pl-7 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none w-28 sm:w-36"
+                          className="bg-[#141332] border border-[#27264E] rounded-xl pl-7 pr-3 py-1.5 text-xs text-white placeholder:text-[#AEABD8]/50 focus:outline-none w-28 sm:w-36"
                         />
                       </div>
 
@@ -6896,7 +6900,7 @@ Thank you for your prompt payment! 🙏`;
                           setNewMemberPhone('');
                           setShowCreateMemberModal(true);
                         }}
-                        className="bg-gray-900 hover:bg-black text-white font-bold text-[11px] px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-sm shrink-0"
+                        className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-[11px] px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-sm shrink-0"
                       >
                         <UserPlus size={13} /> + Member
                       </button>
@@ -6960,12 +6964,12 @@ Thank you for your prompt payment! 🙏`;
                           }}
                           className={`rounded-2xl border transition-all ${
                             isDragOver
-                              ? 'border-indigo-500 ring-2 ring-indigo-300 bg-indigo-50/50 scale-[1.01]'
+                              ? 'border-[#6359E9] ring-2 ring-[#6359E9]/40 bg-[#6359E9]/20 scale-[1.01]'
                               : isBeingDragged
-                                ? 'opacity-40 border-dashed border-indigo-400 bg-gray-50'
+                                ? 'opacity-40 border-dashed border-[#6359E9] bg-[#141332]'
                                 : member?.profileId 
-                                  ? 'bg-white border-gray-200 shadow-2xs hover:border-gray-300' 
-                                  : 'border-dashed border-gray-300 bg-gray-50/60'
+                                  ? 'bg-[#141332] border-[#27264E] shadow-2xs hover:border-[#6359E9]/40' 
+                                  : 'border-dashed border-[#27264E] bg-[#141332]/50'
                           }`}
                         >
                           {/* ── CARD HEADER (Always visible & Clickable to Expand) ── */}
@@ -6984,7 +6988,7 @@ Thank you for your prompt payment! 🙏`;
                                 <div
                                   title="Drag to reorder ticket"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-600 shrink-0 hidden sm:block"
+                                  className="cursor-grab active:cursor-grabbing p-1 text-[#AEABD8] hover:text-white shrink-0 hidden sm:block"
                                 >
                                   <GripVertical size={16} />
                                 </div>
@@ -6992,7 +6996,7 @@ Thank you for your prompt payment! 🙏`;
                                 <div
                                   title="Ticket order is locked for active groups"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="p-1 text-gray-300 shrink-0 hidden sm:block"
+                                  className="p-1 text-[#AEABD8]/60 shrink-0 hidden sm:block"
                                 >
                                   <Lock size={13} />
                                 </div>
@@ -7008,7 +7012,7 @@ Thank you for your prompt payment! 🙏`;
                                     type="button"
                                     disabled={ticketNum === 1}
                                     onClick={() => handleSwapTicketSlots(ticketNum, ticketNum - 1)}
-                                    className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20"
+                                    className="p-0.5 text-[#AEABD8] hover:text-white disabled:opacity-20"
                                   >
                                     <ArrowUp size={11} />
                                   </button>
@@ -7016,7 +7020,7 @@ Thank you for your prompt payment! 🙏`;
                                     type="button"
                                     disabled={ticketNum === editGroupMemberCount}
                                     onClick={() => handleSwapTicketSlots(ticketNum, ticketNum + 1)}
-                                    className="p-0.5 text-gray-400 hover:text-gray-900 disabled:opacity-20"
+                                    className="p-0.5 text-[#AEABD8] hover:text-white disabled:opacity-20"
                                   >
                                     <ArrowDown size={11} />
                                   </button>
@@ -7026,8 +7030,8 @@ Thank you for your prompt payment! 🙏`;
                               {/* Ticket Badge */}
                               <span className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
                                 member?.profileId
-                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-150'
-                                  : 'bg-gray-200 text-gray-500'
+                                  ? 'bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40'
+                                  : 'bg-[#27264E] text-[#AEABD8]'
                               }`}>
                                 #{ticketNum}
                               </span>
@@ -7035,34 +7039,34 @@ Thank you for your prompt payment! 🙏`;
                               {/* Member Identity & Details */}
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className={`text-xs sm:text-sm font-bold truncate ${member?.profileId ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                                  <span className={`text-xs sm:text-sm font-bold truncate ${member?.profileId ? 'text-white' : 'text-[#AEABD8]/60 italic'}`}>
                                     {member?.name || (member?.profileId ? 'Subscriber' : 'Unassigned Ticket')}
                                   </span>
                                   {member?.phone && (
-                                    <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
+                                    <span className="text-[10px] text-[#AEABD8] font-medium hidden sm:inline">
                                       ({member.phone})
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[10px] text-gray-500 font-medium truncate flex items-center gap-1.5 mt-0.5">
-                                  <span>Pays <strong className="text-emerald-700">≈ {formatCurrency(effectiveDue)}/mo</strong></span>
+                                <div className="text-[10px] text-[#AEABD8] font-medium truncate flex items-center gap-1.5 mt-0.5">
+                                  <span>Pays <strong className="text-[#02B15A]">≈ {formatCurrency(effectiveDue)}/mo</strong></span>
                                   {totalShares > 1 && (
-                                    <span className="text-indigo-600 font-bold bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded text-[9px]">
+                                    <span className="text-[#64CFF6] font-bold bg-[#6359E9]/20 border border-[#6359E9]/40 px-1.5 py-0.2 rounded text-[9px]">
                                       {totalShares}x shares
                                     </span>
                                   )}
                                   {member?.profileId && member?.splitPool && (
-                                    <span className="text-purple-700 font-bold bg-purple-50 border border-purple-100 px-1.5 py-0.2 rounded text-[9px]">
+                                    <span className="text-[#9C2CF3] font-bold bg-[#9C2CF3]/20 border border-[#9C2CF3]/40 px-1.5 py-0.2 rounded text-[9px]">
                                       👥 Pool
                                     </span>
                                   )}
                                   {member?.profileId && member?.exitMonth && (
-                                    <span className="text-red-700 font-bold bg-red-50 border border-red-100 px-1.5 py-0.2 rounded text-[9px]">
+                                    <span className="text-rose-400 font-bold bg-rose-500/20 border border-rose-500/40 px-1.5 py-0.2 rounded text-[9px]">
                                       ⚠️ Exits M{member.exitMonth}
                                     </span>
                                   )}
                                   {member?.profileId && member?.transferredFrom && (
-                                    <span className="text-amber-700 font-bold bg-amber-50 border border-amber-100 px-1.5 py-0.2 rounded text-[9px]">
+                                    <span className="text-[#FFBB38] font-bold bg-[#FFBB38]/20 border border-[#FFBB38]/40 px-1.5 py-0.2 rounded text-[9px]">
                                       🔄 Transferred
                                     </span>
                                   )}
@@ -7077,7 +7081,7 @@ Thank you for your prompt payment! 🙏`;
                                   type="button"
                                   title="Unassign ticket"
                                   onClick={() => handleUnassignTicket(member.id, ticketNum)}
-                                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                  className="p-1.5 rounded-lg text-[#AEABD8] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                                 >
                                   <Trash2 size={13} />
                                 </button>
@@ -7090,7 +7094,7 @@ Thank you for your prompt payment! 🙏`;
                                     isExpanded ? prev.filter(id => id !== ticketNum) : [...prev, ticketNum]
                                   );
                                 }}
-                                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                                className="p-1 rounded-lg text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors cursor-pointer"
                               >
                                 {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                               </div>
@@ -7099,13 +7103,13 @@ Thank you for your prompt payment! 🙏`;
 
                           {/* ── EXPANDED CONTROLS BODY ── */}
                           {isExpanded && (
-                            <div className="px-3.5 pb-3.5 pt-1 space-y-3 border-t border-gray-100 animate-in fade-in duration-150 text-xs">
+                            <div className="px-3.5 pb-3.5 pt-1 space-y-3 border-t border-[#27264E] animate-in fade-in duration-150 text-xs">
                               
                               {/* Shares Stepper & Timing Line */}
                               <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Shares:</span>
-                                  <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl p-0.5 shadow-2xs">
+                                  <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider">Shares:</span>
+                                  <div className="flex items-center gap-1 bg-[#1D1D41] border border-[#27264E] rounded-xl p-0.5 shadow-2xs">
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -7116,11 +7120,11 @@ Thank you for your prompt payment! 🙏`;
                                           }
                                         }
                                       }}
-                                      className="w-6 h-6 rounded-lg hover:bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs"
+                                      className="w-6 h-6 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-xs"
                                     >
                                       <Minus size={11} />
                                     </button>
-                                    <span className="w-7 text-center font-bold text-xs text-gray-900">
+                                    <span className="w-7 text-center font-bold text-xs text-white">
                                       {member?.profileId ? `${totalShares}x` : '0x'}
                                     </span>
                                     <button
@@ -7135,7 +7139,7 @@ Thank you for your prompt payment! 🙏`;
                                           }
                                         }
                                       }}
-                                      className="w-6 h-6 rounded-lg hover:bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs"
+                                      className="w-6 h-6 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-xs"
                                     >
                                       <Plus size={11} />
                                     </button>
@@ -7149,7 +7153,7 @@ Thank you for your prompt payment! 🙏`;
                                       isTimingExpanded ? prev.filter(id => id !== ticketNum) : [...prev, ticketNum]
                                     );
                                   }}
-                                  className="text-xs font-semibold text-gray-500 hover:text-gray-900 flex items-center gap-1 transition-colors"
+                                  className="text-xs font-semibold text-[#AEABD8] hover:text-white flex items-center gap-1 transition-colors"
                                 >
                                   Share timing {isTimingExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                                 </button>
@@ -7167,8 +7171,8 @@ Thank you for your prompt payment! 🙏`;
                                   disabled={!member?.profileId}
                                   className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
                                     member?.profileId && member?.customInstallment
-                                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                                      ? 'bg-[#6359E9]/20 text-[#64CFF6] border-[#6359E9]/40'
+                                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E] disabled:opacity-40 disabled:cursor-not-allowed'
                                   }`}
                                 >
                                   {member?.profileId && member?.customInstallment ? `Custom: ₹${member.customInstallment.toLocaleString('en-IN')}` : 'Set custom amount'}
@@ -7187,8 +7191,8 @@ Thank you for your prompt payment! 🙏`;
                                   disabled={!member?.profileId}
                                   className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
                                     member?.profileId && member?.splitPool
-                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                                      ? 'bg-[#9C2CF3]/20 text-[#9C2CF3] border-[#9C2CF3]/40'
+                                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E] disabled:opacity-40 disabled:cursor-not-allowed'
                                   }`}
                                 >
                                   {member?.profileId && member?.splitPool ? `Pool (${member.splitPool.length} payers)` : 'Split into pool'}
@@ -7204,8 +7208,8 @@ Thank you for your prompt payment! 🙏`;
                                   disabled={!member?.profileId}
                                   className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
                                     member?.profileId && member?.exitMonth
-                                      ? 'bg-red-50 text-red-700 border-red-200'
-                                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                                      ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E] disabled:opacity-40 disabled:cursor-not-allowed'
                                   }`}
                                 >
                                   {member?.profileId && member?.exitMonth ? `Exits M${member.exitMonth}` : 'Member leaves chit...'}
@@ -7222,8 +7226,8 @@ Thank you for your prompt payment! 🙏`;
                                   disabled={!member?.profileId}
                                   className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
                                     member?.profileId && member?.transferredFrom
-                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                                      ? 'bg-[#FFBB38]/20 text-[#FFBB38] border-[#FFBB38]/40'
+                                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E] disabled:opacity-40 disabled:cursor-not-allowed'
                                   }`}
                                 >
                                   {member?.profileId && member?.transferredFrom ? 'Transferred' : 'Transfer shares...'}
@@ -7232,16 +7236,16 @@ Thank you for your prompt payment! 🙏`;
 
                               {/* Expanded Share Timing Details */}
                               {isTimingExpanded && (
-                                <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl space-y-1.5 text-xs animate-in fade-in duration-150">
-                                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Share Timeline</span>
+                                <div className="p-2.5 bg-[#1D1D41] border border-[#27264E] rounded-xl space-y-1.5 text-xs animate-in fade-in duration-150">
+                                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Share Timeline</span>
                                   <div className="space-y-1 text-[11px]">
-                                    <div className="flex justify-between py-0.5 border-b border-gray-200">
-                                      <span>Month 1 (Launch)</span>
-                                      <span className="text-gray-500 font-semibold">1x · Collected</span>
+                                    <div className="flex justify-between py-0.5 border-b border-[#27264E]">
+                                      <span className="text-white">Month 1 (Launch)</span>
+                                      <span className="text-[#AEABD8] font-semibold">1x · Collected</span>
                                     </div>
                                     <div className="flex justify-between py-0.5">
-                                      <span>Month 2 onward</span>
-                                      <span className="text-indigo-600 font-semibold">
+                                      <span className="text-white">Month 2 onward</span>
+                                      <span className="text-[#64CFF6] font-semibold">
                                         {member?.profileId ? `${totalShares}x active` : 'Unassigned'}
                                       </span>
                                     </div>
@@ -7251,11 +7255,11 @@ Thank you for your prompt payment! 🙏`;
 
                               {/* Active Split Pool Summary Tag */}
                               {member?.profileId && member?.splitPool && (
-                                <div className="p-2 bg-purple-50/70 border border-purple-200 rounded-xl text-xs text-purple-900 space-y-1">
-                                  <span className="text-[10px] font-extrabold uppercase tracking-wider block">👥 Joint Split Pool Active:</span>
+                                <div className="p-2 bg-[#9C2CF3]/15 border border-[#9C2CF3]/40 rounded-xl text-xs text-white space-y-1">
+                                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#9C2CF3] block">👥 Joint Split Pool Active:</span>
                                   <div className="flex flex-wrap gap-1.5 text-[11px]">
                                     {member.splitPool.map((p: any, pIdx: number) => (
-                                      <span key={pIdx} className="bg-white border border-purple-200 px-2 py-0.5 rounded-md font-semibold">
+                                      <span key={pIdx} className="bg-[#1D1D41] border border-[#9C2CF3]/30 px-2 py-0.5 rounded-md font-semibold text-white">
                                         {p.name}: {formatCurrency(p.part)}
                                       </span>
                                     ))}
@@ -7265,12 +7269,12 @@ Thank you for your prompt payment! 🙏`;
 
                               {/* Active Exit Warning Tag */}
                               {member?.profileId && member?.exitMonth && (
-                                <div className="p-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 flex justify-between items-center">
-                                  <span>⚠️ Scheduled to exit on <strong>Month {member.exitMonth}</strong></span>
+                                <div className="p-2 bg-rose-500/15 border border-rose-500/40 rounded-xl text-xs text-white flex justify-between items-center">
+                                  <span>⚠️ Scheduled to exit on <strong className="text-rose-400">Month {member.exitMonth}</strong></span>
                                   <button
                                     type="button"
                                     onClick={() => handleSaveExit(member.id, null)}
-                                    className="text-[10px] font-bold text-red-700 underline"
+                                    className="text-[10px] font-bold text-rose-400 hover:text-rose-300 underline"
                                   >
                                     Re-instate
                                   </button>
@@ -7278,8 +7282,8 @@ Thank you for your prompt payment! 🙏`;
                               )}
 
                               {/* Reassign Subscriber Selector */}
-                              <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2 text-[11px]">
-                                <span className="text-gray-500 font-medium">Reassign Subscriber:</span>
+                              <div className="pt-2 border-t border-[#27264E] flex items-center justify-between gap-2 text-[11px]">
+                                <span className="text-[#AEABD8] font-medium">Reassign Subscriber:</span>
                                 <select
                                   value={member?.profileId || ''}
                                   onChange={(e) => {
@@ -7289,11 +7293,11 @@ Thank you for your prompt payment! 🙏`;
                                       handleReassignTicketMember(ticketNum, member?.id, targetProfile.id!, targetProfile.name, targetProfile.phone);
                                     }
                                   }}
-                                  className="bg-gray-50 border border-gray-200 text-gray-800 text-[11px] font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 max-w-[200px]"
+                                  className="bg-[#1D1D41] border border-[#27264E] text-white text-[11px] font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#6359E9] max-w-[200px]"
                                 >
-                                  <option value="" disabled>Select Subscriber</option>
+                                  <option value="" disabled className="bg-[#1D1D41] text-[#AEABD8]">Select Subscriber</option>
                                   {masterDirectory.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
+                                    <option key={p.id} value={p.id} className="bg-[#1D1D41] text-white">{p.name} ({p.phone})</option>
                                   ))}
                                 </select>
                               </div>
@@ -7311,11 +7315,11 @@ Thank you for your prompt payment! 🙏`;
             </div>
 
             {/* 4. Modal Sticky Action Footer */}
-            <div className="p-4 sm:p-5 border-t border-gray-150 bg-gray-50 flex justify-between items-center z-10">
+            <div className="p-4 sm:p-5 border-t border-[#27264E] bg-[#1D1D41] flex justify-between items-center z-10">
               <button
                 type="button"
                 onClick={() => setEditingGroup(null)}
-                className="border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors"
+                className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors"
               >
                 Cancel
               </button>
@@ -7324,7 +7328,7 @@ Thank you for your prompt payment! 🙏`;
                 type="button"
                 onClick={() => handleSaveEditGroup()}
                 disabled={isSavingEdit || !editGroupName.trim()}
-                className="bg-gray-900 hover:bg-black text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
               >
                 {isSavingEdit ? (
                   <>
@@ -7344,22 +7348,22 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 1. SUB-MODAL: SPLIT INTO A POOL (Screenshot 3) ──────── */}
       {splitModalTicket && (
-        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+        <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-start border-b border-[#27264E] pb-3">
               <div>
-                <h4 className="text-sm font-bold text-gray-900">Split {splitModalTicket.name}&apos;s share</h4>
-                <p className="text-[11px] text-gray-500 mt-0.5">
+                <h4 className="text-sm font-bold text-white">Split {splitModalTicket.name}&apos;s share</h4>
+                <p className="text-[11px] text-[#AEABD8] mt-0.5">
                   Add each person who pays a part of this one share. Their payments are collected and tracked...
                 </p>
               </div>
-              <button onClick={() => setSplitModalTicket(null)} className="text-gray-400 hover:text-gray-600 p-1">
+              <button onClick={() => setSplitModalTicket(null)} className="text-[#AEABD8] hover:text-white p-1">
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
-              <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <div className="flex justify-between text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider">
                 <span>Who Pays</span>
                 <span>Their Part</span>
               </div>
@@ -7375,10 +7379,10 @@ Thank you for your prompt payment! 🙏`;
                       copy[pIdx].name = e.target.value;
                       setSplitPayers(copy);
                     }}
-                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                    className="flex-1 bg-[#141332] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-semibold text-white placeholder:text-[#AEABD8]/50 focus:outline-none focus:border-[#6359E9]"
                   />
                   <div className="relative w-28">
-                    <span className="absolute left-2.5 top-2 text-gray-400 text-xs font-bold">₹</span>
+                    <span className="absolute left-2.5 top-2 text-[#AEABD8] text-xs font-bold">₹</span>
                     <input
                       type="number"
                       value={payer.part || ''}
@@ -7388,14 +7392,14 @@ Thank you for your prompt payment! 🙏`;
                         copy[pIdx].part = Number(e.target.value) || 0;
                         setSplitPayers(copy);
                       }}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-6 pr-2 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                      className="w-full bg-[#141332] border border-[#27264E] rounded-xl pl-6 pr-2 py-2 text-xs font-bold text-white placeholder:text-[#AEABD8]/50 focus:outline-none focus:border-[#6359E9]"
                     />
                   </div>
                   {splitPayers.length > 2 && (
                     <button
                       type="button"
                       onClick={() => setSplitPayers(splitPayers.filter((_, i) => i !== pIdx))}
-                      className="text-gray-400 hover:text-red-600 p-1"
+                      className="text-[#AEABD8] hover:text-rose-400 p-1"
                     >
                       <X size={14} />
                     </button>
@@ -7406,31 +7410,31 @@ Thank you for your prompt payment! 🙏`;
               <button
                 type="button"
                 onClick={() => setSplitPayers([...splitPayers, { name: `Person ${splitPayers.length + 1}`, part: 0 }])}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-1"
+                className="text-xs font-bold text-[#64CFF6] hover:text-white flex items-center gap-1 mt-1"
               >
                 + Add person
               </button>
             </div>
 
             {/* Total Payers Summary Bar */}
-            <div className="bg-gray-900 text-white rounded-2xl p-3 flex justify-between items-center text-xs">
-              <span className="font-bold flex items-center gap-1.5">
-                <Users size={14} /> {splitPayers.filter(p => p.name.trim()).length} PAYERS
+            <div className="bg-[#141332] border border-[#27264E] text-white rounded-2xl p-3 flex justify-between items-center text-xs">
+              <span className="font-bold flex items-center gap-1.5 text-[#AEABD8]">
+                <Users size={14} className="text-[#64CFF6]" /> {splitPayers.filter(p => p.name.trim()).length} PAYERS
               </span>
-              <strong className="text-sm font-extrabold">
+              <strong className="text-sm font-extrabold text-[#02B15A]">
                 {formatCurrency(splitPayers.reduce((sum, p) => sum + (p.part || 0), 0))}/mo
               </strong>
             </div>
 
-            <p className="text-[10px] text-gray-400 text-center">
+            <p className="text-[10px] text-[#AEABD8] text-center">
               Target ticket due: {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}/mo.
             </p>
 
-            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-gray-100">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-[#27264E]">
               <button
                 type="button"
                 onClick={() => setSplitModalTicket(null)}
-                className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
               >
                 Cancel
               </button>
@@ -7438,7 +7442,7 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   type="button"
                   onClick={() => handleSaveSplit(splitModalTicket.id, [])}
-                  className="w-full sm:w-auto border border-red-200 text-red-700 hover:bg-red-50 font-bold text-xs px-3 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto border border-rose-500/40 text-rose-300 hover:bg-rose-500/20 font-bold text-xs px-3 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
                 >
                   Clear Split
                 </button>
@@ -7446,7 +7450,7 @@ Thank you for your prompt payment! 🙏`;
               <button
                 type="button"
                 onClick={() => handleSaveSplit(splitModalTicket.id, splitPayers)}
-                className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
+                className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
               >
                 Save split
               </button>
@@ -7457,31 +7461,31 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 2. SUB-MODAL: MEMBER LEAVES THE CHIT (Screenshot 4) ──────── */}
       {exitModalTicket && (
-        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+        <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-start border-b border-[#27264E] pb-3">
               <div>
-                <h4 className="text-sm font-bold text-gray-900">Member leaves the chit</h4>
-                <p className="text-[11px] text-gray-500 mt-0.5">
+                <h4 className="text-sm font-bold text-white">Member leaves the chit</h4>
+                <p className="text-[11px] text-[#AEABD8] mt-0.5">
                   {exitModalTicket.name} · Ticket #{exitModalTicket.ticket}
                 </p>
               </div>
-              <button onClick={() => setExitModalTicket(null)} className="text-gray-400 hover:text-gray-600 p-1">
+              <button onClick={() => setExitModalTicket(null)} className="text-[#AEABD8] hover:text-white p-1">
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[11px] font-bold text-gray-700 block">Member stops paying from:</label>
+              <label className="text-[11px] font-bold text-[#AEABD8] block">Member stops paying from:</label>
               <select
                 value={exitMonthVal}
                 onChange={(e) => setExitMonthVal(Number(e.target.value))}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#6359E9]"
               >
                 {Array.from({ length: editGroupMemberCount }).map((_, i) => {
                   const mNum = i + 1;
                   return (
-                    <option key={mNum} value={mNum}>
+                    <option key={mNum} value={mNum} className="bg-[#1D1D41] text-white">
                       Month {mNum} {mNum <= (editingGroup?.currentMonth || 1) ? '(Current/Past)' : ''}
                     </option>
                   );
@@ -7490,52 +7494,52 @@ Thank you for your prompt payment! 🙏`;
             </div>
 
             {/* Now vs After Table */}
-            <div className="border border-gray-200 rounded-2xl overflow-hidden text-xs">
-              <div className="grid grid-cols-4 bg-gray-50 p-2.5 font-bold text-[10px] text-gray-400 uppercase tracking-wider">
+            <div className="border border-[#27264E] rounded-2xl overflow-hidden text-xs">
+              <div className="grid grid-cols-4 bg-[#141332] p-2.5 font-bold text-[10px] text-[#AEABD8] uppercase tracking-wider">
                 <span>Month</span>
                 <span>Member</span>
                 <span>Now</span>
                 <span className="text-right">After</span>
               </div>
-              <div className="divide-y divide-gray-100 max-h-[140px] overflow-y-auto">
+              <div className="divide-y divide-[#27264E] max-h-[140px] overflow-y-auto">
                 {Array.from({ length: editGroupMemberCount }).slice(exitMonthVal - 1).map((_, idx) => {
                   const mNum = exitMonthVal + idx;
                   const stdDue = Math.round(editGroupValue / (editGroupMemberCount || 1));
                   return (
-                    <div key={mNum} className="grid grid-cols-4 p-2.5 text-xs items-center">
-                      <span className="font-bold text-gray-800">M{mNum}</span>
-                      <span className="truncate text-gray-600">{exitModalTicket.name}</span>
-                      <span className="text-gray-500">{formatCurrency(stdDue)}</span>
-                      <span className="text-right font-bold text-red-600">₹0</span>
+                    <div key={mNum} className="grid grid-cols-4 p-2.5 text-xs items-center bg-[#1D1D41]">
+                      <span className="font-bold text-white">M{mNum}</span>
+                      <span className="truncate text-[#AEABD8]">{exitModalTicket.name}</span>
+                      <span className="text-[#AEABD8]">{formatCurrency(stdDue)}</span>
+                      <span className="text-right font-bold text-rose-400">₹0</span>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs flex justify-between items-center font-bold">
-              <span className="text-gray-500">These months collect in total:</span>
-              <span className="text-gray-900">
-                {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)) * Math.max(1, editGroupMemberCount - exitMonthVal + 1))} → <strong className="text-red-600">₹0</strong>
+            <div className="p-3 bg-[#141332] border border-[#27264E] rounded-xl text-xs flex justify-between items-center font-bold">
+              <span className="text-[#AEABD8]">These months collect in total:</span>
+              <span className="text-white">
+                {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)) * Math.max(1, editGroupMemberCount - exitMonthVal + 1))} → <strong className="text-rose-400">₹0</strong>
               </span>
             </div>
 
-            <p className="text-[10px] text-gray-400">
+            <p className="text-[10px] text-[#AEABD8]">
               They pay up to the month before. Payments and wins stay on record; nothing is deleted.
             </p>
 
-            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-gray-100">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-[#27264E]">
               <button
                 type="button"
                 onClick={() => setExitModalTicket(null)}
-                className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => handleSaveExit(exitModalTicket.id, exitMonthVal)}
-                className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
+                className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
               >
                 End shares
               </button>
@@ -7546,48 +7550,48 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 3. SUB-MODAL: TRANSFER SHARES ──────── */}
       {transferModalTicket && (
-        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+        <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-start border-b border-[#27264E] pb-3">
               <div>
-                <h4 className="text-sm font-bold text-gray-900">Transfer Ticket #{transferModalTicket.ticket}</h4>
-                <p className="text-[11px] text-gray-500 mt-0.5">
+                <h4 className="text-sm font-bold text-white">Transfer Ticket #{transferModalTicket.ticket}</h4>
+                <p className="text-[11px] text-[#AEABD8] mt-0.5">
                   Transfer future payments and bidding rights from {transferModalTicket.name} to another subscriber
                 </p>
               </div>
-              <button onClick={() => setTransferModalTicket(null)} className="text-gray-400 hover:text-gray-600 p-1">
+              <button onClick={() => setTransferModalTicket(null)} className="text-[#AEABD8] hover:text-white p-1">
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-700 block">Select New Subscriber *</label>
+                <label className="text-[11px] font-bold text-[#AEABD8] block">Select New Subscriber *</label>
                 <select
                   value={transferRecipientId}
                   onChange={(e) => setTransferRecipientId(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                  className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-[#6359E9]"
                 >
-                  <option value="" disabled>Choose recipient subscriber</option>
+                  <option value="" disabled className="bg-[#1D1D41] text-[#AEABD8]">Choose recipient subscriber</option>
                   {masterDirectory
                     .filter(p => p.id !== transferModalTicket.profileId)
                     .map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
+                      <option key={p.id} value={p.id} className="bg-[#1D1D41] text-white">{p.name} ({p.phone})</option>
                     ))}
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-700 block">Transfer Effective From:</label>
+                <label className="text-[11px] font-bold text-[#AEABD8] block">Transfer Effective From:</label>
                 <select
                   value={transferMonthVal}
                   onChange={(e) => setTransferMonthVal(Number(e.target.value))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                  className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#6359E9]"
                 >
                   {Array.from({ length: editGroupMemberCount }).map((_, i) => {
                     const mNum = i + 1;
                     return (
-                      <option key={mNum} value={mNum}>
+                      <option key={mNum} value={mNum} className="bg-[#1D1D41] text-white">
                         Month {mNum} {mNum <= (editingGroup?.currentMonth || 1) ? '(Upcoming)' : ''}
                       </option>
                     );
@@ -7596,17 +7600,17 @@ Thank you for your prompt payment! 🙏`;
               </div>
             </div>
 
-            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-[11px] text-amber-900 space-y-1">
-              <p className="font-bold">Transfer Summary:</p>
-              <p>• Previous payments remain credited to {transferModalTicket.name}.</p>
-              <p>• Dues and live bidding rights from Month {transferMonthVal} transfer to the new subscriber.</p>
+            <div className="p-3 bg-[#FFBB38]/15 border border-[#FFBB38]/40 rounded-xl text-[11px] text-white space-y-1">
+              <p className="font-bold text-[#FFBB38]">Transfer Summary:</p>
+              <p className="text-[#AEABD8]">• Previous payments remain credited to {transferModalTicket.name}.</p>
+              <p className="text-[#AEABD8]">• Dues and live bidding rights from Month {transferMonthVal} transfer to the new subscriber.</p>
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-gray-100">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-[#27264E]">
               <button
                 type="button"
                 onClick={() => setTransferModalTicket(null)}
-                className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
               >
                 Cancel
               </button>
@@ -7614,7 +7618,7 @@ Thank you for your prompt payment! 🙏`;
                 type="button"
                 disabled={!transferRecipientId}
                 onClick={() => handleSaveTransfer(transferModalTicket.id, transferRecipientId, transferMonthVal)}
-                className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm disabled:opacity-50 text-center"
+                className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm disabled:opacity-50 text-center"
               >
                 Confirm Transfer
               </button>
@@ -7625,24 +7629,24 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 4. SUB-MODAL: CUSTOM AMOUNT ──────── */}
       {customAmountModalTicket && (
-        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+        <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-start border-b border-[#27264E] pb-3">
               <div>
-                <h4 className="text-sm font-bold text-gray-900">Custom Monthly Due</h4>
-                <p className="text-[11px] text-gray-500 mt-0.5">
+                <h4 className="text-sm font-bold text-white">Custom Monthly Due</h4>
+                <p className="text-[11px] text-[#AEABD8] mt-0.5">
                   Ticket #{customAmountModalTicket.ticket} · {customAmountModalTicket.name}
                 </p>
               </div>
-              <button onClick={() => setCustomAmountModalTicket(null)} className="text-gray-400 hover:text-gray-600 p-1">
+              <button onClick={() => setCustomAmountModalTicket(null)} className="text-[#AEABD8] hover:text-white p-1">
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-gray-700 block">Monthly Amount (₹)</label>
+              <label className="text-[11px] font-bold text-[#AEABD8] block">Monthly Amount (₹)</label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-gray-400 font-bold text-xs">₹</span>
+                <span className="absolute left-3 top-2.5 text-[#AEABD8] font-bold text-xs">₹</span>
                 <input
                   type="number"
                   min={1}
@@ -7650,20 +7654,20 @@ Thank you for your prompt payment! 🙏`;
                   value={customAmountVal || ''}
                   placeholder="e.g. 15000"
                   onChange={(e) => setCustomAmountVal(Number(e.target.value) || 0)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                  className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-3 py-2 text-xs font-bold text-white placeholder:text-[#AEABD8]/50 focus:outline-none"
                   autoFocus
                 />
               </div>
-              <p className="text-[10px] text-gray-500">
+              <p className="text-[10px] text-[#AEABD8]">
                 Standard baseline installment: {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}/mo.
               </p>
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-gray-100">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-[#27264E]">
               <button
                 type="button"
                 onClick={() => setCustomAmountModalTicket(null)}
-                className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
               >
                 Cancel
               </button>
@@ -7671,7 +7675,7 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   type="button"
                   onClick={() => handleSaveCustomAmount(customAmountModalTicket.id, null)}
-                  className="w-full sm:w-auto border border-red-200 text-red-700 hover:bg-red-50 font-bold text-xs px-3 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto border border-rose-500/40 text-rose-300 hover:bg-rose-500/20 font-bold text-xs px-3 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
                 >
                   Clear Custom
                 </button>
@@ -7679,7 +7683,7 @@ Thank you for your prompt payment! 🙏`;
               <button
                 type="button"
                 onClick={() => handleSaveCustomAmount(customAmountModalTicket.id, customAmountVal > 0 ? customAmountVal : null)}
-                className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
+                className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
               >
                 Save Custom Amount
               </button>
@@ -7698,29 +7702,27 @@ Thank you for your prompt payment! 🙏`;
           deletePhraseInput.trim().toLowerCase() === deletingGroup.name.toLowerCase();
 
         return (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-            <div className={`bg-white border-2 rounded-2xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto ${
-              isSoft ? 'border-amber-200' : 'border-red-200'
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+            <div className={`bg-[#1D1D41] border-2 rounded-2xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto ${
+              isSoft ? 'border-[#FFBB38]/40' : 'border-rose-500/40'
             }`}>
               
               {/* Header */}
               <div className={`flex justify-between items-start border-b pb-3 ${
-                isSoft ? 'border-amber-100' : 'border-red-100'
+                isSoft ? 'border-[#FFBB38]/30' : 'border-rose-500/30'
               }`}>
                 <div className="flex items-center gap-3">
                   <div className={`p-2.5 rounded-xl ${
-                    isSoft ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                    isSoft ? 'bg-[#FFBB38]/20 text-[#FFBB38]' : 'bg-rose-500/20 text-rose-400'
                   }`}>
                     <AlertTriangle size={22} />
                   </div>
                   <div>
-                    <h4 className={`text-sm font-bold ${
-                      isSoft ? 'text-amber-950' : 'text-red-900'
-                    }`}>
+                    <h4 className="text-sm font-bold text-white">
                       {isSoft ? 'Move Chit Group to Recycle Bin' : 'Permanent Deletion Warning'}
                     </h4>
                     <p className={`text-xs font-semibold mt-0.5 ${
-                      isSoft ? 'text-amber-700' : 'text-red-700'
+                      isSoft ? 'text-[#FFBB38]' : 'text-rose-400'
                     }`}>
                       &quot;{deletingGroup.name}&quot; ({formatCurrency(deletingGroup.totalValue)})
                     </p>
@@ -7729,7 +7731,7 @@ Thank you for your prompt payment! 🙏`;
                 <button 
                   type="button" 
                   onClick={() => setDeletingGroup(null)}
-                  className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="text-[#AEABD8] hover:text-white p-1 rounded-lg hover:bg-[#141332] transition-colors"
                 >
                   <X size={16} />
                 </button>
@@ -7737,24 +7739,24 @@ Thank you for your prompt payment! 🙏`;
 
               {/* Warning Description Box */}
               {isSoft ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 space-y-2 text-xs text-amber-900">
-                  <p className="font-bold flex items-center gap-1.5 text-amber-800">
-                    <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                <div className="bg-[#FFBB38]/10 border border-[#FFBB38]/30 rounded-xl p-3.5 space-y-2 text-xs text-white">
+                  <p className="font-bold flex items-center gap-1.5 text-[#FFBB38]">
+                    <AlertCircle size={14} className="text-[#FFBB38] shrink-0" />
                     This group will be moved to the Recycle Bin.
                   </p>
-                  <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-800 pl-1">
+                  <ul className="list-disc list-inside space-y-1 text-[11px] text-[#AEABD8] pl-1">
                     <li>The group will be hidden from active lists and dashboard calculations.</li>
                     <li>All subscriber assignments, tickets, and logs remain safely preserved.</li>
                     <li>You can restore this group back to active status at any time from the Recycle Bin tab.</li>
                   </ul>
                 </div>
               ) : (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 space-y-2 text-xs text-red-900">
-                  <p className="font-bold flex items-center gap-1.5">
-                    <AlertCircle size={14} className="text-red-600 shrink-0" />
+                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3.5 space-y-2 text-xs text-white">
+                  <p className="font-bold flex items-center gap-1.5 text-rose-400">
+                    <AlertCircle size={14} className="text-rose-400 shrink-0" />
                     This action is permanent and completely irreversible!
                   </p>
-                  <ul className="list-disc list-inside space-y-1 text-[11px] text-red-800 pl-1">
+                  <ul className="list-disc list-inside space-y-1 text-[11px] text-[#AEABD8] pl-1">
                     <li>All {deletingGroup.duration} enrolled subscriber tickets will be unlinked.</li>
                     <li>All historical auction bidding logs and discount pool records will be purged.</li>
                     <li>The group configuration will be permanently removed from Supabase.</li>
@@ -7764,11 +7766,11 @@ Thank you for your prompt payment! 🙏`;
 
               {/* Safety Verification Step 1: Type Required Phrase */}
               <div className="space-y-1.5 pt-1">
-                <label className="text-[11px] text-gray-700 font-bold block">
+                <label className="text-[11px] text-[#AEABD8] font-bold block">
                   Step 1: Type <span className={`font-mono px-1.5 py-0.5 rounded select-all font-bold ${
-                    isSoft ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                    isSoft ? 'bg-[#FFBB38]/20 text-[#FFBB38]' : 'bg-rose-500/20 text-rose-400'
                   }`}>DELETE {deletingGroup.name}</span> (or <span className={`font-mono px-1.5 py-0.5 rounded font-bold ${
-                    isSoft ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                    isSoft ? 'bg-[#FFBB38]/20 text-[#FFBB38]' : 'bg-rose-500/20 text-rose-400'
                   }`}>DELETE</span>) below:
                 </label>
                 <div className="relative">
@@ -7777,15 +7779,15 @@ Thank you for your prompt payment! 🙏`;
                     placeholder={`Type DELETE ${deletingGroup.name}`}
                     value={deletePhraseInput}
                     onChange={(e) => setDeletePhraseInput(e.target.value)}
-                    className={`w-full bg-gray-50 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-gray-900 focus:outline-none transition-colors ${
+                    className={`w-full bg-[#141332] border rounded-lg px-3 py-2 text-xs font-mono font-bold text-white placeholder:text-[#AEABD8]/40 focus:outline-none transition-colors ${
                       isPhraseMatched
-                        ? 'border-emerald-500 bg-emerald-50/40 text-emerald-900'
-                        : isSoft ? 'border-gray-300 focus:border-amber-400' : 'border-gray-300 focus:border-red-400'
+                        ? 'border-[#02B15A] bg-[#02B15A]/15 text-[#02B15A]'
+                        : isSoft ? 'border-[#27264E] focus:border-[#FFBB38]' : 'border-[#27264E] focus:border-rose-400'
                     }`}
                     autoFocus
                   />
                   {isPhraseMatched && (
-                    <span className="absolute right-3 top-2 text-emerald-600 text-xs font-bold flex items-center gap-1">
+                    <span className="absolute right-3 top-2 text-[#02B15A] text-xs font-bold flex items-center gap-1">
                       <Check size={14} /> Verified
                     </span>
                   )}
@@ -7793,18 +7795,18 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* Safety Verification Step 2: Slide to Confirm Slider */}
-              <div className="space-y-2 pt-2 border-t border-gray-100">
+              <div className="space-y-2 pt-2 border-t border-[#27264E]">
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="font-bold text-gray-700 flex items-center gap-1.5">
+                  <span className="font-bold text-[#AEABD8] flex items-center gap-1.5">
                     {isPhraseMatched ? (
-                      <Unlock size={13} className="text-emerald-600" />
+                      <Unlock size={13} className="text-[#02B15A]" />
                     ) : (
-                      <Lock size={13} className="text-gray-400" />
+                      <Lock size={13} className="text-[#AEABD8]/60" />
                     )}
                     Step 2: {isSoft ? 'Slide to move to Recycle Bin' : 'Slide to confirm permanent deletion'}
                   </span>
                   {isPhraseMatched && (
-                    <span className="text-[10px] font-bold text-emerald-600">
+                    <span className="text-[10px] font-bold text-[#02B15A]">
                       Unlocked
                     </span>
                   )}
@@ -7820,7 +7822,7 @@ Thank you for your prompt payment! 🙏`;
                   colorVariant={isSoft ? "amber" : "red"}
                 />
 
-                <p className="text-[10px] text-gray-400 text-center">
+                <p className="text-[10px] text-[#AEABD8] text-center">
                   {!isPhraseMatched
                     ? '🔒 Complete Step 1 above to unlock the confirmation slider'
                     : isSoft ? '👉 Drag the circular button to the right to move to Recycle Bin' : '👉 Drag the circular button to the right to confirm deletion'}
@@ -7828,11 +7830,11 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* Action Controls Footer */}
-              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-gray-100">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-[#27264E]">
                 <button
                   type="button"
                   onClick={() => setDeletingGroup(null)}
-                  className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
                 >
                   Cancel &amp; Keep Group
                 </button>
@@ -7843,9 +7845,9 @@ Thank you for your prompt payment! 🙏`;
                   className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center ${
                     isPhraseMatched && !isDeletingGroup
                       ? isSoft
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white cursor-pointer'
-                        : 'bg-red-600 hover:bg-red-700 text-white cursor-pointer'
-                      : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+                        ? 'bg-[#FFBB38] hover:bg-[#FFBB38]/90 text-black cursor-pointer'
+                        : 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
+                      : 'bg-[#27264E] text-[#AEABD8]/40 cursor-not-allowed opacity-60'
                   }`}
                 >
                   {isDeletingGroup ? (
@@ -7899,22 +7901,22 @@ Thank you for your prompt payment! 🙏`;
 
       {/* Global Create / Register Subscriber Modal Popup */}
       {showCreateMemberModal && (
-        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-center border-b border-[#27264E] pb-3">
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                <div className="p-2 bg-[#6359E9]/20 text-[#64CFF6] rounded-lg">
                   <UserPlus size={18} />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-gray-900">Register New Subscriber</h4>
-                  <p className="text-[11px] text-gray-500">Saves to Supabase directory and assigns to open slot</p>
+                  <h4 className="text-sm font-bold text-white">Register New Subscriber</h4>
+                  <p className="text-[11px] text-[#AEABD8]">Saves to Supabase directory and assigns to open slot</p>
                 </div>
               </div>
               <button 
                 type="button" 
                 onClick={() => setShowCreateMemberModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-1"
+                className="text-[#AEABD8] hover:text-white p-1"
               >
                 <X size={16} />
               </button>
@@ -7923,11 +7925,11 @@ Thank you for your prompt payment! 🙏`;
             <form onSubmit={handleCreateAndAssignMember} className="space-y-4">
               {/* Subscriber Name Field */}
               <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
                   Subscriber Full Name *
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-gray-400">
+                  <span className="absolute left-3 top-2.5 text-[#AEABD8]">
                     <User size={14} />
                   </span>
                   <input
@@ -7936,20 +7938,20 @@ Thank you for your prompt payment! 🙏`;
                     placeholder="e.g. Ramesh Kumar"
                     value={newMemberName}
                     onChange={(e) => setNewMemberName(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-white placeholder:text-[#AEABD8]/50 focus:outline-none"
                     autoFocus
                   />
                 </div>
 
                 {/* Similar / Fuzzy Name Suggestion (e.g. Kishor vs Kishore) */}
                 {similarNameSubscriber && (
-                  <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-blue-900 animate-in fade-in duration-200">
+                  <div className="bg-[#6359E9]/15 border border-[#6359E9]/30 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-white animate-in fade-in duration-200">
                     <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5 font-bold">
+                      <div className="flex items-center gap-1.5 font-bold text-[#64CFF6]">
                         <span>💡</span>
                         <span>Similar subscriber found in directory</span>
                       </div>
-                      <p className="text-[11px] text-blue-700">
+                      <p className="text-[11px] text-[#AEABD8]">
                         Did you mean <strong>{similarNameSubscriber.name}</strong> ({similarNameSubscriber.phone})?
                       </p>
                     </div>
@@ -7966,7 +7968,7 @@ Thank you for your prompt payment! 🙏`;
                           handleAssignExistingMember(similarNameSubscriber);
                         }
                       }}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg shrink-0 transition-colors shadow-sm self-start sm:self-auto"
+                      className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-[10px] px-3 py-1.5 rounded-lg shrink-0 transition-colors shadow-sm self-start sm:self-auto"
                     >
                       Assign {similarNameSubscriber.name} →
                     </button>
@@ -7977,16 +7979,16 @@ Thank you for your prompt payment! 🙏`;
               {/* Phone Number Field */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                  <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
                     Phone Number (10 Digits) *
                   </label>
                   {newMemberPhone.trim() && (
                     <span className={`text-[10px] font-bold ${
                       normalizePhone(newMemberPhone).length === 10
-                        ? 'text-emerald-600'
+                        ? 'text-[#02B15A]'
                         : normalizePhone(newMemberPhone).length < 10
-                          ? 'text-amber-600'
-                          : 'text-rose-600'
+                          ? 'text-[#FFBB38]'
+                          : 'text-rose-400'
                     }`}>
                       {normalizePhone(newMemberPhone).length === 10
                         ? '✓ Valid 10 digits'
@@ -7995,7 +7997,7 @@ Thank you for your prompt payment! 🙏`;
                   )}
                 </div>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-gray-400">
+                  <span className="absolute left-3 top-2.5 text-[#AEABD8]">
                     <Phone size={14} />
                   </span>
                   <input
@@ -8004,32 +8006,32 @@ Thank you for your prompt payment! 🙏`;
                     placeholder="e.g. 9842235740"
                     value={newMemberPhone}
                     onChange={(e) => setNewMemberPhone(e.target.value)}
-                    className={`w-full bg-gray-50 border rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none transition-colors font-mono ${
+                    className={`w-full bg-[#141332] border rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-white placeholder:text-[#AEABD8]/50 focus:outline-none transition-colors font-mono ${
                       duplicatePhoneSubscriber
-                        ? 'border-amber-400 focus:border-amber-500 bg-amber-50/30'
+                        ? 'border-[#FFBB38] focus:border-[#FFBB38] bg-[#FFBB38]/10'
                         : !newMemberPhone.trim()
-                          ? 'border-gray-200 focus:border-indigo-500'
+                          ? 'border-[#27264E] focus:border-[#6359E9]'
                           : normalizePhone(newMemberPhone).length === 10
-                            ? 'border-emerald-400 focus:border-emerald-500 bg-emerald-50/20'
-                            : 'border-amber-400 focus:border-amber-500 bg-amber-50/20'
+                            ? 'border-[#02B15A] focus:border-[#02B15A] bg-[#02B15A]/10'
+                            : 'border-[#FFBB38] focus:border-[#FFBB38] bg-[#FFBB38]/10'
                     }`}
                   />
                 </div>
                 {newMemberPhone.trim() && normalizePhone(newMemberPhone).length !== 10 && (
-                  <p className="text-[10px] text-amber-600 font-medium">
+                  <p className="text-[10px] text-[#FFBB38] font-medium">
                     ⚠️ Phone number must be exactly 10 digits ({normalizePhone(newMemberPhone).length > 10 ? `${normalizePhone(newMemberPhone).length - 10} digits too many` : `${10 - normalizePhone(newMemberPhone).length} digits remaining`})
                   </p>
                 )}
-                <p className="text-[10px] text-gray-400">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
+                <p className="text-[10px] text-[#AEABD8]">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
 
                 {/* Duplicate Phone Warning Alert */}
                 {duplicatePhoneSubscriber && (
-                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 space-y-2.5 text-xs animate-in fade-in duration-200">
+                  <div className="bg-[#FFBB38]/15 border border-[#FFBB38]/40 rounded-xl p-3.5 space-y-2.5 text-xs text-white animate-in fade-in duration-200">
                     <div className="flex items-start gap-2">
-                      <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                      <AlertCircle size={16} className="text-[#FFBB38] shrink-0 mt-0.5" />
                       <div>
-                        <span className="font-bold text-amber-900 block">Phone number already registered</span>
-                        <p className="text-[11px] text-amber-800 mt-0.5">
+                        <span className="font-bold text-[#FFBB38] block">Phone number already registered</span>
+                        <p className="text-[11px] text-[#AEABD8] mt-0.5">
                           This phone number is already registered to <strong>{duplicatePhoneSubscriber.name}</strong> ({duplicatePhoneSubscriber.phone}).
                         </p>
                       </div>
@@ -8048,7 +8050,7 @@ Thank you for your prompt payment! 🙏`;
                           handleAssignExistingMember(duplicatePhoneSubscriber);
                         }
                       }}
-                      className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                      className="w-full bg-[#FFBB38] hover:bg-[#FFBB38]/90 text-black font-bold text-xs py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
                     >
                       <UserPlus size={13} /> Assign {duplicatePhoneSubscriber.name} to Open Slot Instead →
                     </button>
@@ -8056,11 +8058,11 @@ Thank you for your prompt payment! 🙏`;
                 )}
               </div>
 
-              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-gray-100">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-[#27264E]">
                 <button
                   type="button"
                   onClick={() => setShowCreateMemberModal(false)}
-                  className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
                 >
                   Cancel
                 </button>
@@ -8069,8 +8071,8 @@ Thank you for your prompt payment! 🙏`;
                   disabled={isCreatingMember || !newMemberName.trim() || !newMemberPhone.trim() || duplicatePhoneSubscriber !== null}
                   className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center ${
                     duplicatePhoneSubscriber !== null
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
-                      : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50'
+                      ? 'bg-[#27264E] text-[#AEABD8]/40 cursor-not-allowed opacity-60'
+                      : 'bg-[#6359E9] hover:bg-[#6F64FF] text-white disabled:opacity-50'
                   }`}
                 >
                   {isCreatingMember ? (
@@ -8255,48 +8257,48 @@ Thank you for your prompt payment! 🙏`;
         ];
 
         return (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-            <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 w-full max-w-lg space-y-3.5 shadow-2xl my-auto animate-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+            <div className="bg-[#1D1D41] border border-[#27264E] text-white rounded-3xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl my-auto animate-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto">
               {/* Modal Header */}
-              <div className="flex justify-between items-center border-b border-gray-100 pb-2.5">
+              <div className="flex justify-between items-center border-b border-[#27264E] pb-3">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 shadow-xs">
-                    <Banknote size={19} />
+                  <div className="w-10 h-10 rounded-xl bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center justify-center shrink-0 shadow-xs">
+                    <Banknote size={20} />
                   </div>
                   <div className="min-w-0">
-                    <h4 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight leading-tight">
+                    <h4 className="text-sm sm:text-base font-extrabold text-white tracking-tight leading-tight">
                       Disburse Prize Payout
                     </h4>
-                    <p className="text-[11px] text-gray-500 font-medium truncate">
-                      {activeGroup?.name} · M{selectedDashboardMonth} Winner: <strong className="text-gray-900">{winnerName}</strong>
+                    <p className="text-[11px] text-[#AEABD8] font-medium truncate">
+                      {activeGroup?.name} · M{selectedDashboardMonth} Winner: <strong className="text-white">{winnerName}</strong>
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowDisbursePayoutModal(false)}
-                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center shrink-0 transition-colors"
+                  className="w-8 h-8 rounded-full bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border border-[#27264E] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                 >
                   <X size={15} />
                 </button>
               </div>
 
               {/* Pot Summary Pill */}
-              <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between">
+              <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3.5 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Gross Prize Pot</span>
-                  <span className="text-base sm:text-lg font-extrabold text-gray-900 font-mono">{formatCurrency(netPrizePot)}</span>
-                  <span className="text-[10px] text-gray-500 block">
+                  <span className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider block">Gross Prize Pot</span>
+                  <span className="text-base sm:text-xl font-extrabold text-white font-mono">{formatCurrency(netPrizePot)}</span>
+                  <span className="text-[10px] text-[#AEABD8] block">
                     (₹{totalChitVal.toLocaleString('en-IN')} − ₹{winningBid.toLocaleString('en-IN')} bid)
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Remaining Due</span>
-                  <span className={`text-base sm:text-lg font-extrabold font-mono ${remainingPrizeDue > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Remaining Due</span>
+                  <span className={`text-base sm:text-xl font-extrabold font-mono ${remainingPrizeDue > 0 ? 'text-[#FFBB38]' : 'text-[#02B15A]'}`}>
                     {formatCurrency(remainingPrizeDue)}
                   </span>
                   {totalPrizeDisbursed > 0 && (
-                    <span className="text-[10px] text-emerald-700 font-bold block">
+                    <span className="text-[10px] text-[#02B15A] font-bold block">
                       ✓ {formatCurrency(totalPrizeDisbursed)} already paid
                     </span>
                   )}
@@ -8304,24 +8306,24 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* ── Net Settlement Offsets Section ── */}
-              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3 space-y-2.5">
+              <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <CheckCircle2 size={14} className="text-indigo-600 shrink-0" />
-                    <span className="text-xs font-bold text-gray-900 truncate">
+                    <CheckCircle2 size={15} className="text-[#6359E9] shrink-0" />
+                    <span className="text-xs font-bold text-white truncate">
                       Installment Offsets (Optional)
                     </span>
                   </div>
                   {totalDeductionsAmount > 0 && (
-                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md shrink-0">
+                    <span className="text-[10px] font-bold text-[#E41414] bg-[#E41414]/10 border border-[#E41414]/30 px-2 py-0.5 rounded-md shrink-0">
                       − {formatCurrency(totalDeductionsAmount)} offset
                     </span>
                   )}
                 </div>
 
                 {/* 1. Past Pending Balances / Arrears Status */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">
                     1. Past Pending Balances / Arrears
                   </span>
                   {unpaidArrears.length > 0 ? (
@@ -8333,28 +8335,28 @@ Thank you for your prompt payment! 🙏`;
                             key={a.month}
                             type="button"
                             onClick={() => toggleArrearMonth(a.month)}
-                            className={`w-full flex items-center justify-between p-2 rounded-xl border text-left transition-all ${
+                            className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                               isChecked
-                                ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-400/40'
-                                : 'bg-white border-amber-200/80 hover:bg-amber-50/50'
+                                ? 'bg-[#FFBB38]/15 border-[#FFBB38] ring-1 ring-[#FFBB38]'
+                                : 'bg-[#1D1D41] border-[#27264E] hover:border-[#FFBB38]/40'
                             }`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
-                                isChecked ? 'bg-amber-600 border-amber-700 text-white' : 'bg-white border-amber-300'
+                                isChecked ? 'bg-[#FFBB38] border-[#FFBB38] text-[#141332]' : 'bg-[#141332] border-[#27264E]'
                               }`}>
                                 {isChecked && <Check size={11} className="stroke-[3]" />}
                               </div>
                               <div className="min-w-0">
-                                <div className="text-xs font-bold text-amber-950 truncate">
+                                <div className="text-xs font-bold text-white truncate">
                                   Deduct Month {a.month} Past Arrear
                                 </div>
-                                <span className="text-[10px] text-amber-800">
+                                <span className="text-[10px] text-[#AEABD8]">
                                   Owes {formatCurrency(a.unpaid)} from M{a.month}
                                 </span>
                               </div>
                             </div>
-                            <span className="text-xs font-extrabold text-rose-600 font-mono shrink-0">
+                            <span className="text-xs font-extrabold text-[#E41414] font-mono shrink-0">
                               −{formatCurrency(a.unpaid)}
                             </span>
                           </button>
@@ -8362,12 +8364,12 @@ Thank you for your prompt payment! 🙏`;
                       })}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between bg-emerald-50/70 border border-emerald-200/80 rounded-xl px-2.5 py-1.5 text-emerald-800 text-xs font-medium">
+                    <div className="flex items-center justify-between bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl px-3 py-2 text-[#02B15A] text-xs font-medium">
                       <span className="flex items-center gap-1.5 truncate">
-                        <Check size={13} className="text-emerald-600 shrink-0" />
+                        <Check size={13} className="text-[#02B15A] shrink-0" />
                         <span>No Past Arrears Pending</span>
                       </span>
-                      <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded shrink-0 font-mono">
+                      <span className="text-[10px] font-bold bg-[#02B15A]/20 text-[#02B15A] px-2 py-0.5 rounded shrink-0 font-mono">
                         ₹0 Due
                       </span>
                     </div>
@@ -8375,49 +8377,49 @@ Thank you for your prompt payment! 🙏`;
                 </div>
 
                 {/* 2. Current Month Installment Deduction Toggle */}
-                <div className="space-y-1 pt-1 border-t border-slate-200">
-                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                <div className="space-y-1.5 pt-1.5 border-t border-[#27264E]">
+                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">
                     2. Current Month Installment (Month {selectedDashboardMonth})
                   </span>
                   {currentMonthUnpaid > 0 ? (
                     <button
                       type="button"
                       onClick={toggleThisMonthDeduction}
-                      className={`w-full flex items-center justify-between p-2 sm:p-2.5 rounded-xl border text-left transition-all ${
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         disburseDeductThisMonth
-                          ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-400/40'
-                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                          ? 'bg-[#6359E9]/20 border-[#6359E9] ring-1 ring-[#6359E9]'
+                          : 'bg-[#1D1D41] border-[#27264E] hover:border-[#6359E9]/40'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded border flex items-center justify-center shrink-0 transition-all ${
-                          disburseDeductThisMonth ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-gray-300'
+                          disburseDeductThisMonth ? 'bg-[#6359E9] border-[#6359E9] text-white' : 'bg-[#141332] border-[#27264E]'
                         }`}>
                           {disburseDeductThisMonth && <Check size={12} className="stroke-[3]" />}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5 flex-wrap">
+                          <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
                             <span>Deduct Month {selectedDashboardMonth} Due</span>
-                            <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-100/80 px-1.5 py-0.2 rounded">
+                            <span className="text-[10px] font-semibold text-[#02B15A] bg-[#02B15A]/15 border border-[#02B15A]/30 px-1.5 py-0.5 rounded">
                               Mark PAID 🟢
                             </span>
                           </div>
-                          <span className="text-[10px] text-gray-500 block">
+                          <span className="text-[10px] text-[#AEABD8] block">
                             Current due: {formatCurrency(currentMonthUnpaid)}
                           </span>
                         </div>
                       </div>
-                      <span className="text-xs font-extrabold text-rose-600 font-mono shrink-0">
+                      <span className="text-xs font-extrabold text-[#E41414] font-mono shrink-0">
                         −{formatCurrency(currentMonthUnpaid)}
                       </span>
                     </button>
                   ) : (
-                    <div className="flex items-center justify-between bg-emerald-50/80 border border-emerald-200 rounded-xl px-2.5 py-1.5 text-emerald-800 text-xs font-medium">
+                    <div className="flex items-center justify-between bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl px-3 py-2 text-[#02B15A] text-xs font-medium">
                       <span className="flex items-center gap-1.5 truncate">
-                        <Check size={13} className="text-emerald-600 shrink-0" />
+                        <Check size={13} className="text-[#02B15A] shrink-0" />
                         <span>Month {selectedDashboardMonth} Due Already Paid</span>
                       </span>
-                      <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded shrink-0 font-mono">
+                      <span className="text-[10px] font-bold bg-[#02B15A]/20 text-[#02B15A] px-2 py-0.5 rounded shrink-0 font-mono">
                         {formatCurrency(currentMonthPaid)}
                       </span>
                     </div>
@@ -8426,11 +8428,11 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* 3. Pre-pay Advance Upcoming Months (Clean 2-Column Grid) */}
                 {advanceCandidates.length > 0 && (
-                  <div className="space-y-1 pt-1 border-t border-slate-200">
-                    <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                  <div className="space-y-1.5 pt-1.5 border-t border-[#27264E]">
+                    <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">
                       3. Pre-pay Advance Months (Optional)
                     </span>
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-2 gap-2">
                       {advanceCandidates.map(m => {
                         const isSelected = disburseDeductAdvanceMonths.includes(m);
                         return (
@@ -8438,14 +8440,14 @@ Thank you for your prompt payment! 🙏`;
                             key={m}
                             type="button"
                             onClick={() => toggleAdvanceMonth(m)}
-                            className={`w-full py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                            className={`w-full py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                               isSelected
-                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs ring-2 ring-indigo-400/30'
-                                : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-200'
+                                ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-sm'
+                                : 'bg-[#1D1D41] hover:bg-[#27264E] text-[#AEABD8] border-[#27264E]'
                             }`}
                           >
                             <span className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                              isSelected ? 'bg-white text-indigo-700' : 'bg-gray-100 text-gray-500'
+                              isSelected ? 'bg-white text-[#6359E9]' : 'bg-[#141332] text-[#AEABD8]'
                             }`}>
                               {isSelected ? '✓' : '+'}
                             </span>
@@ -8459,14 +8461,14 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* Calculation Summary Footer Pill */}
                 {totalDeductionsAmount > 0 && (
-                  <div className="bg-white border border-indigo-100 rounded-xl p-2.5 flex items-center justify-between text-xs font-medium">
+                  <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 flex items-center justify-between text-xs font-medium">
                     <div className="space-y-0.5">
-                      <span className="text-[11px] text-gray-500 block">Gross Prize: {formatCurrency(netPrizePot)}</span>
-                      <span className="text-[11px] text-rose-600 font-semibold block">Deductions Offset: −{formatCurrency(totalDeductionsAmount)}</span>
+                      <span className="text-[11px] text-[#AEABD8] block">Gross Prize: {formatCurrency(netPrizePot)}</span>
+                      <span className="text-[11px] text-[#E41414] font-semibold block">Deductions Offset: −{formatCurrency(totalDeductionsAmount)}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">Net Cash Paid</span>
-                      <span className="text-sm font-extrabold text-indigo-900 font-mono">
+                      <span className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider block">Net Cash Paid</span>
+                      <span className="text-sm font-extrabold text-white font-mono">
                         = {formatCurrency(Math.max(0, remainingPrizeDue - totalDeductionsAmount))}
                       </span>
                     </div>
@@ -8474,20 +8476,20 @@ Thank you for your prompt payment! 🙏`;
                 )}
               </div>
 
-              <form onSubmit={(e) => handleRecordPrizePayoutSubmit(e, activeGroup, currentMonthAuction, netPrizePot, remainingPrizeDue, activeDeductionsList)} className="space-y-3">
+              <form onSubmit={(e) => handleRecordPrizePayoutSubmit(e, activeGroup, currentMonthAuction, netPrizePot, remainingPrizeDue, activeDeductionsList)} className="space-y-3.5">
                 {/* Net Cash Handed Over Input */}
-                <div className="space-y-2 pt-1">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider truncate">
+                    <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider truncate">
                       Net Cash Payout (₹)
                     </label>
-                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-md shrink-0">
+                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#64CFF6] bg-[#64CFF6]/10 border border-[#64CFF6]/30 px-2 py-0.5 rounded-md shrink-0">
                       Due: {formatCurrency(Math.max(0, remainingPrizeDue - totalDeductionsAmount))}
                     </span>
                   </div>
 
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400">₹</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-[#AEABD8]">₹</span>
                     <input
                       type="number"
                       min={0}
@@ -8495,14 +8497,14 @@ Thank you for your prompt payment! 🙏`;
                       value={disbursePayoutAmount}
                       onChange={(e) => setDisbursePayoutAmount(e.target.value)}
                       placeholder="0"
-                      className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border-2 border-gray-200 focus:border-emerald-500 focus:bg-white rounded-2xl text-2xl font-extrabold text-gray-900 focus:outline-none transition-all font-mono"
+                      className="w-full pl-9 pr-4 py-2.5 bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-2xl text-2xl font-extrabold text-white focus:outline-none transition-all font-mono"
                     />
                   </div>
                 </div>
 
                 {/* Source Wallet Selector */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                  <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
                     Paid From Which Vault / Bank?
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -8514,21 +8516,21 @@ Thank you for your prompt payment! 🙏`;
                           key={w.id}
                           type="button"
                           onClick={() => setDisbursePayoutWallet(w.id)}
-                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-500/20'
-                              : 'bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200'
+                              ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-sm'
+                              : 'bg-[#141332] hover:bg-[#1D1D41] text-[#AEABD8] border-[#27264E]'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm">{w.icon}</span>
                             <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                              isSelected ? 'bg-emerald-700 text-white' : isLowBal ? 'bg-amber-100 text-amber-800' : 'bg-gray-200 text-gray-700'
+                              isSelected ? 'bg-white/20 text-white' : isLowBal ? 'bg-[#FFBB38]/20 text-[#FFBB38]' : 'bg-[#1D1D41] text-[#AEABD8]'
                             }`}>
                               {formatCurrency(w.bal)}
                             </span>
                           </div>
-                          <div className="text-xs font-bold truncate">{w.label}</div>
+                          <div className="text-xs font-bold text-white truncate">{w.label}</div>
                         </button>
                       );
                     })}
@@ -8537,17 +8539,17 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* Disbursal Date Selector */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                  <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
                     Payment Date
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setDisbursePayoutDateType('today')}
-                      className={`py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         disbursePayoutDateType === 'today'
-                          ? 'bg-gray-900 text-white border-black shadow-xs'
-                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                          ? 'bg-[#6359E9] text-white border-[#6359E9]'
+                          : 'bg-[#141332] hover:bg-[#1D1D41] text-[#AEABD8] border-[#27264E]'
                       }`}
                     >
                       Today
@@ -8555,10 +8557,10 @@ Thank you for your prompt payment! 🙏`;
                     <button
                       type="button"
                       onClick={() => setDisbursePayoutDateType('yesterday')}
-                      className={`py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         disbursePayoutDateType === 'yesterday'
-                          ? 'bg-gray-900 text-white border-black shadow-xs'
-                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                          ? 'bg-[#6359E9] text-white border-[#6359E9]'
+                          : 'bg-[#141332] hover:bg-[#1D1D41] text-[#AEABD8] border-[#27264E]'
                       }`}
                     >
                       Yesterday
@@ -8566,10 +8568,10 @@ Thank you for your prompt payment! 🙏`;
                     <button
                       type="button"
                       onClick={() => setDisbursePayoutDateType('custom')}
-                      className={`py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         disbursePayoutDateType === 'custom'
-                          ? 'bg-gray-900 text-white border-black shadow-xs'
-                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                          ? 'bg-[#6359E9] text-white border-[#6359E9]'
+                          : 'bg-[#141332] hover:bg-[#1D1D41] text-[#AEABD8] border-[#27264E]'
                       }`}
                     >
                       Custom Date
@@ -8580,15 +8582,15 @@ Thank you for your prompt payment! 🙏`;
                       type="date"
                       value={disbursePayoutCustomDate}
                       onChange={(e) => setDisbursePayoutCustomDate(e.target.value)}
-                      className="w-full mt-1 px-3 py-1.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-semibold text-gray-900 focus:outline-none focus:border-indigo-500"
+                      className="w-full mt-1.5 px-3 py-2 bg-[#141332] border border-[#27264E] rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-[#6359E9]"
                     />
                   )}
                 </div>
 
                 {/* Reference Note & Receipt Upload */}
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                    <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
                       Reference Note / Cheque No. (Optional)
                     </label>
                     <input
@@ -8596,15 +8598,15 @@ Thank you for your prompt payment! 🙏`;
                       value={disbursePayoutNote}
                       onChange={(e) => setDisbursePayoutNote(e.target.value)}
                       placeholder="e.g. Cheque #492019 or IMPS Ref #81920"
-                      className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-semibold text-gray-900 focus:outline-none"
+                      className="w-full px-3.5 py-2.5 bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl text-xs font-semibold text-white placeholder-[#AEABD8]/40 focus:outline-none"
                     />
                   </div>
 
                   {/* Receipt Photo Attachment */}
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider flex items-center justify-between">
                       <span className="flex items-center gap-1">
-                        <Paperclip size={13} className="text-gray-400" />
+                        <Paperclip size={13} className="text-[#AEABD8]" />
                         Attach Receipt / Cheque Photo (Optional)
                       </span>
                       {disbursePayoutReceiptUrl && (
@@ -8614,20 +8616,20 @@ Thank you for your prompt payment! 🙏`;
                             setDisbursePayoutReceiptUrl('');
                             setDisburseReceiptFileToUpload(null);
                           }}
-                          className="text-rose-600 hover:text-rose-700 text-[10px] font-bold"
+                          className="text-[#E41414] hover:underline text-[10px] font-bold cursor-pointer"
                         >
                           Remove Photo
                         </button>
                       )}
                     </label>
                     {disbursePayoutReceiptUrl ? (
-                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
+                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-[#27264E] bg-[#141332] flex items-center justify-center">
                         <img src={disbursePayoutReceiptUrl} alt="Receipt preview" className="w-full h-full object-cover" />
                       </div>
                     ) : (
-                      <label className="border-2 border-dashed border-gray-200 hover:border-gray-300 rounded-xl p-2.5 flex items-center justify-center gap-2 cursor-pointer bg-gray-50/50 transition-colors">
-                        <Paperclip size={14} className="text-gray-400" />
-                        <span className="text-xs text-gray-500 font-semibold">Tap to attach cheque / transfer screenshot</span>
+                      <label className="border border-dashed border-[#27264E] hover:border-[#6359E9] rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer bg-[#141332] hover:bg-[#1D1D41] transition-colors">
+                        <Paperclip size={14} className="text-[#AEABD8]" />
+                        <span className="text-xs text-[#AEABD8] font-semibold">Tap to attach cheque / transfer screenshot</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -8640,18 +8642,18 @@ Thank you for your prompt payment! 🙏`;
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="flex flex-col-reverse sm:flex-row gap-2.5 pt-2 border-t border-gray-100">
+                <div className="flex flex-col-reverse sm:flex-row gap-2.5 pt-2 border-t border-[#27264E]">
                   <button
                     type="button"
                     onClick={() => setShowDisbursePayoutModal(false)}
-                    className="w-full sm:flex-1 py-3 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs rounded-xl transition-colors text-center"
+                    className="w-full sm:flex-1 py-3 border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs rounded-xl transition-colors text-center cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isProcessingDisbursal || (amountNum <= 0 && totalDeductionsAmount <= 0)}
-                    className="w-full sm:flex-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95 text-center"
+                    className="w-full sm:flex-2 py-3 bg-[#02B15A] hover:bg-[#02B15A]/90 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95 text-center cursor-pointer"
                   >
                     {isProcessingDisbursal ? (
                       <>
@@ -8698,36 +8700,36 @@ Thank you for your prompt payment! 🙏`;
         const groupBroadcastMsg = generateGroupBroadcastText(pendingMembersList, activeGroup, selectedDashboardMonth);
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in overflow-y-auto">
-            <div className="bg-white rounded-3xl max-w-md sm:max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto my-auto">
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in overflow-y-auto">
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl max-w-md sm:max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto my-auto text-white">
               {/* Header */}
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 tracking-tight">
+                  <h3 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
                     Remind All
                   </h3>
-                  <p className="text-xs font-semibold text-gray-500 mt-0.5">
+                  <p className="text-xs font-semibold text-[#AEABD8] mt-0.5">
                     {pendingMembersList.length} pending {pendingMembersList.length === 1 ? 'member' : 'members'} · Month {selectedDashboardMonth}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowRemindModal(false)}
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#141332] border border-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors cursor-pointer"
                 >
                   <X size={16} />
                 </button>
               </div>
 
               {/* Segmented Tab Switcher (Group Message vs Individual) */}
-              <div className="bg-gray-100/90 p-1 rounded-2xl flex gap-1">
+              <div className="bg-[#141332] p-1 border border-[#27264E] rounded-2xl flex gap-1">
                 <button
                   type="button"
                   onClick={() => setRemindModalTab('group')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                     remindModalTab === 'group'
-                      ? 'bg-white text-gray-900 shadow-2xs font-extrabold'
-                      : 'text-gray-500 hover:text-gray-900'
+                      ? 'bg-[#1D1D41] text-white shadow-xs font-extrabold border border-[#27264E]'
+                      : 'text-[#AEABD8] hover:text-white'
                   }`}
                 >
                   Group Message
@@ -8735,10 +8737,10 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   type="button"
                   onClick={() => setRemindModalTab('individual')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                     remindModalTab === 'individual'
-                      ? 'bg-white text-gray-900 shadow-2xs font-extrabold'
-                      : 'text-gray-500 hover:text-gray-900'
+                      ? 'bg-[#1D1D41] text-white shadow-xs font-extrabold border border-[#27264E]'
+                      : 'text-[#AEABD8] hover:text-white'
                   }`}
                 >
                   Individual
@@ -8746,7 +8748,7 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* Description Sub-note */}
-              <p className="text-xs text-gray-500 leading-relaxed">
+              <p className="text-xs text-[#AEABD8] leading-relaxed">
                 {remindModalTab === 'individual'
                   ? "Members with a saved number get a direct WhatsApp link. Add a number for others. It's saved to their profile permanently."
                   : `Compile a single broadcast reminder containing all ${pendingMembersList.length} pending members to paste into your WhatsApp group.`}
@@ -8756,10 +8758,10 @@ Thank you for your prompt payment! 🙏`;
               {remindModalTab === 'individual' && (
                 <div className="space-y-3 pt-1">
                   {pendingMembersList.length === 0 ? (
-                    <div className="py-8 text-center bg-emerald-50/60 border border-emerald-100 rounded-2xl space-y-1.5">
-                      <CheckCircle2 size={28} className="mx-auto text-emerald-600" />
-                      <p className="text-xs font-bold text-emerald-900">All members have paid for Month {selectedDashboardMonth}!</p>
-                      <p className="text-[11px] text-emerald-600">No pending dues to remind.</p>
+                    <div className="py-8 text-center bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-2xl space-y-1.5">
+                      <CheckCircle2 size={28} className="mx-auto text-[#02B15A]" />
+                      <p className="text-xs font-bold text-white">All members have paid for Month {selectedDashboardMonth}!</p>
+                      <p className="text-[11px] text-[#02B15A]">No pending dues to remind.</p>
                     </div>
                   ) : (
                     pendingMembersList.map((member) => {
@@ -8769,26 +8771,26 @@ Thank you for your prompt payment! 🙏`;
                       return (
                         <div
                           key={member.id}
-                          className="bg-white border border-gray-200/90 hover:border-gray-300 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-2.5 transition-all"
+                          className="bg-[#141332] border border-[#27264E] hover:border-[#6359E9]/50 rounded-2xl p-3.5 sm:p-4 space-y-2.5 transition-all"
                         >
                           {/* Member Title & Pending Amount */}
                           <div className="flex items-center justify-between">
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <h4 className="font-extrabold text-xs sm:text-sm text-gray-900 leading-snug">
+                                <h4 className="font-extrabold text-xs sm:text-sm text-white leading-snug">
                                   {member.name}
                                 </h4>
-                                <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded font-mono">
+                                <span className="text-[10px] font-bold bg-[#1D1D41] border border-[#27264E] text-[#64CFF6] px-1.5 py-0.2 rounded font-mono">
                                   #{member.ticket}
                                 </span>
                               </div>
-                              <p className="text-xs font-bold text-gray-500 mt-0.5">
-                                <strong className="text-gray-900 font-extrabold">{formatCurrency(member.remaining)}</strong> pending
+                              <p className="text-xs font-bold text-[#AEABD8] mt-0.5">
+                                <strong className="text-[#FFBB38] font-extrabold">{formatCurrency(member.remaining)}</strong> pending
                               </p>
                             </div>
 
                             {hasPhone && (
-                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                              <span className="text-[10px] font-bold text-[#02B15A] bg-[#02B15A]/15 border border-[#02B15A]/30 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
                                 <Phone size={10} /> Saved
                               </span>
                             )}
@@ -8797,8 +8799,8 @@ Thank you for your prompt payment! 🙏`;
                           {/* Phone input & Send Button */}
                           <div className="flex items-center gap-2">
                             {hasPhone ? (
-                              <div className="flex-1 flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold text-gray-700 min-w-0">
-                                <Phone size={12} className="text-emerald-600 shrink-0" />
+                              <div className="flex-1 flex items-center gap-2 bg-[#1D1D41] border border-[#27264E] px-3 py-2 rounded-xl text-xs font-semibold text-white min-w-0">
+                                <Phone size={12} className="text-[#02B15A] shrink-0" />
                                 <span className="font-mono truncate">+91 {member.phone}</span>
                               </div>
                             ) : (
@@ -8812,7 +8814,7 @@ Thank you for your prompt payment! 🙏`;
                                     [member.id]: e.target.value,
                                   }))
                                 }
-                                className="flex-1 px-3.5 py-2 bg-white border border-gray-300 focus:border-emerald-500 rounded-xl text-xs font-semibold text-gray-900 focus:outline-none min-w-0"
+                                className="flex-1 px-3.5 py-2 bg-[#1D1D41] border border-[#27264E] focus:border-[#6359E9] rounded-xl text-xs font-semibold text-white placeholder-[#AEABD8]/40 focus:outline-none min-w-0"
                               />
                             )}
 
@@ -8821,7 +8823,7 @@ Thank you for your prompt payment! 🙏`;
                                 href={generateMemberReminderWhatsAppUrl(member, member.remaining, activeGroup, selectedDashboardMonth)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="bg-[#10B981] hover:bg-[#059669] text-white font-extrabold text-xs px-4 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 shrink-0"
+                                className="bg-[#02B15A] hover:bg-[#02B15A]/90 text-white font-extrabold text-xs px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95 shrink-0"
                               >
                                 <Send size={13} />
                                 <span>Send</span>
@@ -8831,7 +8833,7 @@ Thank you for your prompt payment! 🙏`;
                                 type="button"
                                 onClick={() => handleSavePhoneAndSend(member, member.remaining, activeGroup, selectedDashboardMonth)}
                                 disabled={savingMemberPhoneId === member.id}
-                                className="bg-[#10B981] hover:bg-[#059669] text-white font-extrabold text-xs px-3.5 sm:px-4 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 shrink-0 disabled:opacity-50"
+                                className="bg-[#02B15A] hover:bg-[#02B15A]/90 text-white font-extrabold text-xs px-3.5 sm:px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95 shrink-0 disabled:opacity-50 cursor-pointer"
                               >
                                 {savingMemberPhoneId === member.id ? (
                                   <RefreshCw size={13} className="animate-spin" />
@@ -8852,18 +8854,18 @@ Thank you for your prompt payment! 🙏`;
               {/* Tab 2: Group Broadcast Message */}
               {remindModalTab === 'group' && (
                 <div className="space-y-3 pt-1">
-                  <div className="relative bg-gray-50 border border-gray-200 rounded-2xl p-3.5 sm:p-4 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-bold text-gray-700 border-b border-gray-200 pb-2">
+                  <div className="relative bg-[#141332] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-white border-b border-[#27264E] pb-2">
                       <span className="flex items-center gap-1.5">
-                        <MessageSquare size={13} className="text-emerald-600" />
+                        <MessageSquare size={13} className="text-[#02B15A]" />
                         WhatsApp Group Broadcast Template
                       </span>
-                      <span className="text-[10px] font-mono text-gray-400">
+                      <span className="text-[10px] font-mono text-[#64CFF6]">
                         {pendingMembersList.length} Subscribers
                       </span>
                     </div>
 
-                    <pre className="text-xs font-sans text-gray-800 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto select-all bg-white p-3 rounded-xl border border-gray-200">
+                    <pre className="text-xs font-sans text-[#AEABD8] whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto select-all bg-[#1D1D41] p-3 rounded-xl border border-[#27264E]">
                       {groupBroadcastMsg}
                     </pre>
                   </div>
@@ -8876,9 +8878,9 @@ Thank you for your prompt payment! 🙏`;
                         setRemindCopied(true);
                         setTimeout(() => setRemindCopied(false), 2000);
                       }}
-                      className="flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl border border-gray-200 transition-colors active:scale-95"
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-[#141332] hover:bg-[#27264E] text-white font-bold text-xs rounded-xl border border-[#27264E] transition-colors active:scale-95 cursor-pointer"
                     >
-                      {remindCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                      {remindCopied ? <Check size={14} className="text-[#02B15A]" /> : <Copy size={14} />}
                       <span>{remindCopied ? 'Copied to Clipboard!' : 'Copy Message'}</span>
                     </button>
 
@@ -8886,7 +8888,7 @@ Thank you for your prompt payment! 🙏`;
                       href={`https://api.whatsapp.com/send?text=${encodeURIComponent(groupBroadcastMsg)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-1.5 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white font-extrabold text-xs rounded-xl transition-all shadow-xs active:scale-95 text-center"
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-[#02B15A] hover:bg-[#02B15A]/90 text-white font-extrabold text-xs rounded-xl transition-all shadow-xs active:scale-95 text-center"
                     >
                       <Send size={14} />
                       <span>Share to Group</span>
@@ -8923,12 +8925,12 @@ Thank you for your prompt payment! 🙏`;
                     setIsFabOpen(false);
                     setShowQuickCollectModal(true);
                   }}
-                  className="flex items-center gap-2.5 bg-white hover:bg-emerald-50 text-gray-900 border border-gray-200 px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                  className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
                 >
-                  <span className="text-xs font-black tracking-tight text-gray-900">
+                  <span className="text-xs font-bold tracking-tight text-white">
                     Quick Collect Payment
                   </span>
-                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                  <div className="w-8 h-8 rounded-xl bg-[#02B15A] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
                     <Coins size={16} />
                   </div>
                 </button>
@@ -8941,12 +8943,12 @@ Thank you for your prompt payment! 🙏`;
                     setIsFabOpen(false);
                     setShowQuickPersonalDrawModal(true);
                   }}
-                  className="flex items-center gap-2.5 bg-white hover:bg-rose-50 text-gray-900 border border-gray-200 px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                  className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
                 >
-                  <span className="text-xs font-black tracking-tight text-gray-900">
+                  <span className="text-xs font-bold tracking-tight text-white">
                     Log Cash Spend (Draw)
                   </span>
-                  <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                  <div className="w-8 h-8 rounded-xl bg-[#E41414] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
                     <MinusCircle size={16} />
                   </div>
                 </button>
@@ -8960,12 +8962,12 @@ Thank you for your prompt payment! 🙏`;
                     setRemindModalTab('individual');
                     setShowRemindModal(true);
                   }}
-                  className="flex items-center gap-2.5 bg-white hover:bg-emerald-50 text-gray-900 border border-gray-200 px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                  className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
                 >
-                  <span className="text-xs font-black tracking-tight text-gray-900">
+                  <span className="text-xs font-bold tracking-tight text-white">
                     Send Dues Reminder
                   </span>
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                  <div className="w-8 h-8 rounded-xl bg-[#6359E9] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
                     <Send size={15} />
                   </div>
                 </button>
@@ -8978,12 +8980,12 @@ Thank you for your prompt payment! 🙏`;
                     setIsFabOpen(false);
                     setShowQuickAtmModal(true);
                   }}
-                  className="flex items-center gap-2.5 bg-white hover:bg-indigo-50 text-gray-900 border border-gray-200 px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                  className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
                 >
-                  <span className="text-xs font-black tracking-tight text-gray-900">
+                  <span className="text-xs font-bold tracking-tight text-white">
                     ATM Cash Withdrawal
                   </span>
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                  <div className="w-8 h-8 rounded-xl bg-[#64CFF6] text-[#141332] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
                     <Landmark size={15} />
                   </div>
                 </button>
@@ -9000,10 +9002,10 @@ Thank you for your prompt payment! 🙏`;
               }}
               className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 cursor-pointer ${
                 isFabOpen
-                  ? 'bg-gray-900 text-white rotate-45 ring-4 ring-gray-900/20'
-                  : 'bg-gradient-to-tr from-emerald-600 via-teal-600 to-indigo-600 text-white ring-4 ring-emerald-500/30 hover:scale-105 shadow-emerald-900/30'
+                  ? 'bg-[#27264E] text-white rotate-45 ring-4 ring-[#6359E9]/30'
+                  : 'bg-gradient-to-tr from-[#6359E9] via-[#8C52FF] to-[#64CFF6] text-white ring-4 ring-[#6359E9]/40 hover:scale-105 shadow-[0_4px_25px_rgba(99,89,233,0.5)]'
               }`}
-              title="Quick Actions &amp; Collect"
+              title="Quick Actions & Collect"
             >
               <Plus size={26} className={`stroke-[2.5] transition-transform duration-200 ${isFabOpen ? 'rotate-90' : ''}`} />
             </button>

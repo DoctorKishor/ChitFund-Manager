@@ -923,60 +923,60 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-xs font-bold text-gray-600 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 px-3.5 py-2 rounded-xl transition-all shadow-xs"
+          className="flex items-center gap-2 text-xs font-bold text-[#AEABD8] hover:text-white bg-[#1D1D41] hover:bg-[#27264E] border border-[#27264E] px-3.5 py-2 rounded-xl transition-all shadow-xs cursor-pointer"
         >
           <ArrowLeft size={16} />
           <span>Back to Members</span>
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl flex items-center gap-1.5">
-            <CheckCircle2 size={14} className="text-emerald-600" />
+          <span className="text-xs font-bold text-[#02B15A] bg-[#02B15A]/10 border border-[#02B15A]/30 px-3 py-1 rounded-xl flex items-center gap-1.5">
+            <CheckCircle2 size={14} className="text-[#02B15A]" />
             <span>{allSettled ? 'Paid' : 'Active'}</span>
           </span>
         </div>
       </div>
 
       {/* Main Profile Header Card */}
-      <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-2xs space-y-4 sm:space-y-6">
+      <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-2xs space-y-4 sm:space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 min-w-0">
-            <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-extrabold text-xl sm:text-2xl flex items-center justify-center shadow-md shrink-0 aspect-square">
+            <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-[#9C2CF3] to-[#3A6FF9] text-white font-extrabold text-xl sm:text-2xl flex items-center justify-center shadow-lg shrink-0 aspect-square">
               {memberInitial}
             </div>
             <div className="space-y-1 min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg sm:text-2xl font-bold text-gray-900 leading-snug truncate">{memberName}</h2>
-                <span className="text-[10px] sm:text-xs font-semibold bg-gray-100 text-gray-700 px-2 sm:px-2.5 py-0.5 rounded-full shrink-0">
+                <h2 className="text-lg sm:text-2xl font-bold text-white leading-snug truncate">{memberName}</h2>
+                <span className="text-[10px] sm:text-xs font-semibold bg-[#141332] text-[#AEABD8] border border-[#27264E] px-2 sm:px-2.5 py-0.5 rounded-full shrink-0">
                   {memberEnrollments.length} {memberEnrollments.length === 1 ? 'active chit' : 'active chits'}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 flex items-center gap-1.5 font-medium">
-                <Phone size={12} className="text-gray-400 shrink-0" />
+              <p className="text-xs text-[#AEABD8] flex items-center gap-1.5 font-medium">
+                <Phone size={12} className="text-[#64CFF6] shrink-0" />
                 <span>{memberProfile?.phone_number || 'No phone recorded'}</span>
               </p>
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                <span className="text-[10px] sm:text-xs font-bold bg-indigo-50 text-indigo-700 px-2 sm:px-2.5 py-0.5 rounded-full border border-indigo-100 shrink-0">
+                <span className="text-[10px] sm:text-xs font-bold bg-[#02B15A]/15 text-[#02B15A] px-2 sm:px-2.5 py-0.5 rounded-full border border-[#02B15A]/30 shrink-0">
                   +{formatCurrency(totalPaidIn)} paid in
                 </span>
-                <span className="text-[10px] sm:text-xs font-semibold bg-gray-100 text-gray-500 px-2 sm:px-2.5 py-0.5 rounded-full shrink-0">
+                <span className="text-[10px] sm:text-xs font-semibold bg-[#141332] text-[#AEABD8] border border-[#27264E] px-2 sm:px-2.5 py-0.5 rounded-full shrink-0">
                   Portal · {memberProfile?.role === 'subscriber' ? 'Active' : 'Admin'}
                 </span>
                 {memberProfile?.passbook_token ? (
-                  <span className="text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 sm:px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] sm:text-xs font-bold bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 px-2 sm:px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
                     <CheckCircle2 size={11} /> QR Linked
                   </span>
                 ) : (
-                  <span className="text-[10px] sm:text-xs font-semibold bg-gray-100 text-gray-500 px-2 sm:px-2.5 py-0.5 rounded-full shrink-0">
+                  <span className="text-[10px] sm:text-xs font-semibold bg-[#141332] text-[#AEABD8] border border-[#27264E] px-2 sm:px-2.5 py-0.5 rounded-full shrink-0">
                     QR Unlinked
                   </span>
                 )}
 
                 {/* Security PIN Badge & Reveal Control */}
-                <div className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2 sm:px-2.5 py-0.5 rounded-full transition-colors">
-                  <KeyRound size={11} className="text-indigo-600 shrink-0" />
-                  <span className="text-[10px] sm:text-xs text-slate-500 font-medium">PIN:</span>
-                  <span className="text-[10px] sm:text-xs font-mono font-bold text-slate-900">
+                <div className="flex items-center gap-1 bg-[#141332] hover:bg-[#141332]/80 border border-[#27264E] px-2 sm:px-2.5 py-0.5 rounded-full transition-colors">
+                  <KeyRound size={11} className="text-[#64CFF6] shrink-0" />
+                  <span className="text-[10px] sm:text-xs text-[#AEABD8] font-medium">PIN:</span>
+                  <span className="text-[10px] sm:text-xs font-mono font-bold text-white">
                     {showMemberPin ? (memberProfile?.mpin || '1234') : '••••'}
                   </span>
                   <button
@@ -997,17 +997,17 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                       }
                     }}
                     title={showMemberPin ? 'Hide PIN' : 'Reveal PIN'}
-                    className="p-0.5 text-slate-400 hover:text-slate-700 transition-colors"
+                    className="p-0.5 text-[#AEABD8] hover:text-white transition-colors cursor-pointer"
                   >
                     {showMemberPin ? <EyeOff size={11} /> : <Eye size={11} />}
                   </button>
 
                   {(!memberProfile?.mpin || memberProfile?.mpin === '1234') ? (
-                    <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 rounded ml-0.5">
+                    <span className="text-[9px] font-bold bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30 px-1.5 rounded ml-0.5">
                       Default
                     </span>
                   ) : (
-                    <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 rounded ml-0.5">
+                    <span className="text-[9px] font-bold bg-[#02B15A]/20 text-[#02B15A] border border-[#02B15A]/30 px-1.5 rounded ml-0.5">
                       Custom
                     </span>
                   )}
@@ -1024,7 +1024,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 setCustomPinInput(memberProfile?.mpin || '1234');
                 setIsEditingPinModal(true);
               }}
-              className="border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center"
+              className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#64CFF6] font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center cursor-pointer"
             >
               <KeyRound size={14} className="shrink-0" />
               <span>Manage PIN</span>
@@ -1033,9 +1033,9 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             <button
               type="button"
               onClick={() => setIsPairingModalOpen(true)}
-              className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center"
+              className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-white font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center cursor-pointer"
             >
-              <QrCode size={14} className="text-indigo-600 shrink-0" />
+              <QrCode size={14} className="text-[#64CFF6] shrink-0" />
               <span>{memberProfile?.passbook_token ? 'Re-Pair QR' : 'Pair QR'}</span>
             </button>
 
@@ -1043,9 +1043,9 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               <button
                 type="button"
                 onClick={handlePrintMemberStickers}
-                className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center"
+                className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-white font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center cursor-pointer"
               >
-                <Printer size={14} className="text-indigo-600 shrink-0" />
+                <Printer size={14} className="text-[#64CFF6] shrink-0" />
                 <span>Print ({Math.max(1, memberEnrollments.length)})</span>
               </button>
             )}
@@ -1053,7 +1053,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             <button
               type="button"
               onClick={handleSharePassbookWhatsApp}
-              className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center"
+              className="border border-[#02B15A]/40 bg-[#02B15A]/10 hover:bg-[#02B15A]/20 text-[#02B15A] font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 text-center cursor-pointer"
             >
               <Share2 size={14} className="shrink-0" />
               <span>WhatsApp Card</span>
@@ -1062,7 +1062,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             <button
               type="button"
               onClick={() => handleOpenRecordPayment()}
-              className="col-span-2 sm:col-span-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 active:scale-95"
+              className="col-span-2 sm:col-span-1 bg-gradient-to-r from-[#9C2CF3] to-[#3A6FF9] hover:opacity-95 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
             >
               <Plus size={15} className="shrink-0" />
               <span>Record Payment</span>
@@ -1073,30 +1073,30 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
         {/* Status / Settlement Banner with Detailed Breakdown */}
         <div className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all shadow-xs ${
           allSettled 
-            ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-emerald-200 text-emerald-950' 
-            : 'bg-gradient-to-r from-amber-50/90 via-orange-50/90 to-amber-50/90 border-amber-300 text-amber-950'
+            ? 'bg-[#02B15A]/10 border-[#02B15A]/30 text-[#02B15A]' 
+            : 'bg-[#FFBB38]/10 border-[#FFBB38]/30 text-[#FFBB38]'
         }`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start sm:items-center gap-3">
               <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 ${
-                allSettled ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                allSettled ? 'bg-[#02B15A]/20 text-[#02B15A]' : 'bg-[#FFBB38]/20 text-[#FFBB38]'
               }`}>
                 {allSettled ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="text-sm sm:text-base font-extrabold text-gray-900 leading-tight">
+                  <h4 className="text-sm sm:text-base font-extrabold text-white leading-tight">
                     {allSettled 
                       ? 'All dues settled for current cycle · ₹0 Pending' 
                       : `Outstanding Dues: ${formatCurrency(totalPendingCurrentDues)} Pending`}
                   </h4>
                   {!allSettled && (
-                    <span className="text-[10px] font-extrabold bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-md uppercase tracking-wider border border-rose-200 shrink-0">
+                    <span className="text-[10px] font-extrabold bg-[#E41414]/20 text-[#E41414] px-2.5 py-0.5 rounded-md uppercase tracking-wider border border-[#E41414]/30 shrink-0">
                       Payment Required
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-600 mt-1 sm:mt-0.5 leading-normal">
+                <p className="text-xs text-[#AEABD8] mt-1 sm:mt-0.5 leading-normal">
                   {allSettled
                     ? 'All active chit groups are completely paid up to the current active month.'
                     : `Uncollected balance across ${groupsWithDues.length} chit ${groupsWithDues.length === 1 ? 'group' : 'groups'}. Click any month below to record.`}
@@ -1117,7 +1117,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                       firstUnpaidMonth?.remainingDue
                     );
                   }}
-                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 shrink-0"
+                  className="bg-[#FFBB38] hover:bg-[#FFBB38]/90 text-[#141332] font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 shrink-0 cursor-pointer"
                 >
                   <Plus size={14} />
                   <span>Collect Due</span>
@@ -1125,8 +1125,8 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               )}
               <span className={`text-xs font-mono font-bold px-2.5 py-1.5 rounded-lg border shrink-0 ${
                 allSettled 
-                  ? 'bg-emerald-100/80 border-emerald-300 text-emerald-900' 
-                  : 'bg-amber-200/70 border-amber-300 text-amber-900'
+                  ? 'bg-[#02B15A]/20 border-[#02B15A]/40 text-[#02B15A]' 
+                  : 'bg-[#FFBB38]/20 border-[#FFBB38]/40 text-[#FFBB38]'
               }`}>
                 {allSettled ? '0 DUE' : `${formatCurrency(totalPendingCurrentDues)} PENDING`}
               </span>
@@ -1135,18 +1135,18 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
           {/* Detailed Breakdown Chips for Unpaid Months */}
           {!allSettled && groupsWithDues.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-amber-200/80 space-y-2">
-              <div className="text-[10px] sm:text-[11px] font-bold text-amber-900 uppercase tracking-wider">
+            <div className="mt-3 pt-3 border-t border-[#FFBB38]/20 space-y-2">
+              <div className="text-[10px] sm:text-[11px] font-bold text-[#FFBB38] uppercase tracking-wider">
                 Pending Dues Breakdown:
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {groupsWithDues.map((grp: any) => (
-                  <div key={grp.groupId} className="bg-white/80 border border-amber-200 rounded-xl p-2.5 flex flex-col justify-between gap-1.5 shadow-2xs">
+                  <div key={grp.groupId} className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 flex flex-col justify-between gap-1.5 shadow-2xs">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold text-gray-900 truncate">
-                        {grp.groupName} <span className="text-gray-500 font-mono text-[11px]">(Ticket #{grp.ticketNumber})</span>
+                      <span className="text-xs font-bold text-white truncate">
+                        {grp.groupName} <span className="text-[#AEABD8] font-mono text-[11px]">(Ticket #{grp.ticketNumber})</span>
                       </span>
-                      <span className="text-xs font-extrabold text-amber-800 shrink-0">
+                      <span className="text-xs font-extrabold text-[#FFBB38] shrink-0">
                         {formatCurrency(grp.outstandingBalance)} due
                       </span>
                     </div>
@@ -1156,10 +1156,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           key={m.month}
                           type="button"
                           onClick={() => handleOpenRecordPayment(grp.groupId, m.month, m.remainingDue)}
-                          className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 transition-all hover:scale-105 active:scale-95 ${
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 transition-all hover:scale-105 active:scale-95 cursor-pointer ${
                             m.status === 'partial'
-                              ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
-                              : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                              ? 'bg-[#FFBB38]/20 text-[#FFBB38] border-[#FFBB38]/40 hover:bg-[#FFBB38]/30'
+                              : 'bg-[#E41414]/20 text-[#E41414] border-[#E41414]/30 hover:bg-[#E41414]/30'
                           }`}
                           title={`Click to record ${m.label} payment of ${formatCurrency(m.remainingDue)}`}
                         >
@@ -1178,32 +1178,32 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
         {/* 3 Metric Stat Boxes */}
         <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-1">
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-4.5 space-y-0.5 sm:space-y-1">
-            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              <ArrowDownLeft size={12} className="text-emerald-600 shrink-0" />
+          <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3 sm:p-4.5 space-y-0.5 sm:space-y-1">
+            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider">
+              <ArrowDownLeft size={12} className="text-[#02B15A] shrink-0" />
               <span className="truncate">Paid In</span>
             </div>
-            <div className="text-sm sm:text-2xl font-extrabold text-emerald-700 leading-none truncate">
+            <div className="text-sm sm:text-2xl font-extrabold text-[#02B15A] leading-none truncate">
               {formatCurrency(totalPaidIn)}
             </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-4.5 space-y-0.5 sm:space-y-1">
-            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              <ArrowUpRight size={12} className="text-amber-600 shrink-0" />
+          <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3 sm:p-4.5 space-y-0.5 sm:space-y-1">
+            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider">
+              <ArrowUpRight size={12} className="text-[#FFBB38] shrink-0" />
               <span className="truncate">Paid Out</span>
             </div>
-            <div className="text-sm sm:text-2xl font-extrabold text-amber-700 leading-none truncate">
+            <div className="text-sm sm:text-2xl font-extrabold text-[#FFBB38] leading-none truncate">
               {formatCurrency(totalPaidOut)}
             </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-4.5 space-y-0.5 sm:space-y-1">
-            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-              <Clock size={12} className="text-slate-500 shrink-0" />
+          <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3 sm:p-4.5 space-y-0.5 sm:space-y-1">
+            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider">
+              <Clock size={12} className="text-[#64CFF6] shrink-0" />
               <span className="truncate">To Go</span>
             </div>
-            <div className="text-sm sm:text-2xl font-extrabold text-slate-900 leading-none truncate">
+            <div className="text-sm sm:text-2xl font-extrabold text-white leading-none truncate">
               {formatCurrency(totalRemainingToGo)}
             </div>
           </div>
@@ -1212,13 +1212,13 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
         {/* Progress Bar */}
         {totalExpectedDue > 0 && (
           <div className="space-y-2 pt-1">
-            <div className="flex justify-between text-xs font-semibold text-gray-500">
+            <div className="flex justify-between text-xs font-semibold text-[#AEABD8]">
               <span>Installment Completion Progress</span>
-              <span className="font-bold text-gray-900">{Math.min(100, Math.round((totalPaidIn / totalExpectedDue) * 100))}%</span>
+              <span className="font-bold text-white">{Math.min(100, Math.round((totalPaidIn / totalExpectedDue) * 100))}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+            <div className="w-full bg-[#141332] rounded-full h-2.5 overflow-hidden border border-[#27264E]">
               <div
-                className="bg-emerald-600 h-full rounded-full transition-all duration-300"
+                className="bg-gradient-to-r from-[#02B15A] to-[#64CFF6] h-full rounded-full transition-all duration-300"
                 style={{ width: `${Math.min(100, (totalPaidIn / totalExpectedDue) * 100)}%` }}
               />
             </div>
@@ -1227,7 +1227,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
       </div>
 
       {/* 4 Interactive Subtabs Bar (Chits | Payments | Prizes | Activity) */}
-      <div className="flex items-center bg-gray-200/80 p-1 sm:p-1.5 rounded-2xl border border-gray-300/60 w-full sm:max-w-md">
+      <div className="flex items-center bg-[#1D1D41] p-1 sm:p-1.5 rounded-2xl border border-[#27264E] w-full sm:max-w-md">
         {[
           { id: 'chits', label: 'Chits', count: memberEnrollments.length },
           { id: 'payments', label: 'Payments', count: memberTransactions.length },
@@ -1239,16 +1239,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             <button
               key={tab.id}
               onClick={() => setActiveSubtab(tab.id as any)}
-              className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all duration-150 flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
                 isActive
-                  ? 'bg-white text-gray-900 shadow-2xs'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-[#6359E9] text-white shadow-xs'
+                  : 'text-[#AEABD8] hover:text-white'
               }`}
             >
               <span>{tab.label}</span>
               {tab.count !== undefined && (
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  isActive ? 'bg-gray-100 text-gray-800' : 'bg-gray-300/70 text-gray-600'
+                  isActive ? 'bg-white/20 text-white' : 'bg-[#141332] text-[#AEABD8]'
                 }`}>
                   {tab.count}
                 </span>
@@ -1261,12 +1261,12 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
       {/* ── Subtab 1: Chits ──────────────────────────────────────────────────────── */}
       {activeSubtab === 'chits' && (
         <div className="space-y-4">
-          <div className="text-xs text-gray-500 font-semibold px-1">
+          <div className="text-xs text-[#AEABD8] font-semibold px-1">
             {memberEnrollments.length} {memberEnrollments.length === 1 ? 'chit group' : 'chit groups'} enrolled
           </div>
 
           {memberEnrollments.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-3xl p-8 text-center text-gray-400 text-xs">
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-8 text-center text-[#AEABD8] text-xs">
               No chit group enrollments found for this subscriber.
             </div>
           ) : (
@@ -1275,26 +1275,26 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 const groupWonPrize = prizesWon.find((p: any) => p.groupId === grpDues.groupId);
 
                 return (
-                  <div key={grpDues.enrollmentId} className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div key={grpDues.enrollmentId} className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#27264E] pb-3">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-base font-bold text-gray-900 leading-snug">{grpDues.groupName}</h3>
-                          <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg border border-indigo-100">
+                          <h3 className="text-base font-bold text-white leading-snug">{grpDues.groupName}</h3>
+                          <span className="text-[10px] font-mono font-bold bg-[#141332] text-[#64CFF6] px-2 py-0.5 rounded-lg border border-[#27264E]">
                             Ticket #{grpDues.ticketNumber}
                           </span>
                           {grpDues.isSettled ? (
-                            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg border border-emerald-200 flex items-center gap-1">
+                            <span className="text-[10px] font-semibold bg-[#02B15A]/15 text-[#02B15A] px-2 py-0.5 rounded-lg border border-[#02B15A]/30 flex items-center gap-1">
                               <Check size={11} /> Settled
                             </span>
                           ) : (
-                            <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded-lg border border-amber-300 flex items-center gap-1">
-                              <AlertCircle size={11} className="text-amber-600" />
+                            <span className="text-[10px] font-bold bg-[#FFBB38]/15 text-[#FFBB38] px-2 py-0.5 rounded-lg border border-[#FFBB38]/30 flex items-center gap-1">
+                              <AlertCircle size={11} className="text-[#FFBB38]" />
                               {formatCurrency(grpDues.outstandingBalance)} Due
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1 leading-normal">
+                        <p className="text-xs text-[#AEABD8] mt-1 leading-normal">
                           {formatCurrency(grpDues.totalValue)} total value · {grpDues.durationMonths} months duration · Monthly: {formatCurrency(grpDues.memberInstallment)}
                         </p>
                       </div>
@@ -1307,7 +1307,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                               const firstUnpaid = grpDues.unpaidMonths?.[0];
                               handleOpenRecordPayment(grpDues.groupId, firstUnpaid?.month, firstUnpaid?.remainingDue);
                             }}
-                            className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 py-1.5 px-3 rounded-xl shadow-xs transition-colors"
+                            className="text-xs font-bold bg-[#02B15A] hover:bg-[#02B15A]/90 text-white flex items-center gap-1 py-1.5 px-3 rounded-xl shadow-xs transition-colors cursor-pointer"
                           >
                             <Plus size={13} />
                             <span>Record Payment</span>
@@ -1318,7 +1318,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             setActiveSubtab('payments');
                             setSelectedChitFilter(grpDues.groupId);
                           }}
-                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 py-1.5 px-2.5 rounded-xl hover:bg-indigo-50 transition-colors"
+                          className="text-xs font-bold text-[#64CFF6] hover:text-[#6359E9] flex items-center gap-1 py-1.5 px-2.5 rounded-xl hover:bg-[#141332] transition-colors cursor-pointer"
                         >
                           <span>View ledger</span>
                           <ChevronRight size={14} />
@@ -1329,10 +1329,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     {/* Interactive Month-by-Month Status Matrix */}
                     <div className="space-y-2 pt-1">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider">
                           Cycle Payment Status (M0 to Active Month)
                         </span>
-                        <span className={`text-[11px] font-extrabold ${grpDues.isSettled ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        <span className={`text-[11px] font-extrabold ${grpDues.isSettled ? 'text-[#02B15A]' : 'text-[#FFBB38]'}`}>
                           {grpDues.isSettled ? 'All active cycles settled' : `${formatCurrency(grpDues.outstandingBalance)} Pending Due`}
                         </span>
                       </div>
@@ -1359,12 +1359,12 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                   : 'cursor-default'
                               } ${
                                 isPaid
-                                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                                  ? 'bg-[#02B15A]/15 border-[#02B15A]/30 text-[#02B15A]'
                                   : isFree
-                                  ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900'
+                                  ? 'bg-[#6359E9]/20 border-[#6359E9]/40 text-[#64CFF6]'
                                   : isPartial
-                                  ? 'bg-amber-50/90 border-amber-300 text-amber-950 ring-1 ring-amber-300'
-                                  : 'bg-rose-50/90 border-rose-300 text-rose-950 ring-1 ring-rose-200'
+                                  ? 'bg-[#FFBB38]/15 border-[#FFBB38]/40 text-[#FFBB38] ring-1 ring-[#FFBB38]/40'
+                                  : 'bg-[#E41414]/15 border-[#E41414]/30 text-[#E41414] ring-1 ring-[#E41414]/30'
                               }`}
                             >
                               <div className="flex items-center justify-between w-full">
@@ -1372,7 +1372,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                   {m.month === 0 ? 'M0 (Launch)' : `Month ${m.month}`}
                                 </span>
                                 {m.isCurrentCycle && (
-                                  <span className="text-[8px] font-extrabold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-sm uppercase tracking-wider">
+                                  <span className="text-[8px] font-extrabold bg-[#64CFF6]/20 text-[#64CFF6] px-1.5 py-0.2 rounded-sm uppercase tracking-wider">
                                     Active
                                   </span>
                                 )}
@@ -1381,34 +1381,34 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                               <div className="mt-1.5 space-y-0.5">
                                 {isPaid && (
                                   <div>
-                                    <span className="text-[9px] font-bold text-emerald-700 uppercase block">Paid Full</span>
-                                    <span className="text-xs font-extrabold text-emerald-900">{formatCurrency(m.paidAmount)}</span>
+                                    <span className="text-[9px] font-bold text-[#02B15A] uppercase block">Paid Full</span>
+                                    <span className="text-xs font-extrabold text-white">{formatCurrency(m.paidAmount)}</span>
                                   </div>
                                 )}
                                 {isFree && (
                                   <div>
-                                    <span className="text-[9px] font-bold text-indigo-700 uppercase block">Free Month</span>
-                                    <span className="text-xs font-extrabold text-indigo-900">₹0 (Laaba Seetu)</span>
+                                    <span className="text-[9px] font-bold text-[#64CFF6] uppercase block">Free Month</span>
+                                    <span className="text-xs font-extrabold text-white">₹0 (Laaba Seetu)</span>
                                   </div>
                                 )}
                                 {isPartial && (
                                   <div>
-                                    <span className="text-[9px] font-bold text-amber-700 uppercase block">
+                                    <span className="text-[9px] font-bold text-[#FFBB38] uppercase block">
                                       Paid {formatCurrency(m.paidAmount)} / {formatCurrency(m.expectedDue)}
                                     </span>
-                                    <span className="text-xs font-extrabold text-amber-900">Due: {formatCurrency(m.remainingDue)}</span>
+                                    <span className="text-xs font-extrabold text-white">Due: {formatCurrency(m.remainingDue)}</span>
                                   </div>
                                 )}
                                 {isUnpaid && (
                                   <div>
-                                    <span className="text-[9px] font-bold text-rose-700 uppercase block">Unpaid</span>
-                                    <span className="text-xs font-extrabold text-rose-900">Due: {formatCurrency(m.remainingDue)}</span>
+                                    <span className="text-[9px] font-bold text-[#E41414] uppercase block">Unpaid</span>
+                                    <span className="text-xs font-extrabold text-white">Due: {formatCurrency(m.remainingDue)}</span>
                                   </div>
                                 )}
                               </div>
 
                               {m.remainingDue > 0 && (
-                                <div className="mt-2 pt-1.5 border-t border-current/10 flex items-center justify-between text-[10px] font-bold text-amber-900">
+                                <div className="mt-2 pt-1.5 border-t border-current/10 flex items-center justify-between text-[10px] font-bold text-[#FFBB38]">
                                   <span>Pay month</span>
                                   <ChevronRight size={12} />
                                 </div>
@@ -1420,31 +1420,31 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     </div>
 
                     {/* Group Financial Summary & Prize Strip */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                    <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
                       <div className="flex items-center gap-4 flex-wrap">
                         <div>
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Total Paid in Group</span>
-                          <span className="text-sm font-extrabold text-emerald-700 mt-0.5 block">{formatCurrency(grpDues.totalPaidForGroup)}</span>
+                          <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Total Paid in Group</span>
+                          <span className="text-sm font-extrabold text-[#02B15A] mt-0.5 block">{formatCurrency(grpDues.totalPaidForGroup)}</span>
                         </div>
-                        <div className="h-7 w-[1px] bg-slate-200 hidden sm:block" />
+                        <div className="h-7 w-[1px] bg-[#27264E] hidden sm:block" />
                         <div>
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Active Cycles Due</span>
-                          <span className={`text-sm font-extrabold mt-0.5 block ${grpDues.isSettled ? 'text-slate-700' : 'text-amber-700'}`}>
+                          <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Active Cycles Due</span>
+                          <span className={`text-sm font-extrabold mt-0.5 block ${grpDues.isSettled ? 'text-[#AEABD8]' : 'text-[#FFBB38]'}`}>
                             {formatCurrency(grpDues.outstandingBalance)}
                           </span>
                         </div>
-                        <div className="h-7 w-[1px] bg-slate-200 hidden sm:block" />
+                        <div className="h-7 w-[1px] bg-[#27264E] hidden sm:block" />
                         <div>
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Lifetime Commitment To Go</span>
-                          <span className="text-sm font-extrabold text-slate-900 mt-0.5 block">{formatCurrency(grpDues.lifetimeRemainingToGo)}</span>
+                          <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Lifetime Commitment To Go</span>
+                          <span className="text-sm font-extrabold text-white mt-0.5 block">{formatCurrency(grpDues.lifetimeRemainingToGo)}</span>
                         </div>
                       </div>
 
                       {groupWonPrize && (
-                        <div className="bg-amber-100/70 border border-amber-300 rounded-xl px-3 py-1.5 text-right shrink-0">
-                          <span className="text-[9px] text-amber-800 font-bold uppercase tracking-wider block">Auction Winner</span>
-                          <span className="font-extrabold text-amber-950 flex items-center gap-1 text-xs">
-                            <Trophy size={13} className="text-amber-600" />
+                        <div className="bg-[#FFBB38]/15 border border-[#FFBB38]/30 rounded-xl px-3 py-1.5 text-right shrink-0">
+                          <span className="text-[9px] text-[#FFBB38] font-bold uppercase tracking-wider block">Auction Winner</span>
+                          <span className="font-extrabold text-white flex items-center gap-1 text-xs">
+                            <Trophy size={13} className="text-[#FFBB38]" />
                             Won prize ({formatCurrency(groupWonPrize.netPayout)})
                           </span>
                         </div>
@@ -1463,15 +1463,15 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
         <div className="space-y-4">
           
           {/* Search and Filters Bar */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row gap-3 items-center justify-between">
             <div className="relative w-full sm:w-72">
-              <Search size={14} className="absolute left-3.5 top-3 text-gray-400" />
+              <Search size={14} className="absolute left-3.5 top-3 text-[#AEABD8]" />
               <input
                 type="text"
                 placeholder="Search amount, chit, method, notes..."
                 value={paymentSearch}
                 onChange={(e) => setPaymentSearch(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-white placeholder-[#AEABD8]/60 focus:outline-none"
               />
             </div>
 
@@ -1479,7 +1479,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               <select
                 value={selectedChitFilter}
                 onChange={(e) => setSelectedChitFilter(e.target.value)}
-                className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 focus:outline-none"
+                className="bg-[#141332] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#6359E9]"
               >
                 <option value="all">All chits</option>
                 {allChitGroups.map(g => (
@@ -1490,7 +1490,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               <select
                 value={selectedTypeFilter}
                 onChange={(e) => setSelectedTypeFilter(e.target.value)}
-                className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 focus:outline-none"
+                className="bg-[#141332] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#6359E9]"
               >
                 <option value="all">All types</option>
                 <option value="collection">Collections</option>
@@ -1499,7 +1499,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
               <button
                 onClick={() => handleOpenRecordPayment()}
-                className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5 shrink-0 active:scale-95 shadow-2xs"
+                className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5 shrink-0 active:scale-95 shadow-2xs cursor-pointer"
               >
                 <Plus size={14} />
                 <span>Record</span>
@@ -1508,19 +1508,19 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           </div>
 
           {/* Transactions Ledger List */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-              <span className="text-xs font-bold text-gray-900">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+            <div className="flex justify-between items-center border-b border-[#27264E] pb-3">
+              <span className="text-xs font-bold text-white">
                 {filteredPayments.length} receipts found
               </span>
             </div>
 
             {filteredPayments.length === 0 ? (
-              <div className="py-10 text-center text-gray-400 text-xs">
+              <div className="py-10 text-center text-[#AEABD8] text-xs">
                 No payment transactions match the selected filters.
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-[#27264E]">
                 {filteredPayments.map((tx) => {
                   const txDate = tx.created_at ? new Date(tx.created_at) : new Date();
                   const monthName = txDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
@@ -1529,27 +1529,27 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   const isCollection = tx.type === 'collection';
 
                   return (
-                    <div key={tx.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-slate-50/80 rounded-2xl px-3.5 transition-colors">
+                    <div key={tx.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-[#141332]/60 rounded-2xl px-3.5 transition-colors">
                       <div className="flex items-center gap-3.5">
                         {/* Date Pill */}
-                        <div className="w-11 h-11 rounded-2xl bg-gray-100 border border-gray-200 flex flex-col items-center justify-center shrink-0">
-                          <span className="text-[9px] font-bold text-gray-500 uppercase">{monthName}</span>
-                          <span className="text-sm font-extrabold text-gray-900 leading-none">{dayNum}</span>
+                        <div className="w-11 h-11 rounded-2xl bg-[#141332] border border-[#27264E] flex flex-col items-center justify-center shrink-0">
+                          <span className="text-[9px] font-bold text-[#AEABD8] uppercase">{monthName}</span>
+                          <span className="text-sm font-extrabold text-white leading-none">{dayNum}</span>
                         </div>
 
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-bold text-gray-900 leading-snug">
+                            <span className="text-xs font-bold text-white leading-snug">
                               {groupObj?.name || 'Chit Group'}
                             </span>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                               isCollection 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                                ? 'bg-[#02B15A]/15 text-[#02B15A] border-[#02B15A]/30' 
+                                : 'bg-[#FFBB38]/15 text-[#FFBB38] border-[#FFBB38]/30'
                             }`}>
                               {isCollection ? 'Collection' : 'Prize Payout'}
                             </span>
-                            <span className="text-[10px] font-mono font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md">
+                            <span className="text-[10px] font-mono font-semibold bg-[#141332] text-[#AEABD8] border border-[#27264E] px-2 py-0.5 rounded-md">
                               {tx.wallet_type === 'kishor_bank'
                                 ? 'KISHOR BANK (UPI)'
                                 : tx.wallet_type === 'dad_bank'
@@ -1563,13 +1563,13 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 href={tx.verification_proof_url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md flex items-center gap-1"
+                                className="text-[10px] font-bold bg-[#6359E9]/20 hover:bg-[#6359E9]/30 text-[#64CFF6] border border-[#6359E9]/40 px-2 py-0.5 rounded-md flex items-center gap-1"
                               >
                                 <Paperclip size={10} /> Receipt
                               </a>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500 max-w-md truncate leading-normal">
+                          <p className="text-xs text-[#AEABD8] max-w-md truncate leading-normal">
                             {tx.notes || 'Monthly chit installment payment'}
                           </p>
                         </div>
@@ -1577,7 +1577,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
                       <div className="flex items-center gap-3 justify-between sm:justify-end">
                         <span className={`text-sm sm:text-base font-extrabold mr-1 ${
-                          isCollection ? 'text-emerald-600' : 'text-amber-600'
+                          isCollection ? 'text-[#02B15A]' : 'text-[#FFBB38]'
                         }`}>
                           {isCollection ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
                         </span>
@@ -1590,7 +1590,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 setViewingReceiptTx(tx);
                               }}
                               title="Share Rendered Receipt PNG"
-                              className="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors active:scale-95 cursor-pointer shadow-2xs"
+                              className="p-2 text-[#02B15A] bg-[#02B15A]/10 hover:bg-[#02B15A]/20 border border-[#02B15A]/30 rounded-xl transition-colors active:scale-95 cursor-pointer shadow-2xs"
                             >
                               <Share2 size={14} />
                             </button>
@@ -1599,7 +1599,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             type="button"
                             onClick={() => handleOpenEditPayment(tx)}
                             title="Edit receipt"
-                            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-xl transition-colors active:scale-95"
+                            className="p-2 text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#141332] border border-[#27264E] rounded-xl transition-colors active:scale-95 cursor-pointer"
                           >
                             <Edit3 size={14} />
                           </button>
@@ -1607,7 +1607,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             type="button"
                             onClick={() => handleDeletePayment(tx)}
                             title="Delete receipt"
-                            className="p-2 text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-200 hover:border-rose-200 rounded-xl transition-colors active:scale-95"
+                            className="p-2 text-[#AEABD8] hover:text-[#E41414] hover:bg-[#E41414]/15 border border-[#27264E] rounded-xl transition-colors active:scale-95 cursor-pointer"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -1625,54 +1625,54 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
       {/* ── Subtab 3: Prizes (Adapted to our Chit Fund system!) ───────────────────── */}
       {activeSubtab === 'prizes' && (
         <div className="space-y-4">
-          <div className="text-xs text-gray-500 font-semibold px-1">
+          <div className="text-xs text-[#AEABD8] font-semibold px-1">
             {prizesWon.length} {prizesWon.length === 1 ? 'prize won' : 'prizes won'}
           </div>
 
           {prizesWon.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 text-xs">
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-8 text-center text-[#AEABD8] text-xs">
               No auction prizes won by this subscriber yet.
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
               {prizesWon.map((prize, idx) => (
-                <div key={idx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                <div key={idx} className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#27264E] pb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                      <div className="w-10 h-10 rounded-xl bg-[#FFBB38]/20 text-[#FFBB38] flex items-center justify-center font-bold">
                         <Trophy size={20} />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-gray-900">{prize.groupName}</h4>
-                        <p className="text-[11px] text-gray-500">Month {prize.month} Auction</p>
+                        <h4 className="text-sm font-bold text-white">{prize.groupName}</h4>
+                        <p className="text-[11px] text-[#AEABD8]">Month {prize.month} Auction</p>
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Total Chit Value</span>
-                      <span className="text-base font-extrabold text-gray-900">{formatCurrency(prize.totalValue)}</span>
+                      <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Total Chit Value</span>
+                      <span className="text-base font-extrabold text-white">{formatCurrency(prize.totalValue)}</span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    <div className="bg-gray-50 rounded-xl p-3">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Bid Discount</span>
-                      <span className="font-bold text-gray-900">{formatCurrency(prize.winningBid)}</span>
+                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-3">
+                      <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Bid Discount</span>
+                      <span className="font-bold text-white">{formatCurrency(prize.winningBid)}</span>
                     </div>
 
-                    <div className="bg-gray-50 rounded-xl p-3">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Pool Credit</span>
-                      <span className="font-bold text-indigo-700">+{formatCurrency(prize.winningBid)}</span>
+                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-3">
+                      <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Pool Credit</span>
+                      <span className="font-bold text-[#64CFF6]">+{formatCurrency(prize.winningBid)}</span>
                     </div>
 
-                    <div className="bg-emerald-50 rounded-xl p-3">
-                      <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">Net Member Payout</span>
-                      <span className="font-extrabold text-emerald-700">{formatCurrency(prize.netPayout)}</span>
+                    <div className="bg-[#02B15A]/15 border border-[#02B15A]/30 rounded-xl p-3">
+                      <span className="text-[10px] text-[#02B15A] font-bold uppercase tracking-wider block">Net Member Payout</span>
+                      <span className="font-extrabold text-[#02B15A]">{formatCurrency(prize.netPayout)}</span>
                     </div>
 
-                    <div className="bg-gray-50 rounded-xl p-3">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Disbursement</span>
-                      <span className="font-bold text-gray-900">
+                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-3">
+                      <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Disbursement</span>
+                      <span className="font-bold text-white">
                         {prize.walletType === 'kishor_bank'
                           ? 'KISHOR BANK (UPI)'
                           : prize.walletType === 'dad_bank'
@@ -1692,24 +1692,24 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
       {/* ── Subtab 4: Activity ─────────────────────────────────────────────────── */}
       {activeSubtab === 'activity' && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
-            <ShieldAlert size={16} className="text-indigo-600" />
+        <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-5 shadow-sm space-y-4">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-[#27264E] pb-3">
+            <ShieldAlert size={16} className="text-[#64CFF6]" />
             <span>Subscriber Activity Feed</span>
           </h3>
 
           <div className="space-y-3">
             {memberTransactions.map((tx) => (
-              <div key={tx.id} className="p-3 bg-gray-50/70 border border-gray-200/60 rounded-xl text-xs flex justify-between items-center">
+              <div key={tx.id} className="p-3 bg-[#141332] border border-[#27264E] rounded-xl text-xs flex justify-between items-center">
                 <div>
-                  <span className="font-bold text-gray-900">
+                  <span className="font-bold text-white">
                     {tx.type === 'collection' ? 'Installment payment recorded' : 'Auction prize payout disbursed'}
                   </span>
-                  <p className="text-[10px] text-gray-500 mt-0.5">{tx.notes || 'Transaction ledger entry'}</p>
+                  <p className="text-[10px] text-[#AEABD8] mt-0.5">{tx.notes || 'Transaction ledger entry'}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <span className="font-extrabold text-gray-900 block">{formatCurrency(Number(tx.amount || 0))}</span>
-                  <span className="text-[10px] text-gray-400">
+                  <span className="font-extrabold text-white block">{formatCurrency(Number(tx.amount || 0))}</span>
+                  <span className="text-[10px] text-[#AEABD8]">
                     {tx.created_at ? new Date(tx.created_at).toLocaleDateString('en-IN') : 'Today'}
                   </span>
                 </div>
@@ -1721,27 +1721,27 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
       {/* ── Modal: Record / Edit Payment ────────────────────────────────────────── */}
       {isPaymentModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <form
             onSubmit={handleSaveModalPayment}
-            className="bg-white rounded-3xl border border-gray-200 p-4 sm:p-6 w-full max-w-md space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto"
+            className="bg-[#1D1D41] rounded-3xl border border-[#27264E] p-4 sm:p-6 w-full max-w-md space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto text-white"
           >
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+            <div className="flex justify-between items-center border-b border-[#27264E] pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[#02B15A]/20 text-[#02B15A] flex items-center justify-center">
                   <Coins size={16} />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-gray-900">
+                  <h4 className="text-sm font-bold text-white">
                     {editingTransaction ? 'Edit payment' : 'Record Installment Payment'}
                   </h4>
-                  <p className="text-[10px] text-gray-500">{memberName}</p>
+                  <p className="text-[10px] text-[#AEABD8]">{memberName}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsPaymentModalOpen(false)}
-                className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                className="text-[#AEABD8] hover:text-white p-1.5 rounded-lg hover:bg-[#141332] transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -1750,13 +1750,13 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             {/* Target Chit Group Selector (for new payments) */}
             {!editingTransaction && memberEnrollments.length > 0 && (
               <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Chit Group</label>
+                <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Chit Group</label>
                 {memberEnrollments.length === 1 ? (
-                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs">
-                    <span className="font-bold text-gray-900">
+                  <div className="p-2.5 bg-[#141332] border border-[#27264E] rounded-xl flex items-center justify-between text-xs">
+                    <span className="font-bold text-white">
                       {(groupDuesBreakdowns[0]?.groupName) || 'Chit Group'}
                     </span>
-                    <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-100">
+                    <span className="text-[10px] font-mono font-bold bg-[#6359E9]/20 text-[#64CFF6] px-2 py-0.5 rounded-md border border-[#6359E9]/40">
                       Ticket #{groupDuesBreakdowns[0]?.ticketNumber}
                     </span>
                   </div>
@@ -1774,7 +1774,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                       setQuickPaymentAmount(dueAmt > 0 ? String(dueAmt) : '10000');
                       setPaymentNote(`Month ${targetM} installment`);
                     }}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none"
                   >
                     {memberEnrollments.map((enroll) => {
                       const g = Array.isArray(enroll.chit_groups) ? enroll.chit_groups[0] : enroll.chit_groups;
@@ -1793,7 +1793,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             {/* Target Month Selector */}
             {!editingTransaction && (
               <div className="space-y-1.5">
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Target Month Cycle</label>
+                <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Target Month Cycle</label>
                 <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full">
                   {(() => {
                     const currentGrp = (groupDuesBreakdowns || []).find((b: any) => b.groupId === (modalTargetGroupId || memberEnrollments[0]?.group_id));
@@ -1816,16 +1816,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             }
                             setPaymentNote(`Month ${m} installment`);
                           }}
-                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold shrink-0 transition-all ${
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold shrink-0 transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                              ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs'
                               : hasDue
-                              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
-                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                              ? 'bg-[#FFBB38]/15 text-[#FFBB38] border-[#FFBB38]/40 hover:bg-[#FFBB38]/25'
+                              : 'bg-[#141332] text-[#AEABD8] border-[#27264E] hover:text-white hover:bg-[#27264E]'
                           }`}
                         >
                           <span>{m === 0 ? 'M0 (Launch)' : `M${m}`}</span>
-                          {hasDue && <span className="ml-1 text-[9px] text-rose-600 font-extrabold">• Due</span>}
+                          {hasDue && <span className="ml-1 text-[9px] text-[#E41414] font-extrabold">• Due</span>}
                         </button>
                       );
                     }
@@ -1837,16 +1837,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
             {/* Amount */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Payment Amount (₹)</label>
+              <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Payment Amount (₹)</label>
               <div className="relative">
-                <span className="absolute left-3.5 top-2.5 text-base text-gray-400 font-bold">₹</span>
+                <span className="absolute left-3.5 top-2.5 text-base text-[#64CFF6] font-bold">₹</span>
                 <input
                   type="number"
                   required
                   placeholder="Amount"
                   value={quickPaymentAmount}
                   onChange={(e) => setQuickPaymentAmount(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-2 text-base font-bold text-gray-900 focus:outline-none"
+                  className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-3 py-2 text-base font-bold text-white focus:outline-none"
                 />
               </div>
             </div>
@@ -1856,21 +1856,21 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               <button
                 type="button"
                 onClick={() => setQuickPaymentAmount('10000')}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-2 rounded-lg border border-gray-200 active:scale-95"
+                className="flex-1 bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white text-xs font-bold py-2 rounded-lg border border-[#27264E] active:scale-95 cursor-pointer"
               >
                 ₹10,000
               </button>
               <button
                 type="button"
                 onClick={() => setQuickPaymentAmount('20000')}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-2 rounded-lg border border-gray-200 active:scale-95"
+                className="flex-1 bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white text-xs font-bold py-2 rounded-lg border border-[#27264E] active:scale-95 cursor-pointer"
               >
                 ₹20,000
               </button>
               <button
                 type="button"
                 onClick={() => setQuickPaymentAmount('')}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-3 py-2 rounded-lg border border-gray-200 active:scale-95"
+                className="bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white text-xs font-bold px-3 py-2 rounded-lg border border-[#27264E] active:scale-95 cursor-pointer"
               >
                 Clear
               </button>
@@ -1878,7 +1878,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
             {/* 4-Wallet Selector */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Receiving Account / Vault</label>
+              <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Receiving Account / Vault</label>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { id: 'cash_in_hand', label: 'Cash in Hand', icon: Banknote },
@@ -1893,13 +1893,13 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                       key={w.id}
                       type="button"
                       onClick={() => setPaymentWalletType(w.id)}
-                      className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all text-left ${
+                      className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer ${
                         isSelected
-                          ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-2 ring-indigo-500/20 shadow-xs'
-                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700'
+                          ? 'bg-[#6359E9]/20 border-[#6359E9] text-white ring-2 ring-[#6359E9]/30 shadow-xs'
+                          : 'bg-[#141332] border-[#27264E] hover:bg-[#27264E] text-[#AEABD8]'
                       }`}
                     >
-                      <Icon size={14} className={isSelected ? 'text-indigo-600' : 'text-gray-500'} />
+                      <Icon size={14} className={isSelected ? 'text-[#64CFF6]' : 'text-[#AEABD8]'} />
                       <span className="truncate">{w.label}</span>
                     </button>
                   );
@@ -1909,7 +1909,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
             {/* Date Selection */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Date</label>
+              <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Date</label>
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: 'today', label: 'Today' },
@@ -1920,10 +1920,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     key={d.id}
                     type="button"
                     onClick={() => setPaymentDateType(d.id as any)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
                       paymentDateType === d.id
-                        ? 'bg-slate-900 border-slate-900 text-white'
-                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700'
+                        ? 'bg-[#6359E9] border-[#6359E9] text-white shadow-xs'
+                        : 'bg-[#141332] border-[#27264E] hover:bg-[#27264E] text-[#AEABD8]'
                     }`}
                   >
                     {d.label}
@@ -1937,7 +1937,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     type="date"
                     value={customPaymentDate}
                     onChange={(e) => setCustomPaymentDate(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900"
+                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-semibold text-white"
                   />
                 </div>
               )}
@@ -1945,29 +1945,29 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
             {/* Note */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Note (optional)</label>
+              <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Note (optional)</label>
               <input
                 type="text"
                 placeholder="e.g. Paid via GPay / Handed cash to Dad"
                 value={paymentNote}
                 onChange={(e) => setPaymentNote(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-medium text-gray-900"
+                className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-medium text-white placeholder-[#AEABD8]/60 focus:outline-none"
               />
             </div>
 
             {/* Receipt Photo */}
             <div className="space-y-1.5">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Receipt Attachment</label>
+              <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Receipt Attachment</label>
               {paymentReceiptUrl ? (
-                <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <div className="flex items-center justify-between p-2.5 bg-[#02B15A]/15 border border-[#02B15A]/30 rounded-xl">
                   <div className="flex items-center gap-2">
                     <img src={paymentReceiptUrl} alt="Receipt" className="w-9 h-9 object-cover rounded-lg" />
-                    <span className="text-xs font-bold text-emerald-900">Receipt Ready</span>
+                    <span className="text-xs font-bold text-[#02B15A]">Receipt Ready</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setPaymentReceiptUrl('')}
-                    className="text-rose-600 text-xs font-bold hover:underline"
+                    className="text-[#E41414] text-xs font-bold hover:underline cursor-pointer"
                   >
                     Remove
                   </button>
@@ -1983,9 +1983,9 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   />
                   <label
                     htmlFor="member-receipt-upload"
-                    className="flex items-center justify-center gap-2 border border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 rounded-xl py-2.5 px-3 text-xs text-gray-600 font-semibold cursor-pointer"
+                    className="flex items-center justify-center gap-2 border border-dashed border-[#27264E] hover:border-[#6359E9] bg-[#141332] rounded-xl py-2.5 px-3 text-xs text-[#AEABD8] hover:text-white font-semibold cursor-pointer transition-colors"
                   >
-                    <Paperclip size={14} className="text-gray-500" />
+                    <Paperclip size={14} className="text-[#64CFF6]" />
                     <span>Attach receipt photo</span>
                   </label>
                 </div>
@@ -1998,7 +1998,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 <button
                   type="button"
                   onClick={() => handleDeletePayment(editingTransaction)}
-                  className="w-full sm:w-auto text-rose-600 hover:text-rose-700 hover:bg-rose-50 p-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                  className="w-full sm:w-auto text-[#E41414] hover:bg-[#E41414]/20 border border-[#E41414]/30 p-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
                 >
                   <Trash2 size={13} />
                   <span>Delete</span>
@@ -2009,14 +2009,14 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 <button
                   type="button"
                   onClick={() => setIsPaymentModalOpen(false)}
-                  className="flex-1 sm:flex-initial border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors text-center"
+                  className="flex-1 sm:flex-initial border border-[#27264E] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors text-center cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isProcessingPayment}
-                  className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                  className="flex-1 sm:flex-initial bg-[#02B15A] hover:bg-[#02B15A]/90 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
                 >
                   <Check size={14} />
                   <span>{isProcessingPayment ? 'Saving...' : 'Save changes'}</span>
@@ -2090,38 +2090,38 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
       {/* Admin Member PIN Management Modal */}
       {isEditingPinModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-gray-200">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-[#1D1D41] rounded-3xl p-6 shadow-2xl space-y-4 border border-[#27264E] text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-[#27264E]">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-[#6359E9]/20 text-[#64CFF6] flex items-center justify-center">
                   <KeyRound size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900">Manage Member PIN</h3>
-                  <p className="text-[11px] text-gray-500 font-medium">{memberName}</p>
+                  <h3 className="text-sm font-bold text-white">Manage Member PIN</h3>
+                  <p className="text-[11px] text-[#AEABD8] font-medium">{memberName}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsEditingPinModal(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+                className="p-1 text-[#AEABD8] hover:text-white rounded-lg hover:bg-[#141332] transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
             {/* Current PIN Status Card */}
-            <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 space-y-1.5">
+            <div className="p-3 bg-[#141332] rounded-2xl border border-[#27264E] space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">Current MPIN:</span>
-                <span className="font-mono font-bold text-indigo-700 text-sm bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
+                <span className="text-[#AEABD8]">Current MPIN:</span>
+                <span className="font-mono font-bold text-[#64CFF6] text-sm bg-[#6359E9]/20 px-2 py-0.5 rounded-lg border border-[#6359E9]/40">
                   {memberProfile?.mpin || '1234'}
                 </span>
               </div>
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-gray-500">Status:</span>
-                <span className={`font-bold ${(!memberProfile?.mpin || memberProfile?.mpin === '1234') ? 'text-amber-600' : 'text-emerald-600'}`}>
+                <span className="text-[#AEABD8]">Status:</span>
+                <span className={`font-bold ${(!memberProfile?.mpin || memberProfile?.mpin === '1234') ? 'text-[#FFBB38]' : 'text-[#02B15A]'}`}>
                   {(!memberProfile?.mpin || memberProfile?.mpin === '1234') ? 'Default PIN (1234)' : 'Custom Subscriber PIN'}
                 </span>
               </div>
@@ -2132,22 +2132,22 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               type="button"
               onClick={handleResetPinToDefault}
               disabled={isSavingPin || memberProfile?.mpin === '1234'}
-              className="w-full py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-900 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+              className="w-full py-2.5 px-3 rounded-xl border border-[#FFBB38]/40 bg-[#FFBB38]/15 hover:bg-[#FFBB38]/25 disabled:opacity-50 text-[#FFBB38] text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
             >
               <RefreshCw size={13} className={isSavingPin ? 'animate-spin' : ''} />
               <span>Reset PIN to Default (1234)</span>
             </button>
 
             <div className="relative flex py-1 items-center">
-              <div className="flex-grow border-t border-gray-200"></div>
-              <span className="flex-shrink mx-2 text-[10px] text-gray-400 font-bold uppercase">Or Set Custom PIN</span>
-              <div className="flex-grow border-t border-gray-200"></div>
+              <div className="flex-grow border-t border-[#27264E]"></div>
+              <span className="flex-shrink mx-2 text-[10px] text-[#AEABD8] font-bold uppercase">Or Set Custom PIN</span>
+              <div className="flex-grow border-t border-[#27264E]"></div>
             </div>
 
             {/* Custom PIN Form */}
             <form onSubmit={handleSaveCustomPin} className="space-y-3">
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                <label className="block text-[11px] font-bold text-[#AEABD8] mb-1">
                   New 4 to 6 Digit PIN
                 </label>
                 <input
@@ -2158,7 +2158,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   value={customPinInput}
                   onChange={(e) => setCustomPinInput(e.target.value.replace(/\D/g, ''))}
                   placeholder="e.g. 5829"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 font-mono text-sm font-bold text-gray-900 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#27264E] bg-[#141332] font-mono text-sm font-bold text-white focus:outline-none focus:border-[#6359E9]"
                 />
               </div>
 
@@ -2166,14 +2166,14 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 <button
                   type="button"
                   onClick={() => setIsEditingPinModal(false)}
-                  className="flex-1 py-2 rounded-xl text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
+                  className="flex-1 py-2 rounded-xl text-xs font-bold text-[#AEABD8] hover:text-white bg-[#141332] hover:bg-[#27264E] border border-[#27264E] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingPin || !customPinInput}
-                  className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-xs cursor-pointer disabled:cursor-not-allowed"
+                  className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-[#6359E9] hover:bg-[#6F64FF] disabled:opacity-50 transition-colors shadow-xs cursor-pointer disabled:cursor-not-allowed"
                 >
                   {isSavingPin ? 'Saving...' : 'Save PIN'}
                 </button>

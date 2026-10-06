@@ -750,14 +750,14 @@ export default function SubscriberPortal() {
 
   const wonGroupsCount = groups.filter(g => g.hasWonRegular).length;
 
-  const isDark = theme === 'dark';
+  const isDark = true;
 
   if (loading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center px-4 ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-900'}`}>
+      <div className="min-h-screen flex items-center justify-center px-4 bg-[#141332] text-white">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-9 h-9 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-medium tracking-tight opacity-70">Loading Member Passbook...</span>
+          <div className="w-9 h-9 border-3 border-[#6359E9] border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-medium tracking-tight text-[#AEABD8]">Loading Member Passbook...</span>
         </div>
       </div>
     );
@@ -779,31 +779,27 @@ export default function SubscriberPortal() {
   );
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${
-      isDark ? 'bg-[#030712] text-slate-100' : 'bg-[#f4f6fb] text-slate-900'
-    }`}>
+    <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-[#141332] text-white">
       
       {/* 1. TOP APP BAR */}
-      <header className={`sticky top-0 z-30 border-b backdrop-blur-md transition-all ${
-        isDark ? 'bg-slate-950/80 border-slate-800/80' : 'bg-white/80 border-slate-200/80'
-      }`}>
+      <header className="sticky top-0 z-30 border-b border-[#27264E] bg-[#1D1D41]/95 backdrop-blur-md transition-all text-white">
         <div className="max-w-5xl mx-auto px-3.5 sm:px-6 h-14 flex items-center justify-between gap-2">
           
           {/* User Identity / Brand */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shadow-md shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-r from-[#9C2CF3] to-[#3A6FF9] text-white font-bold flex items-center justify-center text-xs shadow-md shrink-0">
               {profile?.fullName?.charAt(0)?.toUpperCase() || 'M'}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <span className="text-xs font-bold truncate text-white">
                   {profile?.fullName || 'Subscriber'}
                 </span>
-                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase shrink-0">
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 uppercase shrink-0">
                   Member
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono truncate">
+              <p className="text-[10px] text-[#AEABD8] font-mono truncate">
                 {profile?.phoneNumber || profile?.email || 'Active Member'}
               </p>
             </div>
@@ -817,13 +813,9 @@ export default function SubscriberPortal() {
               title="Sync Latest Data with Ledger"
               aria-label="Refresh and sync data"
               disabled={syncing}
-              className={`p-2 rounded-xl border transition-all text-xs flex items-center gap-1.5 active:scale-95 cursor-pointer ${
-                isDark
-                  ? 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-500/20'
-                  : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 shadow-2xs'
-              }`}
+              className="p-2 rounded-xl border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white transition-all text-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
             >
-              <RefreshCw size={13} className={syncing ? 'animate-spin text-indigo-400' : ''} />
+              <RefreshCw size={13} className={syncing ? 'animate-spin text-[#64CFF6]' : ''} />
               <span className="hidden sm:inline text-[11px] font-semibold">
                 {syncing ? 'Syncing...' : 'Sync'}
               </span>
@@ -834,21 +826,13 @@ export default function SubscriberPortal() {
             {/* LIGHT / DARK MODE TOGGLE */}
             <button
               onClick={toggleTheme}
-              title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
-              aria-label="Toggle Dark/Light Theme"
-              className={`p-2 rounded-xl border transition-all text-xs flex items-center gap-1.5 active:scale-95 cursor-pointer ${
-                isDark 
-                  ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/20' 
-                  : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200 shadow-2xs'
-              }`}
+              title={`Theme: Cyber Fintech Dark`}
+              aria-label="Theme mode"
+              className="p-2 rounded-xl border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white transition-all text-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
             >
-              {isDark ? (
-                <Sun size={13} className="text-amber-400" />
-              ) : (
-                <Moon size={13} className="text-amber-700" />
-              )}
+              <Moon size={13} className="text-[#FFBB38]" />
               <span className="hidden sm:inline text-[11px] font-semibold">
-                {isDark ? 'Light' : 'Dark'}
+                Dark
               </span>
             </button>
 
@@ -857,7 +841,7 @@ export default function SubscriberPortal() {
               onClick={signOut}
               title="Sign Out"
               aria-label="Sign Out"
-              className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 transition-all text-xs flex items-center gap-1 active:scale-95 font-semibold"
+              className="p-2 rounded-xl bg-[#E41414]/15 hover:bg-[#E41414]/25 text-[#FF5555] border border-[#E41414]/30 transition-all text-xs flex items-center gap-1 active:scale-95 font-semibold cursor-pointer"
             >
               <LogOut size={13} />
               <span className="hidden sm:inline text-[11px]">Logout</span>
@@ -871,39 +855,25 @@ export default function SubscriberPortal() {
         
         {/* PROMINENT ORANGE OVERDUE REMINDER BANNER */}
         {overdueGroups.length > 0 && (
-          <div className={`rounded-2xl p-3.5 sm:p-4 border shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2 ${
-            isDark
-              ? 'bg-gradient-to-r from-amber-950/40 via-orange-950/30 to-amber-950/40 border-amber-500/40 text-amber-100'
-              : 'bg-amber-100/80 border-amber-300 text-amber-950 shadow-xs'
-          }`}>
-            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+          <div className="rounded-2xl p-3.5 sm:p-4 border border-[#FFBB38]/40 bg-[#1D1D41] text-amber-100 shadow-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+            <div className="w-8 h-8 rounded-xl bg-[#FFBB38] text-slate-950 flex items-center justify-center shrink-0 shadow-sm mt-0.5">
               <AlertTriangle size={18} className="stroke-[2.5]" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <h3 className={`text-xs sm:text-sm font-black tracking-tight flex items-center gap-1.5 ${
-                  isDark ? 'text-amber-200' : 'text-amber-950'
-                }`}>
+                <h3 className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-1.5 text-[#FFBB38]">
                   <span>⚠️ Payment Past Due Date</span>
-                  <span className={`text-[10px] uppercase font-mono px-1.5 py-0.2 rounded font-bold border ${
-                    isDark
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                      : 'bg-amber-200 text-amber-900 border-amber-300'
-                  }`}>
+                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded font-bold border bg-[#FFBB38]/20 text-[#FFBB38] border-[#FFBB38]/40">
                     {overdueGroups.length} {overdueGroups.length === 1 ? 'Chit' : 'Chits'} Overdue
                   </span>
                 </h3>
-                <div className={`text-xs sm:text-sm font-mono font-black ${
-                  isDark ? 'text-rose-400' : 'text-rose-700'
-                }`}>
+                <div className="text-xs sm:text-sm font-mono font-black text-[#E41414]">
                   Total Overdue: ₹{totalOverdueAmount.toLocaleString('en-IN')}
                 </div>
               </div>
-              <p className={`text-[11px] mt-1 leading-relaxed font-medium ${
-                isDark ? 'text-amber-200/90' : 'text-amber-900'
-              }`}>
+              <p className="text-[11px] mt-1 leading-relaxed font-medium text-[#AEABD8]">
                 The scheduled auction due date for{' '}
-                <strong className={`font-bold ${isDark ? 'text-white underline decoration-amber-400/40' : 'text-amber-950 underline decoration-amber-900/30'}`}>
+                <strong className="font-bold text-white underline decoration-amber-400/40">
                   {overdueGroups
                     .map((g) => `${g.group.groupName} (${g.paymentInfo.daysOverdue} days past due)`)
                     .join(', ')}
@@ -915,13 +885,13 @@ export default function SubscriberPortal() {
         )}
 
         {/* DESKTOP TABS (5 Streamlined Tabs at top) */}
-        <div className={`hidden md:flex items-center gap-2 border-b pb-2 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+        <div className="hidden md:flex items-center gap-2 border-b border-[#27264E] pb-2">
           <button
             onClick={() => setActiveTab('overview')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'overview'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-[#6359E9] text-white shadow-md shadow-[#6359E9]/30'
+                : 'text-[#AEABD8] hover:text-white hover:bg-[#1D1D41]'
             }`}
           >
             <Layers size={13} /> Overview
@@ -930,8 +900,8 @@ export default function SubscriberPortal() {
             onClick={() => setActiveTab('chits')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'chits'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-[#6359E9] text-white shadow-md shadow-[#6359E9]/30'
+                : 'text-[#AEABD8] hover:text-white hover:bg-[#1D1D41]'
             }`}
           >
             <Ticket size={13} /> My Chits ({groups.length})
@@ -940,8 +910,8 @@ export default function SubscriberPortal() {
             onClick={() => setActiveTab('passbook')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'passbook'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-[#6359E9] text-white shadow-md shadow-[#6359E9]/30'
+                : 'text-[#AEABD8] hover:text-white hover:bg-[#1D1D41]'
             }`}
           >
             <History size={13} /> Passbook Ledger ({transactions.length})
@@ -950,8 +920,8 @@ export default function SubscriberPortal() {
             onClick={() => setActiveTab('auctions')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'auctions'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-[#6359E9] text-white shadow-md shadow-[#6359E9]/30'
+                : 'text-[#AEABD8] hover:text-white hover:bg-[#1D1D41]'
             }`}
           >
             <Trophy size={13} /> Auctions ({auctions.length})
@@ -960,8 +930,8 @@ export default function SubscriberPortal() {
             onClick={() => setActiveTab('settings')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'settings'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-[#6359E9] text-white shadow-md shadow-[#6359E9]/30'
+                : 'text-[#AEABD8] hover:text-white hover:bg-[#1D1D41]'
             }`}
           >
             <Settings size={13} /> Settings &amp; Security
@@ -974,24 +944,18 @@ export default function SubscriberPortal() {
         {activeTab === 'overview' && (
           <div className="space-y-4 sm:space-y-5">
             {/* HERO WELCOME & PORTFOLIO SNAPSHOT */}
-            <div className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border p-4 sm:p-6 transition-all ${
-              isDark 
-                ? 'bg-gradient-to-br from-indigo-950/70 via-slate-900 to-slate-900 border-indigo-500/20 text-white shadow-xl' 
-                : 'bg-white border-slate-200 text-slate-900 shadow-xs'
-            }`}>
-              {isDark && (
-                <div className="absolute -top-12 -right-12 w-40 h-40 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
-              )}
+            <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-[#27264E] p-4 sm:p-6 transition-all bg-[#1D1D41] text-white shadow-xl">
+              <div className="absolute -top-12 -right-12 w-40 h-40 bg-[#6359E9]/15 rounded-full blur-2xl pointer-events-none" />
               
               <div className="relative z-10 flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2 text-indigo-400 font-mono text-[11px] uppercase tracking-wider font-bold">
+                <div className="flex items-center gap-2 text-[#64CFF6] font-mono text-[11px] uppercase tracking-wider font-bold">
                   <ShieldCheck size={14} /> Official Chit Passbook
                 </div>
               </div>
 
               {/* GREETING TITLE */}
               <div className="relative z-10 mb-5">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight text-white">
                   வணக்கம், {profile?.fullName || 'Subscriber'}!
                 </h1>
               </div>
@@ -1000,72 +964,52 @@ export default function SubscriberPortal() {
               <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3.5 mt-3.5 sm:mt-4">
                 
                 {/* Stat 1: Total Contributed */}
-                <div className={`rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between ${
-                  isDark 
-                    ? 'bg-[#070b14]/80 backdrop-blur-sm border border-slate-800/90' 
-                    : 'bg-slate-50 border border-slate-200 shadow-2xs'
-                }`}>
-                  <div className={`flex items-center justify-between mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <div className="rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between bg-[#141332] border border-[#27264E]">
+                  <div className="flex items-center justify-between mb-1 text-[#AEABD8]">
                     <span className="text-[10px] font-semibold truncate">Total Paid</span>
-                    <div className={`p-1 rounded-md shrink-0 ${
-                      isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                    }`}>
+                    <div className="p-1 rounded-md shrink-0 bg-[#02B15A]/15 text-[#02B15A]">
                       <Wallet size={13} />
                     </div>
                   </div>
-                  <div className="text-base sm:text-xl font-black font-mono tracking-tight text-emerald-500 whitespace-nowrap">
+                  <div className="text-base sm:text-xl font-black font-mono tracking-tight text-[#02B15A] whitespace-nowrap">
                     ₹{totalPaid.toLocaleString('en-IN')}
                   </div>
-                  <p className={`text-[9px] mt-0.5 truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Across collections</p>
+                  <p className="text-[9px] mt-0.5 truncate text-[#AEABD8]">Across collections</p>
                 </div>
 
                 {/* Stat 2: Enrolled Tickets */}
-                <div className={`rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between ${
-                  isDark 
-                    ? 'bg-[#070b14]/80 backdrop-blur-sm border border-slate-800/90' 
-                    : 'bg-slate-50 border border-slate-200 shadow-2xs'
-                }`}>
-                  <div className={`flex items-center justify-between mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <div className="rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between bg-[#141332] border border-[#27264E]">
+                  <div className="flex items-center justify-between mb-1 text-[#AEABD8]">
                     <span className="text-[10px] font-semibold truncate">Enrolled Chits</span>
-                    <div className={`p-1 rounded-md shrink-0 ${
-                      isDark ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
-                    }`}>
+                    <div className="p-1 rounded-md shrink-0 bg-[#6359E9]/20 text-[#64CFF6]">
                       <Ticket size={13} />
                     </div>
                   </div>
-                  <div className={`text-base sm:text-xl font-black font-mono tracking-tight flex items-baseline gap-1 whitespace-nowrap ${
-                    isDark ? 'text-white' : 'text-slate-900'
-                  }`}>
+                  <div className="text-base sm:text-xl font-black font-mono tracking-tight flex items-baseline gap-1 whitespace-nowrap text-white">
                     <span>{groups.length}</span>
-                    <span className="text-[10px] font-normal text-slate-400">Tickets</span>
+                    <span className="text-[10px] font-normal text-[#AEABD8]">Tickets</span>
                   </div>
-                  <p className={`text-[9px] mt-0.5 truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                  <p className="text-[9px] mt-0.5 truncate text-[#AEABD8]">
                     {groups.map(g => `#${g.ticketNumber}`).join(', ') || 'No tickets'}
                   </p>
                 </div>
 
                 {/* Stat 3: Auction Status */}
-                <div className={`rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between ${
-                  isDark 
-                    ? 'bg-[#070b14]/80 backdrop-blur-sm border border-slate-800/90' 
-                    : 'bg-slate-50 border border-slate-200 shadow-2xs'
-                }`}>
-                  <div className={`flex items-center justify-between mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <div className="rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between bg-[#141332] border border-[#27264E]">
+                  <div className="flex items-center justify-between mb-1 text-[#AEABD8]">
                     <span className="text-[10px] font-semibold truncate">Auction Status</span>
-                    <div className={`p-1 rounded-md shrink-0 ${
-                      isDark ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-600 border border-amber-100'
-                    }`}>
+                    <div className="p-1 rounded-md shrink-0 bg-[#FFBB38]/20 text-[#FFBB38]">
                       <Trophy size={13} />
                     </div>
                   </div>
                   <div className="text-base sm:text-xl font-black font-mono tracking-tight whitespace-nowrap">
                     {wonGroupsCount > 0 ? (
-                      <span className={isDark ? 'text-amber-400' : 'text-amber-600'}>{wonGroupsCount} Won</span>
+                      <span className="text-[#FFBB38]">{wonGroupsCount} Won</span>
                     ) : (
-                      <span className={isDark ? 'text-indigo-400' : 'text-indigo-600'}>Eligible</span>
+                      <span className="text-[#64CFF6]">Eligible</span>
                     )}
                   </div>
-                  <p className={`text-[9px] mt-0.5 truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                  <p className="text-[9px] mt-0.5 truncate text-[#AEABD8]">
                     {wonGroupsCount > 0 ? 'Prize Pot disbursed' : 'Eligible for bidding'}
                   </p>
                 </div>
@@ -1074,10 +1018,10 @@ export default function SubscriberPortal() {
             </div>
 
             {groups.length === 0 ? (
-              <div className={`text-center py-10 rounded-2xl border p-6 ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <Ticket className="mx-auto h-10 w-10 text-slate-400 mb-2" />
-                <h3 className="text-sm font-bold">No Enrolled Chits Found</h3>
-                <p className="text-[11px] text-slate-400 max-w-xs mx-auto mt-1">
+              <div className="text-center py-10 rounded-2xl border border-[#27264E] bg-[#1D1D41] p-6 text-[#AEABD8]">
+                <Ticket className="mx-auto h-10 w-10 text-[#AEABD8] mb-2" />
+                <h3 className="text-sm font-bold text-white">No Enrolled Chits Found</h3>
+                <p className="text-[11px] text-[#AEABD8] max-w-xs mx-auto mt-1">
                   You are not currently enrolled in any chit groups. Contact your Chit Fund Manager.
                 </p>
               </div>
@@ -1104,9 +1048,7 @@ export default function SubscriberPortal() {
                     return (
                       <div
                         key={grp.groupId}
-                        className={`border transition-all rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3.5 ${
-                          isDark ? 'bg-slate-900/90 border-slate-800/90 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
-                        }`}
+                        className="border border-[#27264E] bg-[#1D1D41] hover:border-[#6359E9]/40 transition-all rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3.5"
                       >
                         {/* Header: Name + Value */}
                         <div className="flex items-start justify-between gap-2">
@@ -1215,30 +1157,28 @@ export default function SubscriberPortal() {
                         </div>
 
                         {/* 3-Column Key Metrics */}
-                        <div className={`grid grid-cols-3 gap-1.5 sm:gap-2 p-2.5 rounded-xl border ${
-                          isDark ? 'bg-[#080d17] border-slate-800/80' : 'bg-slate-50 border-slate-200'
-                        }`}>
+                        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-2.5 rounded-xl border bg-[#141332] border-[#27264E]">
                           <div>
-                            <span className="text-[9px] text-slate-400 uppercase font-semibold block">Monthly Due</span>
-                            <div className={`text-xs sm:text-sm font-bold font-mono mt-0.5 whitespace-nowrap ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Monthly Due</span>
+                            <div className="text-xs sm:text-sm font-bold font-mono mt-0.5 whitespace-nowrap text-white">
                               ₹{grp.monthlyInstallment.toLocaleString('en-IN')}
                             </div>
                           </div>
                           <div>
-                            <span className="text-[9px] text-slate-400 uppercase font-semibold block">Total Paid</span>
-                            <div className="text-xs sm:text-sm font-bold font-mono mt-0.5 text-emerald-500 whitespace-nowrap">
+                            <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Total Paid</span>
+                            <div className="text-xs sm:text-sm font-bold font-mono mt-0.5 text-[#02B15A] whitespace-nowrap">
                               ₹{paymentInfo.totalPaidForGroup.toLocaleString('en-IN')}
                             </div>
                           </div>
                           <div>
-                            <span className="text-[9px] text-slate-400 uppercase font-semibold block">Auction Status</span>
+                            <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Auction Status</span>
                             <div className="text-xs sm:text-sm font-bold mt-0.5">
                               {grp.hasWonRegular ? (
-                                <span className="text-amber-500 flex items-center gap-1 font-mono text-xs">
+                                <span className="text-[#FFBB38] flex items-center gap-1 font-mono text-xs">
                                   <Trophy size={12} /> Won
                                 </span>
                               ) : (
-                                <span className="text-emerald-500 flex items-center gap-1 font-mono text-xs">
+                                <span className="text-[#02B15A] flex items-center gap-1 font-mono text-xs">
                                   <CheckCircle2 size={12} /> Eligible
                                 </span>
                               )}
@@ -1247,27 +1187,21 @@ export default function SubscriberPortal() {
                         </div>
 
                         {/* Expandable Month-by-Month Dues Breakdown Matrix */}
-                        <div className={`rounded-xl border overflow-hidden transition-all ${
-                          isDark ? 'bg-[#060a13] border-slate-800' : 'bg-slate-50/80 border-slate-200'
-                        }`}>
+                        <div className="rounded-xl border border-[#27264E] bg-[#141332] overflow-hidden transition-all">
                           <button
                             type="button"
                             onClick={() => toggleBreakdown(grp.groupId)}
-                            className={`w-full p-2.5 sm:p-3 flex items-center justify-between text-left transition-colors cursor-pointer ${
-                              isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-100/80'
-                            }`}
+                            className="w-full p-2.5 sm:p-3 flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[#1D1D41]"
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
-                                isDark ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-700'
-                              }`}>
+                              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 bg-[#6359E9]/20 text-[#64CFF6]">
                                 <Layers size={13} />
                               </div>
                               <div className="min-w-0">
-                                <span className="text-xs font-bold block truncate">
+                                <span className="text-xs font-bold block truncate text-white">
                                   Month-by-Month Dues Breakdown
                                 </span>
-                                <span className="text-[10px] text-slate-400">
+                                <span className="text-[10px] text-[#AEABD8]">
                                   {paymentInfo.monthDues.length} active {paymentInfo.monthDues.length === 1 ? 'cycle' : 'cycles'} (M0 to M{paymentInfo.effectiveCurrentMonth})
                                 </span>
                               </div>
@@ -1275,14 +1209,14 @@ export default function SubscriberPortal() {
 
                             <div className="flex items-center gap-2 shrink-0">
                               <div className="text-right font-mono">
-                                <span className="text-[9px] text-slate-400 uppercase block">Pending</span>
+                                <span className="text-[9px] text-[#AEABD8] uppercase block">Pending</span>
                                 <span className={`text-xs font-black ${
-                                  paymentInfo.isSettled ? 'text-emerald-500' : 'text-rose-500'
+                                  paymentInfo.isSettled ? 'text-[#02B15A]' : 'text-[#E41414]'
                                 }`}>
                                   {paymentInfo.isSettled ? '₹0' : `₹${paymentInfo.outstandingBalance.toLocaleString('en-IN')}`}
                                 </span>
                               </div>
-                              <div className={`p-1 rounded-md ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                              <div className="p-1 rounded-md text-[#AEABD8]">
                                 {isBreakdownExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                               </div>
                             </div>
@@ -1290,9 +1224,7 @@ export default function SubscriberPortal() {
 
                           {/* Expanded Month Matrix */}
                           {isBreakdownExpanded && (
-                            <div className={`p-2.5 sm:p-3 pt-0 border-t space-y-2 animate-in fade-in duration-200 ${
-                              isDark ? 'border-slate-800/80 bg-slate-950/40' : 'border-slate-200/80 bg-white/60'
-                            }`}>
+                            <div className="p-2.5 sm:p-3 pt-0 border-t border-[#27264E] bg-[#141332] space-y-2 animate-in fade-in duration-200">
                               <div className="space-y-1.5 pt-2">
                                 {paymentInfo.monthDues.map((dueItem) => {
                                   return (
@@ -1300,35 +1232,35 @@ export default function SubscriberPortal() {
                                       key={`due-${grp.groupId}-m${dueItem.month}`}
                                       className={`p-2 sm:p-2.5 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
                                         dueItem.status === 'paid'
-                                          ? isDark ? 'bg-emerald-950/20 border-emerald-500/20' : 'bg-emerald-50/50 border-emerald-200'
+                                          ? 'bg-[#02B15A]/10 border-[#02B15A]/20'
                                           : dueItem.status === 'partial'
-                                            ? isDark ? 'bg-amber-950/20 border-amber-500/20' : 'bg-amber-50/60 border-amber-200'
+                                            ? 'bg-[#FFBB38]/10 border-[#FFBB38]/20'
                                             : dueItem.status === 'free_laaba'
-                                              ? isDark ? 'bg-violet-950/20 border-violet-500/20' : 'bg-violet-50/60 border-violet-200'
-                                              : isDark ? 'bg-rose-950/20 border-rose-500/20' : 'bg-rose-50/60 border-rose-200'
+                                              ? 'bg-[#6359E9]/15 border-[#6359E9]/25'
+                                              : 'bg-[#E41414]/10 border-[#E41414]/20'
                                       }`}
                                     >
                                       <div className="flex items-center gap-2 min-w-0">
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black shrink-0 ${
                                           dueItem.month === 0
-                                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                            ? 'bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30'
                                             : dueItem.isCurrentCycle
-                                              ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                                              : isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'
+                                              ? 'bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30'
+                                              : 'bg-[#27264E] text-[#AEABD8]'
                                         }`}>
                                           M{dueItem.month}
                                         </span>
                                         <div className="min-w-0">
-                                          <div className="font-bold flex items-center gap-1.5 flex-wrap text-[11px] sm:text-xs">
+                                          <div className="font-bold flex items-center gap-1.5 flex-wrap text-[11px] sm:text-xs text-white">
                                             <span>{dueItem.monthNameLong}</span>
                                             {dueItem.month === 0 && (
-                                              <span className="text-[9px] font-normal opacity-70">👑 Launch Month</span>
+                                              <span className="text-[9px] font-normal text-[#FFBB38]">👑 Launch Month</span>
                                             )}
                                             {dueItem.isCurrentCycle && (
-                                              <span className="text-[9px] font-normal text-indigo-400">⚡ Current Cycle</span>
+                                              <span className="text-[9px] font-normal text-[#64CFF6]">⚡ Current Cycle</span>
                                             )}
                                           </div>
-                                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                          <div className="text-[10px] text-[#AEABD8] font-mono mt-0.5">
                                             Due Date: {dueItem.formattedDueDate}
                                           </div>
                                         </div>
@@ -1338,12 +1270,12 @@ export default function SubscriberPortal() {
                                       <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 font-mono">
                                         <div className="text-right">
                                           <div className="text-[11px] sm:text-xs">
-                                            <span className="opacity-70">Paid: </span>
-                                            <span className="font-bold text-emerald-500">₹{dueItem.paidAmount.toLocaleString('en-IN')}</span>
-                                            <span className="opacity-50"> / ₹{dueItem.expectedDue.toLocaleString('en-IN')}</span>
+                                            <span className="text-[#AEABD8]">Paid: </span>
+                                            <span className="font-bold text-[#02B15A]">₹{dueItem.paidAmount.toLocaleString('en-IN')}</span>
+                                            <span className="text-[#AEABD8]/60"> / ₹{dueItem.expectedDue.toLocaleString('en-IN')}</span>
                                           </div>
                                           {dueItem.remainingDue > 0 && (
-                                            <div className="text-[10px] font-bold text-rose-500">
+                                            <div className="text-[10px] font-bold text-[#E41414]">
                                               Pending Due: ₹{dueItem.remainingDue.toLocaleString('en-IN')}
                                             </div>
                                           )}
@@ -1351,12 +1283,12 @@ export default function SubscriberPortal() {
 
                                         <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase shrink-0 ${
                                           dueItem.status === 'paid'
-                                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                            ? 'bg-[#02B15A]/20 text-[#02B15A] border border-[#02B15A]/30'
                                             : dueItem.status === 'partial'
-                                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                              ? 'bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30'
                                               : dueItem.status === 'free_laaba'
-                                                ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
-                                                : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                                ? 'bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30'
+                                                : 'bg-[#E41414]/20 text-[#FF5555] border border-[#E41414]/30'
                                         }`}>
                                           {dueItem.status === 'paid'
                                             ? 'Paid'
@@ -1376,38 +1308,32 @@ export default function SubscriberPortal() {
                         </div>
 
                         {/* Laaba Seetu Progress Box */}
-                        <div className={`border rounded-xl p-2.5 sm:p-3 ${
-                          isDark 
-                            ? 'bg-gradient-to-r from-violet-950/40 to-indigo-950/40 border-violet-500/20' 
-                            : 'bg-gradient-to-r from-violet-50 to-indigo-50 border-violet-200'
-                        }`}>
+                        <div className="border border-[#27264E] rounded-xl p-2.5 sm:p-3 bg-[#141332]">
                           <div className="flex items-center justify-between text-[10px] sm:text-xs mb-1.5">
-                            <span className="font-bold text-violet-500 flex items-center gap-1 truncate">
+                            <span className="font-bold text-[#64CFF6] flex items-center gap-1 truncate">
                               <Sparkles size={12} className="shrink-0" />
                               <span>லாப சீட்டு (Laaba Seetu)</span>
                             </span>
-                            <span className={`font-mono font-bold whitespace-nowrap text-[10px] sm:text-xs ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                            <span className="font-mono font-bold whitespace-nowrap text-[10px] sm:text-xs text-white">
                               ₹{grp.kaiIruppuPool.toLocaleString('en-IN')} / ₹{grp.totalValue.toLocaleString('en-IN')}
                             </span>
                           </div>
 
                           {/* Progress Bar */}
-                          <div className={`w-full rounded-full h-2 overflow-hidden border ${
-                            isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-200 border-slate-300'
-                          }`}>
+                          <div className="w-full rounded-full h-2 overflow-hidden border bg-[#1D1D41] border-[#27264E]">
                             <div
                               className={`h-full rounded-full transition-all duration-500 ${
                                 isLaabaReady
-                                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
-                                  : 'bg-gradient-to-r from-violet-500 to-indigo-500'
+                                  ? 'bg-gradient-to-r from-[#02B15A] to-emerald-400'
+                                  : 'bg-gradient-to-r from-[#9C2CF3] to-[#3A6FF9]'
                               }`}
                               style={{ width: `${Math.max(4, laabaProgress)}%` }}
                             />
                           </div>
 
-                          <div className="flex items-center justify-between text-[9px] text-slate-400 mt-1.5">
+                          <div className="flex items-center justify-between text-[9px] text-[#AEABD8] mt-1.5">
                             <span>{isLaabaReady ? '🎉 Target reached! Next month is FREE' : `${laabaProgress}% towards ₹0 Free Month`}</span>
-                            <span className="font-mono text-violet-500 font-bold">{laabaProgress}%</span>
+                            <span className="font-mono text-[#64CFF6] font-bold">{laabaProgress}%</span>
                           </div>
                         </div>
                       </div>
@@ -1418,42 +1344,38 @@ export default function SubscriberPortal() {
             )}
 
             {/* RECENT PASSBOOK TRANSACTIONS */}
-            <div className={`border rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3 ${
-              isDark ? 'bg-slate-900/90 border-slate-800/90' : 'bg-white border-slate-200'
-            }`}>
+            <div className="border border-[#27264E] rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3 bg-[#1D1D41]">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <History className="text-indigo-400" size={13} /> Recent Collections ({transactions.length})
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#AEABD8] flex items-center gap-1.5">
+                  <History className="text-[#64CFF6]" size={13} /> Recent Collections ({transactions.length})
                 </h3>
                 <button
                   onClick={() => setActiveTab('passbook')}
-                  className="text-[11px] text-indigo-400 hover:text-indigo-500 font-bold flex items-center gap-0.5"
+                  className="text-[11px] text-[#64CFF6] hover:text-[#64CFF6]/80 font-bold flex items-center gap-0.5 cursor-pointer"
                 >
                   View All <ChevronRight size={13} />
                 </button>
               </div>
 
               {transactions.length === 0 ? (
-                <div className="text-center py-6 text-slate-400 text-[11px]">
+                <div className="text-center py-6 text-[#AEABD8] text-[11px]">
                   No verified collection receipts yet.
                 </div>
               ) : (
-                <div className={`divide-y ${isDark ? 'divide-slate-800/80' : 'divide-slate-100'}`}>
+                <div className="divide-y divide-[#27264E]">
                   {transactions.slice(0, 4).map((tx) => (
                     <div 
                       key={tx.id} 
                       onClick={() => setSelectedTx(tx)}
-                      className={`py-2.5 flex items-center justify-between gap-2.5 cursor-pointer rounded-lg px-1 transition-all active:scale-[0.99] ${
-                        isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
-                      }`}
+                      className="py-2.5 flex items-center justify-between gap-2.5 cursor-pointer rounded-lg px-1 transition-all active:scale-[0.99] hover:bg-[#141332]"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center justify-center shrink-0">
                           <ArrowDownLeft size={14} />
                         </div>
                         <div className="min-w-0">
-                          <div className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{tx.groupName}</div>
-                          <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.2">
+                          <div className="text-xs font-bold truncate text-white">{tx.groupName}</div>
+                          <div className="text-[10px] text-[#AEABD8] font-mono flex items-center gap-1.5 mt-0.2">
                             <span>
                               {new Date(tx.createdAt).toLocaleDateString('en-IN', {
                                 day: '2-digit',
@@ -1461,9 +1383,7 @@ export default function SubscriberPortal() {
                               })}
                             </span>
                             <span>•</span>
-                            <span className={`uppercase text-[9px] px-1 py-0.2 rounded font-mono ${
-                              isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
-                            }`}>
+                            <span className="uppercase text-[9px] px-1 py-0.2 rounded font-mono bg-[#141332] text-[#AEABD8] border border-[#27264E]">
                               {!tx.walletType || tx.walletType.toLowerCase().includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
                             </span>
                           </div>
@@ -1502,26 +1422,22 @@ export default function SubscriberPortal() {
                 return (
                   <div
                     key={grp.groupId}
-                    className={`border rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3 ${
-                      isDark ? 'bg-slate-900/90 border-slate-800/90' : 'bg-white border-slate-200'
-                    }`}
+                    className="border border-[#27264E] bg-[#1D1D41] rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 text-[10px] font-bold font-mono border border-indigo-500/20 mb-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#6359E9]/20 text-[#64CFF6] text-[10px] font-bold font-mono border border-[#6359E9]/30 mb-1">
                           Ticket #{grp.ticketNumber}
                         </span>
-                        <h3 className={`text-sm sm:text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{grp.groupName}</h3>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
+                        <h3 className="text-sm sm:text-base font-black text-white">{grp.groupName}</h3>
+                        <p className="text-[10px] text-[#AEABD8] mt-0.5">
                           {grp.durationMonths} Months Duration • {grp.memberCount} Members • Month {grp.currentMonth} ({monthNameLong}) of {grp.durationMonths}
                         </p>
                       </div>
 
-                      <div className={`text-right font-mono shrink-0 p-2 rounded-xl border ${
-                        isDark ? 'bg-[#080d17] border-slate-800' : 'bg-slate-50 border-slate-200'
-                      }`}>
-                        <span className="text-[9px] text-slate-400 uppercase font-semibold">Value</span>
-                        <div className="text-sm font-black text-emerald-500 whitespace-nowrap">
+                      <div className="text-right font-mono shrink-0 p-2 rounded-xl border bg-[#141332] border-[#27264E]">
+                        <span className="text-[9px] text-[#AEABD8] uppercase font-semibold">Value</span>
+                        <div className="text-sm font-black text-[#02B15A] whitespace-nowrap">
                           ₹{grp.totalValue.toLocaleString('en-IN')}
                         </div>
                       </div>
@@ -1530,24 +1446,18 @@ export default function SubscriberPortal() {
                     {/* Payment Status Alert Banner */}
                     <div className={`p-2.5 rounded-xl border flex flex-col xs:flex-row xs:items-center justify-between gap-2 ${
                       paymentInfo.isSettled
-                        ? isDark
-                          ? 'bg-emerald-950/30 border-emerald-500/20 text-emerald-300'
-                          : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        ? 'bg-[#02B15A]/15 border-[#02B15A]/30 text-[#02B15A]'
                         : paymentInfo.isPastDueDate
-                          ? isDark
-                            ? 'bg-rose-950/30 border-rose-500/20 text-rose-300'
-                            : 'bg-rose-50 border-rose-200 text-rose-800'
-                          : isDark
-                            ? 'bg-amber-950/30 border-amber-500/20 text-amber-300'
-                            : 'bg-amber-50/80 border-amber-200 text-amber-900'
+                          ? 'bg-[#E41414]/15 border-[#E41414]/30 text-[#FF5555]'
+                          : 'bg-[#FFBB38]/15 border-[#FFBB38]/30 text-[#FFBB38]'
                     }`}>
                       <div className="flex items-center gap-2 min-w-0">
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                           paymentInfo.isSettled
-                            ? isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+                            ? 'bg-[#02B15A]/20 text-[#02B15A]'
                             : paymentInfo.isPastDueDate
-                              ? isDark ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-700'
-                              : isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'
+                              ? 'bg-[#E41414]/20 text-[#FF5555]'
+                              : 'bg-[#FFBB38]/20 text-[#FFBB38]'
                         }`}>
                           {paymentInfo.isSettled ? (
                             <CheckCircle2 size={15} />
@@ -1565,14 +1475,14 @@ export default function SubscriberPortal() {
                               paymentInfo.pendingMonthsCount > 1 ? (
                                 <>
                                   <span className="font-mono font-black">({paymentInfo.pendingMonthsCount} Mos • {monthNameShort}) Overdue:</span>
-                                  <span className="font-mono font-black text-rose-500 underline decoration-rose-500/30">
+                                  <span className="font-mono font-black text-[#E41414] underline decoration-[#E41414]/30">
                                     ₹{paymentInfo.outstandingBalance.toLocaleString('en-IN')}
                                   </span>
                                 </>
                               ) : (
                                 <>
                                   <span className="font-mono font-black">(M{grp.currentMonth} • {monthNameShort}) Past Due Date:</span>
-                                  <span className="font-mono font-black text-rose-500 underline decoration-rose-500/30">
+                                  <span className="font-mono font-black text-[#E41414] underline decoration-[#E41414]/30">
                                     ₹{paymentInfo.outstandingBalance.toLocaleString('en-IN')}
                                   </span>
                                 </>
@@ -1580,7 +1490,7 @@ export default function SubscriberPortal() {
                             ) : (
                               <>
                                 <span className="font-mono font-black">(M{grp.currentMonth} • {monthNameShort}) Due in {paymentInfo.daysRemaining} days:</span>
-                                <span className={`font-mono font-black ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
+                                <span className="font-mono font-black text-[#FFBB38]">
                                   ₹{paymentInfo.outstandingBalance.toLocaleString('en-IN')}
                                 </span>
                               </>
@@ -1600,40 +1510,38 @@ export default function SubscriberPortal() {
 
                       <span className={`text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded-md self-start xs:self-center shrink-0 ${
                         paymentInfo.isSettled
-                          ? isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-200/80 text-emerald-900'
+                          ? 'bg-[#02B15A]/20 text-[#02B15A] border border-[#02B15A]/30'
                           : paymentInfo.isPastDueDate
-                            ? isDark ? 'bg-rose-500/20 text-rose-300' : 'bg-rose-200/80 text-rose-900'
-                            : isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-200/80 text-amber-900'
+                            ? 'bg-[#E41414]/20 text-[#FF5555] border border-[#E41414]/30'
+                            : 'bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30'
                       }`}>
                         {paymentInfo.isSettled ? 'Paid' : paymentInfo.isPastDueDate ? 'Overdue' : 'Upcoming'}
                       </span>
                     </div>
 
                     {/* 3-Column Key Metrics */}
-                    <div className={`grid grid-cols-3 gap-1.5 sm:gap-2 p-2.5 rounded-xl border ${
-                      isDark ? 'bg-[#080d17] border-slate-800/80' : 'bg-slate-50 border-slate-200'
-                    }`}>
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-2.5 rounded-xl border bg-[#141332] border-[#27264E]">
                       <div>
-                        <span className="text-[9px] text-slate-400 uppercase font-semibold block">Monthly Due</span>
-                        <div className={`text-xs sm:text-sm font-bold font-mono mt-0.5 whitespace-nowrap ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Monthly Due</span>
+                        <div className="text-xs sm:text-sm font-bold font-mono mt-0.5 whitespace-nowrap text-white">
                           ₹{grp.monthlyInstallment.toLocaleString('en-IN')}
                         </div>
                       </div>
                       <div>
-                        <span className="text-[9px] text-slate-400 uppercase font-semibold block">Total Paid</span>
-                        <div className="text-xs sm:text-sm font-bold font-mono mt-0.5 text-emerald-500 whitespace-nowrap">
+                        <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Total Paid</span>
+                        <div className="text-xs sm:text-sm font-bold font-mono mt-0.5 text-[#02B15A] whitespace-nowrap">
                           ₹{paymentInfo.totalPaidForGroup.toLocaleString('en-IN')}
                         </div>
                       </div>
                       <div>
-                        <span className="text-[9px] text-slate-400 uppercase font-semibold block">Auction Status</span>
+                        <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Auction Status</span>
                         <div className="text-xs sm:text-sm font-bold mt-0.5">
                           {grp.hasWonRegular ? (
-                            <span className="text-amber-500 flex items-center gap-1 font-mono text-xs">
+                            <span className="text-[#FFBB38] flex items-center gap-1 font-mono text-xs">
                               <Trophy size={12} /> Won
                             </span>
                           ) : (
-                            <span className="text-emerald-500 flex items-center gap-1 font-mono text-xs">
+                            <span className="text-[#02B15A] flex items-center gap-1 font-mono text-xs">
                               <CheckCircle2 size={12} /> Eligible
                             </span>
                           )}
@@ -1652,13 +1560,13 @@ export default function SubscriberPortal() {
           <div className="space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-0.5">
               <div>
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <History className="text-indigo-400" size={14} /> Official Member Passbook
+                <h2 className="text-xs font-bold uppercase tracking-wider text-[#AEABD8] flex items-center gap-1.5">
+                  <History className="text-[#64CFF6]" size={14} /> Official Member Passbook
                 </h2>
               </div>
               <div className="text-left sm:text-right font-mono shrink-0">
-                <span className="text-[10px] text-slate-400 uppercase">Verified Sum: </span>
-                <span className="text-xs sm:text-sm font-black text-emerald-500">
+                <span className="text-[10px] text-[#AEABD8] uppercase">Verified Sum: </span>
+                <span className="text-xs sm:text-sm font-black text-[#02B15A]">
                   ₹{transactions
                     .filter((tx) => selectedPassbookGroup === 'all' || tx.groupId === selectedPassbookGroup || tx.groupName === selectedPassbookGroup)
                     .reduce((acc, tx) => acc + Number(tx.amount || 0), 0)
@@ -1674,17 +1582,15 @@ export default function SubscriberPortal() {
                   onClick={() => setSelectedPassbookGroup('all')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shrink-0 active:scale-95 cursor-pointer flex items-center gap-1.5 ${
                     selectedPassbookGroup === 'all'
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                      : isDark
-                        ? 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
-                        : 'bg-white text-slate-600 border-slate-200 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs'
+                      : 'bg-[#141332] text-[#AEABD8] border-[#27264E] hover:text-white hover:bg-[#1D1D41]'
                   }`}
                 >
                   <span>All Groups</span>
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
                     selectedPassbookGroup === 'all'
                       ? 'bg-white/20 text-white'
-                      : isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
+                      : 'bg-[#27264E] text-[#AEABD8]'
                   }`}>
                     {transactions.length}
                   </span>
@@ -1699,17 +1605,15 @@ export default function SubscriberPortal() {
                       onClick={() => setSelectedPassbookGroup(grp.groupId)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shrink-0 active:scale-95 cursor-pointer flex items-center gap-1.5 ${
                         isSelected
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : isDark
-                            ? 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
-                            : 'bg-white text-slate-600 border-slate-200 hover:text-slate-900 hover:bg-slate-50'
+                          ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs'
+                          : 'bg-[#141332] text-[#AEABD8] border-[#27264E] hover:text-white hover:bg-[#1D1D41]'
                       }`}
                     >
                       <span className="truncate max-w-[160px]">{grp.groupName}</span>
                       <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
                         isSelected
                           ? 'bg-white/20 text-white'
-                          : isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
+                          : 'bg-[#27264E] text-[#AEABD8]'
                       }`}>
                         {grpTxCount}
                       </span>
@@ -1720,12 +1624,10 @@ export default function SubscriberPortal() {
             )}
 
             {transactions.filter((tx) => selectedPassbookGroup === 'all' || tx.groupId === selectedPassbookGroup || tx.groupName === selectedPassbookGroup).length === 0 ? (
-              <div className={`text-center py-10 rounded-2xl border p-6 ${
-                isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
-              }`}>
-                <FileText className="mx-auto h-10 w-10 text-slate-400 mb-2" />
-                <h3 className="text-sm font-bold">No Passbook Entries Recorded</h3>
-                <p className="text-[11px] text-slate-400 max-w-xs mx-auto mt-1">
+              <div className="text-center py-10 rounded-2xl border border-[#27264E] bg-[#1D1D41] p-6 text-[#AEABD8]">
+                <FileText className="mx-auto h-10 w-10 text-[#AEABD8] mb-2" />
+                <h3 className="text-sm font-bold text-white">No Passbook Entries Recorded</h3>
+                <p className="text-[11px] text-[#AEABD8] max-w-xs mx-auto mt-1">
                   {selectedPassbookGroup === 'all' 
                     ? 'Once your installments are recorded by the counter manager, entries will appear here.'
                     : 'No collections recorded yet for this chit group.'}
@@ -1739,17 +1641,15 @@ export default function SubscriberPortal() {
                     <div
                       key={tx.id}
                       onClick={() => setSelectedTx(tx)}
-                      className={`border transition-all rounded-xl p-3 shadow-2xs flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99] ${
-                        isDark ? 'bg-slate-900/90 border-slate-800/90 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
-                      }`}
+                      className="border border-[#27264E] bg-[#141332] hover:bg-[#1D1D41] transition-all rounded-xl p-3 shadow-2xs flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99]"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center justify-center shrink-0">
                           <CheckCircle2 size={16} />
                         </div>
                         <div className="min-w-0">
-                          <div className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{tx.groupName}</div>
-                          <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
+                          <div className="text-xs font-bold truncate text-white">{tx.groupName}</div>
+                          <div className="text-[10px] text-[#AEABD8] font-mono flex items-center gap-1.5 mt-0.5">
                             <span>
                               {new Date(tx.createdAt).toLocaleDateString('en-IN', {
                                 day: '2-digit',
@@ -1758,9 +1658,7 @@ export default function SubscriberPortal() {
                               })}
                             </span>
                             <span>•</span>
-                            <span className={`uppercase text-[9px] px-1.5 py-0.2 rounded font-mono ${
-                              isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
-                            }`}>
+                            <span className="uppercase text-[9px] px-1.5 py-0.2 rounded font-mono bg-[#27264E] text-[#AEABD8]">
                               {!tx.walletType || tx.walletType.toLowerCase().includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
                             </span>
                           </div>
@@ -1768,10 +1666,10 @@ export default function SubscriberPortal() {
                       </div>
 
                       <div className="text-right font-mono shrink-0">
-                        <div className="text-sm font-black text-emerald-500">
+                        <div className="text-sm font-black text-[#02B15A]">
                           +₹{Number(tx.amount).toLocaleString('en-IN')}
                         </div>
-                        <span className="text-[9px] uppercase font-bold text-slate-400">
+                        <span className="text-[9px] uppercase font-bold text-[#AEABD8]">
                           {tx.status}
                         </span>
                       </div>
@@ -1852,12 +1750,10 @@ export default function SubscriberPortal() {
                 </h2>
 
                 {auctions.length === 0 ? (
-                  <div className={`text-center py-10 rounded-2xl border p-6 ${
-                    isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
-                  }`}>
-                    <Trophy className="mx-auto h-10 w-10 text-slate-400 mb-2" />
-                    <h3 className="text-sm font-bold">No Auction Rounds Conducted Yet</h3>
-                    <p className="text-[11px] text-slate-400 max-w-xs mx-auto mt-1">
+                  <div className="text-center py-10 rounded-2xl border border-[#27264E] bg-[#1D1D41] p-6 text-[#AEABD8]">
+                    <Trophy className="mx-auto h-10 w-10 text-[#AEABD8] mb-2" />
+                    <h3 className="text-sm font-bold text-white">No Auction Rounds Conducted Yet</h3>
+                    <p className="text-[11px] text-[#AEABD8] max-w-xs mx-auto mt-1">
                       Starting Month 1, live bidding discounts and winner announcements will be published here.
                     </p>
                   </div>
@@ -1868,19 +1764,17 @@ export default function SubscriberPortal() {
                         key={auc.id}
                         className={`rounded-2xl p-3.5 sm:p-5 border transition-all shadow-sm space-y-2.5 ${
                           auc.isCurrentSubscriberWinner
-                            ? isDark 
-                              ? 'bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-900 border-amber-500/40' 
-                              : 'bg-gradient-to-br from-amber-50 via-white to-white border-amber-300'
-                            : isDark ? 'bg-slate-900/90 border-slate-800/90' : 'bg-white border-slate-200'
+                            ? 'bg-[#1D1D41] border-[#FFBB38]/50 text-white shadow-xl' 
+                            : 'bg-[#1D1D41] border-[#27264E] text-white'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 text-[10px] font-bold font-mono border border-indigo-500/20 mb-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#6359E9]/20 text-[#64CFF6] text-[10px] font-bold font-mono border border-[#6359E9]/30 mb-1">
                               Month {auc.month} Auction
                             </span>
-                            <h3 className={`text-xs sm:text-sm font-black truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{auc.groupName}</h3>
-                            <p className="text-[10px] text-slate-400">
+                            <h3 className="text-xs sm:text-sm font-black truncate text-white">{auc.groupName}</h3>
+                            <p className="text-[10px] text-[#AEABD8]">
                               {new Date(auc.createdAt).toLocaleDateString('en-IN', {
                                 day: 'numeric',
                                 month: 'short',
@@ -1890,34 +1784,32 @@ export default function SubscriberPortal() {
                           </div>
 
                           {auc.isLaabaSeetu && (
-                            <span className="px-2 py-0.5 rounded-md bg-violet-500/20 text-violet-500 text-[10px] font-bold border border-violet-500/30 shrink-0">
+                            <span className="px-2 py-0.5 rounded-md bg-[#6359E9]/20 text-[#64CFF6] text-[10px] font-bold border border-[#6359E9]/30 shrink-0">
                               🎉 Laaba Seetu
                             </span>
                           )}
                         </div>
 
                         {/* Breakdown */}
-                        <div className={`rounded-xl p-2.5 border space-y-1.5 text-xs ${
-                          isDark ? 'bg-[#080d17] border-slate-800' : 'bg-slate-50 border-slate-200'
-                        }`}>
+                        <div className="rounded-xl p-2.5 border border-[#27264E] bg-[#141332] space-y-1.5 text-xs">
                           <div className="flex items-center justify-between">
-                            <span className="text-[11px] text-slate-400">Winner</span>
-                            <span className={`text-[11px] font-bold flex items-center gap-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                              <Trophy size={12} className="text-amber-500" />
+                            <span className="text-[11px] text-[#AEABD8]">Winner</span>
+                            <span className="text-[11px] font-bold flex items-center gap-1 text-white">
+                              <Trophy size={12} className="text-[#FFBB38]" />
                               {auc.winnerName} {auc.isCurrentSubscriberWinner && '(You!)'}
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between">
-                            <span className="text-[11px] text-slate-400">Winning Discount</span>
-                            <span className="text-[11px] font-mono font-bold text-rose-500">
+                            <span className="text-[11px] text-[#AEABD8]">Winning Discount</span>
+                            <span className="text-[11px] font-mono font-bold text-[#E41414]">
                               -₹{Number(auc.winningDiscount).toLocaleString('en-IN')}
                             </span>
                           </div>
 
-                          <div className={`pt-1.5 border-t flex items-center justify-between ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-                            <span className="text-[11px] font-semibold text-indigo-500">Winner Net Payout</span>
-                            <span className="text-xs sm:text-sm font-mono font-black text-emerald-500">
+                          <div className="pt-1.5 border-t border-[#27264E] flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-[#64CFF6]">Winner Net Payout</span>
+                            <span className="text-xs sm:text-sm font-mono font-black text-[#02B15A]">
                               ₹{Number(auc.netPayout).toLocaleString('en-IN')}
                             </span>
                           </div>
@@ -1936,36 +1828,34 @@ export default function SubscriberPortal() {
           <div className="space-y-6 animate-in fade-in duration-150">
             {/* Header description */}
             <div>
-              <h2 className={`text-base sm:text-lg font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
                 Account Settings &amp; Security
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-[#AEABD8] mt-0.5">
                 Manage your passbook login PIN, profile information, and app display preferences.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Card 1: Change MPIN / Passcode */}
-              <div className={`rounded-2xl border p-5 shadow-sm space-y-4 ${
-                isDark ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-              }`}>
+              <div className="rounded-2xl border border-[#27264E] bg-[#1D1D41] text-white p-5 shadow-sm space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 flex items-center justify-center shrink-0">
                       <KeyRound size={18} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold">Security PIN (MPIN)</h3>
-                      <p className="text-[11px] text-slate-400">Used for signing in to your Passbook Portal</p>
+                      <h3 className="text-sm font-bold text-white">Security PIN (MPIN)</h3>
+                      <p className="text-[11px] text-[#AEABD8]">Used for signing in to your Passbook Portal</p>
                     </div>
                   </div>
 
                   {profile?.isDefaultPin || profile?.mpin === '1234' ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1 shrink-0">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFBB38]/15 text-[#FFBB38] border border-[#FFBB38]/30 flex items-center gap-1 shrink-0">
                       <AlertTriangle size={11} /> Default 1234
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shrink-0">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center gap-1 shrink-0">
                       <ShieldCheck size={11} /> Custom PIN
                     </span>
                   )}
@@ -1973,14 +1863,14 @@ export default function SubscriberPortal() {
 
                 {/* Alerts */}
                 {pinSuccessMessage && (
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                  <div className="p-3 rounded-xl bg-[#02B15A]/10 border border-[#02B15A]/30 text-[#02B15A] text-xs flex items-center gap-2">
                     <CheckCircle2 size={16} className="shrink-0" />
                     <span>{pinSuccessMessage}</span>
                   </div>
                 )}
 
                 {pinErrorMessage && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+                  <div className="p-3 rounded-xl bg-[#E41414]/10 border border-[#E41414]/30 text-[#FF5555] text-xs flex items-center gap-2">
                     <AlertCircle size={16} className="shrink-0" />
                     <span>{pinErrorMessage}</span>
                   </div>
@@ -1989,7 +1879,7 @@ export default function SubscriberPortal() {
                 <form onSubmit={handleUpdatePinFromSettings} className="space-y-3 pt-1">
                   {/* Current PIN */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    <label className="block text-[11px] font-semibold text-[#AEABD8] mb-1">
                       Current PIN {(!profile?.isDefaultPin && profile?.mpin !== '1234') ? '' : '(Default is 1234)'}
                     </label>
                     <div className="relative">
@@ -2001,16 +1891,12 @@ export default function SubscriberPortal() {
                         placeholder="Enter current PIN"
                         value={currentPinInput}
                         onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
-                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all outline-none focus:ring-2 focus:ring-indigo-500 ${
-                          isDark
-                            ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
-                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
-                        }`}
+                        className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#27264E] bg-[#141332] text-white placeholder:text-[#AEABD8]/40 transition-all outline-none focus:border-[#6359E9]"
                       />
                       <button
                         type="button"
                         onClick={() => setShowCurrentPin(!showCurrentPin)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEABD8] hover:text-white transition-colors cursor-pointer"
                       >
                         {showCurrentPin ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
@@ -2019,7 +1905,7 @@ export default function SubscriberPortal() {
 
                   {/* New PIN */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    <label className="block text-[11px] font-semibold text-[#AEABD8] mb-1">
                       New 4 to 6 Digit PIN
                     </label>
                     <div className="relative">
@@ -2031,16 +1917,12 @@ export default function SubscriberPortal() {
                         placeholder="Enter 4-6 digit PIN"
                         value={newPinInput}
                         onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
-                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all outline-none focus:ring-2 focus:ring-indigo-500 ${
-                          isDark
-                            ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
-                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
-                        }`}
+                        className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#27264E] bg-[#141332] text-white placeholder:text-[#AEABD8]/40 transition-all outline-none focus:border-[#6359E9]"
                       />
                       <button
                         type="button"
                         onClick={() => setShowNewPin(!showNewPin)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEABD8] hover:text-white transition-colors cursor-pointer"
                       >
                         {showNewPin ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
@@ -2049,7 +1931,7 @@ export default function SubscriberPortal() {
 
                   {/* Confirm PIN */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    <label className="block text-[11px] font-semibold text-[#AEABD8] mb-1">
                       Confirm New PIN
                     </label>
                     <div className="relative">
@@ -2061,16 +1943,12 @@ export default function SubscriberPortal() {
                         placeholder="Re-enter new PIN"
                         value={confirmPinInput}
                         onChange={(e) => setConfirmPinInput(e.target.value.replace(/\D/g, ''))}
-                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all outline-none focus:ring-2 focus:ring-indigo-500 ${
-                          isDark
-                            ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
-                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
-                        }`}
+                        className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#27264E] bg-[#141332] text-white placeholder:text-[#AEABD8]/40 transition-all outline-none focus:border-[#6359E9]"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPin(!showConfirmPin)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEABD8] hover:text-white transition-colors cursor-pointer"
                       >
                         {showConfirmPin ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
@@ -2080,7 +1958,7 @@ export default function SubscriberPortal() {
                   <button
                     type="submit"
                     disabled={isSavingPin || !newPinInput || !confirmPinInput}
-                    className="w-full mt-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                    className="w-full mt-2 py-2.5 px-4 rounded-xl bg-[#6359E9] hover:bg-[#6F64FF] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                   >
                     {isSavingPin ? (
                       <>
@@ -2097,39 +1975,35 @@ export default function SubscriberPortal() {
 
               {/* Card 2: Account Profile & Passbook Info */}
               <div className="space-y-5">
-                <div className={`rounded-2xl border p-5 shadow-sm space-y-3.5 ${
-                  isDark ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-                }`}>
+                <div className="rounded-2xl border border-[#27264E] bg-[#1D1D41] text-white p-5 shadow-sm space-y-3.5">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center justify-center shrink-0">
                       <User size={18} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold">Subscriber Profile</h3>
-                      <p className="text-[11px] text-slate-400">Verified membership account details</p>
+                      <h3 className="text-sm font-bold text-white">Subscriber Profile</h3>
+                      <p className="text-[11px] text-[#AEABD8]">Verified membership account details</p>
                     </div>
                   </div>
 
-                  <div className={`rounded-xl p-3 border space-y-2 text-xs ${
-                    isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
-                  }`}>
+                  <div className="rounded-xl p-3 border border-[#27264E] bg-[#141332] space-y-2 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Full Name</span>
-                      <span className="font-bold">{profile?.fullName || 'Subscriber'}</span>
+                      <span className="text-[#AEABD8]">Full Name</span>
+                      <span className="font-bold text-white">{profile?.fullName || 'Subscriber'}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Phone Number</span>
-                      <span className="font-mono font-bold text-indigo-400">{profile?.phoneNumber || '—'}</span>
+                      <span className="text-[#AEABD8]">Phone Number</span>
+                      <span className="font-mono font-bold text-[#64CFF6]">{profile?.phoneNumber || '—'}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Account Type</span>
-                      <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 text-[10px] font-bold border border-indigo-500/20 uppercase">
+                      <span className="text-[#AEABD8]">Account Type</span>
+                      <span className="px-2 py-0.5 rounded-md bg-[#6359E9]/20 text-[#64CFF6] text-[10px] font-bold border border-[#6359E9]/30 uppercase">
                         {profile?.role || 'Subscriber'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Passbook QR Token</span>
-                      <span className="font-mono text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                      <span className="text-[#AEABD8]">Passbook QR Token</span>
+                      <span className="font-mono text-[11px] text-[#02B15A] font-semibold flex items-center gap-1">
                         <Check size={12} /> Active &amp; Verified
                       </span>
                     </div>
@@ -2137,37 +2011,31 @@ export default function SubscriberPortal() {
                 </div>
 
                 {/* Card 3: Display Preferences */}
-                <div className={`rounded-2xl border p-5 shadow-sm space-y-3.5 ${
-                  isDark ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-                }`}>
+                <div className="rounded-2xl border border-[#27264E] bg-[#1D1D41] text-white p-5 shadow-sm space-y-3.5">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 flex items-center justify-center shrink-0">
                       <Sliders size={18} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold">Display &amp; Accessibility</h3>
-                      <p className="text-[11px] text-slate-400">Visual theme and text scaling options</p>
+                      <h3 className="text-sm font-bold text-white">Display &amp; Accessibility</h3>
+                      <p className="text-[11px] text-[#AEABD8]">Visual theme and text scaling options</p>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
                     <div>
-                      <span className="text-xs font-semibold block">Interface Theme</span>
-                      <span className="text-[10px] text-slate-400">
-                        Currently: {isDark ? '🌙 Dark Mode' : '☀️ Light Mode'}
+                      <span className="text-xs font-semibold block text-white">Interface Theme</span>
+                      <span className="text-[10px] text-[#AEABD8]">
+                        Currently: 🌙 Cyber Fintech Dark
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={toggleTheme}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer ${
-                        isDark
-                          ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
-                          : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200 shadow-2xs'
-                      }`}
+                      className="px-3 py-1.5 rounded-xl border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
                     >
-                      {isDark ? <Sun size={13} className="text-amber-400" /> : <Moon size={13} className="text-amber-700" />}
-                      <span>Switch to {isDark ? 'Light' : 'Dark'}</span>
+                      <Moon size={13} className="text-[#FFBB38]" />
+                      <span>Dark</span>
                     </button>
                   </div>
                 </div>
@@ -2210,28 +2078,26 @@ export default function SubscriberPortal() {
       {/* 4.7. DEFAULT PIN (1234) REMINDER MODAL POPUP */}
       {showDefaultPinModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className={`w-full max-w-md border rounded-3xl p-6 shadow-2xl space-y-4 ${
-            isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
+          <div className="w-full max-w-md border border-[#27264E] bg-[#1D1D41] text-white rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex items-start gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 shadow-inner">
+              <div className="w-11 h-11 rounded-2xl bg-[#FFBB38]/15 border border-[#FFBB38]/30 text-[#FFBB38] flex items-center justify-center shrink-0 shadow-inner">
                 <Shield size={22} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30 uppercase tracking-wider">
                     Security Recommendation
                   </span>
                 </div>
-                <h3 className="text-base font-black tracking-tight mt-1">Change Default PIN</h3>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  Your account is currently using the default PIN (<span className="font-mono font-bold text-amber-400">1234</span>). For your privacy and passbook protection, please set a private security PIN.
+                <h3 className="text-base font-black tracking-tight mt-1 text-white">Change Default PIN</h3>
+                <p className="text-xs text-[#AEABD8] mt-1 leading-relaxed">
+                  Your account is currently using the default PIN (<span className="font-mono font-bold text-[#FFBB38]">1234</span>). For your privacy and passbook protection, please set a private security PIN.
                 </p>
               </div>
             </div>
 
             {modalError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-[#E41414]/10 border border-[#E41414]/30 text-[#FF5555] text-xs flex items-center gap-2">
                 <AlertCircle size={15} className="shrink-0" />
                 <span>{modalError}</span>
               </div>
@@ -2239,7 +2105,7 @@ export default function SubscriberPortal() {
 
             <form onSubmit={handleUpdatePinFromModal} className="space-y-3 pt-1">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                <label className="block text-[11px] font-semibold text-[#AEABD8] mb-1">
                   New 4-6 Digit Security PIN
                 </label>
                 <div className="relative">
@@ -2251,16 +2117,12 @@ export default function SubscriberPortal() {
                     placeholder="Enter new PIN (e.g. 5829)"
                     value={modalNewPin}
                     onChange={(e) => setModalNewPin(e.target.value.replace(/\D/g, ''))}
-                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all outline-none focus:ring-2 focus:ring-indigo-500 ${
-                      isDark
-                        ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
-                    }`}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#27264E] bg-[#141332] text-white placeholder:text-[#AEABD8]/40 transition-all outline-none focus:border-[#6359E9]"
                   />
                   <button
                     type="button"
                     onClick={() => setModalShowNewPin(!modalShowNewPin)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEABD8] hover:text-white"
                   >
                     {modalShowNewPin ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
@@ -2268,7 +2130,7 @@ export default function SubscriberPortal() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                <label className="block text-[11px] font-semibold text-[#AEABD8] mb-1">
                   Confirm New PIN
                 </label>
                 <div className="relative">
@@ -2280,16 +2142,12 @@ export default function SubscriberPortal() {
                     placeholder="Confirm new PIN"
                     value={modalConfirmPin}
                     onChange={(e) => setModalConfirmPin(e.target.value.replace(/\D/g, ''))}
-                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all outline-none focus:ring-2 focus:ring-indigo-500 ${
-                      isDark
-                        ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
-                    }`}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#27264E] bg-[#141332] text-white placeholder:text-[#AEABD8]/40 transition-all outline-none focus:border-[#6359E9]"
                   />
                   <button
                     type="button"
                     onClick={() => setModalShowConfirmPin(!modalShowConfirmPin)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEABD8] hover:text-white"
                   >
                     {modalShowConfirmPin ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
@@ -2299,7 +2157,7 @@ export default function SubscriberPortal() {
               <button
                 type="submit"
                 disabled={modalIsSaving || !modalNewPin || !modalConfirmPin}
-                className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
+                className="w-full py-2.5 px-4 rounded-xl bg-[#6359E9] hover:bg-[#6F64FF] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
               >
                 {modalIsSaving ? (
                   <>
@@ -2314,13 +2172,11 @@ export default function SubscriberPortal() {
             </form>
 
             {/* Actions for reminder dismissal */}
-            <div className={`pt-3 border-t flex items-center justify-between text-xs ${
-              isDark ? 'border-slate-800' : 'border-slate-200'
-            }`}>
+            <div className="pt-3 border-t border-[#27264E] flex items-center justify-between text-xs">
               <button
                 type="button"
                 onClick={handleDismissModalNever}
-                className="text-slate-400 hover:text-slate-300 text-[11px] underline underline-offset-2 transition-colors cursor-pointer"
+                className="text-[#AEABD8] hover:text-white text-[11px] underline underline-offset-2 transition-colors cursor-pointer"
               >
                 Never remind again
               </button>
@@ -2328,11 +2184,7 @@ export default function SubscriberPortal() {
               <button
                 type="button"
                 onClick={handleDismissModalLater}
-                className={`px-3 py-1.5 rounded-xl font-semibold text-[11px] transition-colors cursor-pointer ${
-                  isDark
-                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
+                className="px-3 py-1.5 rounded-xl font-semibold text-[11px] transition-colors cursor-pointer bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border border-[#27264E]"
               >
                 Do it later
               </button>
@@ -2344,17 +2196,15 @@ export default function SubscriberPortal() {
       {/* 5. TRANSACTION DETAIL POPUP MODAL */}
       {selectedTx && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150 overflow-y-auto">
-          <div className={`w-full max-w-sm border rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto my-auto ${
-            isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
-            <div className={`flex items-center justify-between pb-3 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-              <h3 className="text-sm font-bold flex items-center gap-1.5">
-                <FileText size={15} className="text-indigo-500" /> Receipt Details
+          <div className="w-full max-w-sm border border-[#27264E] bg-[#1D1D41] text-white rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[#27264E]">
+              <h3 className="text-sm font-bold flex items-center gap-1.5 text-white">
+                <FileText size={15} className="text-[#64CFF6]" /> Receipt Details
               </h3>
               <button
                 type="button"
                 onClick={() => setSelectedTx(null)}
-                className="text-xs opacity-60 hover:opacity-100 p-1.5 rounded-lg hover:bg-slate-800/40 transition-colors"
+                className="text-xs text-[#AEABD8] hover:text-white p-1.5 rounded-lg hover:bg-[#141332] transition-colors cursor-pointer"
               >
                 ✕
               </button>
@@ -2362,29 +2212,29 @@ export default function SubscriberPortal() {
 
             <div className="space-y-2.5 text-xs">
               <div className="flex justify-between">
-                <span className="opacity-60">Chit Group:</span>
-                <span className="font-bold">{selectedTx.groupName}</span>
+                <span className="text-[#AEABD8]">Chit Group:</span>
+                <span className="font-bold text-white">{selectedTx.groupName}</span>
               </div>
               <div className="flex justify-between font-mono">
-                <span className="opacity-60">Paid Amount:</span>
-                <span className="font-black text-emerald-500 text-sm">₹{Number(selectedTx.amount).toLocaleString('en-IN')}</span>
+                <span className="text-[#AEABD8]">Paid Amount:</span>
+                <span className="font-black text-[#02B15A] text-sm">₹{Number(selectedTx.amount).toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="opacity-60">Payment Mode:</span>
-                <span className="uppercase font-mono font-semibold">
+                <span className="text-[#AEABD8]">Payment Mode:</span>
+                <span className="uppercase font-mono font-semibold text-white">
                   {!selectedTx.walletType || selectedTx.walletType.toLowerCase().includes('cash') ? 'Cash in Hand' : 'Online Transfer'}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="opacity-60">Date:</span>
-                <span className="font-mono">{new Date(selectedTx.createdAt).toLocaleString('en-IN')}</span>
+                <span className="text-[#AEABD8]">Date:</span>
+                <span className="font-mono text-white">{new Date(selectedTx.createdAt).toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="opacity-60">Status:</span>
-                <span className="text-emerald-500 font-bold uppercase">{selectedTx.status}</span>
+                <span className="text-[#AEABD8]">Status:</span>
+                <span className="text-[#02B15A] font-bold uppercase">{selectedTx.status}</span>
               </div>
               {selectedTx.notes && (
-                <div className={`pt-2 border-t text-[11px] ${isDark ? 'border-slate-800 text-slate-300' : 'border-slate-100 text-slate-600'}`}>
+                <div className="pt-2 border-t border-[#27264E] text-[11px] text-[#AEABD8]">
                   <span className="opacity-60 block mb-0.5">Notes:</span>
                   {selectedTx.notes}
                 </div>
@@ -2394,9 +2244,7 @@ export default function SubscriberPortal() {
             <button
               type="button"
               onClick={() => setSelectedTx(null)}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${
-                isDark ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
-              }`}
+              className="w-full py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] bg-[#141332] hover:bg-[#27264E] text-white border border-[#27264E] cursor-pointer"
             >
               Close
             </button>
@@ -2405,13 +2253,11 @@ export default function SubscriberPortal() {
       )}
 
       {/* 6. FIXED MOBILE BOTTOM NAVIGATION BAR (5 Streamlined Tabs) */}
-      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-lg border-t px-2 py-1.5 flex items-center justify-around transition-colors ${
-        isDark ? 'bg-[#0c1220]/95 border-slate-800/90' : 'bg-white/95 border-slate-200 shadow-lg'
-      }`}>
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-lg border-t border-[#27264E] px-2 py-1.5 flex items-center justify-around transition-colors bg-[#1D1D41]/95">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'overview' ? 'text-indigo-500 scale-105' : 'text-slate-400'
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'overview' ? 'text-[#6359E9] scale-105' : 'text-[#AEABD8]'
           }`}
         >
           <Layers size={17} />
@@ -2420,8 +2266,8 @@ export default function SubscriberPortal() {
 
         <button
           onClick={() => setActiveTab('chits')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'chits' ? 'text-indigo-500 scale-105' : 'text-slate-400'
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'chits' ? 'text-[#6359E9] scale-105' : 'text-[#AEABD8]'
           }`}
         >
           <Ticket size={17} />
@@ -2430,8 +2276,8 @@ export default function SubscriberPortal() {
 
         <button
           onClick={() => setActiveTab('passbook')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'passbook' ? 'text-indigo-500 scale-105' : 'text-slate-400'
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'passbook' ? 'text-[#6359E9] scale-105' : 'text-[#AEABD8]'
           }`}
         >
           <History size={17} />
@@ -2440,8 +2286,8 @@ export default function SubscriberPortal() {
 
         <button
           onClick={() => setActiveTab('auctions')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'auctions' ? 'text-indigo-500 scale-105' : 'text-slate-400'
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'auctions' ? 'text-[#6359E9] scale-105' : 'text-[#AEABD8]'
           }`}
         >
           <Trophy size={17} />
@@ -2450,8 +2296,8 @@ export default function SubscriberPortal() {
 
         <button
           onClick={() => setActiveTab('settings')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all ${
-            activeTab === 'settings' ? 'text-indigo-500 scale-105' : 'text-slate-400'
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'settings' ? 'text-[#6359E9] scale-105' : 'text-[#AEABD8]'
           }`}
         >
           <Settings size={17} />

@@ -492,22 +492,22 @@ Access your digital passbook & auctions anytime:
     <div className="space-y-6 animate-in fade-in duration-200">
       
       {/* ── 1. TOP SUB-NAVIGATION RIBBON ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-gray-200 rounded-3xl p-3 sm:p-4 shadow-2xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#1D1D41] border border-[#27264E] rounded-3xl p-3 sm:p-4 shadow-2xs">
         {/* Tab switchers */}
-        <div className="flex items-center gap-1.5 p-1 bg-gray-100/90 rounded-2xl w-full sm:w-auto">
+        <div className="flex items-center gap-1.5 p-1 bg-[#141332] border border-[#27264E] rounded-2xl w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setCurrentTab('users')}
-            className={`flex-1 sm:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 sm:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               currentTab === 'users'
-                ? 'bg-white text-gray-900 shadow-xs ring-1 ring-black/5'
-                : 'text-gray-500 hover:text-gray-800'
+                ? 'bg-[#6359E9] text-white shadow-xs'
+                : 'text-[#AEABD8] hover:text-white'
             }`}
           >
-            <Users size={15} className={currentTab === 'users' ? 'text-indigo-600' : 'text-gray-400'} />
+            <Users size={15} className={currentTab === 'users' ? 'text-white' : 'text-[#64CFF6]'} />
             <span>Users Directory</span>
             <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
-              currentTab === 'users' ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-200 text-gray-600'
+              currentTab === 'users' ? 'bg-white/20 text-white' : 'bg-[#1D1D41] text-[#AEABD8]'
             }`}>
               {stats.total}
             </span>
@@ -516,17 +516,17 @@ Access your digital passbook & auctions anytime:
           <button
             type="button"
             onClick={() => setCurrentTab('roles')}
-            className={`flex-1 sm:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 sm:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               currentTab === 'roles'
-                ? 'bg-white text-gray-900 shadow-xs ring-1 ring-black/5'
-                : 'text-gray-500 hover:text-gray-800'
+                ? 'bg-[#6359E9] text-white shadow-xs'
+                : 'text-[#AEABD8] hover:text-white'
             }`}
           >
-            <Shield size={15} className={currentTab === 'roles' ? 'text-indigo-600' : 'text-gray-400'} />
+            <Shield size={15} className={currentTab === 'roles' ? 'text-white' : 'text-[#64CFF6]'} />
             <span>Roles &amp; Permissions</span>
             {stats.customRolesCount > 0 && (
               <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
-                currentTab === 'roles' ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-200 text-gray-600'
+                currentTab === 'roles' ? 'bg-white/20 text-white' : 'bg-[#1D1D41] text-[#AEABD8]'
               }`}>
                 +{stats.customRolesCount}
               </span>
@@ -541,10 +541,10 @@ Access your digital passbook & auctions anytime:
             type="button"
             disabled={isTogglingMaintenance}
             onClick={handleToggleMaintenance}
-            className={`px-3 sm:px-3.5 py-2 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all border shadow-2xs active:scale-95 ${
+            className={`px-3 sm:px-3.5 py-2 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all border shadow-2xs active:scale-95 cursor-pointer ${
               isMaintenanceMode
-                ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-400 font-extrabold shadow-amber-500/20 ring-2 ring-amber-400/40 animate-pulse'
-                : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                ? 'bg-[#FFBB38] hover:bg-[#FFBB38]/90 text-[#141332] border-[#FFBB38] font-black shadow-[#FFBB38]/20 ring-2 ring-[#FFBB38]/40 animate-pulse'
+                : 'bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]'
             }`}
             title={
               isMaintenanceMode
@@ -554,14 +554,14 @@ Access your digital passbook & auctions anytime:
           >
             <Wrench
               size={14}
-              className={isMaintenanceMode ? 'text-slate-950 animate-bounce' : 'text-gray-500'}
+              className={isMaintenanceMode ? 'text-[#141332] animate-bounce' : 'text-[#FFBB38]'}
             />
             <span className="hidden sm:inline">Portal Maintenance</span>
             <span
               className={`text-[10px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-wider ${
                 isMaintenanceMode
-                  ? 'bg-slate-950 text-amber-300'
-                  : 'bg-gray-200 text-gray-700'
+                  ? 'bg-[#141332] text-[#FFBB38]'
+                  : 'bg-[#27264E] text-[#AEABD8]'
               }`}
             >
               {isMaintenanceMode ? 'ON' : 'OFF'}
@@ -576,9 +576,9 @@ Access your digital passbook & auctions anytime:
               fetchCustomRoles();
             }}
             title="Refresh Users &amp; Roles"
-            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-xl transition-all border border-transparent hover:border-gray-200"
+            className="p-2 text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#141332] rounded-xl transition-all border border-transparent hover:border-[#27264E] cursor-pointer"
           >
-            <RefreshCw size={15} className={loading ? 'animate-spin text-indigo-600' : ''} />
+            <RefreshCw size={15} className={loading ? 'animate-spin text-[#64CFF6]' : ''} />
           </button>
         </div>
       </div>
@@ -599,63 +599,63 @@ Access your digital passbook & auctions anytime:
           
           {/* Top Analytics & Stats Ribbon */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
-              <div className="flex items-center justify-between text-gray-500">
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-[#AEABD8]">
                 <span className="text-xs font-bold uppercase tracking-wider">Total Users</span>
-                <Users size={16} className="text-slate-700" />
+                <Users size={16} className="text-[#64CFF6]" />
               </div>
-              <p className="text-2xl font-black text-gray-900 mt-1">{stats.total}</p>
-              <span className="text-[10px] text-gray-400 font-semibold">Registered in Supabase</span>
+              <p className="text-2xl font-black text-white mt-1">{stats.total}</p>
+              <span className="text-[10px] text-[#AEABD8] font-semibold">Registered in Supabase</span>
             </div>
 
-            <div className="bg-white border border-purple-200 rounded-2xl p-4 shadow-2xs">
-              <div className="flex items-center justify-between text-purple-600">
+            <div className="bg-[#1D1D41] border border-[#9C2CF3]/30 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-[#9C2CF3]">
                 <span className="text-xs font-bold uppercase tracking-wider">Admins</span>
                 <ShieldCheck size={16} />
               </div>
-              <p className="text-2xl font-black text-purple-700 mt-1">{stats.adminCount}</p>
-              <span className="text-[10px] text-purple-600 font-semibold">Full Unrestricted Access</span>
+              <p className="text-2xl font-black text-white mt-1">{stats.adminCount}</p>
+              <span className="text-[10px] text-[#9C2CF3] font-semibold">Full Unrestricted Access</span>
             </div>
 
-            <div className="bg-white border border-blue-200 rounded-2xl p-4 shadow-2xs">
-              <div className="flex items-center justify-between text-blue-600">
+            <div className="bg-[#1D1D41] border border-[#64CFF6]/30 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-[#64CFF6]">
                 <span className="text-xs font-bold uppercase tracking-wider">Managers</span>
                 <Briefcase size={16} />
               </div>
-              <p className="text-2xl font-black text-blue-700 mt-1">{stats.managerCount}</p>
-              <span className="text-[10px] text-blue-600 font-semibold">Operations &amp; Bidding</span>
+              <p className="text-2xl font-black text-white mt-1">{stats.managerCount}</p>
+              <span className="text-[10px] text-[#64CFF6] font-semibold">Operations &amp; Bidding</span>
             </div>
 
-            <div className="bg-white border border-emerald-200 rounded-2xl p-4 shadow-2xs">
-              <div className="flex items-center justify-between text-emerald-600">
+            <div className="bg-[#1D1D41] border border-[#02B15A]/30 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-[#02B15A]">
                 <span className="text-xs font-bold uppercase tracking-wider">Subscribers</span>
                 <UserCheck size={16} />
               </div>
-              <p className="text-2xl font-black text-emerald-700 mt-1">{stats.subscriberCount}</p>
-              <span className="text-[10px] text-emerald-600 font-semibold">Passbook &amp; Member Portal</span>
+              <p className="text-2xl font-black text-white mt-1">{stats.subscriberCount}</p>
+              <span className="text-[10px] text-[#02B15A] font-semibold">Passbook &amp; Member Portal</span>
             </div>
 
-            <div className="bg-white border border-indigo-200 rounded-2xl p-4 shadow-2xs col-span-2 sm:col-span-1">
-              <div className="flex items-center justify-between text-indigo-600">
+            <div className="bg-[#1D1D41] border border-[#6359E9]/40 rounded-2xl p-4 shadow-2xs col-span-2 sm:col-span-1">
+              <div className="flex items-center justify-between text-[#64CFF6]">
                 <span className="text-xs font-bold uppercase tracking-wider">QR Linked</span>
                 <QrCode size={16} />
               </div>
-              <p className="text-2xl font-black text-indigo-700 mt-1">{stats.qrLinkedCount}</p>
-              <span className="text-[10px] text-indigo-600 font-semibold">Active Digital Keys</span>
+              <p className="text-2xl font-black text-white mt-1">{stats.qrLinkedCount}</p>
+              <span className="text-[10px] text-[#64CFF6] font-semibold">Active Digital Keys</span>
             </div>
           </div>
 
           {/* Users Directory & Role Assignment Table */}
-          <div className="bg-white border border-gray-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
             
             {/* Header, Search & Filter Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#27264E] pb-4">
               <div>
-                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <UserCheck size={18} className="text-indigo-600" />
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <UserCheck size={18} className="text-[#64CFF6]" />
                   Users Directory &amp; Access Controls
                 </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-[#AEABD8] mt-0.5">
                   Assign roles, manage passbook QR digital keys, and generate print sheets
                 </p>
               </div>
@@ -663,20 +663,20 @@ Access your digital passbook & auctions anytime:
               {/* Search, Filter, Passbook QRs & Add User */}
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEABD8]" />
                   <input
                     type="text"
                     placeholder="Search user name or phone..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none w-44 sm:w-52"
+                    className="bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#AEABD8]/60 focus:outline-none w-44 sm:w-52"
                   />
                 </div>
 
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
-                  className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-700 focus:outline-none"
+                  className="bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none"
                 >
                   <option value="all">All Roles</option>
                   {customRoles.map((r) => (
@@ -693,16 +693,16 @@ Access your digital passbook & auctions anytime:
                     setQrCenterTab('subscribers');
                     setIsQrCenterOpen(true);
                   }}
-                  className="px-3.5 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 active:scale-[0.98] text-gray-700 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs"
+                  className="px-3.5 py-1.5 rounded-xl border border-[#27264E] bg-[#141332] hover:bg-[#27264E] active:scale-[0.98] text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
                 >
-                  <QrCode size={14} className="text-indigo-600" />
+                  <QrCode size={14} className="text-[#64CFF6]" />
                   <span>Passbook QRs</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs active:scale-95"
+                  className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
                 >
                   <Plus size={14} />
                   <span>Add User</span>
@@ -714,7 +714,7 @@ Access your digital passbook & auctions anytime:
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-gray-100 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
+                  <tr className="border-b border-[#27264E] text-[10px] font-extrabold text-[#AEABD8] uppercase tracking-wider">
                     <th className="py-3 px-3">User Profile</th>
                     <th className="py-3 px-3">Phone Number</th>
                     <th className="py-3 px-3">
@@ -729,10 +729,10 @@ Access your digital passbook & auctions anytime:
                     <th className="py-3 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50 text-xs font-medium text-gray-700">
+                <tbody className="divide-y divide-[#27264E] text-xs font-medium text-[#AEABD8]">
                   {filteredProfiles.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-xs text-gray-400">
+                      <td colSpan={8} className="py-12 text-center text-xs text-[#AEABD8]">
                         No users matching the selected search query or role filter.
                       </td>
                     </tr>
@@ -743,7 +743,7 @@ Access your digital passbook & auctions anytime:
                       const isDefault = !p.mpin || p.mpin === '1234';
 
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
+                        <tr key={p.id} className="hover:bg-[#141332]/60 transition-colors">
                           {/* Name & Avatar */}
                           <td className="py-3.5 px-3">
                             <div className="flex items-center gap-2.5">
@@ -756,41 +756,41 @@ Access your digital passbook & auctions anytime:
                                 {p.full_name ? p.full_name.charAt(0) : 'U'}
                               </div>
                               <div>
-                                <span className="font-bold text-gray-900 block flex items-center gap-1.5">
-                                  <span className={p.is_blocked ? 'line-through text-gray-500' : ''}>{p.full_name}</span>
+                                <span className="font-bold text-white block flex items-center gap-1.5">
+                                  <span className={p.is_blocked ? 'line-through text-[#AEABD8]' : ''}>{p.full_name}</span>
                                   {isCurrentAdmin && (
-                                    <span className="text-[9px] font-extrabold bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded-md">
+                                    <span className="text-[9px] font-extrabold bg-[#6359E9]/20 text-[#64CFF6] px-1.5 py-0.2 rounded-md border border-[#6359E9]/40">
                                       You
                                     </span>
                                   )}
                                   {p.is_blocked && (
-                                    <span className="text-[9px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded-md flex items-center gap-0.5">
+                                    <span className="text-[9px] font-extrabold bg-[#E41414]/20 text-[#E41414] border border-[#E41414]/30 px-1.5 py-0.2 rounded-md flex items-center gap-0.5">
                                       <Ban size={9} /> Blocked
                                     </span>
                                   )}
                                 </span>
-                                <span className="text-[10px] text-gray-400 font-mono">ID: {p.id.slice(0, 8)}...</span>
+                                <span className="text-[10px] text-[#AEABD8] font-mono">ID: {p.id.slice(0, 8)}...</span>
                               </div>
                             </div>
                           </td>
 
                           {/* Phone */}
-                          <td className="py-3.5 px-3 font-mono font-semibold text-gray-800">
+                          <td className="py-3.5 px-3 font-mono font-semibold text-white">
                             {p.phone_number || '—'}
                           </td>
 
                           {/* Security PIN (MPIN) */}
                           <td className="py-3.5 px-3 font-mono">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-700 text-[11px] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                              <span className="font-bold text-white text-[11px] bg-[#141332] px-2 py-0.5 rounded-md border border-[#27264E]">
                                 ••••
                               </span>
                               {isDefault ? (
-                                <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded">
+                                <span className="text-[9px] font-bold bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30 px-1.5 py-0.2 rounded">
                                   Default
                                 </span>
                               ) : (
-                                <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded">
+                                <span className="text-[9px] font-bold bg-[#02B15A]/20 text-[#02B15A] border border-[#02B15A]/30 px-1.5 py-0.2 rounded">
                                   Custom
                                 </span>
                               )}
@@ -801,7 +801,7 @@ Access your digital passbook & auctions anytime:
                           <td className="py-3.5 px-3">
                             {p.passbook_token ? (
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <span className="text-[10px] font-extrabold text-[#02B15A] bg-[#02B15A]/15 border border-[#02B15A]/30 px-2 py-0.5 rounded-md flex items-center gap-1">
                                   Linked 🟢
                                 </span>
 
@@ -809,7 +809,7 @@ Access your digital passbook & auctions anytime:
                                   type="button"
                                   onClick={() => handlePrintSticker(p)}
                                   title="Print passbook sticker"
-                                  className="p-1 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 rounded-md transition-colors"
+                                  className="p-1 text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#141332] border border-[#27264E] rounded-md transition-colors cursor-pointer"
                                 >
                                   <Printer size={12} />
                                 </button>
@@ -818,7 +818,7 @@ Access your digital passbook & auctions anytime:
                                   type="button"
                                   onClick={() => setPairingProfile(p)}
                                   title="Re-pair with a new QR sticker"
-                                  className="p-1 text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded-md transition-colors"
+                                  className="p-1 text-[#64CFF6] hover:bg-[#141332] border border-[#27264E] rounded-md transition-colors cursor-pointer"
                                 >
                                   <QrCode size={12} />
                                 </button>
@@ -827,7 +827,7 @@ Access your digital passbook & auctions anytime:
                                   type="button"
                                   onClick={() => handleUnlinkPassbook(p)}
                                   title="Unlink / Revoke Passbook QR"
-                                  className="p-1 text-rose-500 hover:text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-md transition-colors"
+                                  className="p-1 text-[#E41414] hover:bg-[#E41414]/15 border border-[#27264E] rounded-md transition-colors cursor-pointer"
                                 >
                                   <Unlink size={12} />
                                 </button>
@@ -836,7 +836,7 @@ Access your digital passbook & auctions anytime:
                               <button
                                 type="button"
                                 onClick={() => setPairingProfile(p)}
-                                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 px-2.5 py-1 rounded-lg transition-all"
+                                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#64CFF6] hover:text-white bg-[#141332] hover:bg-[#27264E] border border-[#27264E] px-2.5 py-1 rounded-lg transition-all cursor-pointer"
                               >
                                 <QrCode size={12} />
                                 <span>Pair QR</span>
@@ -858,21 +858,21 @@ Access your digital passbook & auctions anytime:
                                   return (
                                     <span
                                       title={`Acknowledged ${ackCount} reschedule notice(s). Latest: ${latestDate}`}
-                                      className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                      className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30"
                                     >
-                                      <CheckCircle2 size={10} className="text-emerald-600" />
+                                      <CheckCircle2 size={10} className="text-[#02B15A]" />
                                       <span>Acked ({ackCount})</span>
                                     </span>
                                   );
                                 }
                                 return (
-                                  <span className="text-[10px] text-gray-400 font-medium">
+                                  <span className="text-[10px] text-[#AEABD8] font-medium">
                                     No notices
                                   </span>
                                 );
                               })()
                             ) : (
-                              <span className="text-[10px] text-gray-300 font-medium">—</span>
+                              <span className="text-[10px] text-[#AEABD8]/40 font-medium">—</span>
                             )}
                           </td>
 
@@ -893,7 +893,7 @@ Access your digital passbook & auctions anytime:
                               value={p.role}
                               onChange={(e) => handleQuickRoleChange(p.id, e.target.value, p.full_name)}
                               disabled={isCurrentAdmin}
-                              className={`bg-gray-50 border border-gray-200 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer ${
+                              className={`bg-[#141332] border border-[#27264E] text-xs font-bold text-white rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#6359E9] cursor-pointer ${
                                 isCurrentAdmin ? 'opacity-50 cursor-not-allowed' : ''
                               }`}
                             >
@@ -913,7 +913,7 @@ Access your digital passbook & auctions anytime:
                                 type="button"
                                 onClick={() => handleShareWhatsApp(p)}
                                 title="Share WhatsApp Passbook Card"
-                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                className="p-1.5 rounded-lg text-[#02B15A] hover:bg-[#02B15A]/15 transition-colors cursor-pointer"
                               >
                                 <Share2 size={13} />
                               </button>
@@ -923,10 +923,10 @@ Access your digital passbook & auctions anytime:
                                   type="button"
                                   onClick={() => handleToggleBlock(p)}
                                   title={p.is_blocked ? "Unblock Portal Access" : "Block Portal Access"}
-                                  className={`p-1.5 rounded-lg transition-colors ${
+                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                                     p.is_blocked
-                                      ? 'text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200'
-                                      : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
+                                      ? 'text-[#E41414] bg-[#E41414]/15 hover:bg-[#E41414]/25 border border-[#E41414]/30'
+                                      : 'text-[#AEABD8] hover:text-[#FFBB38] hover:bg-[#141332]'
                                   }`}
                                 >
                                   {p.is_blocked ? <Ban size={13} /> : <UserX size={13} />}
@@ -936,7 +936,7 @@ Access your digital passbook & auctions anytime:
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditModal(p)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                className="p-1.5 rounded-lg text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#141332] transition-colors cursor-pointer"
                                 title="Edit Profile & Access"
                               >
                                 <Edit3 size={13} />
@@ -946,7 +946,7 @@ Access your digital passbook & auctions anytime:
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteProfile(p)}
-                                  className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                  className="p-1.5 rounded-lg text-[#AEABD8] hover:text-[#E41414] hover:bg-[#E41414]/15 transition-colors cursor-pointer"
                                   title="Delete Profile"
                                 >
                                   <Trash2 size={13} />
@@ -967,32 +967,32 @@ Access your digital passbook & auctions anytime:
 
       {/* Add User Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl my-auto">
-            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-gray-900 text-sm">Register New User Profile</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl my-auto text-white">
+            <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-white text-sm">Register New User Profile</h3>
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-1.5 text-[#AEABD8] hover:text-white rounded-lg hover:bg-[#141332] transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleCreateProfile} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Full Name *</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Full Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Ramesh Kumar"
                   value={newFullName}
                   onChange={(e) => setNewFullName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-white placeholder-[#AEABD8]/60 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">10-Digit Mobile Number *</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">10-Digit Mobile Number *</label>
                 <input
                   type="tel"
                   required
@@ -1000,15 +1000,15 @@ Access your digital passbook & auctions anytime:
                   placeholder="e.g. 9876543210"
                   value={newPhoneNumber}
                   onChange={(e) => setNewPhoneNumber(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-[#AEABD8]/60 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">System Role *</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">System Role *</label>
                 <select
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-bold text-white focus:outline-none"
                 >
                   {customRoles.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -1022,14 +1022,14 @@ Access your digital passbook & auctions anytime:
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-[#AEABD8] hover:text-white bg-[#141332] hover:bg-[#27264E] border border-[#27264E] rounded-xl transition-colors text-center cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingCreate}
-                  className="w-full sm:w-auto bg-slate-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs active:scale-95 transition-all text-center"
+                  className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs active:scale-95 transition-all text-center cursor-pointer disabled:opacity-50"
                 >
                   {isSubmittingCreate ? 'Creating...' : 'Create Profile'}
                 </button>
@@ -1041,47 +1041,47 @@ Access your digital passbook & auctions anytime:
 
       {/* Edit User Modal */}
       {editingProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl my-auto">
-            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-gray-900 text-sm">Edit User Profile</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl my-auto text-white">
+            <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-white text-sm">Edit User Profile</h3>
               <button
                 type="button"
                 onClick={() => setEditingProfile(null)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-1.5 text-[#AEABD8] hover:text-white rounded-lg hover:bg-[#141332] transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleUpdateProfile} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Full Name</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Full Name</label>
                 <input
                   type="text"
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-white focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Mobile Number</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Mobile Number</label>
                 <input
                   type="tel"
                   required
                   maxLength={10}
                   value={editPhoneNumber}
                   onChange={(e) => setEditPhoneNumber(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-mono text-white focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Assigned Role</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Assigned Role</label>
                 <select
                   value={editRole}
                   onChange={(e) => setEditRole(e.target.value)}
                   disabled={editingProfile.id === currentAdminProfile?.id}
-                  className={`w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:border-indigo-500 ${
+                  className={`w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-bold text-white ${
                     editingProfile.id === currentAdminProfile?.id ? 'opacity-60 cursor-not-allowed' : ''
                   }`}
                 >
@@ -1095,16 +1095,16 @@ Access your digital passbook & auctions anytime:
               </div>
 
               {/* MPIN / Security PIN Management */}
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+              <div className="p-3.5 bg-[#141332] rounded-2xl border border-[#27264E] space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                    <KeyRound size={14} className="text-indigo-600" />
+                  <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <KeyRound size={14} className="text-[#64CFF6]" />
                     <span>Passbook Security PIN (MPIN)</span>
                   </label>
                   <button
                     type="button"
                     onClick={() => setEditMpin('1234')}
-                    className="text-[10px] font-bold text-amber-800 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-md transition-colors"
+                    className="text-[10px] font-bold text-[#FFBB38] hover:bg-[#FFBB38]/20 bg-[#FFBB38]/15 border border-[#FFBB38]/40 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
                   >
                     Reset to 1234
                   </button>
@@ -1117,9 +1117,9 @@ Access your digital passbook & auctions anytime:
                   value={editMpin}
                   onChange={(e) => setEditMpin(e.target.value.replace(/\D/g, ''))}
                   placeholder="4 to 6 digit PIN (Default 1234)"
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-[#6359E9]"
                 />
-                <p className="text-[10px] text-gray-500">
+                <p className="text-[10px] text-[#AEABD8]">
                   Subscribers use this PIN to authenticate on the member passbook portal alongside their phone number or QR key.
                 </p>
               </div>
@@ -1127,35 +1127,35 @@ Access your digital passbook & auctions anytime:
               {/* Block Portal Access Toggle */}
               <div className={`p-3.5 rounded-2xl border transition-all ${
                 editIsBlocked
-                  ? 'bg-rose-50 border-rose-200 ring-1 ring-rose-200'
-                  : 'bg-gray-50/80 border-gray-200'
+                  ? 'bg-[#E41414]/15 border-[#E41414]/30 ring-1 ring-[#E41414]/30'
+                  : 'bg-[#141332] border-[#27264E]'
               }`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-1.5">
                       {editIsBlocked ? (
-                        <Ban size={15} className="text-rose-600 shrink-0" />
+                        <Ban size={15} className="text-[#E41414] shrink-0" />
                       ) : (
-                        <ShieldCheck size={15} className="text-emerald-600 shrink-0" />
+                        <ShieldCheck size={15} className="text-[#02B15A] shrink-0" />
                       )}
                       <span className={`text-xs font-bold ${
-                        editIsBlocked ? 'text-rose-900' : 'text-gray-900'
+                        editIsBlocked ? 'text-[#E41414]' : 'text-white'
                       }`}>
                         Block Portal Access
                       </span>
                       {editIsBlocked && (
-                        <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-rose-200 text-rose-800">
+                        <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-[#E41414]/20 text-[#E41414] border border-[#E41414]/30">
                           Suspended
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                    <p className="text-[11px] text-[#AEABD8] leading-relaxed">
                       {editIsBlocked
                         ? 'Portal access is blocked. This user cannot sign in with phone/MPIN or passbook QR.'
                         : 'Allow user to sign in to member passbook, check balances, and bid in auctions.'}
                     </p>
                     {editingProfile.id === currentAdminProfile?.id && (
-                      <span className="text-[10px] text-amber-700 font-semibold block pt-0.5">
+                      <span className="text-[10px] text-[#FFBB38] font-semibold block pt-0.5">
                         Security Notice: You cannot block your own active administrator account.
                       </span>
                     )}
@@ -1166,7 +1166,7 @@ Access your digital passbook & auctions anytime:
                     disabled={editingProfile.id === currentAdminProfile?.id}
                     onClick={() => setEditIsBlocked(!editIsBlocked)}
                     className={`w-11 h-6 rounded-full p-0.5 transition-colors shrink-0 ${
-                      editIsBlocked ? 'bg-rose-600' : 'bg-gray-300'
+                      editIsBlocked ? 'bg-[#E41414]' : 'bg-[#27264E]'
                     } ${editingProfile.id === currentAdminProfile?.id ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div
@@ -1182,14 +1182,14 @@ Access your digital passbook & auctions anytime:
                 <button
                   type="button"
                   onClick={() => setEditingProfile(null)}
-                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-[#AEABD8] hover:text-white bg-[#141332] hover:bg-[#27264E] border border-[#27264E] rounded-xl transition-colors text-center cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingEdit}
-                  className="w-full sm:w-auto bg-slate-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs active:scale-95 transition-all text-center"
+                  className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs active:scale-95 transition-all text-center cursor-pointer disabled:opacity-50"
                 >
                   {isSubmittingEdit ? 'Saving...' : 'Save Changes'}
                 </button>

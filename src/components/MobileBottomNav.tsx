@@ -37,7 +37,7 @@ export default function MobileBottomNav({
   const bottomItems = allPossibleItems.filter(item => canAccessTab(activeUserRole, item.id));
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200/80 px-2 py-1.5 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] md:hidden">
+    <nav className="fixed bottom-0 inset-x-0 z-40 bg-[#1D1D41]/95 backdrop-blur-md border-t border-[#27264E] px-3 py-2 shadow-[0_-4px_24px_rgba(0,0,0,0.5)] md:hidden pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <div className="flex items-center justify-around max-w-md mx-auto">
         {bottomItems.map((item) => {
           const Icon = item.icon;
@@ -47,19 +47,22 @@ export default function MobileBottomNav({
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 active:scale-95 min-w-[56px] ${
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all duration-200 active:scale-95 min-w-[56px] relative ${
                 isActive 
-                  ? 'text-gray-900 font-bold' 
-                  : 'text-gray-400 hover:text-gray-600 font-medium'
+                  ? 'text-[#64CFF6] font-bold' 
+                  : 'text-[#AEABD8] hover:text-white font-medium'
               }`}
             >
-              <div className={`p-1 rounded-lg transition-all ${
-                isActive ? 'bg-gray-900 text-white shadow-xs' : 'text-current'
+              {isActive && (
+                <div className="absolute -top-2 w-8 h-1 bg-[#64CFF6] rounded-full shadow-[0_0_8px_#64CFF6]" />
+              )}
+              <div className={`p-1.5 rounded-xl transition-all ${
+                isActive ? 'text-[#64CFF6] bg-[#6359E9]/30 shadow-inner' : 'text-[#AEABD8]'
               }`}>
-                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                <Icon size={19} strokeWidth={isActive ? 2.5 : 2} />
               </div>
-              <span className={`text-[10px] mt-0.5 tracking-tight ${
-                isActive ? 'text-gray-900 font-bold' : 'text-gray-500'
+              <span className={`text-[10px] mt-0.5 tracking-tight font-semibold ${
+                isActive ? 'text-[#64CFF6]' : 'text-[#AEABD8]'
               }`}>
                 {item.name}
               </span>
@@ -70,13 +73,13 @@ export default function MobileBottomNav({
         {/* More Drawer Button */}
         <button
           onClick={onOpenDrawer}
-          className="flex flex-col items-center justify-center py-1 px-2.5 rounded-xl text-gray-400 hover:text-gray-600 active:scale-95 min-w-[56px]"
+          className="flex flex-col items-center justify-center py-1 px-3 rounded-2xl text-[#AEABD8] hover:text-white active:scale-95 min-w-[56px]"
           aria-label="Open full menu"
         >
-          <div className="p-1 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
-            <Menu size={18} strokeWidth={2} />
+          <div className="p-1.5 rounded-xl text-[#AEABD8] hover:bg-[#27264E] transition-colors">
+            <Menu size={19} strokeWidth={2} />
           </div>
-          <span className="text-[10px] mt-0.5 font-medium text-gray-500">
+          <span className="text-[10px] mt-0.5 font-semibold text-[#AEABD8]">
             More
           </span>
         </button>

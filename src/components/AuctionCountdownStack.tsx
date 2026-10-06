@@ -28,7 +28,7 @@ interface AuctionCountdownStackProps {
 
 export default function AuctionCountdownStack({
   groups,
-  theme = 'light',
+  theme = 'dark',
   allowConfigure = false,
   onScheduleUpdated,
 }: AuctionCountdownStackProps) {
@@ -53,7 +53,7 @@ export default function AuctionCountdownStack({
           startDate={monthZeroGroup.startDate}
           allowConfigure={allowConfigure}
           onScheduleUpdated={onScheduleUpdated}
-          theme={theme}
+          theme="dark"
         />
       );
     }
@@ -76,7 +76,7 @@ export default function AuctionCountdownStack({
         startDate={grp.startDate}
         allowConfigure={allowConfigure}
         onScheduleUpdated={onScheduleUpdated}
-        theme={theme}
+        theme="dark"
       />
     );
   }
@@ -120,11 +120,7 @@ export default function AuctionCountdownStack({
         onClick={handlePrev}
         title="Previous Auction"
         aria-label="Previous Auction"
-        className={`p-1.5 sm:p-2 rounded-xl border transition-all active:scale-90 cursor-pointer shrink-0 shadow-2xs ${
-          isDark
-            ? 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-800 hover:text-white hover:border-slate-700'
-            : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900 hover:border-slate-300'
-        }`}
+        className="p-1.5 sm:p-2 rounded-xl border transition-all active:scale-90 cursor-pointer shrink-0 shadow-xs bg-[#1D1D41] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]"
       >
         <ChevronLeft size={16} className="stroke-[2.5]" />
       </button>
@@ -148,7 +144,7 @@ export default function AuctionCountdownStack({
           startDate={currentGroup.startDate}
           allowConfigure={allowConfigure}
           onScheduleUpdated={onScheduleUpdated}
-          theme={theme}
+          theme="dark"
           compact={false}
         />
       </div>
@@ -158,11 +154,7 @@ export default function AuctionCountdownStack({
         onClick={handleNext}
         title="Next Auction"
         aria-label="Next Auction"
-        className={`p-1.5 sm:p-2 rounded-xl border transition-all active:scale-90 cursor-pointer shrink-0 shadow-2xs ${
-          isDark
-            ? 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-800 hover:text-white hover:border-slate-700'
-            : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900 hover:border-slate-300'
-        }`}
+        className="p-1.5 sm:p-2 rounded-xl border transition-all active:scale-90 cursor-pointer shrink-0 shadow-xs bg-[#1D1D41] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]"
       >
         <ChevronRight size={16} className="stroke-[2.5]" />
       </button>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "@/context/WalletContext";
@@ -18,9 +18,21 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#141332",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
-  title: "Chit Funds Manager - Workspace",
-  description: "Chit fund workspace with real-time balance sync",
+  title: "Chit Funds Manager - Midnight Workspace",
+  description: "Enterprise Chit Fund Management & Digital Banking Treasury",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Chit Funds Manager",
+  },
 };
 
 export default function RootLayout({
@@ -33,7 +45,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full bg-slate-950 text-slate-100 flex flex-col">
+      <body className="min-h-full bg-[#141332] text-white flex flex-col selection:bg-[#6359E9] selection:text-white">
         <ServiceWorkerCleanup />
         <NetworkStatusBanner />
         <AuthProvider>

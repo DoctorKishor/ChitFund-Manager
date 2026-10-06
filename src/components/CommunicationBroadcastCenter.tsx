@@ -1067,11 +1067,11 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
     <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200 pb-12 sm:pb-6">
       
       {/* ── Organization Signature & Contact Header Card ── */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-3">
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-gray-100 pb-2.5">
+      <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-5 shadow-xl space-y-3">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[#27264E] pb-2.5">
           <div className="flex items-center space-x-2">
-            <Building size={16} className="text-indigo-600 shrink-0" />
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            <Building size={16} className="text-[#6359E9] shrink-0" />
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider">
               Organization Signature &amp; Contact Header
             </h4>
           </div>
@@ -1081,25 +1081,25 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
             <span
               className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
                 cloudSyncStatus === 'synced'
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  ? 'bg-[#02B15A]/15 text-[#02B15A] border-[#02B15A]/30'
                   : cloudSyncStatus === 'saving'
-                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200 animate-pulse'
-                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                  ? 'bg-[#6359E9]/15 text-[#6359E9] border-[#6359E9]/30 animate-pulse'
+                  : 'bg-[#FFBB38]/15 text-[#FFBB38] border-[#FFBB38]/30'
               }`}
             >
               {cloudSyncStatus === 'synced' ? (
                 <>
-                  <CheckCircle2 size={11} className="text-emerald-600" />
+                  <CheckCircle2 size={11} className="text-[#02B15A]" />
                   <span>Cloud Synced (Supabase)</span>
                 </>
               ) : cloudSyncStatus === 'saving' ? (
                 <>
-                  <RefreshCw size={11} className="animate-spin text-indigo-600" />
+                  <RefreshCw size={11} className="animate-spin text-[#6359E9]" />
                   <span>Saving to Cloud...</span>
                 </>
               ) : (
                 <>
-                  <CloudUpload size={11} className="text-amber-600" />
+                  <CloudUpload size={11} className="text-[#FFBB38]" />
                   <span>Saved locally</span>
                 </>
               )}
@@ -1109,29 +1109,29 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
-              <FileText size={13} className="text-gray-400" />
-              <span>Signature Line <code className="text-indigo-600 font-mono font-normal">{'{org_signature}'}</code></span>
+            <label className="text-[11px] font-bold text-[#AEABD8] flex items-center gap-1.5">
+              <FileText size={13} className="text-[#AEABD8]/60" />
+              <span>Signature Line <code className="text-[#64CFF6] font-mono font-normal">{'{org_signature}'}</code></span>
             </label>
             <input
               type="text"
               value={signatureLine}
               onChange={(e) => handleSignatureChange(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-gray-900 focus:outline-none font-semibold shadow-2xs"
+              className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none font-semibold shadow-2xs placeholder:text-[#AEABD8]/40"
               placeholder={organizationName || "e.g. Chit Fund Organization"}
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
-              <Phone size={13} className="text-gray-400" />
-              <span>Organizer Phone <code className="text-indigo-600 font-mono font-normal">{'{org_phone}'}</code></span>
+            <label className="text-[11px] font-bold text-[#AEABD8] flex items-center gap-1.5">
+              <Phone size={13} className="text-[#AEABD8]/60" />
+              <span>Organizer Phone <code className="text-[#64CFF6] font-mono font-normal">{'{org_phone}'}</code></span>
             </label>
             <input
               type="tel"
               value={contactPhone}
               onChange={(e) => handlePhoneChange(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-gray-900 focus:outline-none font-mono font-semibold shadow-2xs"
+              className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none font-mono font-semibold shadow-2xs placeholder:text-[#AEABD8]/40"
               placeholder="e.g. 9943609010"
             />
           </div>
@@ -1139,24 +1139,24 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
       </div>
 
       {/* ── Main Broadcast Studio Card ── */}
-      <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 shadow-2xs space-y-4 sm:space-y-5">
+      <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 shadow-xl space-y-4 sm:space-y-5">
         
         {/* Top Control Bar: Group Selector, Language Toggle, Template Mode, and View Mode */}
-        <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-3.5 border-b border-gray-100 pb-4">
+        <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-3.5 border-b border-[#27264E] pb-4">
           
           {/* Left: Group Selector & Active Pills */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
             <div className="space-y-1 min-w-[200px] w-full sm:w-auto">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+              <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
                 Target Chit Group
               </label>
               <select
                 value={activeGroupKey}
                 onChange={(e) => setActiveGroupKey(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs font-bold text-gray-900 focus:outline-none shadow-2xs"
+                className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-bold text-white focus:outline-none shadow-2xs"
               >
                 {Object.values(groupsMetadata).map((group) => (
-                  <option key={group.id} value={group.id}>
+                  <option key={group.id} value={group.id} className="bg-[#1D1D41] text-white">
                     {group.name} ({formatINR(group.totalValue)})
                   </option>
                 ))}
@@ -1165,13 +1165,13 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
 
             {selectedMeta && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-4">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#141332] text-[#64CFF6] border border-[#27264E]">
                   {selectedMeta.currentMonth === 0 ? 'Month 0 (Launch)' : `Month ${selectedMeta.currentMonth}`}
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#141332] text-[#AEABD8] border border-[#27264E]">
                   📅 {selectedMeta.formattedAuctionDateShort} ({selectedMeta.formattedAuctionDayTamil})
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30">
                   Due: {formatINR(selectedMeta.fixedInstallment)}
                 </span>
               </div>
@@ -1182,7 +1182,7 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
           <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 pt-1 lg:pt-0">
             
             {/* 1. Language Switcher (தமிழ் | English) */}
-            <div className="flex items-center bg-indigo-50/80 p-1 rounded-xl border border-indigo-200 shadow-2xs">
+            <div className="flex items-center bg-[#141332] p-1 rounded-xl border border-[#27264E] shadow-2xs">
               <button
                 type="button"
                 onClick={() => {
@@ -1191,8 +1191,8 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                 }}
                 className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                   language === 'ta'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-indigo-900 hover:bg-indigo-100/60'
+                    ? 'bg-[#6359E9] text-white shadow-xs'
+                    : 'text-[#AEABD8] hover:text-white'
                 }`}
               >
                 <span>தமிழ்</span>
@@ -1205,8 +1205,8 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                 }}
                 className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                   language === 'en'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-indigo-900 hover:bg-indigo-100/60'
+                    ? 'bg-[#6359E9] text-white shadow-xs'
+                    : 'text-[#AEABD8] hover:text-white'
                 }`}
               >
                 <span>English</span>
@@ -1214,14 +1214,14 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
             </div>
 
             {/* 2. Pre/Post Template Switch */}
-            <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 w-full sm:w-auto">
+            <div className="flex items-center bg-[#141332] p-1 rounded-xl border border-[#27264E] w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setTemplateType('pre-auction')}
                 className={`flex-1 sm:flex-initial text-xs font-bold px-3 py-1.5 rounded-lg transition-all text-center ${
                   templateType === 'pre-auction'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-[#6359E9] text-white shadow-xs'
+                    : 'text-[#AEABD8] hover:text-white'
                 }`}
               >
                 {language === 'ta' ? 'முன் அறிவிப்பு' : 'Pre-Auction Notice'}
@@ -1231,8 +1231,8 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                 onClick={() => setTemplateType('post-auction')}
                 className={`flex-1 sm:flex-initial text-xs font-bold px-3 py-1.5 rounded-lg transition-all text-center ${
                   templateType === 'post-auction'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-[#6359E9] text-white shadow-xs'
+                    : 'text-[#AEABD8] hover:text-white'
                 }`}
               >
                 {language === 'ta' ? 'ஏல முடிவு' : 'Post-Auction Summary'}
@@ -1240,15 +1240,15 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
             </div>
 
             {/* 3. View Mode Segment (Editor | Preview | Split View) */}
-            <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 w-full sm:w-auto">
+            <div className="flex items-center bg-[#141332] p-1 rounded-xl border border-[#27264E] w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setViewMode('edit')}
                 title="Edit Template Source"
                 className={`flex-1 sm:flex-initial p-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                   viewMode === 'edit'
-                    ? 'bg-white text-gray-900 shadow-xs'
-                    : 'text-gray-500 hover:text-gray-800'
+                    ? 'bg-[#6359E9] text-white shadow-xs'
+                    : 'text-[#AEABD8] hover:text-white'
                 }`}
               >
                 <Code2 size={13} />
@@ -1260,8 +1260,8 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                 title="Live Compiled Preview"
                 className={`flex-1 sm:flex-initial p-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                   viewMode === 'preview'
-                    ? 'bg-white text-gray-900 shadow-xs'
-                    : 'text-gray-500 hover:text-gray-800'
+                    ? 'bg-[#6359E9] text-white shadow-xs'
+                    : 'text-[#AEABD8] hover:text-white'
                 }`}
               >
                 <Eye size={13} />
@@ -1273,8 +1273,8 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                 title="Side-by-Side Split View"
                 className={`flex-1 sm:flex-initial p-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                   viewMode === 'split'
-                    ? 'bg-white text-gray-900 shadow-xs'
-                    : 'text-gray-500 hover:text-gray-800'
+                    ? 'bg-[#6359E9] text-white shadow-xs'
+                    : 'text-[#AEABD8] hover:text-white'
                 }`}
               >
                 <Columns size={13} />
@@ -1287,17 +1287,17 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
         {/* Workspace: Responsive Split or Single View */}
         <div className={`grid gap-4 sm:gap-6 ${viewMode === 'split' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
           
-          {/* ── LEFT: Template Editor (LIGHT THEME) ── */}
+          {/* ── LEFT: Template Editor ── */}
           {(viewMode === 'edit' || viewMode === 'split') && (
             <div className="space-y-2 relative">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <Code2 size={14} className="text-indigo-600" />
+                  <label className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <Code2 size={14} className="text-[#6359E9]" />
                     <span>{language === 'ta' ? 'தமிழ் மாதிரி வடிவம்' : 'Template Source'}</span>
                   </label>
 
-                  {/* 1. Quick Insert Variable Popover Button (Anchored Right-0 on mobile) */}
+                  {/* 1. Quick Insert Variable Popover Button */}
                   <div className="relative" ref={insertDropdownRef}>
                     <button
                       type="button"
@@ -1305,7 +1305,7 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                         setShowInsertDropdown(!showInsertDropdown);
                         setShowEmojiPicker(false);
                       }}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-lg transition-colors active:scale-95"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#64CFF6] bg-[#141332] hover:bg-[#141332]/80 border border-[#27264E] px-2 py-1 rounded-lg transition-colors active:scale-95"
                     >
                       <Plus size={12} />
                       <span>{language === 'ta' ? 'விவரம் சேர்க்க' : 'Insert Variable'}</span>
@@ -1313,8 +1313,8 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                     </button>
 
                     {showInsertDropdown && (
-                      <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 w-[calc(100vw-3rem)] max-w-[320px] sm:w-80 max-h-80 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
-                        <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                      <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 z-40 bg-[#1D1D41] border border-[#27264E] rounded-2xl shadow-2xl p-2 w-[calc(100vw-3rem)] max-w-[320px] sm:w-80 max-h-80 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
+                        <div className="px-2.5 py-1.5 text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider border-b border-[#27264E]">
                           {language === 'ta' ? 'சீட்டு விவரங்கள் (Dynamic Variables)' : 'Select Dynamic Variable'}
                         </div>
                         {BROADCAST_VARIABLES.map((v) => {
@@ -1324,19 +1324,19 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                               key={v.key}
                               type="button"
                               onClick={() => insertTextAtCursor(`{${v.key}}`, false)}
-                              className="w-full text-left p-2 rounded-xl text-xs hover:bg-indigo-50 transition-colors flex flex-col gap-0.5 group"
+                              className="w-full text-left p-2 rounded-xl text-xs hover:bg-[#141332] transition-colors flex flex-col gap-0.5 group"
                             >
                               <div className="flex items-center justify-between">
-                                <span className="font-mono font-bold text-[11px] text-indigo-700 group-hover:text-indigo-900">
+                                <span className="font-mono font-bold text-[11px] text-[#64CFF6] group-hover:text-white">
                                   {`{${v.key}}`}
                                 </span>
-                                <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono uppercase">
+                                <span className="text-[9px] bg-[#141332] text-[#AEABD8] px-1.5 py-0.5 rounded font-mono uppercase">
                                   {v.category}
                                 </span>
                               </div>
-                              <div className="flex items-center justify-between text-[10px] text-gray-500">
+                              <div className="flex items-center justify-between text-[10px] text-[#AEABD8]">
                                 <span>{v.label}</span>
-                                <span className="font-semibold text-emerald-600 truncate max-w-[120px]" title={liveVal}>
+                                <span className="font-semibold text-[#02B15A] truncate max-w-[120px]" title={liveVal}>
                                   {liveVal || '—'}
                                 </span>
                               </div>
@@ -1355,14 +1355,14 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                         setShowEmojiPicker(!showEmojiPicker);
                         setShowInsertDropdown(false);
                       }}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-lg transition-colors active:scale-95"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#FFBB38] bg-[#141332] hover:bg-[#141332]/80 border border-[#27264E] px-2 py-1 rounded-lg transition-colors active:scale-95"
                     >
-                      <Smile size={12} className="text-amber-600" />
+                      <Smile size={12} className="text-[#FFBB38]" />
                       <span>Emojis</span>
                     </button>
 
                     {showEmojiPicker && (
-                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-gray-200 rounded-2xl shadow-xl p-3 w-80 space-y-2 animate-in zoom-in-95 duration-100">
+                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-[#1D1D41] border border-[#27264E] rounded-2xl shadow-2xl p-3 w-80 space-y-2 animate-in zoom-in-95 duration-100">
                         {/* Emoji Category Tabs */}
                         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-1">
                           {EMOJI_CATEGORIES.map((c) => (
@@ -1372,8 +1372,8 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                               onClick={() => setSelectedEmojiCategory(c.id)}
                               className={`text-[10px] font-bold px-2 py-0.5 rounded-lg transition-all shrink-0 ${
                                 selectedEmojiCategory === c.id
-                                  ? 'bg-amber-600 text-white'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                  ? 'bg-[#6359E9] text-white'
+                                  : 'bg-[#141332] text-[#AEABD8] hover:text-white'
                               }`}
                             >
                               {c.name}
@@ -1382,13 +1382,13 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                         </div>
 
                         {/* Emoji Grid */}
-                        <div className="grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1 bg-[#141332] rounded-xl border border-[#27264E]">
                           {displayedEmojis.map((emoji, idx) => (
                             <button
                               key={idx}
                               type="button"
                               onClick={() => insertTextAtCursor(emoji, false)}
-                              className="w-10 h-10 flex items-center justify-center text-xl hover:bg-white rounded-lg transition-all hover:scale-115 active:scale-90"
+                              className="w-10 h-10 flex items-center justify-center text-xl hover:bg-[#1D1D41] rounded-lg transition-all hover:scale-115 active:scale-90"
                             >
                               {emoji}
                             </button>
@@ -1400,21 +1400,21 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                 </div>
 
                 <div className="flex items-center gap-2 ml-auto">
-                  <span className="text-[10px] text-gray-400 font-mono">
+                  <span className="text-[10px] text-[#AEABD8] font-mono">
                     {activeRawTemplate.length} chars
                   </span>
                   <button
                     type="button"
                     onClick={handleResetDefaultTemplate}
                     title="Reset template to standard default"
-                    className="text-gray-400 hover:text-rose-600 transition-colors p-1"
+                    className="text-[#AEABD8] hover:text-[#E41414] transition-colors p-1"
                   >
                     <RotateCcw size={13} />
                   </button>
                 </div>
               </div>
 
-              {/* Textarea with Light Theme */}
+              {/* Textarea with Cyber-Fintech Theme */}
               <div className="relative">
                 <textarea
                   ref={textareaRef}
@@ -1423,15 +1423,15 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                   onChange={handleTextareaInput}
                   onKeyDown={handleTextareaKeyDown}
                   placeholder={language === 'ta' ? 'செய்தி மாதிரி இங்கே தட்டச்சு செய்யவும்... { அல்லது < அல்லது / அழுத்தவும்' : 'Type message template. Type { or < or / to insert live variables...'}
-                  className="w-full bg-white text-gray-900 border border-gray-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-2xl p-3.5 sm:p-4 text-xs font-mono leading-relaxed focus:outline-none resize-none shadow-2xs transition-all"
+                  className="w-full bg-[#141332] text-white border border-[#27264E] focus:border-[#6359E9] focus:ring-1 focus:ring-[#6359E9] rounded-2xl p-3.5 sm:p-4 text-xs font-mono leading-relaxed focus:outline-none resize-none shadow-md transition-all placeholder:text-[#AEABD8]/40"
                 />
 
                 {/* Autocomplete Dropdown Popup when typing `{`, `<`, or `/` */}
                 {showSuggestMenu && filteredSuggestVariables.length > 0 && (
-                  <div className="absolute left-2 right-2 sm:right-auto sm:left-3 top-14 z-30 bg-white border border-gray-200 rounded-2xl shadow-2xl p-2 max-w-[calc(100vw-3.5rem)] sm:w-80 max-h-72 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
-                    <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 flex justify-between items-center">
+                  <div className="absolute left-2 right-2 sm:right-auto sm:left-3 top-14 z-30 bg-[#1D1D41] border border-[#27264E] rounded-2xl shadow-2xl p-2 max-w-[calc(100vw-3.5rem)] sm:w-80 max-h-72 overflow-y-auto space-y-1 animate-in zoom-in-95 duration-100">
+                    <div className="px-2.5 py-1.5 text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider border-b border-[#27264E] flex justify-between items-center">
                       <span>{language === 'ta' ? 'விவரம் தேர்வு செய்' : 'Insert Dynamic Variable'}</span>
-                      <span className="text-[9px] lowercase font-normal text-indigo-600">Enter / Tab</span>
+                      <span className="text-[9px] lowercase font-normal text-[#64CFF6]">Enter / Tab</span>
                     </div>
                     {filteredSuggestVariables.map((v, idx) => {
                       const liveVal = v.getValue(selectedMeta, signatureLine, contactPhone);
@@ -1445,22 +1445,22 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                           onMouseEnter={() => setSuggestIndex(idx)}
                           className={`w-full text-left p-2 rounded-xl text-xs transition-colors flex flex-col gap-0.5 ${
                             suggestIndex === idx
-                              ? 'bg-indigo-50 border border-indigo-200 shadow-2xs'
-                              : 'hover:bg-gray-50 border border-transparent'
+                              ? 'bg-[#6359E9]/20 border border-[#6359E9] shadow-xs'
+                              : 'hover:bg-[#141332] border border-transparent'
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-mono text-[11px] font-bold text-indigo-700">
+                            <span className="font-mono text-[11px] font-bold text-[#64CFF6]">
                               {`{${v.key}}`}
                             </span>
-                            <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono uppercase">
+                            <span className="text-[9px] bg-[#141332] text-[#AEABD8] px-1.5 py-0.5 rounded font-mono uppercase">
                               {v.category}
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between text-[10px]">
-                            <span className="text-gray-500 font-medium truncate max-w-[120px]">{v.label}</span>
-                            <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded text-[10px] truncate max-w-[130px]" title={liveVal}>
+                            <span className="text-[#AEABD8] font-medium truncate max-w-[120px]">{v.label}</span>
+                            <span className="font-bold text-[#02B15A] bg-[#02B15A]/10 px-1.5 py-0.5 rounded text-[10px] truncate max-w-[130px]" title={liveVal}>
                               Live: {liveVal || '—'}
                             </span>
                           </div>
@@ -1472,12 +1472,12 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
               </div>
 
               {/* Helper Footer Hint */}
-              <div className="flex items-center justify-between text-[11px] text-gray-500 pt-0.5">
+              <div className="flex items-center justify-between text-[11px] text-[#AEABD8] pt-0.5">
                 <span>
-                  💡 Type <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'{'}</code>, <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'<'}</code>, or <code className="bg-gray-100 px-1 rounded border border-gray-200 text-indigo-700 font-bold">{'/'}</code> for live autocomplete.
+                  💡 Type <code className="bg-[#141332] px-1 rounded border border-[#27264E] text-[#64CFF6] font-bold">{'{'}</code>, <code className="bg-[#141332] px-1 rounded border border-[#27264E] text-[#64CFF6] font-bold">{'<'}</code>, or <code className="bg-[#141332] px-1 rounded border border-[#27264E] text-[#64CFF6] font-bold">{'/'}</code> for live autocomplete.
                 </span>
 
-                <span className="text-[10px] text-emerald-600 font-bold hidden sm:inline">
+                <span className="text-[10px] text-[#02B15A] font-bold hidden sm:inline">
                   ☁️ Auto-synced to Supabase
                 </span>
               </div>
@@ -1488,26 +1488,26 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
           {(viewMode === 'preview' || viewMode === 'split') && (
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Eye size={14} className="text-emerald-600" />
+                <label className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Eye size={14} className="text-[#02B15A]" />
                   <span>{language === 'ta' ? 'நேரடி முன்னோட்டம் (வாட்ஸ்அப் செய்தி)' : 'Live Compiled Preview (Ready for WhatsApp)'}</span>
                 </label>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                <span className="text-[10px] font-bold text-[#02B15A] bg-[#02B15A]/15 px-2 py-0.5 rounded-md border border-[#02B15A]/30">
                   ✓ {language === 'ta' ? 'தமிழ் வடிவம்' : 'Real-time Substituted'}
                 </span>
               </div>
 
               {/* WhatsApp Simulated Bubble */}
-              <div className="bg-[#EFEAE2] border border-gray-300 rounded-2xl p-3.5 sm:p-4 shadow-inner flex flex-col justify-between min-h-[300px]">
-                <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm max-w-full text-xs text-gray-900 font-sans border border-emerald-100 relative">
-                  <div className="absolute top-2 right-3 text-[10px] text-gray-400 font-mono">
+              <div className="bg-[#0B141A] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-inner flex flex-col justify-between min-h-[300px]">
+                <div className="bg-[#1F2C34] rounded-2xl p-3.5 sm:p-4 shadow-md max-w-full text-xs text-white font-sans border border-[#27264E] relative">
+                  <div className="absolute top-2 right-3 text-[10px] text-[#AEABD8]/60 font-mono">
                     {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                   <div className="pt-1">{renderWhatsAppFormatted(compiledBroadcastText)}</div>
                 </div>
 
-                <div className="pt-2.5 text-center text-[10px] sm:text-[11px] text-gray-500">
-                  {language === 'ta' ? 'சீட்டுக் குழு' : 'Live data for'}: <strong>{selectedMeta?.name || 'Chit Group'}</strong>
+                <div className="pt-2.5 text-center text-[10px] sm:text-[11px] text-[#AEABD8]">
+                  {language === 'ta' ? 'சீட்டுக் குழு' : 'Live data for'}: <strong className="text-white">{selectedMeta?.name || 'Chit Group'}</strong>
                 </div>
               </div>
 
@@ -1516,9 +1516,9 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                 <button
                   type="button"
                   onClick={handleCopyText}
-                  className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-800 text-xs font-bold px-5 py-3 sm:py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all border border-gray-300 shadow-2xs"
+                  className="w-full sm:w-auto bg-[#141332] hover:bg-[#27264E] active:scale-98 text-white text-xs font-bold px-5 py-3 sm:py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all border border-[#27264E] shadow-2xs"
                 >
-                  {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
+                  {copied ? <Check size={15} className="text-[#02B15A]" /> : <Copy size={15} />}
                   <span>{copied ? (language === 'ta' ? 'நகலெடுக்கப்பட்டது!' : 'Copied!') : (language === 'ta' ? 'செய்தியை நகலெடு' : 'Copy to Clipboard')}</span>
                 </button>
 
@@ -1526,7 +1526,7 @@ function ensurePortalLinkInTemplate(tmpl: string, isTamil: boolean): string {
                   href={formatWhatsAppUrl()}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold px-6 py-3 sm:py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md shadow-emerald-600/20 text-center"
+                  className="w-full sm:w-auto bg-[#02B15A] hover:bg-[#02B15A]/90 active:scale-98 text-white text-xs font-bold px-6 py-3 sm:py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md shadow-[#02B15A]/20 text-center"
                 >
                   <Send size={15} />
                   <span>{language === 'ta' ? 'WhatsApp மூலம் அனுப்புக' : 'Share via WhatsApp'}</span>

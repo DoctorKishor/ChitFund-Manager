@@ -326,20 +326,20 @@ export default function QuickMemberCollectModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
-      <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-lg max-h-[90dvh] flex flex-col shadow-2xl relative overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+      <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-lg max-h-[90dvh] flex flex-col shadow-2xl relative overflow-hidden my-auto animate-in zoom-in-95 duration-150">
         
         {/* 1. Modal Top Bar */}
-        <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between bg-white z-10 shrink-0">
+        <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between bg-[#1D1D41] z-10 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shrink-0 shadow-xs">
+            <div className="w-10 h-10 rounded-2xl bg-[#02B15A]/15 text-[#02B15A] flex items-center justify-center font-bold shrink-0 shadow-xs border border-[#02B15A]/30">
               <Coins size={20} />
             </div>
             <div>
-              <h3 className="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight">
+              <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
                 Quick Collect Payment
               </h3>
-              <p className="text-[11px] text-gray-500 font-medium">
+              <p className="text-[11px] text-[#AEABD8] font-medium">
                 Select subscriber or scan their passbook QR sticker
               </p>
             </div>
@@ -348,31 +348,31 @@ export default function QuickMemberCollectModal({
           <button 
             type="button" 
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-[#27264E] hover:bg-[#3A3A5A] text-[#AEABD8] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* 2. Search & Passbook QR Scan Bar */}
-        <div className="p-3.5 sm:p-4 bg-gray-50/90 border-b border-gray-150 space-y-2.5 shrink-0">
+        <div className="p-3.5 sm:p-4 bg-[#141332] border-b border-[#27264E] space-y-2.5 shrink-0">
           <div className="flex items-center gap-2">
             {/* Live Search Input */}
             <div className="relative flex-1">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#AEABD8]" />
               <input
                 type="text"
                 placeholder="Search by name, phone, ticket #..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-gray-200 focus:border-emerald-600 rounded-xl text-xs font-semibold text-gray-900 placeholder:text-gray-400 focus:outline-none transition-colors shadow-2xs"
+                className="w-full pl-9 pr-3.5 py-2.5 bg-[#1D1D41] border border-[#27264E] focus:border-[#6359E9] rounded-xl text-xs font-semibold text-white placeholder:text-[#AEABD8]/60 focus:outline-none transition-colors shadow-inner"
                 autoFocus
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEABD8] hover:text-white p-0.5 cursor-pointer"
                 >
                   <X size={13} />
                 </button>
@@ -386,7 +386,7 @@ export default function QuickMemberCollectModal({
                 triggerHapticFeedback('light');
                 setIsScannerOpen(true);
               }}
-              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
+              className="flex items-center gap-1.5 bg-[#6359E9] hover:bg-[#6F64FF] active:scale-95 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-md shadow-[#6359E9]/30 shrink-0 cursor-pointer"
               title="Scan member pocket passbook QR sticker"
             >
               <QrCode size={16} />
@@ -402,8 +402,8 @@ export default function QuickMemberCollectModal({
                 onClick={() => setSelectedGroupFilter('all')}
                 className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
                   selectedGroupFilter === 'all'
-                    ? 'bg-gray-900 text-white border-black shadow-2xs'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                    ? 'bg-[#6359E9] text-white border-transparent shadow-xs'
+                    : 'bg-[#1D1D41] text-[#AEABD8] border-[#27264E] hover:bg-[#27264E] hover:text-white'
                 }`}
               >
                 All Groups ({allMembers.length})
@@ -417,8 +417,8 @@ export default function QuickMemberCollectModal({
                     onClick={() => setSelectedGroupFilter(g.id)}
                     className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
                       selectedGroupFilter === g.id
-                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
-                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                        ? 'bg-[#6359E9] text-white border-transparent shadow-xs'
+                        : 'bg-[#1D1D41] text-[#AEABD8] border-[#27264E] hover:bg-[#27264E] hover:text-white'
                     }`}
                   >
                     {g.name} ({count})
@@ -431,23 +431,23 @@ export default function QuickMemberCollectModal({
 
         {/* 3. Unlinked QR Pairing Alert Prompt */}
         {unlinkedTokenFound && (
-          <div className="p-3.5 bg-amber-50 border-b border-amber-200 text-amber-950 text-xs space-y-2 animate-in fade-in duration-200 shrink-0">
+          <div className="p-3.5 bg-[#141332] border-b border-[#FFBB38]/40 text-[#FFBB38] text-xs space-y-2 animate-in fade-in duration-200 shrink-0">
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 font-bold text-amber-900">
-                <LinkIcon size={16} className="text-amber-600 shrink-0" />
+              <div className="flex items-center gap-2 font-bold text-[#FFBB38]">
+                <LinkIcon size={16} className="text-[#FFBB38] shrink-0" />
                 <span>Unlinked Passbook QR Sticker Scanned!</span>
               </div>
               <button 
                 type="button" 
                 onClick={() => setUnlinkedTokenFound(null)} 
-                className="text-amber-600 hover:text-amber-800 text-[10px] font-bold"
+                className="text-[#AEABD8] hover:text-white text-[10px] font-bold cursor-pointer"
               >
                 Dismiss
               </button>
             </div>
-            <p className="text-[11px] text-amber-800">
+            <p className="text-[11px] text-[#AEABD8]">
               This physical QR sticker [<code>{unlinkedTokenFound.slice(0, 8)}...</code>] is valid but not linked to any subscriber yet.
-              <strong className="block mt-0.5">👇 Tap any member below to link this QR sticker to them and record their payment:</strong>
+              <strong className="block mt-0.5 text-[#FFBB38]">👇 Tap any member below to link this QR sticker to them and record their payment:</strong>
             </p>
           </div>
         )}
@@ -455,15 +455,15 @@ export default function QuickMemberCollectModal({
         {/* 4. Scrollable Member Selection List */}
         <div className="p-3.5 sm:p-4 overflow-y-auto flex-1 space-y-2.5">
           {loading ? (
-            <div className="py-12 text-center text-gray-400 text-xs flex flex-col items-center justify-center gap-2">
-              <RefreshCw size={20} className="animate-spin text-emerald-600" />
+            <div className="py-12 text-center text-[#AEABD8] text-xs flex flex-col items-center justify-center gap-2">
+              <RefreshCw size={20} className="animate-spin text-[#64CFF6]" />
               <span>Loading subscribers &amp; live dues...</span>
             </div>
           ) : filteredMembers.length === 0 ? (
-            <div className="py-12 text-center text-gray-400 text-xs space-y-1.5">
-              <User size={28} className="mx-auto text-gray-300" />
-              <p className="font-bold text-gray-600">No matching subscribers found</p>
-              <p className="text-[11px] text-gray-400">Try changing the search query or group filter</p>
+            <div className="py-12 text-center text-[#AEABD8] text-xs space-y-1.5">
+              <User size={28} className="mx-auto text-[#27264E]" />
+              <p className="font-bold text-white">No matching subscribers found</p>
+              <p className="text-[11px] text-[#AEABD8]">Try changing the search query or group filter</p>
             </div>
           ) : (
             filteredMembers.map((member) => {
@@ -484,46 +484,46 @@ export default function QuickMemberCollectModal({
                   }}
                   className={`p-3 sm:p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer active:scale-[0.98] ${
                     unlinkedTokenFound
-                      ? 'bg-amber-50/60 hover:bg-amber-100/70 border-amber-300'
+                      ? 'bg-[#1D1D41] hover:bg-[#27264E] border-[#FFBB38]/40'
                       : member.status === 'paid'
-                        ? 'bg-emerald-50/40 hover:bg-emerald-50/80 border-emerald-200/80'
-                        : 'bg-white hover:bg-gray-50 border-gray-200/90 shadow-2xs hover:border-gray-300'
+                        ? 'bg-[#1D1D41] hover:bg-[#141332] border-[#02B15A]/30'
+                        : 'bg-[#1D1D41] hover:bg-[#141332] border-[#27264E] hover:border-[#6359E9]/50 shadow-md'
                   }`}
                 >
                   {/* Left: Avatar & Member Info */}
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-extrabold text-sm text-white shrink-0 shadow-2xs ${
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-extrabold text-sm text-white shrink-0 shadow-sm ${
                       member.status === 'paid'
-                        ? 'bg-emerald-600'
+                        ? 'bg-[#02B15A]'
                         : member.status === 'partial'
-                          ? 'bg-amber-600'
-                          : 'bg-gradient-to-br from-indigo-500 to-indigo-700'
+                          ? 'bg-[#FFBB38]'
+                          : 'bg-gradient-to-tr from-[#9C2CF3] to-[#3A6FF9]'
                     }`}>
                       {initial}
                     </div>
 
                     <div className="min-w-0 flex-1 space-y-0.5">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-gray-900 text-xs sm:text-sm truncate">
+                        <span className="font-bold text-white text-xs sm:text-sm truncate">
                           {member.name}
                         </span>
-                        <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded font-mono shrink-0">
+                        <span className="text-[10px] font-bold bg-[#141332] text-[#AEABD8] border border-[#27264E] px-1.5 py-0.2 rounded font-mono shrink-0">
                           #{member.ticket}
                         </span>
                         {member.passbookToken && (
-                          <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.2 rounded shrink-0 flex items-center gap-0.5" title="Passbook QR Linked">
+                          <span className="text-[9px] font-bold bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40 px-1.5 py-0.2 rounded shrink-0 flex items-center gap-0.5" title="Passbook QR Linked">
                             <QrCode size={9} /> QR
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 text-[11px] text-gray-500 flex-wrap">
-                        <span className="truncate font-medium text-gray-600 flex items-center gap-1">
-                          <Briefcase size={10} className="text-gray-400" />
+                      <div className="flex items-center gap-2 text-[11px] text-[#AEABD8] flex-wrap">
+                        <span className="truncate font-medium flex items-center gap-1">
+                          <Briefcase size={10} className="text-[#AEABD8]/70" />
                           <span>{member.groupName} (M{member.currentMonth})</span>
                         </span>
                         {member.phone && (
-                          <span className="text-gray-400 font-mono hidden sm:inline">
+                          <span className="text-[#AEABD8]/70 font-mono hidden sm:inline">
                             · {member.phone}
                           </span>
                         )}
@@ -534,21 +534,21 @@ export default function QuickMemberCollectModal({
                   {/* Right: Due Amount & Action */}
                   <div className="text-right shrink-0 flex items-center gap-2.5">
                     <div className="space-y-0.5">
-                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">
+                      <span className="text-[9px] font-bold text-[#AEABD8] uppercase tracking-wider block">
                         {member.status === 'paid' ? 'Paid' : 'Due Amount'}
                       </span>
                       <span className={`text-xs sm:text-sm font-black font-mono block ${
                         member.status === 'paid'
-                          ? 'text-emerald-700'
+                          ? 'text-[#02B15A]'
                           : member.status === 'partial'
-                            ? 'text-amber-700'
-                            : 'text-rose-600'
+                            ? 'text-[#FFBB38]'
+                            : 'text-[#E41414]'
                       }`}>
                         ₹{displayDue.toLocaleString('en-IN')}
                       </span>
                     </div>
 
-                    <div className="w-7 h-7 rounded-xl bg-gray-100 hover:bg-emerald-100 text-gray-500 hover:text-emerald-700 flex items-center justify-center transition-colors">
+                    <div className="w-7 h-7 rounded-xl bg-[#141332] border border-[#27264E] text-[#AEABD8] group-hover:text-white flex items-center justify-center transition-colors">
                       <ArrowRight size={13} />
                     </div>
                   </div>

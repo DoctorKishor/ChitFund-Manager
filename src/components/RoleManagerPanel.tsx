@@ -381,19 +381,19 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-2xs text-gray-900 flex flex-col md:flex-row min-h-[650px] animate-in fade-in duration-200">
+    <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl overflow-hidden shadow-2xs text-white flex flex-col md:flex-row min-h-[650px] animate-in fade-in duration-200">
       
       {/* ── MOBILE ROLE SELECTOR CAROUSEL (Mobile only: < md) ── */}
-      <div className="block md:hidden bg-slate-50 border-b border-gray-200 p-3 space-y-2">
+      <div className="block md:hidden bg-[#141332] border-b border-[#27264E] p-3 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
-            <Shield size={14} className="text-indigo-600" />
+          <div className="flex items-center gap-1.5 text-xs font-bold text-[#AEABD8]">
+            <Shield size={14} className="text-[#64CFF6]" />
             <span>Select Role to Configure</span>
           </div>
           <button
             type="button"
             onClick={() => setIsNewRoleModalOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs active:scale-95"
+            className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer"
           >
             <Plus size={12} />
             <span>Add Role</span>
@@ -410,10 +410,10 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                 key={role.id}
                 type="button"
                 onClick={() => selectRole(role)}
-                className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${
+                className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-white text-gray-900 border-indigo-400 shadow-xs ring-1 ring-indigo-400/30'
-                    : 'bg-white/80 text-gray-600 border-gray-200 hover:bg-white'
+                    ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs'
+                    : 'bg-[#1D1D41] text-[#AEABD8] border-[#27264E] hover:bg-[#27264E] hover:text-white'
                 }`}
               >
                 <span
@@ -421,7 +421,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                   style={{ backgroundColor: role.color || '#6366F1' }}
                 />
                 <span>{role.name}</span>
-                <span className="text-[10px] text-gray-400 font-mono">({memberCount})</span>
+                <span className="text-[10px] text-[#AEABD8] font-mono">({memberCount})</span>
               </button>
             );
           })}
@@ -429,18 +429,18 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
       </div>
 
       {/* ── LEFT SIDEBAR: DESKTOP ROLES LIST (Desktop: >= md) ── */}
-      <div className="hidden md:flex w-72 lg:w-80 bg-slate-50/70 border-r border-gray-200/80 p-4 flex-col justify-between shrink-0">
+      <div className="hidden md:flex w-72 lg:w-80 bg-[#141332] border-r border-[#27264E] p-4 flex-col justify-between shrink-0">
         <div className="space-y-3.5">
           {/* Header & New Role Button */}
-          <div className="flex items-center justify-between gap-2 pb-2 border-b border-gray-200/60">
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#27264E]">
             <div className="flex items-center gap-2">
-              <Shield className="text-indigo-600" size={17} />
-              <span className="font-extrabold text-xs tracking-wider uppercase text-gray-900">Configured Roles</span>
+              <Shield className="text-[#64CFF6]" size={17} />
+              <span className="font-extrabold text-xs tracking-wider uppercase text-white">Configured Roles</span>
             </div>
             <button
               type="button"
               onClick={() => setIsNewRoleModalOpen(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs active:scale-95 transition-all"
+              className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs active:scale-95 transition-all cursor-pointer"
             >
               <Plus size={13} />
               <span>Add Role</span>
@@ -449,13 +449,13 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
 
           {/* Search Bar */}
           <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEABD8]" />
             <input
               type="text"
               placeholder="Search roles..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-indigo-500 shadow-2xs"
+              className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-[#AEABD8]/60 focus:outline-none focus:border-[#6359E9] shadow-2xs"
             />
           </div>
 
@@ -470,10 +470,10 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                   key={role.id}
                   type="button"
                   onClick={() => selectRole(role)}
-                  className={`w-full text-left p-2.5 rounded-2xl flex items-center justify-between transition-all group ${
+                  className={`w-full text-left p-2.5 rounded-2xl flex items-center justify-between transition-all group cursor-pointer ${
                     isSelected
-                      ? 'bg-white border border-gray-300/80 shadow-xs text-gray-900 ring-1 ring-black/5'
-                      : 'hover:bg-white/70 border border-transparent text-gray-600 hover:text-gray-900'
+                      ? 'bg-[#6359E9]/20 border border-[#6359E9] shadow-xs text-white'
+                      : 'hover:bg-[#1D1D41] border border-transparent text-[#AEABD8] hover:text-white'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -483,14 +483,14 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                     />
                     <div className="truncate">
                       <p className="text-xs font-bold truncate flex items-center gap-1.5">
-                        <span className={isSelected ? 'text-gray-900 font-black' : 'text-gray-700'}>{role.name}</span>
+                        <span className={isSelected ? 'text-white font-black' : 'text-[#AEABD8]'}>{role.name}</span>
                         {role.is_system && (
                           <span title="System Role" className="inline-flex">
-                            <Lock size={10} className="text-gray-400 group-hover:text-gray-600 shrink-0" />
+                            <Lock size={10} className="text-[#AEABD8] group-hover:text-white shrink-0" />
                           </span>
                         )}
                       </p>
-                      <span className="text-[10px] text-gray-400 font-mono block">
+                      <span className="text-[10px] text-[#AEABD8] font-mono block">
                         {memberCount} {memberCount === 1 ? 'user' : 'users'}
                       </span>
                     </div>
@@ -498,11 +498,11 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
 
                   <div className="flex items-center gap-1 shrink-0">
                     {role.is_system ? (
-                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#1D1D41] text-[#AEABD8] border border-[#27264E]">
                         System
                       </span>
                     ) : (
-                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40">
                         Custom
                       </span>
                     )}
@@ -514,19 +514,19 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
         </div>
 
         {/* Info hint */}
-        <div className="pt-3 border-t border-gray-200/70 text-[11px] text-gray-500 flex items-start gap-1.5">
-          <Info size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+        <div className="pt-3 border-t border-[#27264E] text-[11px] text-[#AEABD8] flex items-start gap-1.5">
+          <Info size={13} className="text-[#64CFF6] shrink-0 mt-0.5" />
           <span>Members with custom roles inherit assigned module &amp; action permissions instantly.</span>
         </div>
       </div>
 
       {/* ── RIGHT PANEL: ROLE CONFIGURATION & PERMISSIONS ── */}
-      <div className="flex-1 p-4 sm:p-6 lg:p-7 flex flex-col justify-between bg-white overflow-y-auto">
+      <div className="flex-1 p-4 sm:p-6 lg:p-7 flex flex-col justify-between bg-[#1D1D41] overflow-y-auto">
         {activeRole ? (
           <div className="space-y-5 sm:space-y-6">
             
             {/* Header: Role Identity & Save/Delete Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 sm:pb-5 border-b border-gray-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 sm:pb-5 border-b border-[#27264E]">
               <div className="flex items-center gap-3">
                 <div
                   className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-xs shrink-0 uppercase border border-white/20"
@@ -536,17 +536,17 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-base sm:text-lg font-black text-gray-900">
+                    <h2 className="text-base sm:text-lg font-black text-white">
                       {activeRole.name}
                     </h2>
                     {activeRole.is_system && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40">
                         <Lock size={10} /> System Protected
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Role ID: <code className="font-mono text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded text-[11px]">{activeRole.id}</code> · {roleCounts[activeRole.id] || 0} active members
+                  <p className="text-xs text-[#AEABD8] mt-0.5">
+                    Role ID: <code className="font-mono text-[#64CFF6] bg-[#141332] px-1.5 py-0.5 rounded text-[11px] border border-[#27264E]">{activeRole.id}</code> · {roleCounts[activeRole.id] || 0} active members
                   </p>
                 </div>
               </div>
@@ -557,7 +557,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                   <button
                     type="button"
                     onClick={handleDeleteRole}
-                    className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1.5 transition-all"
+                    className="px-3 py-2 rounded-xl bg-[#E41414]/15 hover:bg-[#E41414]/25 text-[#E41414] border border-[#E41414]/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <Trash2 size={13} />
                     <span className="hidden sm:inline">Delete Role</span>
@@ -568,10 +568,10 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                   type="button"
                   onClick={handleSaveRole}
                   disabled={isSaving}
-                  className={`px-4 sm:px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all ${
+                  className={`px-4 sm:px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer ${
                     saveSuccess
-                      ? 'bg-emerald-600 text-white shadow-emerald-600/20'
-                      : 'bg-slate-900 hover:bg-black text-white'
+                      ? 'bg-[#02B15A] text-white shadow-[#02B15A]/20'
+                      : 'bg-[#6359E9] hover:bg-[#6F64FF] text-white'
                   }`}
                 >
                   {saveSuccess ? (
@@ -590,22 +590,22 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
             </div>
 
             {/* Role Profile Settings (Name, Color & Description) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 bg-slate-50/70 border border-gray-200/80 rounded-2xl p-4 sm:p-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 bg-[#141332] border border-[#27264E] rounded-2xl p-4 sm:p-5">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Role Display Name</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Role Display Name</label>
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   placeholder="e.g. Field Officer / Treasury Auditor"
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none focus:border-indigo-500 shadow-2xs"
+                  className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#6359E9] shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1 flex items-center justify-between">
                   <span>Role Theme Color</span>
-                  <span className="text-[10px] font-mono text-gray-400">{editColor}</span>
+                  <span className="text-[10px] font-mono text-[#64CFF6]">{editColor}</span>
                 </label>
                 <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                   {PRESET_COLORS.map((c) => (
@@ -613,8 +613,8 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                       key={c.name}
                       type="button"
                       onClick={() => setEditColor(c.value)}
-                      className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                        editColor.toLowerCase() === c.value.toLowerCase() ? 'ring-2 ring-indigo-600 ring-offset-2 scale-110' : 'opacity-85 hover:opacity-100'
+                      className={`w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                        editColor.toLowerCase() === c.value.toLowerCase() ? 'ring-2 ring-[#6359E9] ring-offset-2 ring-offset-[#141332] scale-110' : 'opacity-85 hover:opacity-100'
                       }`}
                       style={{ backgroundColor: c.value }}
                       title={c.name}
@@ -626,31 +626,31 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                     type="color"
                     value={editColor}
                     onChange={(e) => setEditColor(e.target.value)}
-                    className="w-7 h-7 rounded-lg border border-gray-200 bg-white cursor-pointer p-0.5 ml-1"
+                    className="w-7 h-7 rounded-lg border border-[#27264E] bg-[#1D1D41] cursor-pointer p-0.5 ml-1"
                     title="Custom Hex Color"
                   />
                 </div>
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-gray-700 mb-1">Role Description &amp; Scope</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Role Description &amp; Scope</label>
                 <textarea
                   rows={2}
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   placeholder="Explain the duties and operational scope of this role..."
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-800 focus:outline-none focus:border-indigo-500 resize-none shadow-2xs"
+                  className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6359E9] resize-none shadow-2xs placeholder-[#AEABD8]/60"
                 />
               </div>
 
               {/* Database-Level Security Privilege */}
-              <div className="md:col-span-2 flex items-center justify-between p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl">
+              <div className="md:col-span-2 flex items-center justify-between p-3.5 bg-[#FFBB38]/10 border border-[#FFBB38]/30 rounded-xl">
                 <div>
-                  <p className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                    <ShieldCheck size={14} className="text-amber-600" />
+                  <p className="text-xs font-bold text-[#FFBB38] flex items-center gap-1.5">
+                    <ShieldCheck size={14} className="text-[#FFBB38]" />
                     <span>Database Security Privilege (RLS)</span>
                   </p>
-                  <p className="text-[11px] text-amber-800/80 mt-0.5 leading-relaxed">
+                  <p className="text-[11px] text-[#AEABD8] mt-0.5 leading-relaxed">
                     {activeRole.id === 'admin' 
                       ? 'The Admin role always possesses database super-privileges.' 
                       : 'Privileged roles can read/write administrative data in Supabase (treasury vaults, all members, audits). Only enable for trusted manager-level roles.'}
@@ -661,7 +661,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                   disabled={activeRole.id === 'admin'}
                   onClick={() => setEditIsPrivileged((prev) => !prev)}
                   className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ml-4 ${
-                    (activeRole.id === 'admin' || editIsPrivileged) ? 'bg-amber-500' : 'bg-gray-300'
+                    (activeRole.id === 'admin' || editIsPrivileged) ? 'bg-[#FFBB38]' : 'bg-[#27264E]'
                   } ${activeRole.id === 'admin' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
                 >
                   <span
@@ -675,24 +675,24 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
 
             {/* Quick Bulk Action Bar */}
             {activeRole.id !== 'admin' && (
-              <div className="flex items-center justify-between bg-indigo-50/50 px-3.5 py-2.5 rounded-xl border border-indigo-100">
-                <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                  <Sliders size={13} className="text-indigo-600" />
+              <div className="flex items-center justify-between bg-[#141332] px-3.5 py-2.5 rounded-xl border border-[#27264E]">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Sliders size={13} className="text-[#6359E9]" />
                   Configure Granular Permissions
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleSelectAll}
-                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
+                    className="text-[11px] font-bold text-[#6359E9] hover:text-[#6F64FF] hover:underline"
                   >
                     Grant All
                   </button>
-                  <span className="text-indigo-200">·</span>
+                  <span className="text-[#27264E]">·</span>
                   <button
                     type="button"
                     onClick={handleClearAll}
-                    className="text-[11px] font-bold text-gray-500 hover:text-rose-600 hover:underline"
+                    className="text-[11px] font-bold text-[#AEABD8] hover:text-[#E41414] hover:underline"
                   >
                     Clear All
                   </button>
@@ -705,12 +705,12 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
               {PERMISSION_CATEGORIES.map((cat) => {
                 const IconComponent = cat.icon;
                 return (
-                  <div key={cat.id} className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-5 space-y-3 shadow-2xs">
-                    <div className="flex items-center gap-2 border-b border-gray-100 pb-2.5">
-                      <IconComponent size={16} className="text-indigo-600" />
+                  <div key={cat.id} className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 space-y-3 shadow-md">
+                    <div className="flex items-center gap-2 border-b border-[#27264E] pb-2.5">
+                      <IconComponent size={16} className="text-[#6359E9]" />
                       <div>
-                        <h4 className="text-xs font-black text-gray-900 tracking-wide uppercase">{cat.title}</h4>
-                        <p className="text-[10px] text-gray-500">{cat.description}</p>
+                        <h4 className="text-xs font-black text-white tracking-wide uppercase">{cat.title}</h4>
+                        <p className="text-[10px] text-[#AEABD8]">{cat.description}</p>
                       </div>
                     </div>
 
@@ -732,21 +732,21 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                             }}
                             className={`p-3 rounded-xl border flex items-start justify-between gap-3 transition-all cursor-pointer select-none ${
                               isGranted
-                                ? 'bg-indigo-50/70 border-indigo-200 text-gray-900 shadow-2xs'
-                                : 'bg-gray-50/50 border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300'
+                                ? 'bg-[#6359E9]/15 border-[#6359E9]/40 text-white shadow-xs'
+                                : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:border-[#6359E9]/40 hover:bg-[#141332]/80'
                             } ${activeRole.id === 'admin' ? 'cursor-not-allowed opacity-90' : 'hover:scale-[1.005]'}`}
                           >
                             <div className="space-y-0.5">
-                              <p className={`text-xs font-bold ${isGranted ? 'text-indigo-900 font-extrabold' : 'text-gray-800'}`}>
+                              <p className={`text-xs font-bold ${isGranted ? 'text-white font-extrabold' : 'text-[#AEABD8]'}`}>
                                 {item.label}
                               </p>
-                              <p className="text-[10px] text-gray-500 leading-relaxed">{item.desc}</p>
+                              <p className="text-[10px] text-[#AEABD8]/70 leading-relaxed">{item.desc}</p>
                             </div>
 
                             {/* Toggle Switch */}
                             <div
                               className={`w-9 h-5 rounded-full p-0.5 transition-colors shrink-0 ${
-                                isGranted ? 'bg-indigo-600' : 'bg-gray-300'
+                                isGranted ? 'bg-[#6359E9]' : 'bg-[#27264E]'
                               }`}
                             >
                               <div
@@ -766,8 +766,8 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
 
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <Shield size={40} className="text-gray-300 mb-3" />
+          <div className="flex flex-col items-center justify-center py-20 text-[#AEABD8]">
+            <Shield size={40} className="text-[#27264E] mb-3" />
             <p className="text-sm font-bold">Select or create a role to view permissions</p>
           </div>
         )}
@@ -775,17 +775,17 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
 
       {/* ── CREATE NEW ROLE MODAL ── */}
       {isNewRoleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl text-gray-900 my-auto">
-            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl text-white my-auto">
+            <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <Shield className="text-indigo-600" size={18} />
-                <h3 className="font-bold text-sm text-gray-900">Create New Custom Role</h3>
+                <Shield className="text-[#6359E9]" size={18} />
+                <h3 className="font-bold text-sm text-white">Create New Custom Role</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsNewRoleModalOpen(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-1.5 text-[#AEABD8] hover:text-white rounded-lg hover:bg-[#141332] transition-colors"
               >
                 <X size={18} />
               </button>
@@ -793,19 +793,19 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
 
             <form onSubmit={handleCreateNewRole} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Role Name *</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Role Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Field Collector / Treasury Auditor"
                   value={newRoleName}
                   onChange={(e) => setNewRoleName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3.5 py-2.5 text-xs font-bold text-white placeholder:text-[#AEABD8]/40 focus:outline-none focus:border-[#6359E9]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Color Palette</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Color Palette</label>
                 <div className="flex items-center gap-2 flex-wrap">
                   {PRESET_COLORS.map((c) => (
                     <button
@@ -813,7 +813,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                       type="button"
                       onClick={() => setNewRoleColor(c.value)}
                       className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                        newRoleColor.toLowerCase() === c.value.toLowerCase() ? 'ring-2 ring-indigo-600 ring-offset-2 scale-110' : 'opacity-85 hover:opacity-100'
+                        newRoleColor.toLowerCase() === c.value.toLowerCase() ? 'ring-2 ring-[#6359E9] ring-offset-2 ring-offset-[#1D1D41] scale-110' : 'opacity-85 hover:opacity-100'
                       }`}
                       style={{ backgroundColor: c.value }}
                     >
@@ -824,29 +824,29 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                     type="color"
                     value={newRoleColor}
                     onChange={(e) => setNewRoleColor(e.target.value)}
-                    className="w-8 h-8 rounded-lg border border-gray-200 bg-white cursor-pointer p-0.5 ml-1"
+                    className="w-8 h-8 rounded-lg border border-[#27264E] bg-[#141332] cursor-pointer p-0.5 ml-1"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Description</label>
+                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Description</label>
                 <textarea
                   rows={2}
                   placeholder="Briefly describe what this custom role is responsible for..."
                   value={newRoleDescription}
                   onChange={(e) => setNewRoleDescription(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-indigo-500 resize-none"
+                  className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-[#AEABD8]/40 focus:outline-none focus:border-[#6359E9] resize-none"
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-amber-50/80 border border-amber-200 rounded-xl">
+              <div className="flex items-center justify-between p-3 bg-[#141332] border border-[#FFBB38]/30 rounded-xl">
                 <div>
-                  <p className="text-xs font-bold text-amber-950 flex items-center gap-1">
-                    <ShieldCheck size={13} className="text-amber-600" />
+                  <p className="text-xs font-bold text-white flex items-center gap-1">
+                    <ShieldCheck size={13} className="text-[#FFBB38]" />
                     <span>Database Privilege (RLS)</span>
                   </p>
-                  <p className="text-[10px] text-amber-800/80 mt-0.5">
+                  <p className="text-[10px] text-[#AEABD8] mt-0.5">
                     Allow access to treasury vaults &amp; member ledgers
                   </p>
                 </div>
@@ -854,7 +854,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                   type="button"
                   onClick={() => setNewRoleIsPrivileged((prev) => !prev)}
                   className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ml-3 ${
-                    newRoleIsPrivileged ? 'bg-amber-500' : 'bg-gray-300'
+                    newRoleIsPrivileged ? 'bg-[#FFBB38]' : 'bg-[#27264E]'
                   }`}
                 >
                   <span
@@ -869,14 +869,14 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                 <button
                   type="button"
                   onClick={() => setIsNewRoleModalOpen(false)}
-                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-[#AEABD8] hover:bg-[#141332] hover:text-white rounded-xl transition-colors text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isCreatingRole}
-                  className="w-full sm:w-auto bg-slate-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs active:scale-95 transition-all text-center"
+                  className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs active:scale-95 transition-all text-center"
                 >
                   {isCreatingRole ? 'Creating...' : 'Create Role'}
                 </button>

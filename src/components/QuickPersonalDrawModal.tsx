@@ -119,20 +119,20 @@ export default function QuickPersonalDrawModal({
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
-      <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col shadow-2xl relative overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+      <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col shadow-2xl relative overflow-hidden my-auto animate-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+        <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between bg-[#1D1D41] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold shrink-0 shadow-xs">
+            <div className="w-10 h-10 rounded-2xl bg-[#E41414]/15 text-[#E41414] flex items-center justify-center font-bold shrink-0 shadow-xs border border-[#E41414]/30">
               <MinusCircle size={20} />
             </div>
             <div>
-              <h3 className="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight">
+              <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
                 Log Personal Draw / Spend
               </h3>
-              <p className="text-[11px] text-gray-500 font-medium">
+              <p className="text-[11px] text-[#AEABD8] font-medium">
                 Record cash/bank expense taken for personal or daily needs
               </p>
             </div>
@@ -141,7 +141,7 @@ export default function QuickPersonalDrawModal({
           <button 
             type="button" 
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-[#27264E] hover:bg-[#3A3A5A] text-[#AEABD8] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X size={16} />
           </button>
@@ -152,11 +152,11 @@ export default function QuickPersonalDrawModal({
           
           {/* Amount Input */}
           <div className="space-y-1.5 text-center">
-            <label className="text-[11px] text-gray-500 font-extrabold uppercase tracking-wider block">
+            <label className="text-[11px] text-[#AEABD8] font-extrabold uppercase tracking-wider block">
               Expense Amount (₹) *
             </label>
             <div className="relative max-w-[280px] mx-auto">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-400 select-none">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-[#AEABD8]/50 select-none">
                 ₹
               </span>
               <input
@@ -167,7 +167,7 @@ export default function QuickPersonalDrawModal({
                 placeholder="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-white border-2 border-gray-200 focus:border-rose-600 rounded-2xl pl-10 pr-6 py-3 text-2xl sm:text-3xl font-black text-gray-900 tracking-tight shadow-xs text-center focus:outline-none transition-all font-mono"
+                className="w-full bg-[#141332] border-2 border-[#27264E] focus:border-[#6359E9] rounded-2xl pl-10 pr-6 py-3 text-2xl sm:text-3xl font-black text-white tracking-tight shadow-inner text-center focus:outline-none transition-all font-mono"
                 autoFocus
               />
             </div>
@@ -175,7 +175,7 @@ export default function QuickPersonalDrawModal({
 
           {/* Spend Category Grid */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+            <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
               Expense Category
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -189,11 +189,11 @@ export default function QuickPersonalDrawModal({
                     onClick={() => setCategory(cat.id)}
                     className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-rose-600 text-white border-rose-700 shadow-xs ring-2 ring-rose-500/20'
-                        : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                        ? 'bg-[#6359E9] text-white border-transparent shadow-xs ring-2 ring-[#6359E9]/30'
+                        : 'bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]'
                     }`}
                   >
-                    <IconComponent size={15} className={isSelected ? 'text-white' : 'text-gray-500'} />
+                    <IconComponent size={15} className={isSelected ? 'text-white' : 'text-[#AEABD8]'} />
                     <span className="truncate">{cat.label}</span>
                   </button>
                 );
@@ -206,14 +206,14 @@ export default function QuickPersonalDrawModal({
                 placeholder="Specify expense reason..."
                 value={customCategory}
                 onChange={(e) => setCustomCategory(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-rose-600 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-semibold text-white placeholder:text-[#AEABD8]/60 focus:outline-none"
               />
             )}
           </div>
 
           {/* Source Wallet Selector */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+            <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
               Taken From Which Account?
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -226,19 +226,19 @@ export default function QuickPersonalDrawModal({
                     onClick={() => setSelectedWallet(w.id)}
                     className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                        : 'bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200'
+                        ? 'bg-[#6359E9] text-white border-transparent shadow-md'
+                        : 'bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm">{w.icon}</span>
                       <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded ${
-                        isSelected ? 'bg-slate-800 text-white' : 'bg-gray-200 text-gray-700'
+                        isSelected ? 'bg-black/30 text-white' : 'bg-[#27264E] text-white'
                       }`}>
                         ₹{w.bal.toLocaleString('en-IN')}
                       </span>
                     </div>
-                    <div className="text-xs font-bold truncate">{w.label}</div>
+                    <div className="text-xs font-bold truncate text-white">{w.label}</div>
                   </button>
                 );
               })}
@@ -247,7 +247,7 @@ export default function QuickPersonalDrawModal({
 
           {/* Optional Notes */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+            <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
               Reference / Extra Note (Optional)
             </label>
             <input
@@ -255,30 +255,30 @@ export default function QuickPersonalDrawModal({
               placeholder="e.g. Scooter fuel or grocery bill"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 focus:border-rose-600 rounded-xl px-3.5 py-2 text-xs font-medium text-gray-900 focus:outline-none"
+              className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-medium text-white placeholder:text-[#AEABD8]/60 focus:outline-none"
             />
           </div>
 
           {isInsufficient && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-900 text-xs font-bold">
-              <AlertCircle size={15} className="text-rose-600 shrink-0" />
+            <div className="p-3 bg-[#E41414]/15 border border-[#E41414]/30 rounded-xl flex items-center gap-2 text-[#E41414] text-xs font-bold">
+              <AlertCircle size={15} className="text-[#E41414] shrink-0" />
               <span>Insufficient balance! Available in {selectedWallet.replace(/_/g, ' ')}: ₹{availableBal.toLocaleString('en-IN')}</span>
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2 border-t border-gray-150">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2 border-t border-[#27264E]">
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors text-center cursor-pointer"
+              className="w-full sm:w-auto border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors text-center cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || amountNum <= 0 || isInsufficient}
-              className="w-full sm:flex-1 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+              className="w-full sm:flex-1 bg-[#E41414] hover:bg-[#E41414]/90 active:scale-95 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-[#E41414]/20 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
             >
               {isSubmitting ? (
                 <>

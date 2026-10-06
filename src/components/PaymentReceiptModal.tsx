@@ -667,20 +667,20 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto flex flex-col max-h-[92vh] sm:max-h-[95vh]">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+      <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto flex flex-col max-h-[92vh] sm:max-h-[95vh]">
         
-        {/* Top Actions Header (Light Theme) */}
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
+        {/* Top Actions Header (Dark Cyber Theme) */}
+        <div className="px-4 py-3 bg-[#141332] border-b border-[#27264E] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0 shadow-2xs">
+            <div className="w-7 h-7 rounded-lg bg-[#02B15A]/20 text-[#02B15A] border border-[#02B15A]/40 flex items-center justify-center shrink-0 shadow-2xs">
               <FileCheck size={16} />
             </div>
             <div>
-              <h3 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+              <h3 className="text-xs sm:text-sm font-bold text-white truncate">
                 Payment Receipt PNG
               </h3>
-              <p className="text-[10px] text-slate-500 font-mono font-semibold truncate">
+              <p className="text-[10px] text-[#AEABD8] font-mono font-semibold truncate">
                 {receiptNo} · {monthLabel}
               </p>
             </div>
@@ -689,41 +689,41 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-200/70 transition-colors cursor-pointer"
+            className="p-1.5 text-[#AEABD8] hover:text-white rounded-xl hover:bg-[#1D1D41] transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Scrollable Receipt Preview Area (Light Theme) */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-slate-100/90 flex flex-col items-center justify-start min-h-0">
+        {/* Scrollable Receipt Preview Area */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-[#141332] flex flex-col items-center justify-start min-h-0">
           
           {/* Status / Toast alert if any */}
           {shareStatus && (
-            <div className="mb-2.5 px-3 py-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 shadow-2xs">
-              <CheckCircle2 size={14} className="text-emerald-600" />
+            <div className="mb-2.5 px-3 py-1.5 bg-[#02B15A]/15 border border-[#02B15A]/40 text-[#02B15A] text-xs font-semibold rounded-xl flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 shadow-2xs">
+              <CheckCircle2 size={14} className="text-[#02B15A]" />
               <span>{shareStatus}</span>
             </div>
           )}
 
           {copiedToast && (
-            <div className="mb-2.5 px-3 py-1.5 bg-indigo-50 border border-indigo-300 text-indigo-800 text-xs font-semibold rounded-xl flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 shadow-2xs">
-              <Check size={14} className="text-indigo-600" />
+            <div className="mb-2.5 px-3 py-1.5 bg-[#6359E9]/20 border border-[#6359E9]/40 text-[#64CFF6] text-xs font-semibold rounded-xl flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 shadow-2xs">
+              <Check size={14} className="text-[#64CFF6]" />
               <span>Receipt image copied to clipboard! (Ctrl+V to paste)</span>
             </div>
           )}
 
           {/* Receipt UI Preview Container */}
           <div className="w-full flex justify-center overflow-x-auto py-1">
-            <div ref={previewRef} className="rounded-xl overflow-hidden border border-slate-200 shadow-xl shrink-0 bg-white">
+            <div ref={previewRef} className="rounded-xl overflow-hidden border border-[#27264E] shadow-2xl shrink-0 bg-white">
               {renderReceiptCard()}
             </div>
           </div>
 
         </div>
 
-        {/* Modal Action Controls Bar (Light Theme) */}
-        <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        {/* Modal Action Controls Bar */}
+        <div className="p-3 bg-[#141332] border-t border-[#27264E] flex flex-wrap items-center justify-between gap-2 shrink-0">
           
           <div className="flex items-center gap-1.5">
             <button
@@ -731,7 +731,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               onClick={handleCopyImage}
               disabled={isGenerating}
               title="Copy receipt image to clipboard"
-              className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50 shadow-2xs"
+              className="px-3 py-2 bg-[#1D1D41] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border border-[#27264E] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50 shadow-2xs"
             >
               <Copy size={14} />
               <span className="hidden sm:inline">Copy Image</span>
@@ -742,7 +742,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               onClick={handlePrint}
               disabled={isGenerating}
               title="Print receipt"
-              className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50 shadow-2xs"
+              className="px-3 py-2 bg-[#1D1D41] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border border-[#27264E] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50 shadow-2xs"
             >
               <Printer size={14} />
               <span className="hidden sm:inline">Print</span>
@@ -754,7 +754,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               type="button"
               onClick={handleDownloadPng}
               disabled={isGenerating}
-              className="flex-1 sm:flex-none px-3.5 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50 shadow-xs"
+              className="flex-1 sm:flex-none px-3.5 py-2 bg-[#6359E9] hover:bg-[#6F64FF] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50 shadow-xs"
             >
               <Download size={14} />
               <span>Download PNG</span>
@@ -764,7 +764,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               type="button"
               onClick={handleSharePng}
               disabled={isGenerating}
-              className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-sm shadow-emerald-600/20 cursor-pointer disabled:opacity-50"
+              className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-[#9C2CF3] to-[#3A6FF9] hover:opacity-95 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-sm shadow-[#6359E9]/20 cursor-pointer disabled:opacity-50"
             >
               <Share2 size={14} />
               <span>Share Receipt PNG</span>

@@ -677,23 +677,23 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
     <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
       
       {/* ── 1. TOP HEADER & SUB-NAVIGATION RIBBON ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-gray-200 rounded-3xl p-3 sm:p-4 shadow-2xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#1D1D41] border border-[#27264E] rounded-3xl p-3 sm:p-4 shadow-sm">
         
         {/* Subtab Switchers */}
-        <div className="flex items-center gap-1.5 p-1 bg-gray-100/90 rounded-2xl w-full sm:w-auto">
+        <div className="flex items-center gap-1.5 p-1 bg-[#141332] border border-[#27264E] rounded-2xl w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setCurrentSubtab('directory')}
-            className={`flex-1 sm:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 sm:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               currentSubtab === 'directory'
-                ? 'bg-white text-gray-900 shadow-xs ring-1 ring-black/5'
-                : 'text-gray-500 hover:text-gray-800'
+                ? 'bg-[#6359E9] text-white shadow-sm'
+                : 'text-[#AEABD8] hover:text-white'
             }`}
           >
-            <Users size={15} className={currentSubtab === 'directory' ? 'text-indigo-600' : 'text-gray-400'} />
+            <Users size={15} className={currentSubtab === 'directory' ? 'text-white' : 'text-[#AEABD8]'} />
             <span>Members Directory</span>
             <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
-              currentSubtab === 'directory' ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-200 text-gray-600'
+              currentSubtab === 'directory' ? 'bg-white/20 text-white' : 'bg-[#27264E] text-[#AEABD8]'
             }`}>
               {stats.total}
             </span>
@@ -702,17 +702,17 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           <button
             type="button"
             onClick={() => setCurrentSubtab('roles')}
-            className={`flex-1 sm:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 sm:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               currentSubtab === 'roles'
-                ? 'bg-white text-gray-900 shadow-xs ring-1 ring-black/5'
-                : 'text-gray-500 hover:text-gray-800'
+                ? 'bg-[#6359E9] text-white shadow-sm'
+                : 'text-[#AEABD8] hover:text-white'
             }`}
           >
-            <Shield size={15} className={currentSubtab === 'roles' ? 'text-indigo-600' : 'text-gray-400'} />
+            <Shield size={15} className={currentSubtab === 'roles' ? 'text-white' : 'text-[#AEABD8]'} />
             <span>Roles &amp; Permissions</span>
             {stats.customRolesCount > 0 && (
               <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-extrabold ${
-                currentSubtab === 'roles' ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-200 text-gray-600'
+                currentSubtab === 'roles' ? 'bg-white/20 text-white' : 'bg-[#27264E] text-[#AEABD8]'
               }`}>
                 +{stats.customRolesCount}
               </span>
@@ -728,10 +728,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             type="button"
             disabled={isTogglingMaintenance}
             onClick={handleToggleMaintenance}
-            className={`px-3 sm:px-3.5 py-2 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all border shadow-2xs active:scale-95 ${
+            className={`px-3 sm:px-3.5 py-2 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all border shadow-2xs active:scale-95 cursor-pointer ${
               isMaintenanceMode
-                ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-400 font-extrabold shadow-amber-500/20 ring-2 ring-amber-400/40 animate-pulse'
-                : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                ? 'bg-[#FFBB38] hover:bg-[#FFBB38]/90 text-[#141332] border-[#FFBB38] font-extrabold shadow-[0_0_15px_rgba(255,187,56,0.3)] animate-pulse'
+                : 'bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]'
             }`}
             title={
               isMaintenanceMode
@@ -741,14 +741,14 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           >
             <Wrench
               size={13}
-              className={isMaintenanceMode ? 'text-slate-950 animate-bounce' : 'text-gray-500'}
+              className={isMaintenanceMode ? 'text-[#141332] animate-bounce' : 'text-[#AEABD8]'}
             />
             <span className="hidden md:inline">Maintenance</span>
             <span
               className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider ${
                 isMaintenanceMode
-                  ? 'bg-slate-950 text-amber-300'
-                  : 'bg-gray-200 text-gray-700'
+                  ? 'bg-[#141332] text-[#FFBB38]'
+                  : 'bg-[#27264E] text-[#AEABD8]'
               }`}
             >
               {isMaintenanceMode ? 'ON' : 'OFF'}
@@ -759,10 +759,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           <button
             type="button"
             onClick={() => setIsInventoryOpen(true)}
-            className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+            className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-3 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
             title="Manage pre-printed physical QR stickers"
           >
-            <Layers size={14} className="text-indigo-600" />
+            <Layers size={14} className="text-[#64CFF6]" />
             <span className="hidden sm:inline">QR Inventory</span>
           </button>
 
@@ -774,10 +774,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               setQrCenterTab('subscribers');
               setIsQrCenterOpen(true);
             }}
-            className="border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs px-3 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+            className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-3 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
             title="Passbook QR batch generation and sticker printing hub"
           >
-            <QrCode size={14} className="text-indigo-600" />
+            <QrCode size={14} className="text-[#64CFF6]" />
             <span className="hidden sm:inline">QR Center</span>
           </button>
 
@@ -785,7 +785,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           <button
             type="button"
             onClick={handleOpenAddModal}
-            className="bg-slate-900 hover:bg-black text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+            className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-[0_4px_15px_rgba(99,89,233,0.35)] flex items-center gap-1.5 active:scale-95 cursor-pointer"
           >
             <Plus size={14} />
             <span>Add Member</span>
@@ -799,9 +799,9 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               fetchCustomRoles();
             }}
             title="Refresh Directory"
-            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-xl transition-all border border-gray-200"
+            className="p-2 text-[#AEABD8] hover:text-white hover:bg-[#27264E] rounded-xl transition-all border border-[#27264E] cursor-pointer"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-600' : ''} />
+            <RefreshCw size={14} className={loading ? 'animate-spin text-[#64CFF6]' : ''} />
           </button>
         </div>
       </div>
@@ -822,64 +822,64 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           
           {/* Top Analytics 5-Card Stats Ribbon */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs">
-              <div className="flex items-center justify-between text-gray-500">
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-[#AEABD8]">
                 <span className="text-[11px] font-bold uppercase tracking-wider">Total Members</span>
-                <Users size={15} className="text-slate-700" />
+                <Users size={15} className="text-[#64CFF6]" />
               </div>
-              <p className="text-2xl font-black text-gray-900 mt-1">{stats.total}</p>
-              <span className="text-[10px] text-gray-400 font-semibold">Registered in Directory</span>
+              <p className="text-2xl font-black text-white mt-1">{stats.total}</p>
+              <span className="text-[10px] text-[#AEABD8]/70 font-semibold">Registered in Directory</span>
             </div>
 
-            <div className="bg-white border border-blue-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs">
-              <div className="flex items-center justify-between text-blue-600">
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-[#64CFF6]">
                 <span className="text-[11px] font-bold uppercase tracking-wider">In Chits</span>
                 <Briefcase size={15} />
               </div>
-              <p className="text-2xl font-black text-blue-700 mt-1">{stats.activeInChits}</p>
-              <span className="text-[10px] text-blue-600 font-semibold">Enrolled Subscribers</span>
+              <p className="text-2xl font-black text-[#64CFF6] mt-1">{stats.activeInChits}</p>
+              <span className="text-[10px] text-[#AEABD8]/70 font-semibold">Enrolled Subscribers</span>
             </div>
 
-            <div className="bg-white border border-purple-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs">
-              <div className="flex items-center justify-between text-purple-600">
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-[#C084FC]">
                 <span className="text-[11px] font-bold uppercase tracking-wider">Admins</span>
                 <ShieldCheck size={15} />
               </div>
-              <p className="text-2xl font-black text-purple-700 mt-1">{stats.adminCount}</p>
-              <span className="text-[10px] text-purple-600 font-semibold">Full System Access</span>
+              <p className="text-2xl font-black text-[#C084FC] mt-1">{stats.adminCount}</p>
+              <span className="text-[10px] text-[#AEABD8]/70 font-semibold">Full System Access</span>
             </div>
 
-            <div className="bg-white border border-sky-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs">
-              <div className="flex items-center justify-between text-sky-600">
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-2xs">
+              <div className="flex items-center justify-between text-[#64CFF6]">
                 <span className="text-[11px] font-bold uppercase tracking-wider">Managers</span>
                 <UserCheck size={15} />
               </div>
-              <p className="text-2xl font-black text-sky-700 mt-1">{stats.managerCount}</p>
-              <span className="text-[10px] text-sky-600 font-semibold">Operations &amp; Bidding</span>
+              <p className="text-2xl font-black text-[#64CFF6] mt-1">{stats.managerCount}</p>
+              <span className="text-[10px] text-[#AEABD8]/70 font-semibold">Operations &amp; Bidding</span>
             </div>
 
-            <div className="bg-white border border-emerald-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs col-span-2 sm:col-span-1">
-              <div className="flex items-center justify-between text-emerald-600">
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-2xs col-span-2 sm:col-span-1">
+              <div className="flex items-center justify-between text-[#02B15A]">
                 <span className="text-[11px] font-bold uppercase tracking-wider">QR Linked</span>
                 <QrCode size={15} />
               </div>
-              <p className="text-2xl font-black text-emerald-700 mt-1">{stats.qrLinkedCount}</p>
-              <span className="text-[10px] text-emerald-600 font-semibold">Active Digital Keys</span>
+              <p className="text-2xl font-black text-[#02B15A] mt-1">{stats.qrLinkedCount}</p>
+              <span className="text-[10px] text-[#AEABD8]/70 font-semibold">Active Digital Keys</span>
             </div>
           </div>
 
           {/* Search, Group & Role Filters Bar */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-2xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
             
             {/* Search input */}
             <div className="relative flex-1 max-w-md">
-              <Search size={14} className="absolute left-3.5 top-3 text-gray-400" />
+              <Search size={14} className="absolute left-3.5 top-3 text-[#AEABD8]" />
               <input
                 type="text"
                 placeholder="Search name, phone, tickets, chit groups..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 focus:outline-none shadow-2xs"
+                className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-white placeholder-[#AEABD8]/60 focus:outline-none shadow-2xs"
               />
             </div>
 
@@ -890,7 +890,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               <select
                 value={groupFilter}
                 onChange={(e) => setGroupFilter(e.target.value)}
-                className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-700 focus:outline-none shadow-2xs"
+                className="bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none shadow-2xs cursor-pointer"
               >
                 <option value="all">All Chit Groups</option>
                 {allChitGroups.map((g) => (
@@ -904,7 +904,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
-                className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-700 focus:outline-none shadow-2xs"
+                className="bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none shadow-2xs cursor-pointer"
               >
                 <option value="all">All Roles</option>
                 <option value="subscriber">Subscriber</option>
@@ -921,7 +921,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               <select
                 value={qrFilter}
                 onChange={(e) => setQrFilter(e.target.value as any)}
-                className="bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-700 focus:outline-none shadow-2xs"
+                className="bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none shadow-2xs cursor-pointer"
               >
                 <option value="all">All Passbooks</option>
                 <option value="linked">QR Linked 🟢</option>
@@ -933,7 +933,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           {/* ── MOBILE MEMBER CARDS STREAM (md:hidden) ── */}
           <div className="md:hidden space-y-3.5">
             {filteredMembers.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-3xl p-8 text-center text-gray-400 text-xs shadow-2xs">
+              <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-8 text-center text-[#AEABD8] text-xs shadow-2xs">
                 No members found matching your search. Use &quot;Add Member&quot; to enroll new subscribers.
               </div>
             ) : (
@@ -947,7 +947,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   <div
                     key={member.id}
                     onClick={() => setSelectedMemberId(member.id)}
-                    className="bg-white border border-gray-200 hover:border-gray-300 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs transition-all active:scale-[0.99] cursor-pointer"
+                    className="bg-[#1D1D41] border border-[#27264E] hover:border-[#6359E9]/40 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-sm transition-all active:scale-[0.99] cursor-pointer"
                   >
                     {/* Header: Avatar, Name, Role badge, Blocked badge */}
                     <div className="flex items-start justify-between gap-3">
@@ -962,16 +962,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         </div>
                         <div className="min-w-0 space-y-0.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`font-bold text-gray-900 text-sm leading-snug ${member.isBlocked ? 'line-through text-gray-500' : ''}`}>
+                            <span className={`font-bold text-white text-sm leading-snug ${member.isBlocked ? 'line-through text-[#AEABD8]' : ''}`}>
                               {member.fullName}
                             </span>
                             {isCurrentAdmin && (
-                              <span className="text-[9px] font-extrabold bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded-md">
+                              <span className="text-[9px] font-extrabold bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 px-1.5 py-0.2 rounded-md">
                                 You
                               </span>
                             )}
                             {member.isBlocked && (
-                              <span className="text-[9px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded-md flex items-center gap-0.5">
+                              <span className="text-[9px] font-extrabold bg-[#E41414]/15 text-[#E41414] border border-[#E41414]/30 px-1.5 py-0.2 rounded-md flex items-center gap-0.5">
                                 <Ban size={9} /> Blocked
                               </span>
                             )}
@@ -983,7 +983,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             >
                               {meta.label}
                             </span>
-                            <span className="text-[11px] text-gray-400 font-mono">
+                            <span className="text-[11px] text-[#AEABD8] font-mono">
                               ID: {member.id.slice(0, 8)}
                             </span>
                           </div>
@@ -996,7 +996,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           type="button"
                           onClick={(e) => handleOpenEditModal(e, member)}
                           title="Edit member profile"
-                          className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors active:scale-95"
+                          className="p-2 text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#27264E] rounded-xl transition-colors active:scale-95 cursor-pointer"
                         >
                           <Edit3 size={15} />
                         </button>
@@ -1005,37 +1005,37 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             type="button"
                             onClick={(e) => handleDeleteMember(e, member)}
                             title="Remove member"
-                            className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors active:scale-95"
+                            className="p-2 text-[#AEABD8] hover:text-[#E41414] hover:bg-[#E41414]/15 rounded-xl transition-colors active:scale-95 cursor-pointer"
                           >
                             <Trash2 size={15} />
                           </button>
                         )}
-                        <ChevronRight size={18} className="text-gray-400 ml-0.5" />
+                        <ChevronRight size={18} className="text-[#AEABD8] ml-0.5" />
                       </div>
                     </div>
 
                     {/* Passbook QR Status Strip */}
-                    <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-gray-150 text-xs" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-between bg-[#141332] p-2.5 rounded-xl border border-[#27264E] text-xs" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <QrCode size={14} className={member.passbookToken ? 'text-indigo-600' : 'text-gray-400'} />
-                        <span className="font-bold text-gray-700 text-[11px]">Passbook:</span>
+                        <QrCode size={14} className={member.passbookToken ? 'text-[#02B15A]' : 'text-[#AEABD8]'} />
+                        <span className="font-bold text-white text-[11px]">Passbook:</span>
                         {member.passbookToken ? (
-                          <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <span className="text-[10px] font-extrabold text-[#02B15A] bg-[#02B15A]/15 border border-[#02B15A]/30 px-2 py-0.5 rounded-md flex items-center gap-1">
                             Linked 🟢
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-md">
+                          <span className="text-[10px] font-bold text-[#AEABD8] bg-[#27264E] px-2 py-0.5 rounded-md">
                             Unlinked
                           </span>
                         )}
 
-                        <span className="text-[10px] font-mono font-bold bg-white border border-gray-200 px-1.5 py-0.5 rounded text-slate-700 flex items-center gap-0.5">
-                          <KeyRound size={9} className="text-indigo-500" />
+                        <span className="text-[10px] font-mono font-bold bg-[#1D1D41] border border-[#27264E] px-1.5 py-0.5 rounded text-white flex items-center gap-0.5">
+                          <KeyRound size={9} className="text-[#64CFF6]" />
                           <span>••••</span>
                           {(!member.mpin || member.mpin === '1234') ? (
-                            <span className="text-[8px] font-bold text-amber-600 ml-0.5">(Def)</span>
+                            <span className="text-[8px] font-bold text-[#FFBB38] ml-0.5">(Def)</span>
                           ) : (
-                            <span className="text-[8px] font-bold text-emerald-600 ml-0.5">(Set)</span>
+                            <span className="text-[8px] font-bold text-[#02B15A] ml-0.5">(Set)</span>
                           )}
                         </span>
                       </div>
@@ -1044,7 +1044,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         <button
                           type="button"
                           onClick={() => setPairingMember(member)}
-                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg shadow-2xs"
+                          className="text-[11px] font-bold text-[#64CFF6] hover:underline bg-[#1D1D41] border border-[#27264E] px-2.5 py-1 rounded-lg shadow-2xs cursor-pointer"
                         >
                           {member.passbookToken ? 'Re-Link 📷' : 'Pair QR 📷'}
                         </button>
@@ -1054,7 +1054,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             type="button"
                             onClick={(e) => handleUnlinkPassbook(e, member)}
                             title="Unlink / Revoke lost passbook QR"
-                            className="p-1.5 text-rose-500 hover:text-rose-700 bg-white border border-rose-200 rounded-lg"
+                            className="p-1.5 text-[#E41414] hover:bg-[#E41414]/15 bg-[#1D1D41] border border-[#E41414]/30 rounded-lg cursor-pointer"
                           >
                             <Unlink size={13} />
                           </button>
@@ -1068,23 +1068,23 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         {member.groups.map((g, idx) => (
                           <span
                             key={idx}
-                            className="inline-flex items-center gap-1 bg-gray-50 text-gray-800 text-xs font-semibold px-2.5 py-1 rounded-xl border border-gray-200/80"
+                            className="inline-flex items-center gap-1 bg-[#141332] text-white text-xs font-semibold px-2.5 py-1 rounded-xl border border-[#27264E]"
                           >
                             <span>{g.name}</span>
-                            <strong className="text-indigo-600 font-mono">#{g.ticket}</strong>
+                            <strong className="text-[#64CFF6] font-mono">#{g.ticket}</strong>
                           </span>
                         ))}
                       </div>
                     )}
 
                     {/* Inline Role Selector Dropdown */}
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-xs font-bold text-gray-600">Assign Role:</span>
+                    <div className="flex items-center justify-between pt-2 border-t border-[#27264E]" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-xs font-bold text-[#AEABD8]">Assign Role:</span>
                       <select
                         value={member.role}
                         onChange={(e) => handleQuickRoleChange(member.id, e.target.value, member.fullName)}
                         disabled={isCurrentAdmin}
-                        className={`bg-gray-50 border border-gray-200 text-xs font-bold rounded-xl px-2.5 py-1 focus:outline-none focus:border-indigo-500 ${
+                        className={`bg-[#141332] border border-[#27264E] text-white text-xs font-bold rounded-xl px-2.5 py-1 focus:outline-none focus:border-[#6359E9] cursor-pointer ${
                           isCurrentAdmin ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       >
@@ -1106,22 +1106,22 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           <>
                             <a
                               href={`tel:+91${cleanPhone}`}
-                              className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs px-2.5 py-1.5 rounded-xl border border-gray-200 active:scale-95 transition-all"
+                              className="flex items-center gap-1.5 bg-[#141332] hover:bg-[#27264E] text-white font-bold text-xs px-2.5 py-1.5 rounded-xl border border-[#27264E] active:scale-95 transition-all"
                             >
-                              <Phone size={12} className="text-indigo-600" />
+                              <Phone size={12} className="text-[#64CFF6]" />
                               <span>Call</span>
                             </a>
                             <button
                               type="button"
                               onClick={(e) => handleShareWhatsApp(e, member)}
-                              className="flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs px-2.5 py-1.5 rounded-xl border border-emerald-200 active:scale-95 transition-all"
+                              className="flex items-center gap-1 bg-[#02B15A]/15 hover:bg-[#02B15A]/25 text-[#02B15A] font-bold text-xs px-2.5 py-1.5 rounded-xl border border-[#02B15A]/30 active:scale-95 transition-all cursor-pointer"
                             >
                               <Share2 size={12} />
                               <span>WhatsApp</span>
                             </button>
                           </>
                         ) : (
-                          <span className="text-xs text-gray-400 italic">No phone</span>
+                          <span className="text-xs text-[#AEABD8]/60 italic">No phone</span>
                         )}
                       </div>
 
@@ -1129,10 +1129,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         <button
                           type="button"
                           onClick={() => handleToggleBlock(member)}
-                          className={`px-2.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all ${
+                          className={`px-2.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer ${
                             member.isBlocked
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
-                              : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
+                              ? 'bg-[#E41414]/15 text-[#E41414] border border-[#E41414]/30 hover:bg-[#E41414]/25'
+                              : 'bg-[#141332] text-[#AEABD8] border border-[#27264E] hover:text-white hover:bg-[#27264E]'
                           }`}
                         >
                           {member.isBlocked ? <Ban size={12} /> : <UserX size={12} />}
@@ -1147,10 +1147,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           </div>
 
           {/* ── DESKTOP MEMBERS DIRECTORY TABLE (hidden md:block) ── */}
-          <div className="hidden md:block bg-white border border-gray-200 rounded-3xl shadow-2xs overflow-hidden">
+          <div className="hidden md:block bg-[#1D1D41] border border-[#27264E] rounded-3xl shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-gray-50/80 border-b border-gray-200 text-[10px] uppercase tracking-wider text-gray-400 font-bold">
+                <thead className="bg-[#141332] border-b border-[#27264E] text-[10px] uppercase tracking-wider text-[#AEABD8] font-bold">
                   <tr>
                     <th className="py-4 px-6">Member Profile</th>
                     <th className="py-4 px-5">Phone</th>
@@ -1166,10 +1166,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     <th className="py-4 px-6 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-gray-700">
+                <tbody className="divide-y divide-[#27264E] text-white">
                   {filteredMembers.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-14 text-center text-gray-400 text-xs">
+                      <td colSpan={8} className="py-14 text-center text-[#AEABD8] text-xs">
                         No members found matching your search. Use &quot;Add Member&quot; to enroll new subscribers.
                       </td>
                     </tr>
@@ -1185,7 +1185,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         <tr
                           key={member.id}
                           onClick={() => setSelectedMemberId(member.id)}
-                          className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                          className="hover:bg-[#141332]/60 transition-colors cursor-pointer group"
                         >
                           {/* Member Name & Avatar */}
                           <td className="py-4 px-6">
@@ -1199,22 +1199,22 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 {initial}
                               </div>
                               <div>
-                                <span className="font-bold text-gray-900 block text-xs group-hover:text-indigo-600 transition-colors leading-snug flex items-center gap-1.5">
-                                  <span className={member.isBlocked ? 'line-through text-gray-500' : ''}>
+                                <span className="font-bold text-white block text-xs group-hover:text-[#64CFF6] transition-colors leading-snug flex items-center gap-1.5">
+                                  <span className={member.isBlocked ? 'line-through text-[#AEABD8]' : ''}>
                                     {member.fullName}
                                   </span>
                                   {isCurrentAdmin && (
-                                    <span className="text-[9px] font-extrabold bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded-md">
+                                    <span className="text-[9px] font-extrabold bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 px-1.5 py-0.2 rounded-md">
                                       You
                                     </span>
                                   )}
                                   {member.isBlocked && (
-                                    <span className="text-[9px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded-md flex items-center gap-0.5">
+                                    <span className="text-[9px] font-extrabold bg-[#E41414]/15 text-[#E41414] border border-[#E41414]/30 px-1.5 py-0.2 rounded-md flex items-center gap-0.5">
                                       <Ban size={9} /> Blocked
                                     </span>
                                   )}
                                 </span>
-                                <span className="text-[11px] text-gray-400 font-mono mt-0.5 block">
+                                <span className="text-[11px] text-[#AEABD8] font-mono mt-0.5 block">
                                   ID: {member.id.slice(0, 8)}
                                 </span>
                               </div>
@@ -1223,14 +1223,14 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
                           {/* Phone */}
                           <td className="py-4 px-5">
-                            <div className="flex items-center gap-1.5 font-mono font-medium text-gray-700">
+                            <div className="flex items-center gap-1.5 font-mono font-medium text-white">
                               <span>{member.phoneNumber || '—'}</span>
                               {cleanPhone && (
                                 <a
                                   href={`tel:+91${cleanPhone}`}
                                   onClick={(e) => e.stopPropagation()}
                                   title="Call member"
-                                  className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                                  className="p-1 text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#27264E] rounded-md transition-colors"
                                 >
                                   <Phone size={11} />
                                 </a>
@@ -1241,15 +1241,15 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           {/* Security PIN (MPIN) */}
                           <td className="py-4 px-5 font-mono" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-700 text-[11px] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                              <span className="font-bold text-white text-[11px] bg-[#141332] px-2 py-0.5 rounded-md border border-[#27264E]">
                                 ••••
                               </span>
                               {isDefaultPin ? (
-                                <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded">
+                                <span className="text-[9px] font-bold bg-[#FFBB38]/15 text-[#FFBB38] border border-[#FFBB38]/30 px-1.5 py-0.2 rounded">
                                   Default
                                 </span>
                               ) : (
-                                <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded">
+                                <span className="text-[9px] font-bold bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 px-1.5 py-0.2 rounded">
                                   Custom
                                 </span>
                               )}
@@ -1260,11 +1260,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           <td className="py-4 px-5" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center gap-1.5">
                               {member.passbookToken ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#02B15A] bg-[#02B15A]/15 border border-[#02B15A]/30 px-2 py-0.5 rounded-lg">
                                   <CheckCircle2 size={11} /> Linked
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#AEABD8] bg-[#141332] border border-[#27264E] px-2 py-0.5 rounded-lg">
                                   Unlinked
                                 </span>
                               )}
@@ -1273,7 +1273,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 type="button"
                                 onClick={() => setPairingMember(member)}
                                 title={member.passbookToken ? "Re-link / Replace with a new blank QR sticker" : "Scan blank QR sticker on physical passbook to pair"}
-                                className="p-1.5 text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded-lg transition-colors"
+                                className="p-1.5 text-[#64CFF6] hover:bg-[#27264E] border border-[#27264E] rounded-lg transition-colors cursor-pointer"
                               >
                                 <QrCode size={13} />
                               </button>
@@ -1283,7 +1283,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                   type="button"
                                   onClick={(e) => handleUnlinkPassbook(e, member)}
                                   title="Unlink / Revoke lost passbook QR"
-                                  className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors"
+                                  className="p-1.5 text-[#E41414] hover:bg-[#E41414]/15 border border-[#E41414]/30 rounded-lg transition-colors cursor-pointer"
                                 >
                                   <Unlink size={13} />
                                 </button>
@@ -1298,15 +1298,15 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 {member.groups.map((g, idx) => (
                                   <span
                                     key={idx}
-                                    className="inline-flex items-center gap-1 bg-gray-100 text-gray-800 text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-gray-200"
+                                    className="inline-flex items-center gap-1 bg-[#141332] text-white text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-[#27264E]"
                                   >
                                     <span>{g.name}</span>
-                                    <strong className="text-indigo-600 font-mono">#{g.ticket}</strong>
+                                    <strong className="text-[#64CFF6] font-mono">#{g.ticket}</strong>
                                   </span>
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-gray-400 italic text-xs">No active groups</span>
+                              <span className="text-[#AEABD8]/60 italic text-xs">No active groups</span>
                             )}
                           </td>
 
@@ -1318,14 +1318,14 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 return (
                                   <span
                                     title={`Acknowledged ${ackCount} reschedule notice(s)`}
-                                    className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                    className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30"
                                   >
-                                    <CheckCircle2 size={10} className="text-emerald-600" />
+                                    <CheckCircle2 size={10} className="text-[#02B15A]" />
                                     <span>Acked ({ackCount})</span>
                                   </span>
                                 );
                               }
-                              return <span className="text-[10px] text-gray-300 font-medium">—</span>;
+                              return <span className="text-[10px] text-[#AEABD8]/40 font-medium">—</span>;
                             })()}
                           </td>
 
@@ -1343,7 +1343,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 value={member.role}
                                 onChange={(e) => handleQuickRoleChange(member.id, e.target.value, member.fullName)}
                                 disabled={isCurrentAdmin}
-                                className={`bg-gray-50 border border-gray-200 text-xs font-bold rounded-xl px-2.5 py-1 focus:outline-none focus:border-indigo-500 cursor-pointer ${
+                                className={`bg-[#141332] border border-[#27264E] text-white text-xs font-bold rounded-xl px-2.5 py-1 focus:outline-none focus:border-[#6359E9] cursor-pointer ${
                                   isCurrentAdmin ? 'opacity-50 cursor-not-allowed' : ''
                                 }`}
                               >
@@ -1367,7 +1367,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 type="button"
                                 onClick={(e) => handleShareWhatsApp(e, member)}
                                 title="Share passbook login card via WhatsApp"
-                                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                                className="p-2 text-[#02B15A] hover:bg-[#02B15A]/15 rounded-xl transition-colors cursor-pointer"
                               >
                                 <Share2 size={14} />
                               </button>
@@ -1378,10 +1378,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                   type="button"
                                   onClick={() => handleToggleBlock(member)}
                                   title={member.isBlocked ? "Unblock Portal Access" : "Block Portal Access"}
-                                  className={`p-2 rounded-xl transition-colors ${
+                                  className={`p-2 rounded-xl transition-colors cursor-pointer ${
                                     member.isBlocked
-                                      ? 'text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200'
-                                      : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
+                                      ? 'text-[#E41414] bg-[#E41414]/15 hover:bg-[#E41414]/25 border border-[#E41414]/30'
+                                      : 'text-[#AEABD8] hover:text-[#FFBB38] hover:bg-[#FFBB38]/10'
                                   }`}
                                 >
                                   {member.isBlocked ? <Ban size={14} /> : <UserX size={14} />}
@@ -1393,7 +1393,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 type="button"
                                 onClick={(e) => handleOpenEditModal(e, member)}
                                 title="Edit member profile"
-                                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                                className="p-2 text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#27264E] rounded-xl transition-colors cursor-pointer"
                               >
                                 <Edit3 size={14} />
                               </button>
@@ -1404,7 +1404,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                   type="button"
                                   onClick={(e) => handleDeleteMember(e, member)}
                                   title="Remove member"
-                                  className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                                  className="p-2 text-[#AEABD8] hover:text-[#E41414] hover:bg-[#E41414]/15 rounded-xl transition-colors cursor-pointer"
                                 >
                                   <Trash2 size={14} />
                                 </button>

@@ -274,22 +274,18 @@ export default function AuctionCountdownBanner({
   // If in Month 0 (Launch Month / Organizer Profit phase)
   if (currentMonth === 0) {
     return (
-      <div className={`rounded-xl sm:rounded-2xl p-2 sm:p-2.5 border transition-all ${
-        isDark 
-          ? 'bg-amber-950/40 border-amber-500/30 text-amber-200' 
-          : 'bg-amber-50/80 border-amber-200 text-amber-900'
-      }`}>
+      <div className="rounded-xl sm:rounded-2xl p-2 sm:p-2.5 border transition-all bg-[#141332] border-[#FFBB38]/40 text-[#FFBB38]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-amber-500 text-white shrink-0">
+            <span className="p-1.5 rounded-lg bg-[#FFBB38]/20 text-[#FFBB38] shrink-0">
               <CalendarClock size={14} />
             </span>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-black">Month 0 — Organizer Profit Phase</span>
-              <span className="text-[8px] font-bold uppercase bg-amber-200/80 text-amber-900 px-1.5 py-0.2 rounded">
+              <span className="text-xs font-black text-white">Month 0 — Organizer Profit Phase</span>
+              <span className="text-[8px] font-bold uppercase bg-[#FFBB38]/20 text-[#FFBB38] px-1.5 py-0.2 rounded border border-[#FFBB38]/30">
                 No Auction
               </span>
-              <span className="text-[10px] opacity-75 hidden md:inline">
+              <span className="text-[10px] text-[#AEABD8] hidden md:inline">
                 • 1st live auction starts Month 1 upon launch
               </span>
             </div>
@@ -298,7 +294,7 @@ export default function AuctionCountdownBanner({
           {allowConfigure && groupId && (
             <button
               onClick={() => setShowConfigModal(true)}
-              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 transition-all active:scale-95 flex items-center gap-1 self-start sm:self-auto cursor-pointer shadow-2xs"
+              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[#1D1D41] border border-[#27264E] text-white hover:bg-[#27264E] transition-all active:scale-95 flex items-center gap-1 self-start sm:self-auto cursor-pointer shadow-xs"
             >
               <Settings2 size={12} />
               <span>Configure Schedule</span>
@@ -307,23 +303,19 @@ export default function AuctionCountdownBanner({
         </div>
       </div>
     );
-  }  return (
+  }
+
+  return (
     <>
-      <div className={`rounded-xl sm:rounded-2xl border transition-all shadow-xs relative z-20 ${
+      <div className={`rounded-xl sm:rounded-2xl border transition-all shadow-xl relative z-20 ${
         compact ? 'p-2 sm:p-2.5' : 'py-2.5 px-3 sm:py-3 sm:px-4'
       } ${
         countdown.isLive
-          ? isDark 
-            ? 'bg-gradient-to-r from-rose-950/80 via-purple-950/60 to-slate-900 border-rose-500/50' 
-            : 'bg-gradient-to-r from-rose-50 via-red-50 to-orange-50 border-rose-300 text-rose-950'
-          : isDark
-            ? 'bg-gradient-to-br from-[#0e1629] via-slate-900 to-slate-900 border-indigo-500/30 text-white'
-            : 'bg-white border-slate-200 text-slate-900'
+          ? 'bg-gradient-to-r from-[#E41414]/30 via-[#9C2CF3]/30 to-[#1D1D41] border-[#E41414]/60 text-white'
+          : 'bg-[#1D1D41] border-[#27264E] text-white'
       }`}>
-        {/* Ambient Glow for Dark Mode */}
-        {isDark && (
-          <div className="absolute -top-8 -right-8 w-24 h-24 bg-indigo-500/15 rounded-full blur-xl pointer-events-none overflow-hidden" />
-        )}
+        {/* Ambient Glow */}
+        <div className="absolute -top-8 -right-8 w-24 h-24 bg-[#6359E9]/15 rounded-full blur-xl pointer-events-none overflow-hidden" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
           
@@ -331,119 +323,83 @@ export default function AuctionCountdownBanner({
           <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               {countdown.isLive ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-rose-500 text-white animate-pulse shadow-xs">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-[#E41414] text-white animate-pulse shadow-xs">
                   <Radio size={10} className="animate-spin" /> Live Bidding Active
                 </span>
               ) : (
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
-                  isDark 
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
-                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isDark ? 'bg-emerald-400' : 'bg-emerald-500'}`} />
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30">
+                  <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-[#02B15A]" />
                   Upcoming Auction (Month {currentMonth})
                 </span>
               )}
 
               {groupName && (
-                <span className={`text-[11px] sm:text-xs font-bold truncate ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <span className="text-[11px] sm:text-xs font-bold truncate text-[#AEABD8]">
                   • {groupName}
                 </span>
               )}
             </div>
 
             {/* Target Date & Time readout */}
-            <div className={`flex items-center gap-2 text-[11px] sm:text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-600'}`}>
-              <div className={`flex items-center gap-1 ${isDark ? 'text-indigo-300' : 'text-indigo-600'}`}>
-                <Calendar size={13} className={`shrink-0 ${isDark ? 'text-indigo-400' : 'text-indigo-500'}`} />
+            <div className="flex items-center gap-2 text-[11px] sm:text-xs font-semibold text-[#AEABD8]">
+              <div className="flex items-center gap-1 text-[#64CFF6]">
+                <Calendar size={13} className="shrink-0 text-[#64CFF6]" />
                 <span>{countdown.formattedTargetDate}</span>
               </div>
               <span className="opacity-40">•</span>
-              <div className={`flex items-center gap-1 ${isDark ? 'text-indigo-300' : 'text-indigo-600'}`}>
-                <Clock size={13} className={`shrink-0 ${isDark ? 'text-indigo-400' : 'text-indigo-500'}`} />
+              <div className="flex items-center gap-1 text-[#64CFF6]">
+                <Clock size={13} className="shrink-0 text-[#64CFF6]" />
                 <span>{countdown.formattedTargetTime}</span>
               </div>
             </div>
           </div>
 
           {/* Right Column: Timer & Actions (Responsive Layout) */}
-          <div className="flex items-center justify-between md:justify-end gap-2 sm:gap-2.5 flex-wrap sm:flex-nowrap pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-200/40 dark:border-slate-800/40">
+          <div className="flex items-center justify-between md:justify-end gap-2 sm:gap-2.5 flex-wrap sm:flex-nowrap pt-1 sm:pt-0 border-t sm:border-t-0 border-[#27264E]">
             {/* Live Digital Countdown Segments */}
             <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               {/* Days */}
-              <div className={`rounded-lg sm:rounded-xl px-1.5 sm:px-2.5 py-1 text-center min-w-[36px] sm:min-w-[44px] ${
-                isDark 
-                  ? 'bg-[#080d19]/90 backdrop-blur-md border border-indigo-500/30 shadow-inner' 
-                  : 'bg-slate-50 border border-slate-200 shadow-2xs'
-              }`}>
-                <span className={`text-xs sm:text-base font-black font-mono block leading-tight tracking-tight ${
-                  isDark ? 'text-white' : 'text-slate-900'
-                }`}>
+              <div className="rounded-lg sm:rounded-xl px-1.5 sm:px-2.5 py-1 text-center min-w-[36px] sm:min-w-[44px] bg-[#141332] border border-[#27264E] shadow-inner">
+                <span className="text-xs sm:text-base font-black font-mono block leading-tight tracking-tight text-white">
                   {String(countdown.days).padStart(2, '0')}
                 </span>
-                <span className={`text-[7px] sm:text-[8px] font-bold uppercase tracking-wider block mt-0.2 leading-none ${
-                  isDark ? 'text-slate-400' : 'text-slate-500'
-                }`}>
+                <span className="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider block mt-0.2 leading-none text-[#AEABD8]">
                   Days
                 </span>
               </div>
 
-              <span className={`text-xs sm:text-sm font-black font-mono ${isDark ? 'text-indigo-400' : 'text-slate-300'}`}>:</span>
+              <span className="text-xs sm:text-sm font-black font-mono text-[#6359E9]">:</span>
 
               {/* Hours */}
-              <div className={`rounded-lg sm:rounded-xl px-1.5 sm:px-2.5 py-1 text-center min-w-[36px] sm:min-w-[44px] ${
-                isDark 
-                  ? 'bg-[#080d19]/90 backdrop-blur-md border border-indigo-500/30 shadow-inner' 
-                  : 'bg-slate-50 border border-slate-200 shadow-2xs'
-              }`}>
-                <span className={`text-xs sm:text-base font-black font-mono block leading-tight tracking-tight ${
-                  isDark ? 'text-white' : 'text-slate-900'
-                }`}>
+              <div className="rounded-lg sm:rounded-xl px-1.5 sm:px-2.5 py-1 text-center min-w-[36px] sm:min-w-[44px] bg-[#141332] border border-[#27264E] shadow-inner">
+                <span className="text-xs sm:text-base font-black font-mono block leading-tight tracking-tight text-white">
                   {String(countdown.hours).padStart(2, '0')}
                 </span>
-                <span className={`text-[7px] sm:text-[8px] font-bold uppercase tracking-wider block mt-0.2 leading-none ${
-                  isDark ? 'text-slate-400' : 'text-slate-500'
-                }`}>
+                <span className="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider block mt-0.2 leading-none text-[#AEABD8]">
                   Hours
                 </span>
               </div>
 
-              <span className={`text-xs sm:text-sm font-black font-mono ${isDark ? 'text-indigo-400' : 'text-slate-300'}`}>:</span>
+              <span className="text-xs sm:text-sm font-black font-mono text-[#6359E9]">:</span>
 
               {/* Minutes */}
-              <div className={`rounded-lg sm:rounded-xl px-1.5 sm:px-2.5 py-1 text-center min-w-[36px] sm:min-w-[44px] ${
-                isDark 
-                  ? 'bg-[#080d19]/90 backdrop-blur-md border border-indigo-500/30 shadow-inner' 
-                  : 'bg-slate-50 border border-slate-200 shadow-2xs'
-              }`}>
-                <span className={`text-xs sm:text-base font-black font-mono block leading-tight tracking-tight ${
-                  isDark ? 'text-white' : 'text-slate-900'
-                }`}>
+              <div className="rounded-lg sm:rounded-xl px-1.5 sm:px-2.5 py-1 text-center min-w-[36px] sm:min-w-[44px] bg-[#141332] border border-[#27264E] shadow-inner">
+                <span className="text-xs sm:text-base font-black font-mono block leading-tight tracking-tight text-white">
                   {String(countdown.minutes).padStart(2, '0')}
                 </span>
-                <span className={`text-[7px] sm:text-[8px] font-bold uppercase tracking-wider block mt-0.2 leading-none ${
-                  isDark ? 'text-slate-400' : 'text-slate-500'
-                }`}>
+                <span className="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider block mt-0.2 leading-none text-[#AEABD8]">
                   Mins
                 </span>
               </div>
 
-              <span className={`text-xs sm:text-sm font-black font-mono ${isDark ? 'text-indigo-400' : 'text-slate-300'}`}>:</span>
+              <span className="text-xs sm:text-sm font-black font-mono text-[#6359E9]">:</span>
 
               {/* Seconds (Glowing / Animated) */}
-              <div className={`rounded-lg sm:rounded-xl px-1.5 sm:px-2.5 py-1 text-center min-w-[36px] sm:min-w-[44px] ${
-                isDark 
-                  ? 'bg-[#080d19]/90 backdrop-blur-md border border-indigo-400/50 shadow-inner ring-1 ring-indigo-500/30' 
-                  : 'bg-emerald-50 border border-emerald-200 ring-1 ring-emerald-500/20 shadow-2xs'
-              }`}>
-                <span className={`text-xs sm:text-base font-black font-mono block leading-tight tracking-tight animate-pulse ${
-                  isDark ? 'text-emerald-400' : 'text-emerald-700'
-                }`}>
+              <div className="rounded-lg sm:rounded-xl px-1.5 sm:px-2.5 py-1 text-center min-w-[36px] sm:min-w-[44px] bg-[#141332] border border-[#02B15A]/40 shadow-inner ring-1 ring-[#02B15A]/20">
+                <span className="text-xs sm:text-base font-black font-mono block leading-tight tracking-tight animate-pulse text-[#02B15A]">
                   {String(countdown.seconds).padStart(2, '0')}
                 </span>
-                <span className={`text-[7px] sm:text-[8px] font-bold uppercase tracking-wider block mt-0.2 leading-none ${
-                  isDark ? 'text-emerald-400/80' : 'text-emerald-600'
-                }`}>
+                <span className="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider block mt-0.2 leading-none text-[#02B15A]/80">
                   Secs
                 </span>
               </div>
@@ -460,13 +416,9 @@ export default function AuctionCountdownBanner({
                     setShowCalendarMenu((prev) => !prev);
                   }}
                   title="Add Auction Event to Personal Calendar (Google, Outlook, Apple / iCal)"
-                  className={`px-2.5 py-1.5 rounded-lg active:scale-95 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                    isDark
-                      ? 'bg-indigo-600/30 hover:bg-indigo-600/40 border border-indigo-500/50 text-indigo-200 hover:text-white shadow-sm'
-                      : 'bg-indigo-50 hover:bg-indigo-100/90 border border-indigo-300/80 text-indigo-700 hover:text-indigo-950 shadow-2xs'
-                  }`}
+                  className="px-2.5 py-1.5 rounded-lg active:scale-95 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-[#64CFF6] shadow-sm"
                 >
-                  <CalendarPlus size={14} className={isDark ? 'text-indigo-300' : 'text-indigo-600'} />
+                  <CalendarPlus size={14} className="text-[#64CFF6]" />
                   <span className="inline">Add to Calendar</span>
                   <ChevronDown size={12} className={`opacity-70 transition-transform duration-200 ${showCalendarMenu ? 'rotate-180' : ''}`} />
                 </button>
@@ -478,37 +430,25 @@ export default function AuctionCountdownBanner({
                   type="button"
                   onClick={() => setShowConfigModal(true)}
                   title="Configure Auction Date & Time"
-                  className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg active:scale-95 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
-                    isDark
-                      ? 'bg-white/10 hover:bg-white/20 border border-white/20 text-white'
-                      : 'bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 shadow-2xs'
-                  }`}
+                  className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg active:scale-95 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-[#AEABD8] hover:text-white"
                 >
-                  <Settings2 size={13} className={isDark ? 'text-white' : 'text-slate-500'} />
+                  <Settings2 size={13} className="text-[#AEABD8]" />
                   <span className="hidden sm:inline">Edit Schedule</span>
                 </button>
               )}
 
               {/* Desktop Dropdown Popover */}
               {showCalendarMenu && (
-                <div
-                  className={`hidden sm:block absolute right-0 top-full mt-2 w-60 rounded-2xl shadow-2xl border p-2 z-50 animate-in fade-in zoom-in-95 duration-150 ${
-                    isDark
-                      ? 'bg-[#0b1120]/95 backdrop-blur-md border-slate-700/80 text-white shadow-black/80'
-                      : 'bg-white border-slate-200 text-slate-800 shadow-xl'
-                  }`}
-                >
-                  <div className="px-2.5 py-1 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider border-b border-slate-200/60 dark:border-slate-800/80 mb-1 flex items-center justify-between">
+                <div className="hidden sm:block absolute right-0 top-full mt-2 w-60 rounded-2xl shadow-2xl border border-[#27264E] p-2 z-50 animate-in fade-in zoom-in-95 duration-150 bg-[#1D1D41] text-white shadow-black/80">
+                  <div className="px-2.5 py-1 text-[10px] font-extrabold text-[#AEABD8] uppercase tracking-wider border-b border-[#27264E] mb-1 flex items-center justify-between">
                     <span>Add to Calendar</span>
-                    <span className="text-[9px] font-mono text-indigo-400">Month {currentMonth}</span>
+                    <span className="text-[9px] font-mono text-[#6359E9]">Month {currentMonth}</span>
                   </div>
                   
                   <button
                     type="button"
                     onClick={handleAddToGoogleCalendar}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
-                      isDark ? 'hover:bg-slate-800/90 text-slate-200' : 'hover:bg-indigo-50/80 text-slate-800'
-                    }`}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer hover:bg-[#141332] text-white"
                   >
                     <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
                     <span>Google Calendar</span>
@@ -518,9 +458,7 @@ export default function AuctionCountdownBanner({
                   <button
                     type="button"
                     onClick={handleAddToOutlookCalendar}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
-                      isDark ? 'hover:bg-slate-800/90 text-slate-200' : 'hover:bg-indigo-50/80 text-slate-800'
-                    }`}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer hover:bg-[#141332] text-white"
                   >
                     <span className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" />
                     <span>Microsoft Outlook</span>
@@ -530,11 +468,9 @@ export default function AuctionCountdownBanner({
                   <button
                     type="button"
                     onClick={handleDownloadIcs}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
-                      isDark ? 'hover:bg-slate-800/90 text-slate-200' : 'hover:bg-indigo-50/80 text-slate-800'
-                    }`}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer hover:bg-[#141332] text-white"
                   >
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#02B15A] shrink-0" />
                     <span>Apple / iCal File (.ics)</span>
                     <Download size={12} className="ml-auto opacity-50" />
                   </button>
@@ -548,29 +484,23 @@ export default function AuctionCountdownBanner({
 
       {/* ── MOBILE MODAL / BOTTOM SHEET (FOR PERFECT MOBILE VISIBILITY & TOUCH) ── */}
       {showCalendarMenu && (
-        <div className="sm:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="sm:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div 
             className="fixed inset-0" 
             onClick={() => setShowCalendarMenu(false)} 
           />
-          <div 
-            className={`relative z-10 w-full rounded-t-3xl border-t p-5 space-y-4 shadow-2xl animate-in slide-in-from-bottom duration-200 ${
-              isDark 
-                ? 'bg-[#0d1527] border-slate-700 text-white' 
-                : 'bg-white border-slate-200 text-slate-900'
-            }`}
-          >
+          <div className="relative z-10 w-full rounded-t-3xl border-t border-[#27264E] p-5 space-y-4 shadow-2xl animate-in slide-in-from-bottom duration-200 bg-[#1D1D41] text-white">
             {/* Header / Grab Handle */}
             <div className="flex flex-col items-center">
-              <div className="w-10 h-1 rounded-full bg-slate-400/40 mb-3" />
+              <div className="w-10 h-1 rounded-full bg-[#27264E] mb-3" />
               <div className="w-full flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-500">
+                  <div className="p-2 rounded-xl bg-[#6359E9]/20 text-[#6359E9]">
                     <CalendarPlus size={18} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black">Add Auction to Calendar</h3>
-                    <p className="text-[11px] text-slate-400 truncate max-w-[220px]">
+                    <h3 className="text-sm font-black text-white">Add Auction to Calendar</h3>
+                    <p className="text-[11px] text-[#AEABD8] truncate max-w-[220px]">
                       {groupName || 'Chit Auction'} • Month {currentMonth}
                     </p>
                   </div>
@@ -578,9 +508,7 @@ export default function AuctionCountdownBanner({
                 <button
                   type="button"
                   onClick={() => setShowCalendarMenu(false)}
-                  className={`p-1.5 rounded-full cursor-pointer ${
-                    isDark ? 'bg-slate-800 text-slate-300 hover:text-white' : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-                  }`}
+                  className="p-1.5 rounded-full cursor-pointer bg-[#141332] text-[#AEABD8] hover:text-white"
                 >
                   <X size={16} />
                 </button>
@@ -588,15 +516,13 @@ export default function AuctionCountdownBanner({
             </div>
 
             {/* Target Date readout */}
-            <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-semibold ${
-              isDark ? 'bg-slate-900/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'
-            }`}>
+            <div className="p-2.5 rounded-xl border border-[#27264E] flex items-center justify-between text-xs font-semibold bg-[#141332] text-[#AEABD8]">
               <div className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-indigo-500" />
+                <Calendar size={13} className="text-[#64CFF6]" />
                 <span>{countdown.formattedTargetDate}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Clock size={13} className="text-indigo-500" />
+                <Clock size={13} className="text-[#64CFF6]" />
                 <span>{countdown.formattedTargetTime}</span>
               </div>
             </div>
@@ -606,58 +532,44 @@ export default function AuctionCountdownBanner({
               <button
                 type="button"
                 onClick={handleAddToGoogleCalendar}
-                className={`w-full flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition-all active:scale-98 cursor-pointer ${
-                  isDark 
-                    ? 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-white' 
-                    : 'bg-white hover:bg-indigo-50/50 border-slate-200 text-slate-900 shadow-2xs'
-                }`}
+                className="w-full flex items-center justify-between p-3 rounded-2xl border border-[#27264E] text-xs font-bold transition-all active:scale-98 cursor-pointer bg-[#141332] hover:bg-[#27264E] text-white"
               >
                 <div className="flex items-center gap-2.5">
                   <span className="w-3 h-3 rounded-full bg-blue-500 shrink-0" />
                   <span>Google Calendar</span>
                 </div>
-                <ExternalLink size={14} className="text-slate-400" />
+                <ExternalLink size={14} className="text-[#AEABD8]" />
               </button>
 
               <button
                 type="button"
                 onClick={handleAddToOutlookCalendar}
-                className={`w-full flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition-all active:scale-98 cursor-pointer ${
-                  isDark 
-                    ? 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-white' 
-                    : 'bg-white hover:bg-indigo-50/50 border-slate-200 text-slate-900 shadow-2xs'
-                }`}
+                className="w-full flex items-center justify-between p-3 rounded-2xl border border-[#27264E] text-xs font-bold transition-all active:scale-98 cursor-pointer bg-[#141332] hover:bg-[#27264E] text-white"
               >
                 <div className="flex items-center gap-2.5">
                   <span className="w-3 h-3 rounded-full bg-sky-500 shrink-0" />
                   <span>Microsoft Outlook / 365</span>
                 </div>
-                <ExternalLink size={14} className="text-slate-400" />
+                <ExternalLink size={14} className="text-[#AEABD8]" />
               </button>
 
               <button
                 type="button"
                 onClick={handleDownloadIcs}
-                className={`w-full flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition-all active:scale-98 cursor-pointer ${
-                  isDark 
-                    ? 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-white' 
-                    : 'bg-white hover:bg-indigo-50/50 border-slate-200 text-slate-900 shadow-2xs'
-                }`}
+                className="w-full flex items-center justify-between p-3 rounded-2xl border border-[#27264E] text-xs font-bold transition-all active:scale-98 cursor-pointer bg-[#141332] hover:bg-[#27264E] text-white"
               >
                 <div className="flex items-center gap-2.5">
-                  <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="w-3 h-3 rounded-full bg-[#02B15A] shrink-0" />
                   <span>Apple Calendar / File (.ics)</span>
                 </div>
-                <Download size={14} className="text-slate-400" />
+                <Download size={14} className="text-[#AEABD8]" />
               </button>
             </div>
 
             <button
               type="button"
               onClick={() => setShowCalendarMenu(false)}
-              className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-              }`}
+              className="w-full py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer bg-[#141332] hover:bg-[#27264E] text-[#AEABD8]"
             >
               Cancel
             </button>

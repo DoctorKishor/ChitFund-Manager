@@ -74,27 +74,23 @@ export default function AuctionRescheduleAlertModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
       <div 
-        className={`w-full max-w-md rounded-3xl border shadow-2xl overflow-hidden max-h-[90dvh] overflow-y-auto my-auto transition-all transform scale-100 ${
-          isDark 
-            ? 'bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-indigo-500/30 text-white shadow-indigo-950/50' 
-            : 'bg-gradient-to-b from-white via-white to-slate-50 border-indigo-200 text-slate-900 shadow-slate-300'
-        }`}
+        className="w-full max-w-md rounded-3xl border border-[#27264E] bg-[#1D1D41] text-white shadow-2xl overflow-hidden max-h-[90dvh] overflow-y-auto my-auto transition-all transform scale-100"
       >
         {/* Top Header Glow Ribbon */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-indigo-500 to-emerald-400" />
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#FFBB38] via-[#6359E9] to-[#02B15A]" />
 
         <div className="p-5 sm:p-6 space-y-4">
           {/* Header Row */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 shadow-inner">
+              <div className="w-11 h-11 rounded-2xl bg-[#FFBB38]/15 border border-[#FFBB38]/30 text-[#FFBB38] flex items-center justify-center shrink-0 shadow-inner">
                 <BellRing size={22} className="animate-bounce" />
               </div>
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 block flex items-center gap-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#FFBB38] block flex items-center gap-1">
                   <span>Important Announcement</span>
                 </span>
-                <h3 className="text-base sm:text-lg font-black tracking-tight leading-snug">
+                <h3 className="text-base sm:text-lg font-black tracking-tight leading-snug text-white">
                   Auction Rescheduled
                 </h3>
               </div>
@@ -103,9 +99,7 @@ export default function AuctionRescheduleAlertModal({
             <button
               type="button"
               onClick={onRemindLater}
-              className={`p-1.5 rounded-xl transition-colors ${
-                isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-              }`}
+              className="p-1.5 rounded-xl transition-colors text-[#AEABD8] hover:text-white hover:bg-[#141332]"
               title="Close for now"
             >
               <X size={18} />
@@ -113,52 +107,44 @@ export default function AuctionRescheduleAlertModal({
           </div>
 
           {/* Group Card Information */}
-          <div className={`p-4 rounded-2xl border space-y-3 ${
-            isDark ? 'bg-slate-800/60 border-slate-700/80' : 'bg-slate-50 border-slate-200'
-          }`}>
+          <div className="p-4 rounded-2xl border border-[#27264E] bg-[#141332] space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <h4 className="font-black text-sm">{currentNotice.groupName}</h4>
-                <p className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <h4 className="font-black text-sm text-white">{currentNotice.groupName}</h4>
+                <p className="text-[11px] font-medium text-[#AEABD8]">
                   Chit Value: {formatCurrency(currentNotice.totalValue)}
                 </p>
               </div>
-              <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+              <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30">
                 Month {currentNotice.currentMonth} Auction
               </span>
             </div>
 
             {/* Rescheduled Date & Time Box */}
-            <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
-              isDark 
-                ? 'bg-amber-950/20 border-amber-500/40 text-amber-200' 
-                : 'bg-amber-50 border-amber-300 text-amber-950'
-            }`}>
+            <div className="p-3.5 rounded-xl border border-[#FFBB38]/40 bg-[#FFBB38]/10 text-[#FFBB38] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div className="flex items-center space-x-2.5">
-                <Calendar className="text-amber-500 shrink-0" size={18} />
+                <Calendar className="text-[#FFBB38] shrink-0" size={18} />
                 <div>
                   <span className="text-[9px] font-bold uppercase tracking-wider block opacity-75">New Auction Date</span>
-                  <span className="text-xs font-black block">{currentNotice.newDateStr}</span>
+                  <span className="text-xs font-black block text-white">{currentNotice.newDateStr}</span>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2.5 sm:border-l sm:border-amber-500/30 sm:pl-3">
-                <Clock className="text-amber-500 shrink-0" size={18} />
+              <div className="flex items-center space-x-2.5 sm:border-l sm:border-[#FFBB38]/30 sm:pl-3">
+                <Clock className="text-[#FFBB38] shrink-0" size={18} />
                 <div>
                   <span className="text-[9px] font-bold uppercase tracking-wider block opacity-75">Time</span>
-                  <span className="text-xs font-black block">{currentNotice.newTimeStr}</span>
+                  <span className="text-xs font-black block text-white">{currentNotice.newTimeStr}</span>
                 </div>
               </div>
             </div>
 
             {/* Reschedule Reason */}
             {currentNotice.reason && (
-              <div className={`p-2.5 rounded-xl flex items-start space-x-2 text-xs ${
-                isDark ? 'bg-slate-900/60 text-slate-300 border border-slate-700/50' : 'bg-white text-slate-700 border border-slate-200'
-              }`}>
-                <Info size={14} className="text-indigo-400 shrink-0 mt-0.5" />
+              <div className="p-2.5 rounded-xl flex items-start space-x-2 text-xs bg-[#1D1D41] text-[#AEABD8] border border-[#27264E]">
+                <Info size={14} className="text-[#64CFF6] shrink-0 mt-0.5" />
                 <div>
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400 block">Reason:</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#64CFF6] block">Reason:</span>
                   <span className="text-[11px] font-medium leading-relaxed">{currentNotice.reason}</span>
                 </div>
               </div>
@@ -168,7 +154,7 @@ export default function AuctionRescheduleAlertModal({
           {/* Multiple Notices Navigation */}
           {notices.length > 1 && (
             <div className="flex items-center justify-between text-xs pt-1 px-1">
-              <span className={`text-[11px] font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <span className="text-[11px] font-bold text-[#AEABD8]">
                 Notice {currentIndex + 1} of {notices.length}
               </span>
               <div className="flex items-center gap-1.5">
@@ -176,7 +162,7 @@ export default function AuctionRescheduleAlertModal({
                   type="button"
                   disabled={currentIndex === 0}
                   onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
-                  className="p-1 rounded-lg border border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800"
+                  className="p-1 rounded-lg border border-[#27264E] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#141332] text-white"
                 >
                   <ChevronLeft size={14} />
                 </button>
@@ -184,7 +170,7 @@ export default function AuctionRescheduleAlertModal({
                   type="button"
                   disabled={currentIndex === notices.length - 1}
                   onClick={() => setCurrentIndex((prev) => Math.min(notices.length - 1, prev + 1))}
-                  className="p-1 rounded-lg border border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800"
+                  className="p-1 rounded-lg border border-[#27264E] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#141332] text-white"
                 >
                   <ChevronRight size={14} />
                 </button>
@@ -193,15 +179,11 @@ export default function AuctionRescheduleAlertModal({
           )}
 
           {/* Modal Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-slate-800/80">
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-[#27264E]">
             <button
               type="button"
               onClick={onRemindLater}
-              className={`flex-1 py-2.5 px-3.5 rounded-xl text-xs font-bold transition-all text-center border cursor-pointer ${
-                isDark 
-                  ? 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300' 
-                  : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
-              }`}
+              className="flex-1 py-2.5 px-3.5 rounded-xl text-xs font-bold transition-all text-center border cursor-pointer bg-[#141332] hover:bg-[#27264E] border-[#27264E] text-[#AEABD8] hover:text-white"
             >
               Remind Me Later
             </button>
@@ -209,7 +191,7 @@ export default function AuctionRescheduleAlertModal({
               type="button"
               onClick={handleAcknowledgeCurrent}
               disabled={isAcknowledging}
-              className="flex-1 py-2.5 px-3.5 rounded-xl text-xs font-extrabold transition-all text-center bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-98 text-white shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="flex-1 py-2.5 px-3.5 rounded-xl text-xs font-extrabold transition-all text-center bg-[#6359E9] hover:bg-[#6F64FF] active:scale-98 text-white shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               {isAcknowledging ? (
                 <>

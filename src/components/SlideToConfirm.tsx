@@ -37,36 +37,36 @@ export default function SlideToConfirm({
       activeBg: 'bg-gradient-to-r from-red-600 via-rose-600 to-red-600',
       activeText: 'text-white',
       fillBg: 'bg-red-500/20',
-      thumbActiveText: 'text-red-600',
+      thumbActiveText: 'text-red-500',
       glow: 'shadow-red-500/20',
     },
     amber: {
       activeBg: 'bg-gradient-to-r from-amber-600 via-orange-500 to-amber-600',
       activeText: 'text-white',
       fillBg: 'bg-amber-500/20',
-      thumbActiveText: 'text-amber-600',
+      thumbActiveText: 'text-amber-500',
       glow: 'shadow-amber-500/20',
     },
     green: {
-      activeBg: 'bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-600',
+      activeBg: 'bg-gradient-to-r from-[#02B15A] via-emerald-600 to-[#02B15A]',
       activeText: 'text-white',
-      fillBg: 'bg-emerald-500/20',
-      thumbActiveText: 'text-emerald-600',
-      glow: 'shadow-emerald-500/20',
+      fillBg: 'bg-[#02B15A]/20',
+      thumbActiveText: 'text-[#02B15A]',
+      glow: 'shadow-[#02B15A]/20',
     },
     indigo: {
-      activeBg: 'bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-600',
+      activeBg: 'bg-gradient-to-r from-[#9C2CF3] via-[#6359E9] to-[#3A6FF9]',
       activeText: 'text-white',
-      fillBg: 'bg-indigo-500/20',
-      thumbActiveText: 'text-indigo-600',
-      glow: 'shadow-indigo-500/20',
+      fillBg: 'bg-[#6359E9]/25',
+      thumbActiveText: 'text-[#6359E9]',
+      glow: 'shadow-[#6359E9]/25',
     },
     slate: {
-      activeBg: 'bg-slate-800',
+      activeBg: 'bg-[#27264E]',
       activeText: 'text-white',
-      fillBg: 'bg-slate-500/20',
-      thumbActiveText: 'text-slate-800',
-      glow: 'shadow-slate-500/20',
+      fillBg: 'bg-[#6359E9]/20',
+      thumbActiveText: 'text-[#64CFF6]',
+      glow: 'shadow-[#27264E]/40',
     },
   }[colorVariant];
 
@@ -166,12 +166,12 @@ export default function SlideToConfirm({
   return (
     <div
       ref={trackRef}
-      className={`relative h-14 select-none rounded-full overflow-hidden p-1 flex items-center transition-all duration-300 ${
+      className={`relative h-14 select-none rounded-2xl overflow-hidden p-1 flex items-center transition-all duration-300 border ${
         disabled
-          ? 'bg-gray-200/80 cursor-not-allowed opacity-60'
+          ? 'bg-[#141332]/60 border-[#27264E]/60 cursor-not-allowed opacity-50'
           : isConfirmed || isLoading
-          ? `${colorStyles.activeBg} shadow-md ${colorStyles.glow}`
-          : 'bg-gray-200/90 hover:bg-gray-200 cursor-grab active:cursor-grabbing shadow-inner'
+          ? `${colorStyles.activeBg} border-transparent shadow-lg ${colorStyles.glow}`
+          : 'bg-[#141332] border-[#27264E] hover:border-[#6359E9]/50 cursor-grab active:cursor-grabbing shadow-inner'
       } ${className}`}
       onMouseDown={(e) => {
         if (disabled || isConfirmed || isLoading) return;
@@ -187,7 +187,7 @@ export default function SlideToConfirm({
       {/* Dynamic Fill Track behind thumb during drag */}
       {!isConfirmed && !isLoading && (
         <div
-          className={`absolute left-0 top-0 bottom-0 ${colorStyles.fillBg} rounded-full transition-none`}
+          className={`absolute left-0 top-0 bottom-0 ${colorStyles.fillBg} rounded-2xl transition-none`}
           style={{
             width: thumbRef.current
               ? `${thumbPositionPx + thumbRef.current.offsetWidth / 2}px`
@@ -203,8 +203,8 @@ export default function SlideToConfirm({
             isConfirmed || isLoading
               ? `${colorStyles.activeText} animate-in zoom-in-95`
               : disabled
-              ? 'text-gray-400 font-bold'
-              : 'text-gray-600 font-bold'
+              ? 'text-[#AEABD8]/40 font-bold'
+              : 'text-[#AEABD8] font-bold'
           }`}
           style={{
             opacity: isConfirmed || isLoading ? 1 : Math.max(0.15, 1 - dragProgress * 1.5),
@@ -223,11 +223,11 @@ export default function SlideToConfirm({
         </span>
       </div>
 
-      {/* Circular Drag Thumb */}
+      {/* Drag Thumb */}
       <div
         ref={thumbRef}
-        className={`relative z-10 w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-md transition-transform ${
-          isDragging ? 'scale-105 shadow-lg' : isConfirmed ? 'shadow-lg scale-100' : 'hover:scale-102'
+        className={`relative z-10 w-12 h-12 rounded-xl bg-[#6359E9] text-white flex items-center justify-center shadow-lg transition-transform ${
+          isDragging ? 'scale-105 shadow-[#6359E9]/50' : isConfirmed ? 'bg-white shadow-xl scale-100' : 'hover:scale-102 hover:bg-[#6F64FF]'
         }`}
         style={{
           transform: `translateX(${thumbPositionPx}px)`,
@@ -235,14 +235,14 @@ export default function SlideToConfirm({
         }}
       >
         {isLoading ? (
-          <RefreshCw size={18} className={`animate-spin ${colorStyles.thumbActiveText}`} />
+          <RefreshCw size={18} className="animate-spin text-white" />
         ) : isConfirmed ? (
           <Check size={22} className={`${colorStyles.thumbActiveText} stroke-[3] animate-in zoom-in duration-200`} />
         ) : (
           <ChevronRight
             size={22}
-            className={`text-gray-700 stroke-[2.5] transition-transform ${
-              isDragging ? 'translate-x-0.5 text-gray-900' : ''
+            className={`text-white stroke-[2.5] transition-transform ${
+              isDragging ? 'translate-x-0.5' : ''
             }`}
           />
         )}

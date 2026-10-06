@@ -209,7 +209,6 @@ export default function CashVaultLedger() {
     }).format(val || 0);
   };
 
-  // Wallet Metadata (Names, Roles, Colors)
   const WALLET_META: Record<WalletType, {
     name: string;
     owner: string;
@@ -228,12 +227,12 @@ export default function CashVaultLedger() {
       owner: 'On-Premises Locker',
       accountNumber: 'Vault #01',
       typeLabel: 'Cash Vault · Physical Box',
-      bgGradient: 'from-emerald-50 via-teal-50/40 to-white',
-      borderClass: 'border-emerald-300',
-      textAccent: 'text-emerald-700',
-      dotColor: 'bg-emerald-500',
-      badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      iconBg: 'bg-emerald-100 text-emerald-700',
+      bgGradient: 'bg-[#1D1D41]',
+      borderClass: 'border-[#27264E]',
+      textAccent: 'text-[#02B15A]',
+      dotColor: 'bg-[#02B15A]',
+      badgeBg: 'bg-[#02B15A]/15 text-[#02B15A] border-[#02B15A]/30',
+      iconBg: 'bg-[#02B15A]/20 text-[#02B15A]',
       icon: Banknote,
     },
     kishor_bank: {
@@ -241,12 +240,12 @@ export default function CashVaultLedger() {
       owner: 'Kishor',
       accountNumber: '•••• 8492 · Primary Digital',
       typeLabel: 'Digital Vault · Primary Inflow',
-      bgGradient: 'from-blue-50 via-indigo-50/40 to-white',
-      borderClass: 'border-blue-300',
-      textAccent: 'text-blue-700',
-      dotColor: 'bg-blue-500',
-      badgeBg: 'bg-blue-100 text-blue-800 border-blue-200',
-      iconBg: 'bg-blue-100 text-blue-700',
+      bgGradient: 'bg-gradient-to-br from-[#9C2CF3] to-[#3A6FF9]',
+      borderClass: 'border-transparent shadow-[0_8px_30px_rgba(156,44,243,0.35)]',
+      textAccent: 'text-white',
+      dotColor: 'bg-[#64CFF6]',
+      badgeBg: 'bg-white/20 text-white border-white/30',
+      iconBg: 'bg-white/20 text-white',
       icon: Landmark,
     },
     dad_bank: {
@@ -254,12 +253,12 @@ export default function CashVaultLedger() {
       owner: 'Anbazhakan',
       accountNumber: '•••• 3108 · Primary Banking',
       typeLabel: 'Disbursement Vault · Primary Banking',
-      bgGradient: 'from-purple-50 via-fuchsia-50/40 to-white',
-      borderClass: 'border-purple-300',
-      textAccent: 'text-purple-700',
-      dotColor: 'bg-purple-500',
-      badgeBg: 'bg-purple-100 text-purple-800 border-purple-200',
-      iconBg: 'bg-purple-100 text-purple-700',
+      bgGradient: 'bg-[#1D1D41]',
+      borderClass: 'border-[#27264E]',
+      textAccent: 'text-[#64CFF6]',
+      dotColor: 'bg-[#64CFF6]',
+      badgeBg: 'bg-[#64CFF6]/15 text-[#64CFF6] border-[#64CFF6]/30',
+      iconBg: 'bg-[#64CFF6]/20 text-[#64CFF6]',
       icon: CreditCard,
     },
     mom_bank: {
@@ -267,12 +266,12 @@ export default function CashVaultLedger() {
       owner: 'Parimalam',
       accountNumber: '•••• 5521 · Reserve Account',
       typeLabel: 'Reserve Vault · Secondary Channel',
-      bgGradient: 'from-amber-50 via-orange-50/40 to-white',
-      borderClass: 'border-amber-300',
-      textAccent: 'text-amber-700',
-      dotColor: 'bg-amber-500',
-      badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
-      iconBg: 'bg-amber-100 text-amber-700',
+      bgGradient: 'bg-[#1D1D41]',
+      borderClass: 'border-[#27264E]',
+      textAccent: 'text-[#FFBB38]',
+      dotColor: 'bg-[#FFBB38]',
+      badgeBg: 'bg-[#FFBB38]/15 text-[#FFBB38] border-[#FFBB38]/30',
+      iconBg: 'bg-[#FFBB38]/20 text-[#FFBB38]',
       icon: Wallet,
     },
   };
@@ -1118,13 +1117,13 @@ export default function CashVaultLedger() {
       {/* ── 2. FOUR CORE VAULT CARDS (Interactive GPay / Account Feed Selector) ── */}
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-black uppercase tracking-wider text-gray-500">
+          <span className="text-xs font-black uppercase tracking-wider text-[#AEABD8]">
             Accounts &amp; Vault Balances
           </span>
           {selectedWalletFilter !== 'all' && (
             <button
               onClick={() => setSelectedWalletFilter('all')}
-              className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+              className="text-xs font-extrabold text-[#64CFF6] hover:underline transition-colors cursor-pointer"
             >
               Show All Accounts
             </button>
@@ -1137,13 +1136,16 @@ export default function CashVaultLedger() {
             const Icon = meta.icon;
             const bal = balances[wKey] || 0;
             const isSelected = selectedWalletFilter === wKey;
+            const isKishor = wKey === 'kishor_bank';
 
             return (
               <div
                 key={wKey}
                 onClick={() => setSelectedWalletFilter(prev => prev === wKey ? 'all' : wKey)}
-                className={`bg-gradient-to-br ${meta.bgGradient} border-2 rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 cursor-pointer transition-all shadow-xs hover:shadow-md active:scale-98 ${
-                  isSelected ? 'border-indigo-600 ring-4 ring-indigo-500/20 shadow-md scale-[1.02]' : meta.borderClass
+                className={`${meta.bgGradient} border-2 rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 cursor-pointer transition-all shadow-xs hover:shadow-lg active:scale-98 ${
+                  isSelected 
+                    ? 'border-[#6359E9] ring-4 ring-[#6359E9]/30 shadow-md scale-[1.02]' 
+                    : meta.borderClass
                 }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
@@ -1154,20 +1156,22 @@ export default function CashVaultLedger() {
                 </div>
 
                 <div className="min-w-0">
-                  <div className="text-xs sm:text-sm font-black text-gray-900 truncate">
+                  <div className={`text-xs sm:text-sm font-black truncate ${isKishor ? 'text-white' : 'text-white'}`}>
                     {meta.name}
                   </div>
-                  <div className="text-[10px] text-gray-500 font-medium truncate">
+                  <div className={`text-[10px] font-medium truncate ${isKishor ? 'text-white/80' : 'text-[#AEABD8]'}`}>
                     {meta.owner}
                   </div>
-                  <div className="text-base sm:text-2xl font-black text-gray-900 font-mono tracking-tight mt-1 truncate">
+                  <div className={`text-base sm:text-2xl font-black font-mono tracking-tight mt-1 truncate ${isKishor ? 'text-white' : meta.textAccent}`}>
                     {formatCurrency(bal)}
                   </div>
                 </div>
 
-                <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[9px] sm:text-[10px] text-gray-400 font-bold uppercase">
+                <div className={`mt-2 pt-2 border-t flex items-center justify-between text-[9px] sm:text-[10px] font-bold uppercase ${
+                  isKishor ? 'border-white/20 text-white/70' : 'border-[#27264E] text-[#AEABD8]'
+                }`}>
                   <span>{isSelected ? 'Viewing Feed' : 'Tap for Feed'}</span>
-                  <ArrowRight size={10} className={isSelected ? 'text-indigo-600 font-bold' : ''} />
+                  <ArrowRight size={10} className={isSelected ? 'text-[#64CFF6] font-bold' : ''} />
                 </div>
               </div>
             );
@@ -1176,8 +1180,8 @@ export default function CashVaultLedger() {
       </div>
 
       {/* ── 3. PARENT-FRIENDLY QUICK ACTION BUTTONS ─────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-2xs space-y-3">
-        <span className="text-xs font-black uppercase tracking-wider text-gray-500 block px-0.5">
+      <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-sm space-y-3">
+        <span className="text-xs font-black uppercase tracking-wider text-[#AEABD8] block px-0.5">
           Quick Cash Actions
         </span>
 
@@ -1185,16 +1189,16 @@ export default function CashVaultLedger() {
           {/* Action 1: ATM to Cash Box */}
           <button
             onClick={() => setActiveModal('atm')}
-            className="bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200 text-indigo-950 p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
+            className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
           >
-            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-[#6359E9] text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
               <Landmark size={16} />
             </div>
             <div className="min-w-0">
-              <strong className="text-xs sm:text-sm font-black block text-indigo-950 leading-tight">
+              <strong className="text-xs sm:text-sm font-black block text-white leading-tight">
                 🏧 ATM to Cash Box
               </strong>
-              <span className="text-[10px] text-indigo-700/80 font-medium block mt-0.5">
+              <span className="text-[10px] text-[#AEABD8] font-medium block mt-0.5">
                 Bank → Cash Box
               </span>
             </div>
@@ -1203,16 +1207,16 @@ export default function CashVaultLedger() {
           {/* Action 2: Personal Spend / Draw */}
           <button
             onClick={() => setActiveModal('spend')}
-            className="bg-rose-50 hover:bg-rose-100/80 border border-rose-200 text-rose-950 p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
+            className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
           >
-            <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-[#E41414] text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
               <Coins size={16} />
             </div>
             <div className="min-w-0">
-              <strong className="text-xs sm:text-sm font-black block text-rose-950 leading-tight">
+              <strong className="text-xs sm:text-sm font-black block text-white leading-tight">
                 💸 Log Spend / Draw
               </strong>
-              <span className="text-[10px] text-rose-700/80 font-medium block mt-0.5">
+              <span className="text-[10px] text-[#AEABD8] font-medium block mt-0.5">
                 Petrol, Groceries, Dad
               </span>
             </div>
@@ -1221,16 +1225,16 @@ export default function CashVaultLedger() {
           {/* Action 3: Deposit Float / Inflow */}
           <button
             onClick={() => setActiveModal('deposit')}
-            className="bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-950 p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
+            className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
           >
-            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-[#02B15A] text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
               <Plus size={16} />
             </div>
             <div className="min-w-0">
-              <strong className="text-xs sm:text-sm font-black block text-emerald-950 leading-tight">
+              <strong className="text-xs sm:text-sm font-black block text-white leading-tight">
                 📥 Deposit Money
               </strong>
-              <span className="text-[10px] text-emerald-700/80 font-medium block mt-0.5">
+              <span className="text-[10px] text-[#AEABD8] font-medium block mt-0.5">
                 Add Float / Inflow
               </span>
             </div>
@@ -1239,16 +1243,16 @@ export default function CashVaultLedger() {
           {/* Action 4: Transfer between Accounts */}
           <button
             onClick={() => setActiveModal('transfer')}
-            className="bg-blue-50 hover:bg-blue-100/80 border border-blue-200 text-blue-950 p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
+            className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
           >
-            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-[#64CFF6] text-[#141332] flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
               <ArrowRightLeft size={16} />
             </div>
             <div className="min-w-0">
-              <strong className="text-xs sm:text-sm font-black block text-blue-950 leading-tight">
+              <strong className="text-xs sm:text-sm font-black block text-white leading-tight">
                 ⇄ Inter-Bank Transfer
               </strong>
-              <span className="text-[10px] text-blue-700/80 font-medium block mt-0.5">
+              <span className="text-[10px] text-[#AEABD8] font-medium block mt-0.5">
                 Move between Vaults
               </span>
             </div>
@@ -1260,33 +1264,33 @@ export default function CashVaultLedger() {
       <div className="space-y-4">
         {/* Pending ATM Relocation Banner */}
         {pendingRelocations.length > 0 && (
-          <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-3 sm:p-4 space-y-2.5 shadow-xs animate-in fade-in duration-150">
+          <div className="bg-[#1D1D41] border border-[#FFBB38]/40 rounded-2xl p-3 sm:p-4 space-y-2.5 shadow-sm animate-in fade-in duration-150">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs sm:text-sm font-black text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
-                <AlertCircle size={15} className="text-amber-600 animate-pulse" />
+              <h4 className="text-xs sm:text-sm font-black text-[#FFBB38] uppercase tracking-wider flex items-center gap-1.5">
+                <AlertCircle size={15} className="text-[#FFBB38] animate-pulse" />
                 Pending Physical Cash Box Verification ({pendingRelocations.length})
               </h4>
-              <span className="text-[10px] font-bold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold text-[#FFBB38] bg-[#FFBB38]/15 border border-[#FFBB38]/30 px-2 py-0.5 rounded-full">
                 Step 2 Pending
               </span>
             </div>
-            <p className="text-[11px] text-amber-900/80 font-medium">
+            <p className="text-[11px] text-[#AEABD8] font-medium">
               Currency was debited from bank. Click below once notes are physically placed inside the Cash Box:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {pendingRelocations.map((reloc) => {
                 const isVerifying = isVerifyingAtmId === reloc.id;
                 return (
-                  <div key={reloc.id} className="bg-white border border-amber-200 p-3 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
+                  <div key={reloc.id} className="bg-[#141332] border border-[#27264E] p-3 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
                     <div className="min-w-0">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase block truncate">From: {WALLET_META[reloc.source]?.name}</span>
-                      <span className="text-sm sm:text-base font-black text-gray-900 font-mono mt-0.5 block">{formatCurrency(reloc.amount)}</span>
-                      <span className="text-[9px] text-gray-400 font-mono">{reloc.createdAt}</span>
+                      <span className="text-[10px] font-bold text-[#AEABD8] uppercase block truncate">From: {WALLET_META[reloc.source]?.name}</span>
+                      <span className="text-sm sm:text-base font-black text-white font-mono mt-0.5 block">{formatCurrency(reloc.amount)}</span>
+                      <span className="text-[9px] text-[#AEABD8]/70 font-mono">{reloc.createdAt}</span>
                     </div>
                     <button
                       onClick={() => handleVerifyATM(reloc.id, reloc.amount, reloc.source, reloc.notes)}
                       disabled={isVerifying}
-                      className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                      className="bg-[#02B15A] hover:bg-[#02B15A]/85 active:scale-95 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs cursor-pointer disabled:opacity-50"
                     >
                       {isVerifying ? <RefreshCw size={12} className="animate-spin" /> : <Check size={13} />}
                       <span>Confirm Inflow</span>
@@ -1299,41 +1303,41 @@ export default function CashVaultLedger() {
         )}
 
         {/* ── FAMILY KHATABOOK (FLOATS & PERSONAL DRAWS) ── */}
-        <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xs space-y-4">
+        <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4">
           {/* Khatabook Header & Tab Selector */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100 pb-3.5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#27264E] pb-3.5">
             <div>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-xl bg-[#6359E9]/20 text-[#64CFF6] flex items-center justify-center font-bold">
                   <BookOpen size={16} />
                 </div>
-                <h3 className="text-base sm:text-lg font-black text-gray-900">
+                <h3 className="text-base sm:text-lg font-black text-white">
                   Family Khatabook · Capital &amp; Spends
                 </h3>
-                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full hidden sm:inline-block">
+                <span className="text-[10px] font-bold text-[#64CFF6] bg-[#6359E9]/20 border border-[#6359E9]/30 px-2 py-0.5 rounded-full hidden sm:inline-block">
                   குடும்ப கணக்கு
                 </span>
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-[#AEABD8] mt-0.5">
                 Track float capital provided by Dad, Mom, or Kishor to recover, &amp; personal cash draws to be repaid
               </p>
             </div>
 
             {/* Tab Switcher: Floating Capital vs Personal Draws */}
-            <div className="flex items-center bg-gray-100 p-1 rounded-2xl gap-1 shrink-0 self-start md:self-auto">
+            <div className="flex items-center bg-[#141332] border border-[#27264E] p-1 rounded-2xl gap-1 shrink-0 self-start md:self-auto">
               <button
                 type="button"
                 onClick={() => { setKhatabookTab('floats'); triggerHapticFeedback('light'); }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                   khatabookTab === 'floats'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    ? 'bg-[#02B15A] text-white shadow-xs'
+                    : 'text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
                 }`}
               >
                 <Plus size={13} />
                 <span>Floating Capital</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  khatabookTab === 'floats' ? 'bg-emerald-700 text-emerald-100' : 'bg-gray-200 text-gray-700'
+                  khatabookTab === 'floats' ? 'bg-[#02B15A]/80 text-white' : 'bg-[#27264E] text-[#AEABD8]'
                 }`}>
                   {floatStats.activeCount}
                 </span>
@@ -1344,14 +1348,14 @@ export default function CashVaultLedger() {
                 onClick={() => { setKhatabookTab('draws'); triggerHapticFeedback('light'); }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                   khatabookTab === 'draws'
-                    ? 'bg-rose-600 text-white shadow-xs'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    ? 'bg-[#E41414] text-white shadow-xs'
+                    : 'text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
                 }`}
               >
                 <Coins size={13} />
                 <span>Personal Draws</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  khatabookTab === 'draws' ? 'bg-rose-700 text-rose-100' : 'bg-gray-200 text-gray-700'
+                  khatabookTab === 'draws' ? 'bg-[#E41414]/80 text-white' : 'bg-[#27264E] text-[#AEABD8]'
                 }`}>
                   {personalDrawStats.activeCount}
                 </span>
@@ -1365,16 +1369,16 @@ export default function CashVaultLedger() {
             <div 
               onClick={() => setKhatabookPersonFilter(prev => prev === 'anbazhakan' ? 'all' : 'anbazhakan')}
               className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                khatabookPersonFilter === 'anbazhakan' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
+                khatabookPersonFilter === 'anbazhakan' ? 'ring-2 ring-[#6359E9] bg-[#141332] border-[#6359E9]' : 'bg-[#141332] border-[#27264E] hover:border-[#6359E9]/40'
               }`}
             >
-              <span className="text-[10px] font-bold text-gray-500 uppercase block">Anbazhakan</span>
+              <span className="text-[10px] font-bold text-[#AEABD8] uppercase block">Anbazhakan</span>
               <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
-                khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
+                khatabookTab === 'floats' ? 'text-[#02B15A]' : 'text-[#E41414]'
               }`}>
                 {formatCurrency(khatabookTab === 'floats' ? floatStats.anbazhakan : personalDrawStats.anbazhakan)}
               </span>
-              <span className="text-[9px] text-gray-400 font-medium block mt-0.5">
+              <span className="text-[9px] text-[#AEABD8]/70 font-medium block mt-0.5">
                 {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
               </span>
             </div>
@@ -1383,16 +1387,16 @@ export default function CashVaultLedger() {
             <div 
               onClick={() => setKhatabookPersonFilter(prev => prev === 'parimalam' ? 'all' : 'parimalam')}
               className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                khatabookPersonFilter === 'parimalam' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
+                khatabookPersonFilter === 'parimalam' ? 'ring-2 ring-[#6359E9] bg-[#141332] border-[#6359E9]' : 'bg-[#141332] border-[#27264E] hover:border-[#6359E9]/40'
               }`}
             >
-              <span className="text-[10px] font-bold text-gray-500 uppercase block">Parimalam</span>
+              <span className="text-[10px] font-bold text-[#AEABD8] uppercase block">Parimalam</span>
               <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
-                khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
+                khatabookTab === 'floats' ? 'text-[#02B15A]' : 'text-[#E41414]'
               }`}>
                 {formatCurrency(khatabookTab === 'floats' ? floatStats.parimalam : personalDrawStats.parimalam)}
               </span>
-              <span className="text-[9px] text-gray-400 font-medium block mt-0.5">
+              <span className="text-[9px] text-[#AEABD8]/70 font-medium block mt-0.5">
                 {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
               </span>
             </div>
@@ -1401,16 +1405,16 @@ export default function CashVaultLedger() {
             <div 
               onClick={() => setKhatabookPersonFilter(prev => prev === 'kishor' ? 'all' : 'kishor')}
               className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                khatabookPersonFilter === 'kishor' ? 'ring-2 ring-indigo-600 bg-indigo-50/60 border-indigo-300' : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/60'
+                khatabookPersonFilter === 'kishor' ? 'ring-2 ring-[#6359E9] bg-[#141332] border-[#6359E9]' : 'bg-[#141332] border-[#27264E] hover:border-[#6359E9]/40'
               }`}
             >
-              <span className="text-[10px] font-bold text-gray-500 uppercase block">Kishor</span>
+              <span className="text-[10px] font-bold text-[#AEABD8] uppercase block">Kishor</span>
               <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
-                khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
+                khatabookTab === 'floats' ? 'text-[#02B15A]' : 'text-[#E41414]'
               }`}>
                 {formatCurrency(khatabookTab === 'floats' ? floatStats.kishor : personalDrawStats.kishor)}
               </span>
-              <span className="text-[9px] text-gray-400 font-medium block mt-0.5">
+              <span className="text-[9px] text-[#AEABD8]/70 font-medium block mt-0.5">
                 {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
               </span>
             </div>
@@ -1419,22 +1423,18 @@ export default function CashVaultLedger() {
             <div 
               onClick={() => setKhatabookPersonFilter('all')}
               className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                khatabookTab === 'floats' ? 'bg-emerald-50/80 border-emerald-300' : 'bg-rose-50/80 border-rose-300'
-              } ${khatabookPersonFilter === 'all' ? 'ring-2 ring-slate-800' : ''}`}
+                khatabookTab === 'floats' ? 'bg-[#02B15A]/10 border-[#02B15A]/30' : 'bg-[#E41414]/10 border-[#E41414]/30'
+              } ${khatabookPersonFilter === 'all' ? 'ring-2 ring-white/30' : ''}`}
             >
               <span className={`text-[10px] font-black uppercase block ${
-                khatabookTab === 'floats' ? 'text-emerald-800' : 'text-rose-800'
+                khatabookTab === 'floats' ? 'text-[#02B15A]' : 'text-[#E41414]'
               }`}>
                 {khatabookTab === 'floats' ? 'Total Active Float' : 'Total Debt to Settle'}
               </span>
-              <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
-                khatabookTab === 'floats' ? 'text-emerald-900' : 'text-rose-900'
-              }`}>
+              <span className="text-base sm:text-lg font-black font-mono mt-0.5 block text-white">
                 {formatCurrency(khatabookTab === 'floats' ? floatStats.total : personalDrawStats.total)}
               </span>
-              <span className={`text-[9px] font-medium block mt-0.5 ${
-                khatabookTab === 'floats' ? 'text-emerald-700' : 'text-rose-700'
-              }`}>
+              <span className="text-[9px] text-[#AEABD8] font-medium block mt-0.5">
                 {khatabookTab === 'floats' ? `${floatStats.activeCount} active items` : `${personalDrawStats.activeCount} active items`}
               </span>
             </div>
@@ -1758,38 +1758,38 @@ export default function CashVaultLedger() {
       </div>
 
       {/* ── 5. UNIFIED STATEMENT & ACTIVITY TIMELINE ────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xs">
+      <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 shadow-sm">
         {/* Header & Filter Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#27264E] pb-3">
           <div>
-            <h3 className="text-base sm:text-lg font-black text-gray-900 flex items-center gap-2">
-              <History size={18} className="text-indigo-600" />
+            <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+              <History size={18} className="text-[#64CFF6]" />
               <span>
                 {selectedWalletFilter === 'all' 
                   ? 'Unified Treasury Statement' 
                   : `${WALLET_META[selectedWalletFilter].name} Statement`}
               </span>
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-[#AEABD8] mt-0.5">
               Chronological feed of collections, ATM withdrawals, spends and transfers
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <div className="relative flex-1 sm:w-60">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEABD8]" />
               <input
                 type="text"
                 placeholder="Search statements..."
                 value={ledgerSearch}
                 onChange={(e) => setLedgerSearch(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-600 rounded-xl pl-8 pr-3 py-1.5 text-xs font-medium text-gray-900 focus:outline-none"
+                className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-3 py-1.5 text-xs font-medium text-white placeholder-[#AEABD8]/60 focus:outline-none"
               />
             </div>
 
             <button
               onClick={() => window.print()}
-              className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors cursor-pointer"
+              className="p-2 bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-[#AEABD8] hover:text-white rounded-xl transition-colors cursor-pointer"
               title="Print Statement"
             >
               <Printer size={15} />
@@ -1814,8 +1814,8 @@ export default function CashVaultLedger() {
                 onClick={() => setLedgerTypeFilter(pill.id)}
                 className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
                   isSelected 
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs' 
-                    : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200'
+                    ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-sm' 
+                    : 'bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]'
                 }`}
               >
                 {pill.label}
@@ -1827,7 +1827,7 @@ export default function CashVaultLedger() {
         {/* Statement Timeline Feed List */}
         <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
           {filteredTransactions.length === 0 ? (
-            <div className="py-16 text-center text-xs text-gray-400">
+            <div className="py-16 text-center text-xs text-[#AEABD8]">
               No transactions match your search filter.
             </div>
           ) : (
@@ -1840,25 +1840,25 @@ export default function CashVaultLedger() {
               return (
                 <div 
                   key={tx.id} 
-                  className="p-3 sm:p-4 bg-gray-50/70 border border-gray-100 rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3 hover:bg-slate-50 transition-colors"
+                  className="p-3 sm:p-4 bg-[#141332] border border-[#27264E] rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3 hover:border-[#6359E9]/40 transition-colors"
                 >
                   <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                       <span className={`text-[9px] sm:text-[10px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded-md border ${badgeColor}`}>
                         {badgeLabel}
                       </span>
-                      <span className="text-[10px] text-gray-400 font-mono">{dateLabel}</span>
-                      <span className="text-[10px] text-gray-500 font-bold bg-gray-200/70 px-1.5 py-0.2 rounded">
+                      <span className="text-[10px] text-[#AEABD8] font-mono">{dateLabel}</span>
+                      <span className="text-[10px] text-[#AEABD8] font-bold bg-[#27264E] px-1.5 py-0.2 rounded">
                         {WALLET_META[tx.wallet_type]?.name || tx.wallet_type}
                       </span>
                     </div>
-                    <p className="text-xs font-semibold text-gray-800 leading-snug truncate mt-0.5">
+                    <p className="text-xs font-semibold text-white leading-snug truncate mt-0.5">
                       {tx.notes || tx.description || 'Treasury Ledger Movement'}
                     </p>
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className={`text-sm sm:text-base font-black font-mono block ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    <span className={`text-sm sm:text-base font-black font-mono block ${isCredit ? 'text-[#02B15A]' : 'text-[#E41414]'}`}>
                       {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
                     </span>
                   </div>

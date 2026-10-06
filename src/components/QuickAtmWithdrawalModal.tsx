@@ -198,25 +198,25 @@ export default function QuickAtmWithdrawalModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
-      <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col shadow-2xl relative overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
+      <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col shadow-2xl relative overflow-hidden my-auto animate-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+        <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between bg-[#1D1D41] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold shrink-0 shadow-xs">
+            <div className="w-10 h-10 rounded-2xl bg-[#6359E9]/20 text-[#64CFF6] flex items-center justify-center font-bold shrink-0 shadow-xs border border-[#6359E9]/30">
               <Landmark size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight">
+                <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
                   ATM Bank-to-Cash
                 </h3>
-                <span className="text-[10px] text-indigo-700 font-extrabold bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] text-[#64CFF6] font-extrabold bg-[#6359E9]/20 border border-[#6359E9]/40 px-2 py-0.5 rounded-full">
                   2-Step Verify
                 </span>
               </div>
-              <p className="text-[11px] text-gray-500 font-medium">
+              <p className="text-[11px] text-[#AEABD8] font-medium">
                 Debit Bank → Place physical notes in Cash Box → Confirm
               </p>
             </div>
@@ -225,7 +225,7 @@ export default function QuickAtmWithdrawalModal({
           <button 
             type="button" 
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-[#27264E] hover:bg-[#3A3A5A] text-[#AEABD8] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X size={16} />
           </button>
@@ -236,17 +236,17 @@ export default function QuickAtmWithdrawalModal({
           
           {/* Pending Inflow Verification List (if any exists) */}
           {pendingInflows.length > 0 && (
-            <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-3.5 space-y-2.5 animate-in fade-in duration-200">
+            <div className="bg-[#141332] border-2 border-[#FFBB38]/40 rounded-2xl p-3.5 space-y-2.5 animate-in fade-in duration-200">
               <div className="flex items-center justify-between">
-                <h4 className="text-[11px] font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <AlertCircle size={14} className="text-amber-600 animate-pulse" />
+                <h4 className="text-[11px] font-black text-[#FFBB38] uppercase tracking-wider flex items-center gap-1.5">
+                  <AlertCircle size={14} className="text-[#FFBB38] animate-pulse" />
                   Pending Cash Box Verification ({pendingInflows.length})
                 </h4>
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-200/70 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold text-[#FFBB38] bg-[#FFBB38]/20 border border-[#FFBB38]/40 px-2 py-0.5 rounded-full">
                   Step 2
                 </span>
               </div>
-              <p className="text-[11px] text-amber-800 font-medium leading-tight">
+              <p className="text-[11px] text-[#AEABD8] font-medium leading-tight">
                 Currency was debited from bank. Click below once notes are in the cash box:
               </p>
               <div className="space-y-2 pt-1">
@@ -257,16 +257,16 @@ export default function QuickAtmWithdrawalModal({
                   return (
                     <div
                       key={item.id}
-                      className="bg-white border border-amber-200 p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-2 shadow-2xs"
+                      className="bg-[#1D1D41] border border-[#27264E] p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-2 shadow-inner"
                     >
                       <div className="min-w-0">
-                        <div className="text-[10px] font-bold text-gray-500 uppercase truncate">
+                        <div className="text-[10px] font-bold text-[#AEABD8] uppercase truncate">
                           From: {srcLabel}
                         </div>
-                        <div className="text-base font-black text-gray-900 font-mono">
+                        <div className="text-base font-black text-white font-mono">
                           ₹{item.amount.toLocaleString('en-IN')}
                         </div>
-                        <div className="text-[10px] text-gray-400 font-mono flex items-center gap-1 mt-0.5">
+                        <div className="text-[10px] text-[#AEABD8] font-mono flex items-center gap-1 mt-0.5">
                           <Clock size={10} />
                           {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -276,7 +276,7 @@ export default function QuickAtmWithdrawalModal({
                         type="button"
                         onClick={() => handleVerifyInflow(item)}
                         disabled={isVerifying}
-                        className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
+                        className="bg-[#02B15A] hover:bg-[#02B15A]/90 active:scale-95 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-md shadow-[#02B15A]/20 shrink-0 cursor-pointer disabled:opacity-50"
                       >
                         {isVerifying ? (
                           <RefreshCw size={12} className="animate-spin" />
@@ -296,11 +296,11 @@ export default function QuickAtmWithdrawalModal({
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Amount Input */}
             <div className="space-y-1.5 text-center">
-              <label className="text-[11px] text-gray-500 font-extrabold uppercase tracking-wider block">
+              <label className="text-[11px] text-[#AEABD8] font-extrabold uppercase tracking-wider block">
                 Withdrawal Amount (₹) *
               </label>
               <div className="relative max-w-[280px] mx-auto">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-400 select-none">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-[#AEABD8]/50 select-none">
                   ₹
                 </span>
                 <input
@@ -311,35 +311,35 @@ export default function QuickAtmWithdrawalModal({
                   placeholder="0"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full bg-white border-2 border-gray-200 focus:border-indigo-600 rounded-2xl pl-10 pr-6 py-3 text-2xl sm:text-3xl font-black text-gray-900 tracking-tight shadow-xs text-center focus:outline-none transition-all font-mono"
+                  className="w-full bg-[#141332] border-2 border-[#27264E] focus:border-[#6359E9] rounded-2xl pl-10 pr-6 py-3 text-2xl sm:text-3xl font-black text-white tracking-tight shadow-inner text-center focus:outline-none transition-all font-mono"
                   autoFocus
                 />
               </div>
             </div>
 
             {/* Transfer Flow Visualizer Card */}
-            <div className="bg-slate-50 border border-gray-200 rounded-2xl p-3 flex items-center justify-between text-xs">
+            <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3 flex items-center justify-between text-xs">
               <div className="space-y-0.5">
-                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Step 1: Debit Bank</span>
-                <strong className="text-gray-900 block truncate">
+                <span className="text-[9px] font-bold text-[#AEABD8] uppercase tracking-wider block">Step 1: Debit Bank</span>
+                <strong className="text-white block truncate">
                   {sourceWallet === 'kishor_bank' ? 'Kishor UPI' : sourceWallet === 'dad_bank' ? "Dad's Bank" : "Mom's Bank"}
                 </strong>
               </div>
 
-              <div className="flex items-center gap-1 text-indigo-600 px-2 py-1 bg-indigo-50 rounded-xl border border-indigo-100">
+              <div className="flex items-center gap-1 text-[#64CFF6] px-2 py-1 bg-[#6359E9]/20 rounded-xl border border-[#6359E9]/40">
                 <span className="text-[10px] font-extrabold font-mono">₹{amountNum.toLocaleString('en-IN')}</span>
                 <ArrowRight size={13} />
               </div>
 
               <div className="space-y-0.5 text-right">
-                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Step 2: Credit Box</span>
-                <strong className="text-emerald-700 block">Cash in Hand 💵</strong>
+                <span className="text-[9px] font-bold text-[#AEABD8] uppercase tracking-wider block">Step 2: Credit Box</span>
+                <strong className="text-[#02B15A] block">Cash in Hand 💵</strong>
               </div>
             </div>
 
             {/* Source Bank Account Options */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+              <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
                 Withdraw From Which Bank Account?
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -352,19 +352,19 @@ export default function QuickAtmWithdrawalModal({
                       onClick={() => setSourceWallet(w.id)}
                       className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs ring-2 ring-indigo-400/30'
-                          : 'bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200'
+                          ? 'bg-[#6359E9] text-white border-transparent shadow-md ring-2 ring-[#6359E9]/40'
+                          : 'bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm">{w.icon}</span>
                         <span className={`text-[9px] font-mono font-bold px-1 py-0.2 rounded ${
-                          isSelected ? 'bg-indigo-700 text-white' : 'bg-gray-200 text-gray-700'
+                          isSelected ? 'bg-black/30 text-white' : 'bg-[#27264E] text-white'
                         }`}>
                           ₹{w.bal.toLocaleString('en-IN')}
                         </span>
                       </div>
-                      <div className="text-[11px] font-bold truncate">{w.label}</div>
+                      <div className="text-[11px] font-bold truncate text-white">{w.label}</div>
                     </button>
                   );
                 })}
@@ -373,7 +373,7 @@ export default function QuickAtmWithdrawalModal({
 
             {/* Optional Reference Notes */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+              <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
                 ATM / Cheque Reference (Optional)
               </label>
               <input
@@ -381,30 +381,30 @@ export default function QuickAtmWithdrawalModal({
                 placeholder="e.g. SBI ATM #4920 or Dad withdraw cash"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-600 rounded-xl px-3.5 py-2 text-xs font-medium text-gray-900 focus:outline-none"
+                className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-medium text-white placeholder:text-[#AEABD8]/60 focus:outline-none"
               />
             </div>
 
             {isInsufficient && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-900 text-xs font-bold">
-                <AlertCircle size={15} className="text-rose-600 shrink-0" />
+              <div className="p-3 bg-[#E41414]/15 border border-[#E41414]/30 rounded-xl flex items-center gap-2 text-[#E41414] text-xs font-bold">
+                <AlertCircle size={15} className="text-[#E41414] shrink-0" />
                 <span>Insufficient balance in source bank! Available: ₹{availableBal.toLocaleString('en-IN')}</span>
               </div>
             )}
 
             {/* Action Buttons */}
-            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2 border-t border-gray-150">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2 border-t border-[#27264E]">
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full sm:w-auto border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors text-center cursor-pointer"
+                className="w-full sm:w-auto border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors text-center cursor-pointer"
               >
                 Close
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || amountNum <= 0 || isInsufficient}
-                className="w-full sm:flex-1 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                className="w-full sm:flex-1 bg-gradient-to-r from-[#9C2CF3] to-[#3A6FF9] hover:opacity-95 active:scale-95 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-[#9C2CF3]/20 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
               >
                 {isSubmitting ? (
                   <>

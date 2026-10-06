@@ -210,17 +210,17 @@ export default function PassbookScannerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md max-h-[90dvh] overflow-hidden shadow-2xl relative flex flex-col my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-md max-h-[90dvh] overflow-hidden shadow-2xl relative flex flex-col my-auto text-white">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
+        <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+            <div className="p-2.5 rounded-xl bg-[#6359E9]/10 border border-[#6359E9]/20 text-[#6359E9] shrink-0">
               <Camera size={20} />
             </div>
             <div className="min-w-0">
               <h3 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">{title}</h3>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-[11px] text-[#AEABD8] truncate">
                 {targetMemberName ? `Pairing to ${targetMemberName}` : subtitle}
               </p>
             </div>
@@ -228,7 +228,7 @@ export default function PassbookScannerModal({
           <button
             type="button"
             onClick={handleClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+            className="p-2 rounded-xl text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors shrink-0"
           >
             <X size={18} />
           </button>
@@ -236,27 +236,27 @@ export default function PassbookScannerModal({
 
         {/* Camera View Area */}
         <div className="p-4 sm:p-6 flex flex-col items-center justify-center">
-          <div className={`relative w-full max-w-[280px] aspect-square rounded-2xl overflow-hidden bg-slate-950 border-2 shadow-inner flex items-center justify-center transition-colors ${
-            scannerWarning ? 'border-amber-500/80 animate-shake' : 'border-indigo-500/40'
+          <div className={`relative w-full max-w-[280px] aspect-square rounded-2xl overflow-hidden bg-[#141332] border-2 shadow-inner flex items-center justify-center transition-colors ${
+            scannerWarning ? 'border-[#FFBB38]/80 animate-shake' : 'border-[#6359E9]/40'
           }`}>
             <div id={readerElementId} className="w-full h-full object-cover" />
 
             {/* Target Scanning Overlay Frame */}
             <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
               <div className={`w-48 h-48 border-2 border-dashed rounded-xl relative transition-colors ${
-                scannerWarning ? 'border-amber-400' : 'border-indigo-400/70 animate-pulse'
+                scannerWarning ? 'border-[#FFBB38]' : 'border-[#6359E9]/70 animate-pulse'
               }`}>
                 {/* Corner Markers */}
-                <div className={`absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 ${scannerWarning ? 'border-amber-400' : 'border-indigo-400'}`} />
-                <div className={`absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 ${scannerWarning ? 'border-amber-400' : 'border-indigo-400'}`} />
-                <div className={`absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 ${scannerWarning ? 'border-amber-400' : 'border-indigo-400'}`} />
-                <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 ${scannerWarning ? 'border-amber-400' : 'border-indigo-400'}`} />
+                <div className={`absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 ${scannerWarning ? 'border-[#FFBB38]' : 'border-[#6359E9]'}`} />
+                <div className={`absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 ${scannerWarning ? 'border-[#FFBB38]' : 'border-[#6359E9]'}`} />
+                <div className={`absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 ${scannerWarning ? 'border-[#FFBB38]' : 'border-[#6359E9]'}`} />
+                <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 ${scannerWarning ? 'border-[#FFBB38]' : 'border-[#6359E9]'}`} />
               </div>
             </div>
 
             {isProcessing && (
-              <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white">
-                <RefreshCw className="animate-spin text-indigo-400" size={28} />
+              <div className="absolute inset-0 bg-[#141332]/90 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white">
+                <RefreshCw className="animate-spin text-[#64CFF6]" size={28} />
                 <span className="text-xs font-bold">Verifying Passbook Token...</span>
               </div>
             )}
@@ -264,22 +264,22 @@ export default function PassbookScannerModal({
 
           {/* Warning for foreign / invalid QR codes */}
           {scannerWarning && (
-            <div className="mt-3 p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2 max-w-sm text-left animate-in fade-in duration-200">
-              <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-400" />
+            <div className="mt-3 p-3 rounded-2xl bg-[#FFBB38]/15 border border-[#FFBB38]/30 text-[#FFBB38] text-xs flex items-start gap-2 max-w-sm text-left animate-in fade-in duration-200">
+              <AlertTriangle size={16} className="shrink-0 mt-0.5 text-[#FFBB38]" />
               <div>
                 <span className="font-bold block">Invalid QR Code</span>
-                <span className="text-[11px] text-amber-200/90">{scannerWarning}</span>
+                <span className="text-[11px] text-[#FFBB38]/90">{scannerWarning}</span>
               </div>
             </div>
           )}
 
           {scannerError ? (
-            <div className="mt-4 p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex flex-col items-start gap-2.5 max-w-sm text-left animate-in fade-in duration-200">
+            <div className="mt-4 p-3.5 rounded-2xl bg-[#E41414]/15 border border-[#E41414]/30 text-[#E41414] text-xs flex flex-col items-start gap-2.5 max-w-sm text-left animate-in fade-in duration-200">
               <div className="flex items-start gap-2 w-full">
-                <AlertCircle size={18} className="shrink-0 mt-0.5 text-rose-400" />
+                <AlertCircle size={18} className="shrink-0 mt-0.5 text-[#E41414]" />
                 <div>
                   <span className="font-bold text-white block">Cannot Link QR Code</span>
-                  <span className="text-[11px] text-rose-200 leading-relaxed block mt-0.5">
+                  <span className="text-[11px] text-red-300 leading-relaxed block mt-0.5">
                     {scannerError}
                   </span>
                 </div>
@@ -288,26 +288,26 @@ export default function PassbookScannerModal({
               <button
                 type="button"
                 onClick={handleRetryScan}
-                className="w-full mt-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-700 shadow-sm"
+                className="w-full mt-1 py-2 px-3 rounded-xl bg-[#27264E] hover:bg-[#27264E]/80 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all border border-[#27264E] shadow-sm"
               >
                 <RefreshCw size={13} />
                 <span>Scan Another Passbook Sticker</span>
               </button>
             </div>
           ) : !scannerWarning && (
-            <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-400">
-              <ShieldCheck size={14} className="text-emerald-400" />
+            <div className="mt-4 flex items-center gap-2 text-[11px] text-[#AEABD8]">
+              <ShieldCheck size={14} className="text-[#02B15A]" />
               <span>Official Passbook QR verification active</span>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/50 flex justify-end gap-2">
+        <div className="p-4 border-t border-[#27264E] bg-[#141332]/60 flex justify-end gap-2">
           <button
             type="button"
             onClick={handleClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 transition-colors"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors"
           >
             Cancel
           </button>
