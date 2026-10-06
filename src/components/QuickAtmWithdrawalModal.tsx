@@ -107,13 +107,23 @@ export default function QuickAtmWithdrawalModal({
       const noteDetail = notes.trim() ? ` | Note: ${notes.trim()}` : '';
       const fullNote = `[ATM Relocation] From: ${sourceName} -> Cash Box${noteDetail} | Pending Physical Verification`;
 
-      // 1. Debit Source Bank Account (delta is negative)
-      await updateBalance(sourceWallet, -amountNum);
+      // 1. Debit Source Bank Account (atomic RPC with negative balance protection)
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
+        p_wallet: sourceWallet,
+        p_delta: -amountNum,
+        p_user_id: profile?.id || null,
+      });
 
-      // 2. Insert into transactions table as 'pending_verification'
+      if (rpcErr || !rpcData?.success) {
+        throw new Error(rpcData?.error || rpcErr?.message || 'Failed to debit source bank account');
+      }
+
+      // 2. Insert into transactions table as 'pending_verification' on the source bank
       const { error } = await supabase.from('transactions').insert([
         {
-          wallet_type: 'cash_in_hand',
+          wallet_type: sourceWallet,
+          from_wallet: sourceWallet,
+          to_wallet: 'cash_in_hand',
           type: 'atm_withdrawal',
           status: 'pending_verification',
           amount: amountNum,

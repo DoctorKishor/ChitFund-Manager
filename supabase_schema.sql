@@ -17,6 +17,7 @@ create table public.custom_roles (
   description text default '',
   color text default '#6366F1',
   is_system boolean not null default false,
+  is_privileged boolean not null default false,
   allowed_tabs text[] default '{}',
   allowed_actions text[] default '{}',
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
@@ -25,7 +26,7 @@ create table public.custom_roles (
 
 -- profiles: User profiles extending Supabase auth.users
 create table public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
   phone_number text not null unique,
   full_name text not null,
   role text not null default 'subscriber' references public.custom_roles(id) on update cascade on delete set default,
@@ -34,6 +35,7 @@ create table public.profiles (
   passbook_last_scanned_at timestamp with time zone,
   mpin varchar(6) default '1234',
   is_blocked boolean not null default false,
+  is_deleted boolean not null default false,
   reschedule_acknowledgments jsonb default '{}'::jsonb,
   created_at timestamp with time zone not null default timezone('utc'::text, now())
 );
@@ -83,7 +85,7 @@ create table public.group_members (
 create table public.global_treasury (
   id uuid primary key default gen_random_uuid(),
   wallet_type text not null unique check (wallet_type in ('cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank')),
-  current_balance numeric not null default 0,
+  current_balance numeric not null default 0 check (current_balance >= 0),
   pending_verification_balance numeric not null default 0,
   last_updated_by uuid references public.profiles(id) on delete set null
 );
@@ -95,16 +97,20 @@ create table public.transactions (
   profile_id uuid references public.profiles(id) on delete set null,
   group_member_id uuid references public.group_members(id) on delete set null,
   wallet_type text not null check (wallet_type in ('cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank')),
-  type text not null check (type in ('collection', 'payout', 'personal_draw', 'atm_withdrawal', 'transfer')),
+  from_wallet text default null,
+  to_wallet text default null,
+  transfer_pair_id uuid default null,
+  type text not null check (type in ('collection', 'payout', 'personal_draw', 'atm_withdrawal', 'transfer', 'transfer_in', 'organizer_profit')),
   status text not null check (status in ('completed', 'pending_verification')),
-  amount numeric not null check (amount > 0),
+  amount numeric not null check (amount >= 0),
   notes text default null,
   denomination_log jsonb default null,
   voice_note_text text default null,
   verification_proof_url text default null,
   created_by uuid references public.profiles(id) on delete set null default auth.uid(),
   cycle_month integer default null,
-  created_at timestamp with time zone not null default timezone('utc'::text, now())
+  created_at timestamp with time zone not null default timezone('utc'::text, now()),
+  constraint check_collection_has_cycle_month check (type != 'collection' or cycle_month is not null)
 );
 
 -- auction_logs: Monthly group bidding records
@@ -117,8 +123,19 @@ create table public.auction_logs (
   winning_discount numeric not null check (winning_discount >= 0),
   runner_up_bidder_id uuid references public.profiles(id) on delete restrict,
   is_laaba_seetu boolean not null default false,
-  created_at timestamp with time zone not null default timezone('utc'::text, now())
+  created_at timestamp with time zone not null default timezone('utc'::text, now()),
+  constraint unique_auction_group_month unique (group_id, month)
 );
+
+-- login_attempts: MPIN rate limiting
+create table if not exists public.login_attempts (
+  id uuid primary key default gen_random_uuid(),
+  phone_number text not null,
+  attempted_at timestamp with time zone not null default timezone('utc'::text, now()),
+  success boolean not null default false,
+  ip_address text default null
+);
+create index if not exists idx_login_attempts_phone_time on public.login_attempts (phone_number, attempted_at);
 
 -- security_audit_logs: Logs of administrative database actions
 create table public.security_audit_logs (
@@ -139,10 +156,22 @@ returns text as $$
   select role from public.profiles where id = user_id;
 $$ language sql security definer set search_path = public;
 
--- Check if the current authenticated user is an admin or a manager
+-- Check if the current authenticated user is an admin, manager, or has an is_privileged role
 create or replace function public.is_admin_or_manager()
 returns boolean as $$
-  select coalesce(public.get_user_role(auth.uid()) in ('admin', 'manager'), false);
+  select coalesce(
+    exists (
+      select 1
+      from public.profiles p
+      left join public.custom_roles cr on cr.id = p.role
+      where p.id = auth.uid()
+        and (
+          p.role in ('admin', 'manager')
+          or coalesce(cr.is_privileged, false) = true
+        )
+    ),
+    false
+  );
 $$ language sql security definer set search_path = public;
 
 -- Get the set of group IDs that a user belongs to, bypassing RLS to prevent recursion
@@ -1093,6 +1122,119 @@ begin
   );
 end;
 $$;
+
+-- Atomic Wallet Balance Mutation with non-negative guard & row-level locking
+create or replace function public.mutate_wallet_balance(
+  p_wallet text,
+  p_delta numeric,
+  p_user_id uuid default auth.uid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_current_bal numeric;
+  v_new_bal numeric;
+begin
+  insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
+  values (p_wallet, 0, 0, p_user_id)
+  on conflict (wallet_type) do nothing;
+
+  select current_balance into v_current_bal
+  from public.global_treasury
+  where wallet_type = p_wallet
+  for update;
+
+  v_new_bal := v_current_bal + p_delta;
+
+  if v_new_bal < 0 then
+    return jsonb_build_object(
+      'success', false,
+      'error', 'Insufficient balance in ' || p_wallet || '. Available: ₹' || v_current_bal || ', Requested debit: ₹' || abs(p_delta)
+    );
+  end if;
+
+  update public.global_treasury
+  set current_balance = v_new_bal,
+      last_updated_by = p_user_id
+  where wallet_type = p_wallet
+  returning current_balance into v_new_bal;
+
+  return jsonb_build_object(
+    'success', true,
+    'wallet', p_wallet,
+    'new_balance', v_new_bal,
+    'delta', p_delta
+  );
+end;
+$$;
+
+-- Authenticate by Phone and MPIN with Rate Limiting (10 failed attempts / 15 mins)
+create or replace function public.authenticate_by_phone_and_mpin(
+  p_phone text,
+  p_mpin text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_profile record;
+  v_recent_failures int;
+begin
+  select count(*) into v_recent_failures
+  from public.login_attempts
+  where phone_number = p_phone
+    and success = false
+    and attempted_at > (now() - interval '15 minutes');
+
+  if v_recent_failures >= 10 then
+    return jsonb_build_object(
+      'success', false,
+      'error', 'Too many failed login attempts. Account temporarily locked for 15 minutes.'
+    );
+  end if;
+
+  select * into v_profile
+  from public.profiles
+  where phone_number = p_phone
+    and is_deleted = false
+  limit 1;
+
+  if not found then
+    insert into public.login_attempts (phone_number, success) values (p_phone, false);
+    return jsonb_build_object('success', false, 'error', 'Invalid phone number or MPIN.');
+  end if;
+
+  if v_profile.is_blocked = true then
+    return jsonb_build_object('success', false, 'error', 'Your subscriber account is suspended. Contact administration.');
+  end if;
+
+  if coalesce(v_profile.mpin, '1234') <> p_mpin then
+    insert into public.login_attempts (phone_number, success) values (p_phone, false);
+    return jsonb_build_object('success', false, 'error', 'Invalid phone number or MPIN.');
+  end if;
+
+  insert into public.login_attempts (phone_number, success) values (p_phone, true);
+
+  return jsonb_build_object(
+    'success', true,
+    'profile', jsonb_build_object(
+      'id', v_profile.id,
+      'fullName', v_profile.full_name,
+      'phoneNumber', v_profile.phone_number,
+      'role', v_profile.role,
+      'passbookToken', v_profile.passbook_token,
+      'isDefaultPin', coalesce(v_profile.mpin, '1234') = '1234',
+      'isBlocked', v_profile.is_blocked
+    )
+  );
+end;
+$$;
+
 
 
 

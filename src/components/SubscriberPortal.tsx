@@ -996,8 +996,8 @@ export default function SubscriberPortal() {
                 </h1>
               </div>
 
-              {/* 4-METRIC GRID */}
-              <div className="relative z-10 grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3.5 mt-3.5 sm:mt-4">
+              {/* 3-METRIC GRID */}
+              <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3.5 mt-3.5 sm:mt-4">
                 
                 {/* Stat 1: Total Contributed */}
                 <div className={`rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between ${
@@ -1068,29 +1068,6 @@ export default function SubscriberPortal() {
                   <p className={`text-[9px] mt-0.5 truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
                     {wonGroupsCount > 0 ? 'Prize Pot disbursed' : 'Eligible for bidding'}
                   </p>
-                </div>
-
-                {/* Stat 4: Sync Status */}
-                <div className={`rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between ${
-                  isDark 
-                    ? 'bg-[#070b14]/80 backdrop-blur-sm border border-slate-800/90' 
-                    : 'bg-slate-50 border border-slate-200 shadow-2xs'
-                }`}>
-                  <div className={`flex items-center justify-between mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    <span className="text-[10px] font-semibold truncate">Passbook Sync</span>
-                    <div className={`p-1 rounded-md shrink-0 ${
-                      isDark ? 'bg-violet-500/10 text-violet-400' : 'bg-violet-50 text-violet-600 border border-violet-100'
-                    }`}>
-                      <FileText size={13} />
-                    </div>
-                  </div>
-                  <div className={`text-base sm:text-xl font-black font-mono tracking-tight flex items-center gap-1 whitespace-nowrap ${
-                    isDark ? 'text-white' : 'text-slate-900'
-                  }`}>
-                    <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />
-                    <span>Synced</span>
-                  </div>
-                  <p className={`text-[9px] mt-0.5 truncate ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Counter & Digital</p>
                 </div>
 
               </div>

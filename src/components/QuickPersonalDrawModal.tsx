@@ -66,8 +66,16 @@ export default function QuickPersonalDrawModal({
         ? `Personal Draw (${resolvedCategory}): ${notes.trim()}`
         : `Personal Draw (${resolvedCategory})`;
 
-      // 1. Deduct from treasury balance (updateBalance receives delta: -amountNum)
-      await updateBalance(selectedWallet, -amountNum);
+      // 1. Deduct from treasury balance via atomic RPC
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
+        p_wallet: selectedWallet,
+        p_delta: -amountNum,
+        p_user_id: profile?.id || null,
+      });
+
+      if (rpcErr || !rpcData?.success) {
+        throw new Error(rpcData?.error || rpcErr?.message || 'Failed to debit wallet balance');
+      }
 
       // 2. Insert into transactions table
       const { error } = await supabase.from('transactions').insert([

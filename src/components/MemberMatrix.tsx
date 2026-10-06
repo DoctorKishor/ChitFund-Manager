@@ -83,7 +83,6 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
   const [customRoles, setCustomRoles] = useState<CustomRoleRecord[]>([]);
   const [allChitGroups, setAllChitGroups] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [showPins, setShowPins] = useState<boolean>(false);
 
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -153,6 +152,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (profilesError) throw profilesError;
@@ -478,7 +478,7 @@ Welcome to your Chit Fund Member Portal.
 Access your digital passbook, payment ledger & live auction bidding anytime:
 🔗 *Passbook Direct Link*: ${scanUrl}
 👤 *Mobile Number*: ${cleanPhone}
-🔑 *Initial MPIN*: ${member.mpin || '1234'}
+🔑 *Login PIN*: Use the default PIN *1234* and change it after your first login.
 
 _(Point any camera at your physical pocket book QR sticker to log in instantly)_`;
 
@@ -610,23 +610,44 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
       return;
     }
 
-    if (!confirm(`Are you sure you want to remove "${member.fullName}"? This will unenroll them from all chits and delete their profile.`)) {
+    // Check transaction history
+    const { data: txs } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('profile_id', member.id);
+
+    const txCount = txs?.length || 0;
+    const confirmPrompt = txCount > 0
+      ? `"${member.fullName}" has ${txCount} historical financial transaction record(s).\n\nTo preserve accounting ledger integrity, their profile will be archived and hidden from active rosters, while all transaction history is securely retained.\n\nProceed to archive this member?`
+      : `Are you sure you want to remove "${member.fullName}"? This will archive their profile.`;
+
+    if (!confirm(confirmPrompt)) {
       return;
     }
 
     try {
-      await supabase.from('group_members').delete().eq('profile_id', member.id);
-      const { error } = await supabase.from('profiles').delete().eq('id', member.id);
+      // Soft-delete profile
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_deleted: true })
+        .eq('id', member.id);
       if (error) throw error;
 
+      // Log in security audit logs
+      await supabase.from('security_audit_logs').insert({
+        admin_id: currentAdminProfile?.id || null,
+        action_description: `MEMBER ARCHIVED: ${member.fullName} (${member.phoneNumber || 'No Phone'}) archived by admin. ${txCount} transactions preserved in ledger.`,
+        target_table: 'profiles',
+      });
+
       if (onAddAuditLog) {
-        onAddAuditLog(`DELETE subscriber profile: Removed ${member.fullName}`);
+        onAddAuditLog(`ARCHIVE subscriber profile: ${member.fullName} (${txCount} txs preserved)`);
       }
 
       await fetchData();
     } catch (err: any) {
-      console.error('Error deleting member:', err);
-      alert('Error deleting member: ' + err.message);
+      console.error('Error archiving member:', err);
+      alert('Error archiving member: ' + err.message);
     }
   };
 
@@ -1010,9 +1031,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
                         <span className="text-[10px] font-mono font-bold bg-white border border-gray-200 px-1.5 py-0.5 rounded text-slate-700 flex items-center gap-0.5">
                           <KeyRound size={9} className="text-indigo-500" />
-                          <span>{member.mpin || '1234'}</span>
-                          {(!member.mpin || member.mpin === '1234') && (
+                          <span>••••</span>
+                          {(!member.mpin || member.mpin === '1234') ? (
                             <span className="text-[8px] font-bold text-amber-600 ml-0.5">(Def)</span>
+                          ) : (
+                            <span className="text-[8px] font-bold text-emerald-600 ml-0.5">(Set)</span>
                           )}
                         </span>
                       </div>
@@ -1133,15 +1156,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     <th className="py-4 px-5">Phone</th>
                     <th className="py-4 px-5">
                       <div className="flex items-center gap-1.5">
-                        <span>MPIN</span>
-                        <button
-                          type="button"
-                          onClick={() => setShowPins(!showPins)}
-                          title={showPins ? 'Hide All PINs' : 'Show All PINs'}
-                          className="p-0.5 text-gray-400 hover:text-indigo-600 transition-colors"
-                        >
-                          {showPins ? <EyeOff size={12} /> : <Eye size={12} />}
-                        </button>
+                        <span>MPIN Status</span>
                       </div>
                     </th>
                     <th className="py-4 px-5">Passbook QR Key</th>
@@ -1226,8 +1241,8 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           {/* Security PIN (MPIN) */}
                           <td className="py-4 px-5 font-mono" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-800 text-[11px] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                {showPins ? (member.mpin || '1234') : '••••'}
+                              <span className="font-bold text-slate-700 text-[11px] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                ••••
                               </span>
                               {isDefaultPin ? (
                                 <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded">

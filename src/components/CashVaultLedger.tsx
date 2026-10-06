@@ -51,6 +51,9 @@ interface TreasuryTx {
   status?: 'completed' | 'pending_verification' | string;
   amount: number;
   wallet_type: WalletType;
+  from_wallet?: string | null;
+  to_wallet?: string | null;
+  transfer_pair_id?: string | null;
   notes?: string;
   description?: string;
   group_id?: string;
@@ -323,7 +326,16 @@ export default function CashVaultLedger() {
       return { isCredit: false, badgeLabel: 'ATM WITHDRAWAL (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' };
     }
 
-    // 8. Inter-Vault Transfers
+    // 8. Explicit Transfer Leg Types
+    if (type === 'transfer_in') {
+      return { isCredit: true, badgeLabel: 'TRANSFER IN (+)', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' };
+    }
+
+    if (type === 'organizer_profit') {
+      return { isCredit: false, badgeLabel: 'ORGANIZER PROFIT (-)', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200' };
+    }
+
+    // 9. Inter-Vault Transfers
     if (type === 'transfer') {
       const walletName = (WALLET_META[targetWallet]?.name || targetWallet).toLowerCase();
       
@@ -349,11 +361,13 @@ export default function CashVaultLedger() {
     return recentTransactions
       .filter(tx => tx.type === 'atm_withdrawal' && tx.status === 'pending_verification')
       .map(tx => {
-        let source: Exclude<WalletType, 'cash_in_hand'> = 'kishor_bank';
-        const n = (tx.notes || '').toLowerCase();
-        if (n.includes('dad')) source = 'dad_bank';
-        else if (n.includes('mom')) source = 'mom_bank';
-        else if (n.includes('kishor')) source = 'kishor_bank';
+        let source: Exclude<WalletType, 'cash_in_hand'> = (tx.from_wallet as any) || (tx.wallet_type !== 'cash_in_hand' ? tx.wallet_type : 'kishor_bank');
+        if (!tx.from_wallet && tx.wallet_type === 'cash_in_hand') {
+          const n = (tx.notes || '').toLowerCase();
+          if (n.includes('dad')) source = 'dad_bank';
+          else if (n.includes('mom')) source = 'mom_bank';
+          else if (n.includes('kishor')) source = 'kishor_bank';
+        }
 
         return {
           id: tx.id,
@@ -633,12 +647,27 @@ export default function CashVaultLedger() {
 
     try {
       setIsProcessingTransfer(true);
-      await updateBalance(relocateSource, -amount);
+      
+      // Step 1: Debit the SOURCE bank via atomic RPC
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
+        p_wallet: relocateSource,
+        p_delta: -amount,
+        p_user_id: profile?.id || null,
+      });
+
+      if (rpcErr || !rpcData?.success) {
+        alert('Failed to debit bank account: ' + (rpcData?.error || rpcErr?.message));
+        return;
+      }
+
       const sourceName = WALLET_META[relocateSource].name;
 
+      // Step 2: Record a PENDING transaction on the SOURCE wallet (not cash_in_hand)
       const { error } = await supabase.from('transactions').insert([
         {
-          wallet_type: 'cash_in_hand',
+          wallet_type: relocateSource,
+          from_wallet: relocateSource,
+          to_wallet: 'cash_in_hand',
           type: 'atm_withdrawal',
           status: 'pending_verification',
           amount: amount,
@@ -647,7 +676,13 @@ export default function CashVaultLedger() {
         }
       ]);
 
-      if (error) throw error;
+      if (error) {
+        await supabase.from('security_audit_logs').insert({
+          action_description: `ATM TX RECORD FAILURE: ₹${amount} debited from ${sourceName} but transaction record failed: ${error.message}. MANUAL RECONCILIATION REQUIRED.`,
+          target_table: 'transactions',
+        });
+        throw error;
+      }
 
       await supabase.from('security_audit_logs').insert({
         action_description: `ATM RELOCATION TRIGGERED: ₹${amount.toLocaleString('en-IN')} debited from ${sourceName}. Pending physical cash box confirmation.`,
@@ -672,7 +707,17 @@ export default function CashVaultLedger() {
       setIsVerifyingAtmId(txId);
       triggerHapticFeedback('light');
 
-      await updateBalance('cash_in_hand', amount);
+      // Atomic credit to cash_in_hand
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
+        p_wallet: 'cash_in_hand',
+        p_delta: amount,
+        p_user_id: profile?.id || null,
+      });
+
+      if (rpcErr || !rpcData?.success) {
+        alert('Failed to credit Cash Box: ' + (rpcData?.error || rpcErr?.message));
+        return;
+      }
 
       const sourceName = WALLET_META[source]?.name || source;
       const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -858,7 +903,7 @@ export default function CashVaultLedger() {
     }
   };
 
-  // 6. Inter-Vault Transfer
+  // 6. Inter-Vault Transfer (Full Double-Entry Accounting)
   const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(transferAmount);
@@ -877,33 +922,82 @@ export default function CashVaultLedger() {
 
     try {
       setIsProcessingTransfer(true);
-      await updateBalance(transferSource, -amount);
-      await updateBalance(transferDest, amount);
 
+      // Step 1: Atomic debit from source
+      const { data: debitData, error: debitErr } = await supabase.rpc('mutate_wallet_balance', {
+        p_wallet: transferSource,
+        p_delta: -amount,
+        p_user_id: profile?.id || null,
+      });
+
+      if (debitErr || !debitData?.success) {
+        alert('Failed to debit source account: ' + (debitData?.error || debitErr?.message));
+        return;
+      }
+
+      // Step 2: Atomic credit to destination
+      const { data: creditData, error: creditErr } = await supabase.rpc('mutate_wallet_balance', {
+        p_wallet: transferDest,
+        p_delta: amount,
+        p_user_id: profile?.id || null,
+      });
+
+      if (creditErr || !creditData?.success) {
+        // Rollback source debit
+        await supabase.rpc('mutate_wallet_balance', {
+          p_wallet: transferSource,
+          p_delta: amount,
+          p_user_id: profile?.id || null,
+        });
+        alert('Failed to credit destination account: ' + (creditData?.error || creditErr?.message));
+        return;
+      }
+
+      const pairId = crypto.randomUUID();
       const userNotes = transferNotes.trim();
-      const notes = userNotes 
-        ? `[Transfer: ${transferSource} -> ${transferDest}] ${userNotes} (${WALLET_META[transferSource].name} -> ${WALLET_META[transferDest].name})`
-        : `[Transfer: ${transferSource} -> ${transferDest}] Inter-Vault Transfer from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name}`;
+      const debitNote = `[Transfer] ₹${amount.toLocaleString('en-IN')} sent to ${WALLET_META[transferDest].name}${userNotes ? ' | ' + userNotes : ''}`;
+      const creditNote = `[Transfer In] ₹${amount.toLocaleString('en-IN')} received from ${WALLET_META[transferSource].name}${userNotes ? ' | ' + userNotes : ''}`;
 
-      await supabase.from('transactions').insert([
+      const { error: txErr } = await supabase.from('transactions').insert([
         {
           wallet_type: transferSource,
+          from_wallet: transferSource,
+          to_wallet: transferDest,
           type: 'transfer',
           status: 'completed',
           amount: amount,
-          notes: notes,
+          notes: debitNote,
+          transfer_pair_id: pairId,
           created_by: profile?.id || null,
-        }
+        },
+        {
+          wallet_type: transferDest,
+          from_wallet: transferSource,
+          to_wallet: transferDest,
+          type: 'transfer_in',
+          status: 'completed',
+          amount: amount,
+          notes: creditNote,
+          transfer_pair_id: pairId,
+          created_by: profile?.id || null,
+        },
       ]);
+
+      if (txErr) console.warn('Transfer transaction recording note:', txErr);
+
+      await supabase.from('security_audit_logs').insert({
+        action_description: `INTER-VAULT TRANSFER: ₹${amount.toLocaleString('en-IN')} moved from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name} (Double-entry logged).`,
+        target_table: 'transactions',
+      });
 
       setTransferAmount('');
       setTransferNotes('');
       setActiveModal('none');
       await fetchData();
       alert(`✓ Transferred ${formatCurrency(amount)} from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name}!`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error executing transfer:', err);
-      alert('Failed to complete transfer. Please try again.');
+      alert('Failed to complete transfer: ' + (err.message || 'Please try again.'));
     } finally {
       setIsProcessingTransfer(false);
     }
@@ -929,15 +1023,26 @@ export default function CashVaultLedger() {
 
     try {
       setIsProcessingRecover(true);
-      await updateBalance(recoverSourceWallet, -amount);
+
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
+        p_wallet: recoverSourceWallet,
+        p_delta: -amount,
+        p_user_id: profile?.id || null,
+      });
+
+      if (rpcErr || !rpcData?.success) {
+        alert('Failed to debit float source: ' + (rpcData?.error || rpcErr?.message));
+        return;
+      }
 
       await supabase.from('transactions').insert([
         {
           wallet_type: recoverSourceWallet,
-          type: 'transfer',
+          from_wallet: recoverSourceWallet,
+          type: 'personal_draw',
           status: 'completed',
           amount: amount,
-          notes: `Float Recovery of ${formatCurrency(amount)} by ${recoveringFloat.depositedBy} paid from ${WALLET_META[recoverSourceWallet].name}`,
+          notes: `[Float Recovery] ₹${amount.toLocaleString('en-IN')} returned to ${recoveringFloat.depositedBy} from ${WALLET_META[recoverSourceWallet].name} | Original deposit on ${new Date(recoveringFloat.created_at).toLocaleDateString('en-IN')}`,
           created_by: profile?.id || null,
         }
       ]);

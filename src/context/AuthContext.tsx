@@ -76,8 +76,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // create or construct a fallback profile object from user metadata
         const { data: userData } = await supabase.auth.getUser();
         const userObj = userData?.user;
-        const fallbackRole = (userObj?.user_metadata?.role as UserRole) || 'admin';
-        const fallbackName = userObj?.user_metadata?.full_name || email?.split('@')[0] || 'Administrator';
+        const fallbackRole = (userObj?.user_metadata?.role as UserRole) || 'subscriber';
+        const fallbackName = userObj?.user_metadata?.full_name || email?.split('@')[0] || 'Subscriber';
         const fallbackPhone = userObj?.user_metadata?.phone_number || userObj?.phone || '';
 
         setProfile({
@@ -237,9 +237,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshProfile = async () => {
     if (user) {
+      // Admin/manager: fetch profile silently
       await fetchProfile(user.id, user.email);
+    } else if (profile?.id && !profile?.passbookToken) {
+      // Phone+MPIN subscriber: re-fetch profile row directly by ID
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', profile.id)
+          .maybeSingle();
+        if (data) {
+          setProfile(prev => prev ? {
+            ...prev,
+            fullName: data.full_name || prev.fullName,
+            phoneNumber: data.phone_number || prev.phoneNumber,
+            role: (data.role as UserRole) || prev.role,
+            mpin: data.mpin || '1234',
+            isDefaultPin: (data.mpin || '1234') === '1234',
+            isBlocked: data.is_blocked || false,
+          } : null);
+        }
+      } catch (err) {
+        console.warn('Silent profile refresh failed:', err);
+      }
     } else if (profile?.passbookToken) {
-      await loginWithPassbookToken(profile.passbookToken);
+      // QR passbook subscriber: silent re-auth without loading spinner
+      try {
+        const { data } = await supabase.rpc('authenticate_by_passbook_token', {
+          p_token: profile.passbookToken,
+        });
+        if (data?.success && data?.user) {
+          setProfile(prev => prev ? {
+            ...prev,
+            fullName: data.user.fullName,
+            phoneNumber: data.user.phoneNumber,
+            role: data.user.role,
+            mpin: data.user.mpin || '1234',
+            isDefaultPin: data.user.isDefaultPin ?? false,
+          } : null);
+        }
+      } catch (err) {
+        console.warn('Silent passbook refresh failed:', err);
+      }
     }
   };
 
@@ -308,6 +348,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem(PASSBOOK_SESSION_KEY);
         }
+        setProfile(null);
         setUser(session.user);
         await fetchProfile(session.user.id, session.user.email);
         setLoading(false);

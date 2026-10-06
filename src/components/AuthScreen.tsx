@@ -36,23 +36,27 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
   const [subscriberPhone, setSubscriberPhone] = useState('');
   const [subscriberPin, setSubscriberPin] = useState('');
   const [rememberPhone, setRememberPhone] = useState(false);
-  const [rememberPin, setRememberPin] = useState(false);
 
   // Admin email state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberEmail, setRememberEmail] = useState(false);
-  const [rememberPassword, setRememberPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Load saved credentials from localStorage on mount
+  // Load saved identifiers (email/phone only) from localStorage on mount & clean up any legacy saved passwords/pins
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      // 1. Admin saved credentials
+      // Clean up any legacy sensitive credentials stored in localStorage
+      localStorage.removeItem('cf_admin_saved_password');
+      localStorage.removeItem('cf_admin_remember_password');
+      localStorage.removeItem('cf_pin_saved_pin');
+      localStorage.removeItem('cf_pin_remember_pin');
+
+      // 1. Admin saved email
       const savedRememberEmail = localStorage.getItem('cf_admin_remember_email') === 'true';
       const savedEmail = localStorage.getItem('cf_admin_saved_email');
       if (savedRememberEmail && savedEmail) {
@@ -60,26 +64,12 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
         setRememberEmail(true);
       }
 
-      const savedRememberPassword = localStorage.getItem('cf_admin_remember_password') === 'true';
-      const savedPassword = localStorage.getItem('cf_admin_saved_password');
-      if (savedRememberPassword && savedPassword) {
-        setPassword(savedPassword);
-        setRememberPassword(true);
-      }
-
-      // 2. PIN login saved credentials
+      // 2. PIN login saved phone
       const savedRememberPhone = localStorage.getItem('cf_pin_remember_phone') === 'true';
       const savedPhone = localStorage.getItem('cf_pin_saved_phone');
       if (savedRememberPhone && savedPhone) {
         setSubscriberPhone(savedPhone);
         setRememberPhone(true);
-      }
-
-      const savedRememberPin = localStorage.getItem('cf_pin_remember_pin') === 'true';
-      const savedPin = localStorage.getItem('cf_pin_saved_pin');
-      if (savedRememberPin && savedPin) {
-        setSubscriberPin(savedPin);
-        setRememberPin(true);
       }
     }
   }, []);
@@ -143,12 +133,12 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
           localStorage.removeItem('cf_pin_saved_phone');
         }
 
-        if (rememberPin) {
-          localStorage.setItem('cf_pin_remember_pin', 'true');
-          localStorage.setItem('cf_pin_saved_pin', subscriberPin);
+        if (rememberPhone) {
+          localStorage.setItem('cf_pin_remember_phone', 'true');
+          localStorage.setItem('cf_pin_saved_phone', cleanPhone);
         } else {
-          localStorage.removeItem('cf_pin_remember_pin');
-          localStorage.removeItem('cf_pin_saved_pin');
+          localStorage.removeItem('cf_pin_remember_phone');
+          localStorage.removeItem('cf_pin_saved_phone');
         }
       }
 
@@ -186,21 +176,13 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
         localStorage.removeItem('cf_passbook_token_session');
         localStorage.removeItem('cf_subscriber_session_id');
 
-        // Persist / Clear Admin credentials in localStorage
+        // Persist / Clear Admin email in localStorage
         if (rememberEmail) {
           localStorage.setItem('cf_admin_remember_email', 'true');
           localStorage.setItem('cf_admin_saved_email', cleanEmail);
         } else {
           localStorage.removeItem('cf_admin_remember_email');
           localStorage.removeItem('cf_admin_saved_email');
-        }
-
-        if (rememberPassword) {
-          localStorage.setItem('cf_admin_remember_password', 'true');
-          localStorage.setItem('cf_admin_saved_password', password);
-        } else {
-          localStorage.removeItem('cf_admin_remember_password');
-          localStorage.removeItem('cf_admin_saved_password');
         }
       }
 
@@ -409,17 +391,6 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono tracking-widest"
                   />
                 </div>
-                <div className="mt-1.5 flex items-center">
-                  <label className="inline-flex items-center gap-2 cursor-pointer text-[11px] text-slate-400 hover:text-slate-200 select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberPin}
-                      onChange={(e) => setRememberPin(e.target.checked)}
-                      className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500/40 cursor-pointer w-3.5 h-3.5"
-                    />
-                    <span>Remember MPIN</span>
-                  </label>
-                </div>
               </div>
 
               <button
@@ -484,17 +455,6 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
                   >
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
-                </div>
-                <div className="mt-1.5 flex items-center">
-                  <label className="inline-flex items-center gap-2 cursor-pointer text-[11px] text-slate-400 hover:text-slate-200 select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberPassword}
-                      onChange={(e) => setRememberPassword(e.target.checked)}
-                      className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500/40 cursor-pointer w-3.5 h-3.5"
-                    />
-                    <span>Remember Password</span>
-                  </label>
                 </div>
               </div>
 

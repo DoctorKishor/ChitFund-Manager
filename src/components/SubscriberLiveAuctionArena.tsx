@@ -91,9 +91,9 @@ export default function SubscriberLiveAuctionArena({
   const [isLiveActiveLocally, setIsLiveActiveLocally] = useState<boolean>(group.isLiveAuctionActive !== false);
   const prevTopBidAmountRef = useRef<number>(0);
 
-  // Synchronize when prop changes
+  // Synchronize when prop changes (only when session is active)
   useEffect(() => {
-    if (Array.isArray(group.liveBidStream)) {
+    if (sessionStatus !== 'paused' && sessionStatus !== 'concluded' && Array.isArray(group.liveBidStream)) {
       setLiveBids((prev) => {
         if (prev.length === 0 || (group.liveBidStream && group.liveBidStream.length > prev.length)) {
           return group.liveBidStream || [];
@@ -101,7 +101,7 @@ export default function SubscriberLiveAuctionArena({
         return prev;
       });
     }
-  }, [group.liveBidStream]);
+  }, [group.liveBidStream, sessionStatus]);
 
   useEffect(() => {
     if (group.isLiveAuctionActive !== undefined) {
@@ -111,6 +111,17 @@ export default function SubscriberLiveAuctionArena({
       }
     }
   }, [group.isLiveAuctionActive]);
+
+  // Track current sessionStatus and isLiveActive in refs for event listeners
+  const sessionStatusRef = useRef<'active' | 'paused' | 'concluded'>(sessionStatus);
+  useEffect(() => {
+    sessionStatusRef.current = sessionStatus;
+  }, [sessionStatus]);
+
+  const isLiveActiveRef = useRef<boolean>(isLiveActiveLocally);
+  useEffect(() => {
+    isLiveActiveRef.current = isLiveActiveLocally;
+  }, [isLiveActiveLocally]);
 
   // FLIP animation refs for smooth physical climbing transitions
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -135,6 +146,10 @@ export default function SubscriberLiveAuctionArena({
 
     presenceChannel
       .on('broadcast', { event: 'new_bid' }, (payload: any) => {
+        // Do NOT update bids if session is paused or concluded or not live
+        if (sessionStatusRef.current === 'paused' || sessionStatusRef.current === 'concluded' || !isLiveActiveRef.current) {
+          return;
+        }
         if (payload.payload?.bid) {
           const newBid: LiveBidItem = payload.payload.bid;
           setLiveBids((prev) => {
@@ -148,6 +163,10 @@ export default function SubscriberLiveAuctionArena({
         }
       })
       .on('broadcast', { event: 'bids_sync' }, (payload: any) => {
+        // Do NOT update bids if session is paused or concluded or not live
+        if (sessionStatusRef.current === 'paused' || sessionStatusRef.current === 'concluded' || !isLiveActiveRef.current) {
+          return;
+        }
         if (Array.isArray(payload.payload?.bids)) {
           setLiveBids(payload.payload.bids);
         }
@@ -158,34 +177,47 @@ export default function SubscriberLiveAuctionArena({
         if (p.status === 'concluded' || p.concluded === true) {
           setSessionStatus('concluded');
           setIsLiveActiveLocally(false);
+          if (Array.isArray(p.bids)) {
+            setLiveBids(p.bids);
+          }
         } else if (p.status === 'paused' || p.isLiveAuctionActive === false) {
           setSessionStatus('paused');
           setIsLiveActiveLocally(false);
+          // Keep current bids frozen as they were when live was paused
         } else if (p.isLiveAuctionActive === true) {
           setSessionStatus('active');
           setIsLiveActiveLocally(true);
-        }
-        if (Array.isArray(p.bids)) {
-          setLiveBids(p.bids);
+          if (Array.isArray(p.bids)) {
+            setLiveBids(p.bids);
+          }
         }
       })
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'chit_groups', filter: `id=eq.${group.groupId}` },
         (payload: any) => {
-          if (payload.new?.live_bid_stream && Array.isArray(payload.new.live_bid_stream)) {
-            setLiveBids(payload.new.live_bid_stream);
-          }
           if (payload.new?.is_live_auction_active !== undefined) {
-            setIsLiveActiveLocally(payload.new.is_live_auction_active);
-            if (payload.new.is_live_auction_active) {
+            const isLive = payload.new.is_live_auction_active;
+            setIsLiveActiveLocally(isLive);
+            if (isLive) {
               setSessionStatus('active');
+              if (payload.new?.live_bid_stream && Array.isArray(payload.new.live_bid_stream)) {
+                setLiveBids(payload.new.live_bid_stream);
+              }
             } else {
               if (payload.new.current_month > group.currentMonth || payload.new.status === 'completed') {
                 setSessionStatus('concluded');
+                if (payload.new?.live_bid_stream && Array.isArray(payload.new.live_bid_stream)) {
+                  setLiveBids(payload.new.live_bid_stream);
+                }
               } else {
                 setSessionStatus('paused');
+                // When paused, do NOT update liveBids so top bidder and leading bid stay frozen
               }
+            }
+          } else if (isLiveActiveRef.current && sessionStatusRef.current === 'active') {
+            if (payload.new?.live_bid_stream && Array.isArray(payload.new.live_bid_stream)) {
+              setLiveBids(payload.new.live_bid_stream);
             }
           }
         }

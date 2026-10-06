@@ -23,10 +23,12 @@ interface OrganizationContextType {
 
 export function computeInitials(name: string): string {
   if (!name) return 'CF';
-  const clean = name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+  // Unicode-aware: preserve all letters (Latin, Tamil, Devanagari, etc.) and numbers
+  const clean = name.replace(/[^\p{L}\p{N}\s]/gu, '').trim();
   const words = clean.split(/\s+/).filter(Boolean);
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[1][0]).toUpperCase();
+  if (words.length === 0) return 'CF';
+  if (words.length === 1) return Array.from(words[0]).slice(0, 2).join('').toUpperCase();
+  return (Array.from(words[0])[0] + Array.from(words[1])[0]).toUpperCase();
 }
 
 const DEFAULT_ORG_NAME = 'ANBAZHAKAN CHIT FUNDS';
@@ -38,40 +40,34 @@ const OrganizationContext = createContext<OrganizationContextType | undefined>(u
 export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   const { profile } = useAuth();
   
-  // Initialize with cached localStorage or default
-  const [organizationName, setOrganizationName] = useState<string>(() => {
+  // Initialize with cached localStorage or default once
+  const [initialSettings] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
         const cached = localStorage.getItem(STORAGE_KEY);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed.name) return parsed.name;
+          const name = parsed.name || DEFAULT_ORG_NAME;
+          return {
+            name,
+            tagline: parsed.tagline || DEFAULT_TAGLINE,
+            initials: parsed.initials || computeInitials(name),
+          };
         }
       } catch (e) {
         // Ignore JSON error
       }
     }
-    return DEFAULT_ORG_NAME;
+    return {
+      name: DEFAULT_ORG_NAME,
+      tagline: DEFAULT_TAGLINE,
+      initials: computeInitials(DEFAULT_ORG_NAME),
+    };
   });
 
-  const [organizationTagline, setOrganizationTagline] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem(STORAGE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed.tagline) return parsed.tagline;
-        }
-      } catch (e) {
-        // Ignore JSON error
-      }
-    }
-    return DEFAULT_TAGLINE;
-  });
-
-  const [organizationInitials, setOrganizationInitials] = useState<string>(() => {
-    return computeInitials(organizationName);
-  });
+  const [organizationName, setOrganizationName] = useState<string>(initialSettings.name);
+  const [organizationTagline, setOrganizationTagline] = useState<string>(initialSettings.tagline);
+  const [organizationInitials, setOrganizationInitials] = useState<string>(initialSettings.initials);
 
   const [loading, setLoading] = useState<boolean>(true);
 

@@ -641,7 +641,29 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       } else {
         // Record new payment
         const targetEnroll = memberEnrollments.find(e => e.group_id === modalTargetGroupId) || memberEnrollments[0];
-        const monthTag = modalTargetMonth !== undefined ? `Month ${modalTargetMonth}` : '';
+        const targetCycleMonth = modalTargetMonth !== undefined && modalTargetMonth !== null ? Number(modalTargetMonth) : 0;
+        
+        // Guard against duplicate collection for the same group and month
+        if (modalTargetGroupId) {
+          const { data: existingColl } = await supabase
+            .from('transactions')
+            .select('amount')
+            .eq('type', 'collection')
+            .eq('profile_id', memberId)
+            .eq('group_id', modalTargetGroupId)
+            .eq('cycle_month', targetCycleMonth)
+            .eq('status', 'completed');
+
+          const existingTotal = (existingColl || []).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+          if (existingTotal > 0) {
+            const proceed = window.confirm(
+              `⚠️ DUPLICATE PAYMENT WARNING:\n\n${memberProfile?.full_name || 'Member'} has already paid ₹${existingTotal.toLocaleString('en-IN')} for Month ${targetCycleMonth}.\n\nRecording this will result in an additional collection of ₹${amt.toLocaleString('en-IN')}.\n\nDo you want to proceed anyway?`
+            );
+            if (!proceed) return;
+          }
+        }
+
+        const monthTag = `Month ${targetCycleMonth}`;
         const defaultNote = `Collection payment - Ticket #${targetEnroll?.ticket_number || 1} (${memberProfile?.full_name})${monthTag ? ` - ${monthTag}` : ''}`;
         const finalNote = paymentNote.trim() 
           ? (monthTag && !paymentNote.toLowerCase().includes('month') ? `${paymentNote.trim()} (${monthTag})` : paymentNote.trim())
@@ -657,7 +679,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
             type: 'collection',
             status: 'completed',
             amount: amt,
-            cycle_month: modalTargetMonth !== undefined ? modalTargetMonth : null,
+            cycle_month: targetCycleMonth,
             notes: finalNote,
             verification_proof_url: finalReceiptUrl,
             created_at: effectiveDateStr,
@@ -959,7 +981,21 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   </span>
                   <button
                     type="button"
-                    onClick={() => setShowMemberPin(!showMemberPin)}
+                    onClick={async () => {
+                      const next = !showMemberPin;
+                      setShowMemberPin(next);
+                      if (next && profile?.id) {
+                        try {
+                          await supabase.from('security_audit_logs').insert({
+                            admin_id: profile.id,
+                            action_description: `PIN VIEWED: Admin viewed MPIN for member ${memberName} (${memberProfile?.phone_number || ''})`,
+                            target_table: 'profiles',
+                          });
+                        } catch (e) {
+                          console.warn('Audit log insert note:', e);
+                        }
+                      }
+                    }}
                     title={showMemberPin ? 'Hide PIN' : 'Reveal PIN'}
                     className="p-0.5 text-slate-400 hover:text-slate-700 transition-colors"
                   >

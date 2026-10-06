@@ -149,6 +149,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
   const [editName, setEditName] = useState<string>('');
   const [editDescription, setEditDescription] = useState<string>('');
   const [editColor, setEditColor] = useState<string>('#6366F1');
+  const [editIsPrivileged, setEditIsPrivileged] = useState<boolean>(false);
   const [allowedTabs, setAllowedTabs] = useState<string[]>([]);
   const [allowedActions, setAllowedActions] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -159,6 +160,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
   const [newRoleName, setNewRoleName] = useState<string>('');
   const [newRoleDescription, setNewRoleDescription] = useState<string>('');
   const [newRoleColor, setNewRoleColor] = useState<string>('#6366F1');
+  const [newRoleIsPrivileged, setNewRoleIsPrivileged] = useState<boolean>(false);
   const [isCreatingRole, setIsCreatingRole] = useState<boolean>(false);
 
   // Fetch Roles and Member counts from Supabase
@@ -214,6 +216,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
     setEditName(role.name);
     setEditDescription(role.description || '');
     setEditColor(role.color || '#6366F1');
+    setEditIsPrivileged(!!role.is_privileged);
     setAllowedTabs(role.allowed_tabs || []);
     setAllowedActions(role.allowed_actions || []);
     setSaveSuccess(false);
@@ -224,6 +227,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
       setEditName(activeRole.name);
       setEditDescription(activeRole.description || '');
       setEditColor(activeRole.color || '#6366F1');
+      setEditIsPrivileged(!!activeRole.is_privileged);
       setAllowedTabs(activeRole.allowed_tabs || []);
       setAllowedActions(activeRole.allowed_actions || []);
       setSaveSuccess(false);
@@ -280,6 +284,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
           name: editName.trim() || activeRole.name,
           description: editDescription.trim(),
           color: editColor,
+          is_privileged: activeRole.id === 'admin' ? true : editIsPrivileged,
           allowed_tabs: activeRole.id === 'admin' ? activeRole.allowed_tabs : allowedTabs,
           allowed_actions: activeRole.id === 'admin' ? activeRole.allowed_actions : allowedActions,
           updated_at: new Date().toISOString(),
@@ -353,6 +358,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
         description: newRoleDescription.trim() || 'Custom organizational role',
         color: newRoleColor,
         is_system: false,
+        is_privileged: newRoleIsPrivileged,
         allowed_tabs: defaultTabs,
         allowed_actions: defaultActions,
       });
@@ -363,6 +369,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
       setNewRoleName('');
       setNewRoleDescription('');
       setNewRoleColor('#6366F1');
+      setNewRoleIsPrivileged(false);
       setSelectedRoleId(generatedId);
       await fetchRoles();
       if (onRoleUpdated) onRoleUpdated();
@@ -635,6 +642,35 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                   className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-800 focus:outline-none focus:border-indigo-500 resize-none shadow-2xs"
                 />
               </div>
+
+              {/* Database-Level Security Privilege */}
+              <div className="md:col-span-2 flex items-center justify-between p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl">
+                <div>
+                  <p className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                    <ShieldCheck size={14} className="text-amber-600" />
+                    <span>Database Security Privilege (RLS)</span>
+                  </p>
+                  <p className="text-[11px] text-amber-800/80 mt-0.5 leading-relaxed">
+                    {activeRole.id === 'admin' 
+                      ? 'The Admin role always possesses database super-privileges.' 
+                      : 'Privileged roles can read/write administrative data in Supabase (treasury vaults, all members, audits). Only enable for trusted manager-level roles.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={activeRole.id === 'admin'}
+                  onClick={() => setEditIsPrivileged((prev) => !prev)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ml-4 ${
+                    (activeRole.id === 'admin' || editIsPrivileged) ? 'bg-amber-500' : 'bg-gray-300'
+                  } ${activeRole.id === 'admin' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition-transform ${
+                      (activeRole.id === 'admin' || editIsPrivileged) ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Quick Bulk Action Bar */}
@@ -802,6 +838,31 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                   onChange={(e) => setNewRoleDescription(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-indigo-500 resize-none"
                 />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-amber-50/80 border border-amber-200 rounded-xl">
+                <div>
+                  <p className="text-xs font-bold text-amber-950 flex items-center gap-1">
+                    <ShieldCheck size={13} className="text-amber-600" />
+                    <span>Database Privilege (RLS)</span>
+                  </p>
+                  <p className="text-[10px] text-amber-800/80 mt-0.5">
+                    Allow access to treasury vaults &amp; member ledgers
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNewRoleIsPrivileged((prev) => !prev)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ml-3 ${
+                    newRoleIsPrivileged ? 'bg-amber-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-xs transition-transform ${
+                      newRoleIsPrivileged ? 'translate-x-4' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
               </div>
 
               <div className="pt-2 flex flex-col-reverse sm:flex-row justify-end gap-2 shrink-0">

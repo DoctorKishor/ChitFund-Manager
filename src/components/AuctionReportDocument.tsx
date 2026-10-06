@@ -35,6 +35,8 @@ export interface AuctionReportData {
   isNextMonthLaabaSeetu: boolean;
   concludedAt: string;
   organizerName: string;
+  organizerTagline?: string;
+  organizerInitials?: string;
   organizerPhone?: string;
   attendingMembers?: { ticketNumber: number; fullName: string; attended: boolean }[];
   bidStream: {
@@ -124,14 +126,14 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
                 className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm shrink-0 shadow-2xs"
                 style={{ backgroundColor: '#fef3c7', border: '1px solid #fde68a', color: '#b45309' }}
               >
-                CF
+                {data.organizerInitials || 'CF'}
               </span>
               <div className="min-w-0">
                 <h1 className="text-base sm:text-xl font-black tracking-tight truncate" style={{ color: '#0f172a' }}>
                   {data.organizerName}
                 </h1>
                 <p className="text-[10px] sm:text-[11px] font-semibold truncate" style={{ color: '#64748b' }}>
-                  Official Live Auction Audit Certificate &amp; Settlement Statement
+                  {data.organizerTagline || 'Official Live Auction Audit Certificate & Settlement Statement'}
                 </p>
               </div>
             </div>

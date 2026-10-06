@@ -51,6 +51,7 @@ export interface CustomRoleRecord {
   description?: string;
   color?: string;
   is_system?: boolean;
+  is_privileged?: boolean;
   allowed_tabs?: string[];
   allowed_actions?: string[];
   created_at?: string;

@@ -109,7 +109,7 @@ export default function QuickMemberCollectModal({
 
       if (membersErr) throw membersErr;
 
-      // 3. Fetch collection transactions
+      // 3. Fetch collection transactions and auction logs
       const { data: txsData } = await supabase
         .from('transactions')
         .select('id, group_id, profile_id, group_member_id, amount, notes, type, cycle_month')
@@ -117,6 +117,12 @@ export default function QuickMemberCollectModal({
         .eq('type', 'collection');
 
       const transactions = txsData || [];
+
+      const { data: logsData } = await supabase
+        .from('auction_logs')
+        .select('group_id, month, is_laaba_seetu')
+        .in('group_id', activeGroups.map(g => g.id));
+      const auctionLogs = logsData || [];
 
       // Helper to compute member paid amount for a given month
       const getPaidAmount = (memberProfileId: string | undefined, memberId: string, grpId: string, mNum: number) => {
@@ -131,12 +137,6 @@ export default function QuickMemberCollectModal({
 
             if (t.cycle_month !== null && t.cycle_month !== undefined) {
               return Number(t.cycle_month) === Number(mNum);
-            }
-
-            if (!t.notes) return false;
-            const match = t.notes.match(/\bMonth\s+(\d+)\b/i) || t.notes.match(/\bM(\d+)\b/i);
-            if (match) {
-              return Number(match[1]) === Number(mNum);
             }
             return false;
           })
@@ -163,7 +163,10 @@ export default function QuickMemberCollectModal({
         let totalDueUpToNow = 0;
         let totalPaidUpToNow = 0;
         for (let m = 0; m <= currentMonth; m++) {
-          const mDue = isLaaba && m > 0 ? 0 : (row.custom_installment ? Number(row.custom_installment) : baseInstallment);
+          const isMonthLaaba = m === currentMonth
+            ? isLaaba
+            : !!auctionLogs.find(l => l.group_id === row.group_id && l.month === m)?.is_laaba_seetu;
+          const mDue = isMonthLaaba ? 0 : (row.custom_installment ? Number(row.custom_installment) : baseInstallment);
           totalDueUpToNow += mDue;
           totalPaidUpToNow += getPaidAmount(row.profile_id, row.id, row.group_id, m);
         }

@@ -48,6 +48,7 @@ import AuctionScheduleModal from '@/components/AuctionScheduleModal';
 import { computeNextAuctionDateTime } from '@/utils/auctionSchedule';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import { useAuth } from '@/context/AuthContext';
+import { useWallet, WalletType } from '@/context/WalletContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { exportAuctionReportPdf, shareAuctionReportToWhatsApp } from '@/utils/auctionPdfExporter';
 import AuctionReportDocument, { AuctionReportData } from '@/components/AuctionReportDocument';
@@ -87,6 +88,13 @@ interface ChitGroup {
   live_auction_started_at?: string | null;
 }
 
+const WALLET_OPTIONS: { id: WalletType; name: string }[] = [
+  { id: 'dad_bank', name: 'Dad Bank Account (Primary Payout)' },
+  { id: 'kishor_bank', name: 'Kishor Bank Account (Digital)' },
+  { id: 'cash_in_hand', name: 'Cash in Hand (Physical Cash Box)' },
+  { id: 'mom_bank', name: 'Mom Bank Account (Cheques/Reserves)' },
+];
+
 export interface HistoricalAuctionLog {
   id: string;
   groupId: string;
@@ -104,19 +112,13 @@ export interface HistoricalAuctionLog {
   createdAt: string;
 }
 
-// ── Utility: First Sunday on-or-after the 10th ──────────────────────────────
-function getFirstSundayOnOrAfter10th(year: number, month: number): Date {
-  const d = new Date(year, month, 10);
-  while (d.getDay() !== 0) d.setDate(d.getDate() + 1);
-  return d;
-}
 function fmtDate(d: Date): string {
   return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 export default function LiveAuctionEngine() {
   const { profile } = useAuth();
-  const { organizationName } = useOrganization();
+  const { organizationName, organizationTagline, organizationInitials } = useOrganization();
 
   // 1. Initial State Data (Loaded from Supabase)
   const [allGroups, setAllGroups] = useState<ChitGroup[]>([]);
@@ -184,6 +186,9 @@ export default function LiveAuctionEngine() {
   } | null>(null);
 
   // Stage state (Stage 1: Overview, Stage 2: Live Studio Workspace)
+  const { balances } = useWallet();
+  const [showMonth0Modal, setShowMonth0Modal] = useState<boolean>(false);
+  const [month0PayoutWallet, setMonth0PayoutWallet] = useState<WalletType>('dad_bank');
   const [stage, setStage] = useState<'overview' | 'studio'>('overview');
   const [isStartingLiveSession, setIsStartingLiveSession] = useState<boolean>(false);
   const [liveViewerCount, setLiveViewerCount] = useState<number>(0);
@@ -348,7 +353,7 @@ export default function LiveAuctionEngine() {
       // Fetch payout transactions for this group to accurately compute disbursal status
       const { data: payoutTxs } = await supabase
         .from('transactions')
-        .select('id, profile_id, group_member_id, amount, notes, type')
+        .select('id, profile_id, group_member_id, amount, notes, type, cycle_month')
         .eq('group_id', groupId)
         .eq('type', 'payout');
 
@@ -363,9 +368,15 @@ export default function LiveAuctionEngine() {
           const monthNum = Number(l.month);
           const monthPattern = new RegExp(`\\bMonth\\s+${monthNum}\\b|\\bM${monthNum}\\b|\\bM\\s*${monthNum}\\b`, 'i');
           const monthPayouts = (payoutTxs || []).filter((t: any) =>
-            (t.notes && monthPattern.test(t.notes)) ||
-            (l.winning_bidder_id && (t.profile_id === l.winning_bidder_id || t.group_member_id === l.winning_bidder_id)) ||
-            (matchingMember && (t.group_member_id === matchingMember.id || t.profile_id === matchingMember.profile_id))
+            t.cycle_month === monthNum ||
+            (
+              t.cycle_month == null &&
+              (
+                (t.notes && monthPattern.test(t.notes)) ||
+                (l.winning_bidder_id && (t.profile_id === l.winning_bidder_id || t.group_member_id === l.winning_bidder_id)) ||
+                (matchingMember && (t.group_member_id === matchingMember.id || t.profile_id === matchingMember.profile_id))
+              )
+            )
           );
 
           const totalDisbursed = monthPayouts.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
@@ -636,20 +647,17 @@ export default function LiveAuctionEngine() {
     });
   }, [group]);
 
-  // Is the scheduled auction date today? (Temporarily bypassed for testing)
+  // Is the scheduled auction date today?
   const isAuctionDateToday = useMemo(() => {
-    // TEMPORARY: Date restriction bypassed for testing as requested
-    return true;
-    /*
     if (!targetAuctionDate) return true;
+    if (group?.currentMonth === 0) return true;
     const today = new Date();
     return (
       today.getFullYear() === targetAuctionDate.getFullYear() &&
       today.getMonth() === targetAuctionDate.getMonth() &&
       today.getDate() === targetAuctionDate.getDate()
     );
-    */
-  }, [targetAuctionDate]);
+  }, [targetAuctionDate, group?.currentMonth]);
 
   const formattedTargetAuctionDate = useMemo(() => {
     if (!targetAuctionDate) return '';
@@ -719,7 +727,7 @@ export default function LiveAuctionEngine() {
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
     const newBid: Bid = {
-      id: Math.random().toString(),
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2),
       memberId: member.id,
       memberName: member.fullName,
       ticketNumber: member.ticketNumber,
@@ -740,19 +748,21 @@ export default function LiveAuctionEngine() {
           console.error('Error saving bids to localStorage:', err);
         }
       }
-      // 1. Instantaneous WebSocket broadcast (<20ms latency to all subscriber live floor arenas)
-      try {
-        presenceChannelRef.current?.send({
-          type: 'broadcast',
-          event: 'new_bid',
-          payload: {
-            bid: newBid,
-            bids: updated[selectedGroupId],
-            groupId: selectedGroupId,
-          },
-        });
-      } catch (err) {
-        console.warn('Broadcast send error:', err);
+      // 1. Instantaneous WebSocket broadcast (<20ms latency to all subscriber live floor arenas) ONLY if live broadcast is active
+      if (group?.is_live_auction_active) {
+        try {
+          presenceChannelRef.current?.send({
+            type: 'broadcast',
+            event: 'new_bid',
+            payload: {
+              bid: newBid,
+              bids: updated[selectedGroupId],
+              groupId: selectedGroupId,
+            },
+          });
+        } catch (err) {
+          console.warn('Broadcast send error:', err);
+        }
       }
 
       // 2. Persist to PostgreSQL database asynchronously in background
@@ -790,8 +800,15 @@ export default function LiveAuctionEngine() {
     }
   };
 
-  const handleUndo = () => {
+  const handleUndo = async () => {
     if (!selectedGroupId || bids.length === 0) return;
+    const lastBid = bids[0];
+
+    const confirmed = window.confirm(
+      `Undo last bid of ₹${lastBid.amount.toLocaleString('en-IN')} by ${lastBid.memberName} (Ticket #${lastBid.ticketNumber})?\n\nThis undo action will be recorded in the security audit trail.`
+    );
+    if (!confirmed) return;
+
     setGroupBidsMap(prev => {
       const currentGroupBids = prev[selectedGroupId] || [];
       const updatedStream = currentGroupBids.slice(1);
@@ -806,18 +823,20 @@ export default function LiveAuctionEngine() {
           console.error('Error saving bids to localStorage:', err);
         }
       }
-      // 1. Instantaneous WebSocket broadcast of undo action
-      try {
-        presenceChannelRef.current?.send({
-          type: 'broadcast',
-          event: 'bids_sync',
-          payload: {
-            bids: updatedStream,
-            groupId: selectedGroupId,
-          },
-        });
-      } catch (err) {
-        console.warn('Broadcast send error:', err);
+      // 1. Instantaneous WebSocket broadcast of undo action ONLY if live broadcast is active
+      if (group?.is_live_auction_active) {
+        try {
+          presenceChannelRef.current?.send({
+            type: 'broadcast',
+            event: 'bids_sync',
+            payload: {
+              bids: updatedStream,
+              groupId: selectedGroupId,
+            },
+          });
+        } catch (err) {
+          console.warn('Broadcast send error:', err);
+        }
       }
 
       // 2. Persist undo to database
@@ -831,39 +850,76 @@ export default function LiveAuctionEngine() {
 
       return updated;
     });
+
+    // 3. Immutable audit log record
+    await supabase.from('security_audit_logs').insert({
+      admin_id: profile?.id || null,
+      action_description: `BID UNDONE: Last bid by ${lastBid.memberName} (Ticket #${lastBid.ticketNumber}) for ₹${lastBid.amount.toLocaleString('en-IN')} was undone in Group "${group?.name}" Month ${group?.currentMonth}.`,
+      target_table: 'auction_logs',
+    });
   };
 
   // Month 0 Launch Advance Action
-  const handleAdvanceMonth0 = async () => {
+  const handleAdvanceMonth0 = () => {
     if (!group) return;
-    const confirmLaunch = window.confirm(
-      `CONFIRM LAUNCH (Month 0)?\n\nAll launch collections (${formatCurrency(group.totalValue)}) are allocated to the Organizer as Organizer Profit.\n\nAdvance "${group.name}" to Month 1 (Live Auctions Phase)?`
-    );
-    if (!confirmLaunch) return;
+    setShowMonth0Modal(true);
+  };
 
+  const handleConfirmMonth0 = async () => {
+    if (!group) return;
     try {
       setIsRecording(true);
-      const { error } = await supabase
+
+      // 1. Advance group to Month 1
+      const { error: groupErr } = await supabase
         .from('chit_groups')
         .update({ current_month: 1 })
         .eq('id', group.id);
+      if (groupErr) throw groupErr;
 
-      if (error) {
-        alert('Error advancing to Month 1: ' + error.message);
+      // 2. Atomic debit from the selected wallet
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
+        p_wallet: month0PayoutWallet,
+        p_delta: -group.totalValue,
+        p_user_id: profile?.id || null,
+      });
+
+      if (rpcErr || !rpcData?.success) {
+        // Rollback group advance if wallet update failed
+        await supabase.from('chit_groups').update({ current_month: 0 }).eq('id', group.id);
+        alert('Failed to deduct from wallet: ' + (rpcData?.error || rpcErr?.message));
         return;
       }
 
-      // Record audit log
+      // 3. Record organizer profit transaction
+      const payoutNote = `[Organizer Profit] Month 0 Launch — Full chit value ₹${group.totalValue.toLocaleString('en-IN')} collected and allocated as Organizer Profit for "${group.name}".`;
+      await supabase.from('transactions').insert([{
+        group_id: group.id,
+        wallet_type: month0PayoutWallet,
+        from_wallet: month0PayoutWallet,
+        type: 'organizer_profit',
+        status: 'completed',
+        amount: group.totalValue,
+        notes: payoutNote,
+        cycle_month: 0,
+        created_by: profile?.id || null,
+      }]);
+
+      // 4. Audit log
+      const walletName = WALLET_OPTIONS.find(w => w.id === month0PayoutWallet)?.name || month0PayoutWallet;
       await supabase.from('security_audit_logs').insert({
-        action_description: `LAUNCH CONFIRMED: "${group.name}" — ${formatCurrency(group.totalValue)} allocated as Organizer Profit for Month 0. Group advanced to Month 1.`,
-        target_table: 'chit_groups'
+        action_description: `LAUNCH CONFIRMED: "${group.name}" — ₹${group.totalValue.toLocaleString('en-IN')} Organizer Profit recorded from ${walletName}. Group advanced to Month 1.`,
+        target_table: 'chit_groups',
       });
 
       setGroup(prev => prev ? ({ ...prev, currentMonth: 1 }) : null);
       setAllGroups(prev => prev.map(g => g.id === group.id ? { ...g, currentMonth: 1 } : g));
+      setShowMonth0Modal(false);
       await fetchGroupDetails(group.id);
+      alert(`✓ Month 0 Launch Confirmed! ₹${group.totalValue.toLocaleString('en-IN')} Organizer Profit recorded from ${walletName}. Group advanced to Month 1.`);
     } catch (err: any) {
       console.error('Error confirming launch:', err);
+      alert('Error confirming launch: ' + (err.message || 'Unknown error'));
     } finally {
       setIsRecording(false);
     }
@@ -945,10 +1001,12 @@ export default function LiveAuctionEngine() {
       isLaabaSeetuThisMonth: selectedHistoricalLog.isLaabaSeetu,
       isNextMonthLaabaSeetu: false,
       concludedAt: selectedHistoricalLog.createdAt,
-      organizerName: profile?.fullName ? `${profile.fullName}'s Chit Funds` : "Chit Funds Manager",
+      organizerName: organizationName || (profile?.fullName ? `${profile.fullName}'s Chit Funds` : "ANBAZHAKAN CHIT FUNDS"),
+      organizerTagline: organizationTagline || "TRUSTED CHIT FUNDS MANAGEMENT",
+      organizerInitials: organizationInitials || "CF",
       bidStream: selectedHistoricalLog.bidStream || [],
     };
-  }, [selectedHistoricalLog, group, profile]);
+  }, [selectedHistoricalLog, group, profile, organizationName, organizationTagline, organizationInitials]);
 
   const handleConfirmClose = async () => {
     if (!group || bids.length === 0) return;
@@ -956,7 +1014,7 @@ export default function LiveAuctionEngine() {
 
     const recordedMonth = group.currentMonth;
     const nextMonth = Math.min(group.durationMonths, group.currentMonth + 1);
-    const isCompleting = nextMonth >= group.durationMonths;
+    const isCompleting = group.currentMonth >= group.durationMonths;
     const nextPool = isLaabaSeetuActive 
       ? Math.max(0, group.kai_iruppu_pool - group.totalValue) + highestBid 
       : group.kai_iruppu_pool + highestBid;
@@ -992,7 +1050,9 @@ export default function LiveAuctionEngine() {
       isLaabaSeetuThisMonth: isLaabaSeetuActive,
       isNextMonthLaabaSeetu: nextPool >= group.totalValue,
       concludedAt: new Date().toISOString(),
-      organizerName: profile?.fullName ? `${profile.fullName}'s Chit Funds` : "Chit Funds Manager",
+      organizerName: organizationName || (profile?.fullName ? `${profile.fullName}'s Chit Funds` : "ANBAZHAKAN CHIT FUNDS"),
+      organizerTagline: organizationTagline || "TRUSTED CHIT FUNDS MANAGEMENT",
+      organizerInitials: organizationInitials || "CF",
       attendingMembers: members.map(m => ({
         ticketNumber: m.ticketNumber,
         fullName: m.fullName,
@@ -1274,7 +1334,7 @@ export default function LiveAuctionEngine() {
   }
 
   const now = new Date();
-  const canonicalDate = getFirstSundayOnOrAfter10th(now.getFullYear(), now.getMonth());
+  const canonicalDate = targetAuctionDate || now;
   const auctionDateDisplay = auctionDateOverride
     ? fmtDate(new Date(auctionDateOverride)) + ' (Override)'
     : fmtDate(canonicalDate);
@@ -2759,6 +2819,90 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: MONTH 0 ORGANIZER PROFIT WALLET SELECTION ── */}
+      {showMonth0Modal && group && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  <Crown size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Confirm Launch (Month 0)</h3>
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Organizer Profit Payout</span>
+                </div>
+              </div>
+              <button onClick={() => setShowMonth0Modal(false)} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-amber-950 text-xs space-y-1">
+                <div className="flex justify-between font-bold">
+                  <span>Chit Group:</span>
+                  <span>{group.name}</span>
+                </div>
+                <div className="flex justify-between font-black text-sm text-amber-900">
+                  <span>Organizer Profit:</span>
+                  <span>₹{group.totalValue.toLocaleString('en-IN')}</span>
+                </div>
+                <p className="text-[11px] text-amber-800/90 pt-1 leading-snug">
+                  All 1st-month collections ({group.memberCount} × ₹{(group.totalValue / group.memberCount).toLocaleString('en-IN')}) are taken by the Organizer. Please select the vault/account from which this payout is recorded.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Payout Source Vault</label>
+                <div className="space-y-1.5">
+                  {WALLET_OPTIONS.map((w) => {
+                    const isSelected = month0PayoutWallet === w.id;
+                    const bal = balances[w.id] || 0;
+                    return (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => setMonth0PayoutWallet(w.id)}
+                        className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                          isSelected 
+                            ? 'bg-amber-50/80 border-amber-400 ring-2 ring-amber-300' 
+                            : 'bg-gray-50/60 hover:bg-gray-100 border-gray-200'
+                        }`}
+                      >
+                        <div>
+                          <span className="text-xs font-bold text-gray-900 block">{w.name}</span>
+                          <span className="text-[10px] text-gray-500 font-mono">Available: ₹{bal.toLocaleString('en-IN')}</span>
+                        </div>
+                        {isSelected && <CheckCircle2 size={16} className="text-amber-600 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowMonth0Modal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-bold text-xs hover:bg-gray-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmMonth0}
+                disabled={isRecording}
+                className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isRecording ? 'Processing...' : 'Confirm & Disburse'}
+              </button>
+            </div>
           </div>
         </div>
       )}

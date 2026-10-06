@@ -66,7 +66,6 @@ export default function UserAccessManager() {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [showPins, setShowPins] = useState<boolean>(false);
 
   // Modal State: Create Profile
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -118,6 +117,7 @@ export default function UserAccessManager() {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -430,16 +430,37 @@ Access your digital passbook & auctions anytime:
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete profile "${p.full_name}"?`)) {
+    // Check transaction history
+    const { data: txs } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('profile_id', p.id);
+
+    const txCount = txs?.length || 0;
+    const confirmPrompt = txCount > 0
+      ? `"${p.full_name}" has ${txCount} historical financial transaction record(s).\n\nTo preserve accounting ledger integrity, their profile will be archived and hidden from user management, while all transaction history is securely retained.\n\nProceed to archive this profile?`
+      : `Are you sure you want to archive profile "${p.full_name}"?`;
+
+    if (!confirm(confirmPrompt)) {
       return;
     }
 
     try {
-      const { error } = await supabase.from('profiles').delete().eq('id', p.id);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_deleted: true })
+        .eq('id', p.id);
       if (error) throw error;
+
+      await supabase.from('security_audit_logs').insert({
+        admin_id: currentAdminProfile?.id || null,
+        action_description: `USER PROFILE ARCHIVED: ${p.full_name} (${p.phone_number || 'No Phone'}) archived by admin. ${txCount} transactions preserved in ledger.`,
+        target_table: 'profiles',
+      });
+
       await fetchProfiles();
     } catch (err: any) {
-      alert(`Failed to delete profile: ${err.message}`);
+      alert(`Failed to archive profile: ${err.message}`);
     }
   };
 
@@ -698,15 +719,7 @@ Access your digital passbook & auctions anytime:
                     <th className="py-3 px-3">Phone Number</th>
                     <th className="py-3 px-3">
                       <div className="flex items-center gap-1.5">
-                        <span>MPIN</span>
-                        <button
-                          type="button"
-                          onClick={() => setShowPins(!showPins)}
-                          title={showPins ? 'Hide All PINs' : 'Show All PINs'}
-                          className="p-0.5 text-gray-400 hover:text-indigo-600 transition-colors"
-                        >
-                          {showPins ? <EyeOff size={12} /> : <Eye size={12} />}
-                        </button>
+                        <span>MPIN Status</span>
                       </div>
                     </th>
                     <th className="py-3 px-3">Passbook QR</th>
@@ -769,8 +782,8 @@ Access your digital passbook & auctions anytime:
                           {/* Security PIN (MPIN) */}
                           <td className="py-3.5 px-3 font-mono">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-800 text-[11px] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                {showPins ? (p.mpin || '1234') : '••••'}
+                              <span className="font-bold text-slate-700 text-[11px] bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                ••••
                               </span>
                               {isDefault ? (
                                 <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded">
