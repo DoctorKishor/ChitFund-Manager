@@ -3223,9 +3223,6 @@ Thank you for your prompt payment! 🙏`;
 
         return (
           <div className="space-y-4 sm:space-y-6">
-            {/* ── Top Multi-Vault Treasury Showcase (Figma Signature Cards) ── */}
-            <TopStatusRibbon />
-
             {/* ⚠️ HIGH-PRIORITY ALERT BANNER: Pending Physical Cash Box Verification */}
             {pendingAtmRelocations.length > 0 && (
               <div className="bg-[#1D1D41] border border-amber-500/40 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-xl shadow-amber-500/5 space-y-2.5 sm:space-y-3 animate-in fade-in zoom-in-95 duration-200">
@@ -3322,12 +3319,12 @@ Thank you for your prompt payment! 🙏`;
               </div>
             )}
 
-            {/* Top Chit Groups Pill Switcher Bar */}
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-2.5 sm:p-3 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none flex-nowrap scroll-smooth">
+            {/* Top Chit Groups Pill Switcher Bar (Matches Figma Frame #1:290) */}
+            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-2.5 sm:p-3 shadow-lg flex items-center justify-between">
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none flex-nowrap scroll-smooth w-full">
                 <span className="text-[11px] font-bold text-[#AEABD8] uppercase tracking-wider shrink-0 px-1.5 sm:px-2 flex items-center gap-1.5">
                   <Briefcase size={13} className="text-[#64CFF6]" />
-                  Chits:
+                  CHITS:
                 </span>
                 {localGroups.filter(g => g.status !== 'deleted').length === 0 ? (
                   <span className="text-xs text-[#AEABD8] italic">No active chit groups found</span>
@@ -3379,15 +3376,6 @@ Thank you for your prompt payment! 🙏`;
                   })
                 )}
               </div>
-
-              {/* Action Button: Create New Group */}
-              <button
-                onClick={() => setShowWizard(true)}
-                className="flex items-center justify-center gap-1.5 bg-[#6359E9] hover:bg-[#6F64FF] text-white text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-xl transition-all shrink-0 shadow-[0_4px_15px_rgba(99,89,233,0.35)] active:scale-95 w-full sm:w-auto cursor-pointer"
-              >
-                <Plus size={14} />
-                <span>New Group</span>
-              </button>
             </div>
 
             {/* Horizontal Month Carousel Navigator */}
@@ -3466,13 +3454,10 @@ Thank you for your prompt payment! 🙏`;
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   {/* Left: Pool Amount & Label */}
                   <div className="flex items-center gap-2.5 flex-wrap">
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 text-[#FFBB38] flex items-center justify-center shrink-0">
-                      <Coins size={16} />
-                    </div>
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#FFBB38] bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.2 rounded">
-                          கை இருப்பு · Kai Iruppu Pool
+                          KAI IRUPPU POOL
                         </span>
                         {isLaabaActive && (
                           <span className="bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded flex items-center gap-1">
@@ -3481,22 +3466,19 @@ Thank you for your prompt payment! 🙏`;
                         )}
                       </div>
                       <div className="flex items-baseline gap-1.5 mt-0.5">
-                        <span className="text-base sm:text-lg font-black text-white font-mono tracking-tight">
+                        <span className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">
                           {formatCurrency(activeKaiIruppuPool)}
                         </span>
                         <span className="text-xs text-[#AEABD8] font-mono">
                           / {formatCurrency(totalChitVal)}
                         </span>
-                        <span className="text-[10px] text-[#AEABD8] font-medium hidden md:inline">
-                          ({isLaabaActive ? 'Threshold Reached!' : `${formatCurrency(remainingToLaaba)} to free month`})
-                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Middle / Right: Slim Progress & Breakdown Button */}
-                  <div className="flex items-center gap-3 sm:gap-4 shrink-0 justify-between sm:justify-end">
-                    <div className="flex items-center gap-2 min-w-[140px] sm:min-w-[180px]">
+                  {/* Middle / Right: Extended Progress Bar & Breakdown Button */}
+                  <div className="flex-1 flex items-center gap-3 sm:gap-4 justify-between sm:justify-end max-w-full sm:max-w-[740px]">
+                    <div className="flex-1 flex items-center gap-2.5 min-w-[160px]">
                       <div className="flex-1 bg-[#141332] rounded-full h-2 overflow-hidden border border-[#27264E]">
                         <div
                           className="bg-gradient-to-r from-[#FFBB38] via-[#6359E9] to-[#02B15A] h-full rounded-full transition-all duration-500"
@@ -3591,10 +3573,13 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* Actions & Paid Progress */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    <div className="bg-[#141332] border border-[#27264E] rounded-2xl px-4 py-2.5 text-center flex items-center justify-between sm:block shadow-2xs">
-                      <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Paid Members</span>
-                      <div className="text-base font-black text-white sm:mt-0.5">
-                        <span className="text-[#02B15A]">{paidList.length}</span> / {dashboardGroupMembers.length}
+                    <div className="bg-[#27264E] border border-[#64CFF6]/30 shadow-2xs flex items-center gap-2 h-9 px-3.5 py-1 rounded-xl shrink-0">
+                      <Users size={14} className="text-[#64CFF6]" />
+                      <span className="text-[11px] font-bold text-[#AEABD8] uppercase tracking-wider">PAID</span>
+                      <div className="text-sm font-black text-[#02B15A] flex items-center gap-1 font-mono">
+                        <span>{paidList.length}</span>
+                        <span className="text-white">/</span>
+                        <span className="text-white">{dashboardGroupMembers.length}</span>
                       </div>
                     </div>
 
@@ -3616,7 +3601,7 @@ Thank you for your prompt payment! 🙏`;
                             setRemindModalTab('individual');
                             setShowRemindModal(true);
                           }}
-                          className="flex items-center justify-center gap-1.5 bg-[#27264E] hover:bg-[#323062] text-[#64CFF6] border border-[#64CFF6]/30 font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer"
+                          className="flex items-center justify-center gap-1.5 bg-[#27264E] hover:bg-[#323062] text-[#64CFF6] border border-[#64CFF6]/30 font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
                           title="Send individual or group WhatsApp reminders to pending members"
                         >
                           <Send size={13} className="text-[#64CFF6]" />
@@ -3834,30 +3819,24 @@ Thank you for your prompt payment! 🙏`;
                       {/* Financial Figures Grid */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
                         <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 shadow-2xs">
-                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Winning Discount</span>
-                          <span className="text-sm sm:text-base font-extrabold text-[#64CFF6] font-mono">
+                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">WINNING DISCOUNT</span>
+                          <span className="text-base sm:text-lg font-bold text-[#64CFF6] font-mono block mt-0.5">
                             {formatCurrency(winningBid)}
                           </span>
-                          <span className="text-[9px] text-[#02B15A] font-bold block mt-0.5 flex items-center gap-1">
-                            <Sparkles size={10} className="text-[#FFBB38] shrink-0" />
-                            <span>Pooled to Kai Iruppu</span>
-                          </span>
                         </div>
 
                         <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 shadow-2xs">
-                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Net Prize Pot Due</span>
-                          <span className="text-sm sm:text-base font-extrabold text-white font-mono">
+                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">NET PRIZE POT DUE</span>
+                          <span className="text-base sm:text-lg font-bold text-white font-mono block mt-0.5">
                             {formatCurrency(netPrizePot)}
                           </span>
-                          <span className="text-[9px] text-[#AEABD8] block mt-0.5">Total Chit − Winning Bid</span>
                         </div>
 
                         <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 shadow-2xs">
-                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Disbursed So Far</span>
-                          <span className={`text-sm sm:text-base font-extrabold font-mono ${totalPrizeDisbursed > 0 ? 'text-[#02B15A]' : 'text-[#AEABD8]'}`}>
+                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">DISBURSED SO FAR</span>
+                          <span className={`text-base sm:text-lg font-bold font-mono block mt-0.5 ${totalPrizeDisbursed > 0 ? 'text-[#02B15A]' : 'text-[#AEABD8]'}`}>
                             {formatCurrency(totalPrizeDisbursed)}
                           </span>
-                          <span className="text-[9px] text-[#AEABD8] block mt-0.5">{monthPayoutTxs.length} transfer(s)</span>
                         </div>
 
                         <div className={`border rounded-xl p-3 shadow-2xs ${
@@ -3866,15 +3845,12 @@ Thank you for your prompt payment! 🙏`;
                           <span className={`text-[10px] font-bold uppercase tracking-wider block ${
                             remainingPrizeDue > 0 ? 'text-[#FF6B6B]' : 'text-[#02B15A]'
                           }`}>
-                            {remainingPrizeDue > 0 ? 'Balance Pending' : 'Balance Settled'}
+                            {remainingPrizeDue > 0 ? 'BALANCE PENDING' : 'BALANCE SETTLED'}
                           </span>
-                          <span className={`text-sm sm:text-base font-extrabold font-mono ${
+                          <span className={`text-base sm:text-lg font-bold font-mono block mt-0.5 ${
                             remainingPrizeDue > 0 ? 'text-[#FF6B6B]' : 'text-[#02B15A]'
                           }`}>
                             {formatCurrency(remainingPrizeDue)}
-                          </span>
-                          <span className="text-[9px] text-[#AEABD8] block mt-0.5">
-                            {remainingPrizeDue === 0 ? '✓ Zero balance' : 'Pay to winner'}
                           </span>
                         </div>
                       </div>
@@ -4043,8 +4019,33 @@ Thank you for your prompt payment! 🙏`;
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {/* 1-Tap Record Button */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {/* Remind Button (Matches Figma Frame #1:560) */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                triggerHapticFeedback('light');
+                                const msg = encodeURIComponent(
+                                  `*CHIT INSTALLMENT DUE REMINDER* 🔔\n` +
+                                  `Group: ${activeGroup?.name}\n` +
+                                  `Month: Month ${selectedDashboardMonth} (${getDashboardMonthLabel(activeGroup, selectedDashboardMonth)})\n` +
+                                  `Ticket: #${member.ticket}\n` +
+                                  `Subscriber: ${member.name}\n` +
+                                  `Pending Due: ${formatCurrency(member.remaining)}\n\n` +
+                                  `Kindly clear your installment due for this month. Thank you! 🙏`
+                                );
+                                const cleanPhone = normalizePhone(member.phone);
+                                const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${msg}` : `https://wa.me/?text=${msg}`;
+                                window.open(url, '_blank');
+                              }}
+                              className="bg-[#27264E] hover:bg-[#323062] text-[#64CFF6] border border-[#64CFF6]/30 font-bold text-xs px-3 py-2 sm:py-2.5 rounded-xl transition-all shadow-2xs shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                              title={`Send WhatsApp dues reminder to ${member.name}`}
+                            >
+                              <Send size={12} className="text-[#64CFF6]" />
+                              <span>Remind</span>
+                            </button>
+
+                            {/* 1-Tap Record Payment Button */}
                             <button
                               onClick={() => {
                                 setRecordingPaymentMember(member);
@@ -4061,10 +4062,11 @@ Thank you for your prompt payment! 🙏`;
                                 setPaymentNote('');
                                 setPaymentReceiptUrl('');
                               }}
-                              className="bg-[#02B15A] hover:bg-[#029B4F] text-white font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#02B15A]/20 shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                              className="bg-[#02B15A] hover:bg-[#029B4F] text-white font-bold text-xs px-3 py-2 sm:py-2.5 rounded-xl transition-all shadow-md shadow-[#02B15A]/20 shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                              title={`Record payment from ${member.name}`}
                             >
                               <Coins size={13} />
-                              <span>Record</span>
+                              <span className="hidden sm:inline">Record</span>
                             </button>
                           </div>
                         </div>

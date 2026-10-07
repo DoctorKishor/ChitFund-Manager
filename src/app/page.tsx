@@ -112,38 +112,8 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right Header Actions: Search + Notification + Settings + Profile Badge */}
-          <div className="flex items-center space-x-2.5 sm:space-x-4 shrink-0">
-            {/* Desktop Search Pill */}
-            <div className="hidden lg:flex items-center relative w-56 xl:w-64">
-              <Search size={16} className="absolute left-4 text-[#AEABD8] pointer-events-none" />
-              <input 
-                type="text" 
-                placeholder="Search for anything...." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#27264E] text-white placeholder-[#AEABD8] pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium border border-transparent focus:border-[#6359E9] focus:bg-[#1D1D41] outline-none transition-all shadow-2xs" 
-              />
-            </div>
-
-            {/* Settings Quick Icon */}
-            <button 
-              onClick={() => setActiveTab('settings')}
-              title="Settings"
-              className="hidden sm:flex w-10 h-10 rounded-xl bg-[#27264E] hover:bg-[#3A3A5A] items-center justify-center text-[#AEABD8] hover:text-[#64CFF6] transition-colors cursor-pointer"
-            >
-              <Settings size={18} />
-            </button>
-
-            {/* Notification Bell with Badge */}
-            <div 
-              title="Notifications"
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#27264E] hover:bg-[#3A3A5A] flex items-center justify-center text-[#64CFF6] relative transition-colors cursor-pointer"
-            >
-              <Bell size={18} />
-              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#E41414] ring-2 ring-[#1D1D41]" />
-            </div>
-
+          {/* Right Header Actions: Font Size Switcher + Profile Badge (Matches Figma Desktop Frame) */}
+          <div className="flex items-center space-x-3 sm:space-x-4 shrink-0">
             <FontSizeSwitcher />
 
             <div className="hidden sm:block">

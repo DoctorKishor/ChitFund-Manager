@@ -162,3 +162,85 @@ Whenever an AI agent is requested to audit, debug, fine-tune, or add features to
 4. Run `npm run build` at repository root to ensure **0 TypeScript / compilation errors**.
 5. Commit and push all synchronized changes to GitHub `main`.
 
+---
+
+## 8. UI/UX Design System & MCP Visual Overhaul Protocol
+
+### A. End-to-End Visual Overhaul Pipeline
+To eliminate generic/cluttered UI ("AI slop") and elevate the application to institutional-grade fintech aesthetics without breaking existing Supabase business logic, the team utilizes a 6-step round-trip visual workflow:
+
+```
+[ Local Web App (localhost:3000) ]
+       │
+       ▼ (1. html.to.design Chrome Extension)
+[ Figma Project (EjxNYmDhbpjq9Es9QKS9u3) ] ── (Full scroll capture)
+       │
+       ▼ (2. Export Frame as PNG)
+[ Google Stitch (Project 16235470526146286805) ]
+       │
+       ▼ (3. Stitch AI Generative Overhaul using user credits)
+[ Redesigned Screen in Stitch (HTML + Design System) ]
+       │
+       ▼ (4. Stitch "Export to Figma" ➔ Real Vector Layers & Components)
+[ Figma Final Canvas (EjxNYmDhbpjq9Es9QKS9u3) ]
+       │
+       ▼ (5. User manual polish & frame naming / selection link)
+[ Agent MCP Extraction & Codebase Reconciliation ]
+       │
+       ▼ (Figma Dev Mode MCP: get_figma_data / Stitch MCP: get_screen)
+[ Next.js React Codebase (src/components/...) ]
+  - Pure visual/Tailwind/CSS update
+  - 100% Supabase queries, real-time hooks, and chit business math preserved
+```
+
+---
+
+### B. Screen & Frame Identification Protocol (Zero Ambiguity)
+Since Figma and Stitch projects contain multiple screens, test iterations, and scratch frames, the agent must NEVER guess which frame to use. The user points the agent to the approved design via one of two methods:
+
+1. **Method 1: Direct Frame Selection Link (Preferred)**
+   - In Figma, select the frame border ➔ Right-click ➔ **Copy/Paste as ➔ Copy link to selection** (Shortcut: `Ctrl + L`).
+   - The URL will format as:
+     `https://www.figma.com/design/EjxNYmDhbpjq9Es9QKS9u3/Chitfund-Manager?node-id=X-Y`
+   - The agent parses `node-id` (converting `X-Y` to `X:Y`) and queries `figma-dev-mode-mcp-server` tool `get_figma_data` with:
+     ```json
+     { "fileKey": "EjxNYmDhbpjq9Es9QKS9u3", "nodeId": "X:Y" }
+     ```
+
+2. **Method 2: Explicit Frame Naming**
+   - In Figma, double-click the frame title and rename it (e.g. `Dashboard - Final`, `Members - V2 Approved`).
+   - The user informs the agent of the exact name. The agent scans the document tree via Figma MCP and extracts the matching node.
+
+3. **Method 3: Direct Stitch Screen Inspection (Alternative)**
+   - If the user approves a design directly in Stitch without re-exporting to Figma, the agent calls `stitch` MCP tool `list_screens` on project `16235470526146286805` to retrieve the latest screen ID, then calls `get_screen` to inspect the raw `htmlCode` and `designSystem`.
+
+---
+
+### C. Stitch AI Prompting & Aesthetics Standard
+When generating screens in Google Stitch, follow these prompt guidelines to produce production-grade fintech interfaces:
+- **Design Archetype**: Institutional Fintech Dark Mode (inspired by Linear, Stripe, and Mercury).
+- **Surface Palette**: Deep zinc/slate dark surfaces (`#09090b`, `#121217`, `#18181b`) with ultra-subtle border contrasts (`border-white/5` to `border-white/10`). Avoid flat pitch black or washed-out grays.
+- **Accent Tokens**:
+  - Primary Action / Growth: Refined Emerald (`#10b981` / `#059669` / emerald-400 with 10-20% opacity glow).
+  - Warnings / Pending: Amber / Warm Gold (`#f59e0b` / `#d97706`).
+  - Urgent / Deficit: Crimson / Rose (`#f43f5e`).
+- **Typography**: Clean sans-serif hierarchy (Inter or system sans), tabular numbers (`font-mono` / `tabular-nums`) for currency values and dates.
+- **Card Styling**: Flat modular cards with subtle inner highlights (`ring-1 ring-white/5`), rounded corners (`rounded-xl` or `rounded-2xl`), generous internal breathing room (`p-5` to `p-6`).
+
+#### Recommended Prompt Template for Stitch:
+> "Redesign this chit fund management screen into an institutional-grade dark-mode fintech dashboard. Follow the visual precision of Stripe and Linear. Use deep slate cards with 1px subtle borders, crisp tabular typography for rupee amounts, clean pill badges for statuses, and streamlined action buttons. Retain all existing data fields, stats cards, tables, and quick actions, but elevate the hierarchy and eliminate visual clutter."
+
+---
+
+### D. Codebase Reconciliation & Invariants (Agent Directive)
+When applying visual updates from Figma AST or Stitch HTML to React TSX files:
+1. **Never Require Manual Explanations**: Extract the visual diff directly from the raw MCP metadata (bounding boxes, layout mode, gap, padding, colors, typography).
+2. **Strict Logic Preservation**:
+   - DO NOT alter React component state variables, `useState`, `useEffect`, or custom hooks (`useAuth`, `useWallet`).
+   - DO NOT alter Supabase queries, real-time subscriptions, or RPC calls.
+   - DO NOT alter Chit Fund calculation math (Organizer profit, Laaba Seetu accumulation, winner net payout formulas).
+   - DO NOT alter event handler bindings (`onClick`, WhatsApp reminder links, modal toggles).
+3. **Component Modularity**: Match styling updates to the corresponding component file (e.g. `DashboardContent.tsx`, `Sidebar.tsx`, `PaymentChecklistPrintModal.tsx`).
+4. **Verification**: Always run `npm run build` immediately after applying edits to ensure **0 TypeScript errors**.
+
+
