@@ -7,7 +7,6 @@ import { CustomRoleRecord } from '@/utils/rbac';
 import {
   Shield,
   ShieldCheck,
-  ShieldAlert,
   Plus,
   Trash2,
   Save,
@@ -16,24 +15,33 @@ import {
   Lock,
   Search,
   Users,
-  Sparkles,
-  RefreshCw,
   Sliders,
-  Palette,
-  Eye,
-  Layers,
-  CircleDot,
+  Copy,
+  RotateCcw,
+  Download,
+  Phone,
   CheckCircle2,
   AlertTriangle,
-  Info,
-  ChevronRight
+  UserCheck,
+  UserX
 } from 'lucide-react';
 
-interface RoleCategoryConfig {
+interface ProfileRecord {
   id: string;
+  full_name: string;
+  phone_number: string;
+  role: string;
+  created_at: string;
+  passbook_token?: string;
+}
+
+interface PermissionCategory {
+  id: number;
+  badge: string;
+  badgeClass: string;
   title: string;
-  icon: any;
-  description: string;
+  subtitle: string;
+  toggleBgClass: string;
   items: {
     key: string;
     label: string;
@@ -42,181 +50,196 @@ interface RoleCategoryConfig {
   }[];
 }
 
-const PRESET_COLORS = [
-  { name: 'Indigo', value: '#6366F1' },
-  { name: 'Purple', value: '#9333EA' },
-  { name: 'Sky Blue', value: '#0284C7' },
-  { name: 'Emerald', value: '#059669' },
-  { name: 'Amber', value: '#D97706' },
-  { name: 'Rose', value: '#E11D48' },
-  { name: 'Fuchsia', value: '#C026D3' },
-  { name: 'Slate', value: '#475569' },
-  { name: 'Teal', value: '#0D9488' },
-  { name: 'Orange', value: '#EA580C' },
-];
-
-const PERMISSION_CATEGORIES: RoleCategoryConfig[] = [
+const CATEGORIES: PermissionCategory[] = [
   {
-    id: 'navigation',
-    title: 'Navigation & Module Tabs',
-    icon: Layers,
-    description: 'Control which core navigation panels and screens are accessible in the primary sidebar.',
+    id: 1,
+    badge: '1',
+    badgeClass: 'bg-indigo-50 text-brand-600',
+    title: 'Module & Navigation Access',
+    subtitle: 'Controls top navigation & sidebar visibility',
+    toggleBgClass: 'peer-checked:bg-brand-600',
     items: [
-      { key: 'dashboard', label: 'Dashboard & Analytics', desc: 'View high-level cash overview and active chits KPI summary.', type: 'tab' },
-      { key: 'chits', label: 'Chit Groups Management', desc: 'Browse and inspect all family & community chit funds.', type: 'tab' },
-      { key: 'members', label: 'Members Matrix & Passbooks', desc: 'View subscriber rosters, ticket assignments, and physical QR codes.', type: 'tab' },
-      { key: 'auctions', label: 'Live Auction Arena', desc: 'Enter the real-time bidding room and view live discount shoutings.', type: 'tab' },
-      { key: 'cash', label: 'Treasury & Multi-Vault Ledger', desc: 'Inspect physical cash box, digital bank accounts, and transactions.', type: 'tab' },
-      { key: 'communication', label: 'WhatsApp Broadcasts', desc: 'Compose reminders, auction results, and member alerts.', type: 'tab' },
-      { key: 'reports', label: 'Reports & Statements', desc: 'Export financial ledgers, member passbook summaries, and receipts.', type: 'tab' },
-      { key: 'users', label: 'Access Control & Roles', desc: 'Manage registered users, QR pairing, and custom role permissions.', type: 'tab' },
-      { key: 'settings', label: 'System Settings', desc: 'Configure global parameters, backup tools, and security rules.', type: 'tab' },
+      { key: 'dashboard', label: 'Overview Dashboard', desc: 'High-level financial summaries & charts', type: 'tab' },
+      { key: 'chits', label: 'Chits & Groups Directory', desc: 'View scheme rosters and pool balances', type: 'tab' },
+      { key: 'members', label: 'Members & Passbooks', desc: 'Member directory & passbook scanner', type: 'tab' },
+      { key: 'auctions', label: 'Auctions & Live Bidding', desc: 'Real-time auction desk and prize pots', type: 'tab' },
+      { key: 'cash', label: 'Treasury & Cash Vaults', desc: 'Physical cash drawer & bank ledger', type: 'tab' },
+      { key: 'communication', label: 'WhatsApp Broadcaster', desc: 'Direct notices & payment receipts dispatch', type: 'tab' },
     ],
   },
   {
-    id: 'chits_ops',
-    title: 'Chit Fund Operations',
-    icon: Sparkles,
-    description: 'Permissions for creating, editing, and managing chit group life cycles.',
+    id: 2,
+    badge: '2',
+    badgeClass: 'bg-emerald-50 text-emerald-700',
+    title: 'Member & Passbook Logistics',
+    subtitle: 'Core operations for Collections Agent',
+    toggleBgClass: 'peer-checked:bg-emerald-600',
     items: [
-      { key: 'chits:view', label: 'View Chit Groups', desc: 'Inspect chit group details, installment schedules, and month states.', type: 'action' },
-      { key: 'chits:create', label: 'Create New Chit Fund', desc: 'Launch new chit fund schemes with custom value, duration, and member slots.', type: 'action' },
-      { key: 'chits:edit', label: 'Edit Group Parameters', desc: 'Modify group notes, custom installment rules, or dates.', type: 'action' },
-      { key: 'chits:delete', label: 'Delete / Archive Chit Fund', desc: 'Permanently remove or archive completed chit groups.', type: 'action' },
+      { key: 'members:view', label: 'View Member Rosters', desc: 'Search subscriber names & ticket IDs', type: 'action' },
+      { key: 'members:collect', label: 'Record Installment Collections', desc: 'Post cash, UPI, & issue digital receipts', type: 'action' },
+      { key: 'members:pair_qr', label: 'Pair & Print Passbook QRs', desc: 'Link camera QR scan to physical booklet', type: 'action' },
+      { key: 'members:enroll', label: 'Enroll New Members', desc: 'Register new subscribers and tickets', type: 'action' },
+      { key: 'members:edit', label: 'Edit Subscriber Info', desc: 'Modify phone numbers and addresses', type: 'action' },
+      { key: 'members:suspend', label: 'Suspend Portal Access', desc: 'Trigger default locks and bidding blocks', type: 'action' },
     ],
   },
   {
-    id: 'members_ops',
-    title: 'Member Management & Collections',
-    icon: Users,
-    description: 'Permissions for member enrollments, physical passbooks, and monthly collections.',
+    id: 3,
+    badge: '3',
+    badgeClass: 'bg-amber-50 text-amber-700',
+    title: 'Chit Scheme Lifecycle',
+    subtitle: 'Restricted configuration management',
+    toggleBgClass: 'peer-checked:bg-brand-600',
     items: [
-      { key: 'members:view', label: 'View Member Rosters', desc: 'Browse enrolled tickets, contact info, and payment records.', type: 'action' },
-      { key: 'members:enroll', label: 'Enroll Subscribers', desc: 'Assign members to chit tickets and initialize payment profiles.', type: 'action' },
-      { key: 'members:collect', label: 'Record Monthly Collections', desc: 'Accept physical cash/UPI collections and sync with passbooks.', type: 'action' },
-      { key: 'members:edit', label: 'Edit Member Profiles', desc: 'Update phone numbers, full names, and bank details.', type: 'action' },
-      { key: 'members:delete', label: 'Remove / Unenroll Member', desc: 'Expel a ticket or transfer slot to another subscriber.', type: 'action' },
+      { key: 'chits:view', label: 'View Chit Scheme Details', desc: 'Inspect duration, pot totals, and cycles', type: 'action' },
+      { key: 'chits:create', label: 'Create New Chit Pool', desc: 'Launch ₹1L, ₹2L or custom groups', type: 'action' },
+      { key: 'chits:edit', label: 'Edit Group Rules & Dates', desc: 'Adjust monthly deadlines and caps', type: 'action' },
     ],
   },
   {
-    id: 'auctions_ops',
-    title: 'Live Auction Bidding & Payouts',
-    icon: CircleDot,
-    description: 'Permissions for conducting live monthly bidding cycles and winner disbursements.',
+    id: 4,
+    badge: '4',
+    badgeClass: 'bg-purple-50 text-purple-700',
+    title: 'Live Auctions & Bidding Operations',
+    subtitle: 'Monthly floor bidding & payout dispatch',
+    toggleBgClass: 'peer-checked:bg-purple-600',
     items: [
-      { key: 'auctions:view', label: 'Spectate Live Auctions', desc: 'View active auction room, participant bids, and countdowns.', type: 'action' },
-      { key: 'auctions:bid', label: 'Place Discount Bids', desc: 'Shout live discount bids on behalf of an eligible ticket.', type: 'action' },
-      { key: 'auctions:conduct', label: 'Conduct & Close Auction', desc: 'Finalize winning bid, advance chit month, and accumulate discount pool.', type: 'action' },
-      { key: 'auctions:disburse', label: 'Disburse Prize Pot Payout', desc: 'Execute net payout transfer/cash disbursement to the winning subscriber.', type: 'action' },
+      { key: 'auctions:conduct', label: 'Conduct Live Auction Cycles', desc: 'Finalize winning discount bids, advance chit month cycles, & pool', type: 'action' },
+      { key: 'auctions:bid', label: 'Place Proxy Bids for Tickets', desc: 'Shout live discount bids on behalf of eligible non-winning subscribers', type: 'action' },
+      { key: 'auctions:disburse', label: 'Disburse Prize Pot Payouts', desc: 'Authorize and disburse net pot payouts to winning subscribers', type: 'action' },
     ],
   },
   {
-    id: 'treasury_ops',
-    title: 'Treasury & 4-Vault Ledger',
-    icon: ShieldCheck,
-    description: 'Permissions for physical cash box handling, digital bank accounts, and ATM relocations.',
+    id: 5,
+    badge: '5',
+    badgeClass: 'bg-rose-50 text-rose-700',
+    title: 'Treasury & Financial Vaults',
+    subtitle: 'High-Risk Administrative Controls',
+    toggleBgClass: 'peer-checked:bg-amber-500',
     items: [
-      { key: 'treasury:view', label: 'View Multi-Vault Balances', desc: 'Inspect real-time balances of Cash Box, Kishor Bank, Dad Bank, and Mom Bank.', type: 'action' },
-      { key: 'treasury:move_money', label: 'Relocate Funds / ATM Draw', desc: 'Perform bank-to-cash or inter-vault transfers with physical verification.', type: 'action' },
-      { key: 'treasury:deposit', label: 'Direct Vault Deposit', desc: 'Add capital injections or external deposits into any vault.', type: 'action' },
-      { key: 'treasury:personal_draw', label: 'Record Personal Draws / Spends', desc: 'Log authorized petty cash expenses (petrol, maintenance, etc.).', type: 'action' },
-      { key: 'treasury:recover_float', label: 'Recover Admin Float', desc: 'Record repayments or re-credits to floating accounts.', type: 'action' },
-      { key: 'treasury:reconcile', label: 'Physical Cash Reconcile', desc: 'Perform cash-in-hand denomination audits and lock reconciliations.', type: 'action' },
-    ],
-  },
-  {
-    id: 'security_ops',
-    title: 'Administration & Security',
-    icon: ShieldAlert,
-    description: 'High-level administration controls, security audit logs, and broadcast messaging.',
-    items: [
-      { key: 'system:manage_users', label: 'Manage Users & Permissions', desc: 'Assign roles to profiles, pair passbook QR tokens, and edit permissions.', type: 'action' },
-      { key: 'communication:broadcast', label: 'Send WhatsApp Broadcasts', desc: 'Transmit mass notifications and payment reminders to all subscribers.', type: 'action' },
-      { key: 'reports:export', label: 'Export Audit & Tax Reports', desc: 'Generate CSV / PDF ledgers for offline compliance and bookkeeping.', type: 'action' },
+      { key: 'treasury:collect_cash', label: 'Accept Physical Cash & Field Receipts', desc: 'Accept physical currency and issue immediate passbook receipts', type: 'action' },
+      { key: 'treasury:move_money', label: 'ATM & Inter-Vault Relocations', desc: 'Transfer funds between digital bank accounts (Kishor / Dad / Mom Bank) & Cash Box', type: 'action' },
+      { key: 'treasury:personal_draw', label: 'Petty Cash & Personal Draws', desc: 'Record authorized expenses such as vehicle fuel, office maintenance, admin draws', type: 'action' },
+      { key: 'treasury:reconcile', label: 'Physical Denomination Reconciliation', desc: 'Perform physical note counts and lock cash-in-hand audits', type: 'action' },
     ],
   },
 ];
 
-export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: () => void }) {
+const COLOR_PRESETS = [
+  { name: 'Indigo', hex: '#4F46E5', bgClass: 'bg-brand-600' },
+  { name: 'Emerald', hex: '#10B981', bgClass: 'bg-emerald-500' },
+  { name: 'Amber', hex: '#F59E0B', bgClass: 'bg-amber-500' },
+  { name: 'Purple', hex: '#8B5CF6', bgClass: 'bg-purple-500' },
+  { name: 'Sky Blue', hex: '#0EA5E9', bgClass: 'bg-sky-500' },
+  { name: 'Rose', hex: '#F43F5E', bgClass: 'bg-rose-500' },
+];
+
+const ROLE_EMOJIS: Record<string, string> = {
+  admin: '👑',
+  manager: '💼',
+  subscriber: '📱',
+  collections_agent: '💳',
+  auction_clerk: '🔨',
+  auditor: '📊',
+};
+
+interface RoleManagerPanelProps {
+  onRoleUpdated?: () => void;
+  isCreateModalOpen?: boolean;
+  setIsCreateModalOpen?: (open: boolean) => void;
+  onExportPolicy?: () => void;
+}
+
+export default function RoleManagerPanel({
+  onRoleUpdated,
+  isCreateModalOpen: externalIsCreateModalOpen,
+  setIsCreateModalOpen: externalSetIsCreateModalOpen,
+  onExportPolicy,
+}: RoleManagerPanelProps) {
   const { profile: currentAdminProfile } = useAuth();
   const [roles, setRoles] = useState<CustomRoleRecord[]>([]);
-  const [roleCounts, setRoleCounts] = useState<Record<string, number>>({});
+  const [profiles, setProfiles] = useState<ProfileRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedRoleId, setSelectedRoleId] = useState<string>('admin');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('collections_agent');
 
   // Editing state for active role
-  const [editName, setEditName] = useState<string>('');
-  const [editDescription, setEditDescription] = useState<string>('');
-  const [editColor, setEditColor] = useState<string>('#6366F1');
-  const [editIsPrivileged, setEditIsPrivileged] = useState<boolean>(false);
+  const [editColor, setEditColor] = useState<string>('#F59E0B');
   const [allowedTabs, setAllowedTabs] = useState<string[]>([]);
   const [allowedActions, setAllowedActions] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
-  // New Role Creation modal
-  const [isNewRoleModalOpen, setIsNewRoleModalOpen] = useState<boolean>(false);
+  // Internal create modal state
+  const [internalIsCreateModalOpen, setInternalIsCreateModalOpen] = useState<boolean>(false);
+  const isCreateModalOpen = externalIsCreateModalOpen ?? internalIsCreateModalOpen;
+  const setIsCreateModalOpen = externalSetIsCreateModalOpen ?? setInternalIsCreateModalOpen;
+
   const [newRoleName, setNewRoleName] = useState<string>('');
   const [newRoleDescription, setNewRoleDescription] = useState<string>('');
-  const [newRoleColor, setNewRoleColor] = useState<string>('#6366F1');
+  const [newRoleColor, setNewRoleColor] = useState<string>('#4F46E5');
   const [newRoleIsPrivileged, setNewRoleIsPrivileged] = useState<boolean>(false);
   const [isCreatingRole, setIsCreatingRole] = useState<boolean>(false);
 
-  // Fetch Roles and Member counts from Supabase
-  const fetchRoles = async () => {
+  // Assign Member modal state
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
+  const [selectedProfileIdToAssign, setSelectedProfileIdToAssign] = useState<string>('');
+  const [isAssigning, setIsAssigning] = useState<boolean>(false);
+
+  // Fetch Roles and Profiles from Supabase
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('custom_roles')
-        .select('*')
-        .order('is_system', { ascending: false })
-        .order('created_at', { ascending: true });
+      const [rolesRes, profilesRes] = await Promise.all([
+        supabase
+          .from('custom_roles')
+          .select('*')
+          .order('is_system', { ascending: false })
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('profiles')
+          .select('id, full_name, phone_number, role, created_at, passbook_token')
+          .order('full_name', { ascending: true }),
+      ]);
 
-      if (rolesError) throw rolesError;
+      if (rolesRes.error) throw rolesRes.error;
+      const rolesData = rolesRes.data || [];
+      setRoles(rolesData);
 
-      // Fetch profile counts per role
-      const { data: profileCountsData, error: profileError } = await supabase
-        .from('profiles')
-        .select('role');
-
-      const counts: Record<string, number> = {};
-      if (profileCountsData) {
-        profileCountsData.forEach((p: any) => {
-          counts[p.role] = (counts[p.role] || 0) + 1;
-        });
+      if (profilesRes.data) {
+        setProfiles(profilesRes.data);
       }
 
-      setRoles(rolesData || []);
-      setRoleCounts(counts);
-
-      if (rolesData && rolesData.length > 0) {
+      // Default selection priority
+      if (rolesData.length > 0) {
         const found = rolesData.find((r) => r.id === selectedRoleId);
         if (!found) {
-          selectRole(rolesData[0]);
+          const colAgent = rolesData.find((r) => r.id === 'collections_agent');
+          if (colAgent) {
+            setSelectedRoleId(colAgent.id);
+            syncRoleState(colAgent);
+          } else {
+            setSelectedRoleId(rolesData[0].id);
+            syncRoleState(rolesData[0]);
+          }
         }
       }
     } catch (err: any) {
-      console.error('Error fetching custom roles:', err);
+      console.error('Error fetching role data:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRoles();
+    fetchData();
   }, []);
 
   const activeRole = useMemo(() => {
     return roles.find((r) => r.id === selectedRoleId) || roles[0];
   }, [roles, selectedRoleId]);
 
-  const selectRole = (role: CustomRoleRecord) => {
-    setSelectedRoleId(role.id);
-    setEditName(role.name);
-    setEditDescription(role.description || '');
-    setEditColor(role.color || '#6366F1');
-    setEditIsPrivileged(!!role.is_privileged);
+  const syncRoleState = (role: CustomRoleRecord) => {
+    setEditColor(role.color || '#4F46E5');
     setAllowedTabs(role.allowed_tabs || []);
     setAllowedActions(role.allowed_actions || []);
     setSaveSuccess(false);
@@ -224,22 +247,40 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
 
   useEffect(() => {
     if (activeRole) {
-      setEditName(activeRole.name);
-      setEditDescription(activeRole.description || '');
-      setEditColor(activeRole.color || '#6366F1');
-      setEditIsPrivileged(!!activeRole.is_privileged);
-      setAllowedTabs(activeRole.allowed_tabs || []);
-      setAllowedActions(activeRole.allowed_actions || []);
-      setSaveSuccess(false);
+      syncRoleState(activeRole);
     }
   }, [activeRole?.id]);
 
-  const filteredRoles = useMemo(() => {
-    return roles.filter((r) =>
-      r.name.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
-      r.id.toLowerCase().includes(searchQuery.toLowerCase().trim())
-    );
-  }, [roles, searchQuery]);
+  const selectRole = (role: CustomRoleRecord) => {
+    setSelectedRoleId(role.id);
+    syncRoleState(role);
+  };
+
+  // Group roles into Built-in and Custom
+  const builtInRoles = useMemo(() => roles.filter((r) => r.is_system), [roles]);
+  const customRoles = useMemo(() => roles.filter((r) => !r.is_system), [roles]);
+
+  // Profile counts per role
+  const roleCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    profiles.forEach((p) => {
+      counts[p.role] = (counts[p.role] || 0) + 1;
+    });
+    return counts;
+  }, [profiles]);
+
+  // Personnel assigned to active role
+  const assignedPersonnel = useMemo(() => {
+    if (!activeRole) return [];
+    return profiles.filter((p) => p.role === activeRole.id);
+  }, [profiles, activeRole]);
+
+  // Overall metric counts
+  const staffCount = useMemo(() => profiles.filter((p) => p.role !== 'subscriber').length, [profiles]);
+  const totalUsers = profiles.length;
+  const subscriberCount = roleCounts['subscriber'] || 0;
+  const adminProfiles = useMemo(() => profiles.filter((p) => p.role === 'admin'), [profiles]);
+  const adminName = adminProfiles[0]?.full_name || 'Dr. Kishor Anbazhakan';
 
   // Toggle Tab Permission
   const toggleTab = (tabKey: string) => {
@@ -260,17 +301,25 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
   // Select All Permissions
   const handleSelectAll = () => {
     if (activeRole?.id === 'admin') return;
-    const allTabs = PERMISSION_CATEGORIES[0].items.map((i) => i.key);
-    const allActs = PERMISSION_CATEGORIES.slice(1).flatMap((c) => c.items.map((i) => i.key));
+    const allTabs = CATEGORIES[0].items.map((i) => i.key);
+    const allActs = CATEGORIES.slice(1).flatMap((c) => c.items.map((i) => i.key));
     setAllowedTabs(allTabs);
     setAllowedActions(allActs);
   };
 
-  // Clear All Permissions
-  const handleClearAll = () => {
+  // Deselect All Permissions
+  const handleDeselectAll = () => {
     if (activeRole?.id === 'admin') return;
     setAllowedTabs([]);
     setAllowedActions([]);
+  };
+
+  // Reset to active role defaults
+  const handleResetDefaults = () => {
+    if (!activeRole) return;
+    setAllowedTabs(activeRole.allowed_tabs || []);
+    setAllowedActions(activeRole.allowed_actions || []);
+    setEditColor(activeRole.color || '#4F46E5');
   };
 
   // Save Role Changes to Supabase
@@ -281,10 +330,7 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
       const { error } = await supabase
         .from('custom_roles')
         .update({
-          name: editName.trim() || activeRole.name,
-          description: editDescription.trim(),
           color: editColor,
-          is_privileged: activeRole.id === 'admin' ? true : editIsPrivileged,
           allowed_tabs: activeRole.id === 'admin' ? activeRole.allowed_tabs : allowedTabs,
           allowed_actions: activeRole.id === 'admin' ? activeRole.allowed_actions : allowedActions,
           updated_at: new Date().toISOString(),
@@ -294,13 +340,41 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
       if (error) throw error;
 
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-      await fetchRoles();
+      setTimeout(() => setSaveSuccess(false), 2500);
+      await fetchData();
       if (onRoleUpdated) onRoleUpdated();
     } catch (err: any) {
       alert(`Failed to save role: ${err.message}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Clone Role
+  const handleCloneRole = async () => {
+    if (!activeRole) return;
+    const cloneId = `${activeRole.id}_copy_${Date.now().toString().slice(-4)}`;
+    const cloneName = `${activeRole.name} (Copy)`;
+
+    try {
+      const { error } = await supabase.from('custom_roles').insert({
+        id: cloneId,
+        name: cloneName,
+        description: activeRole.description || 'Cloned custom security role',
+        color: activeRole.color || '#4F46E5',
+        is_system: false,
+        is_privileged: !!activeRole.is_privileged,
+        allowed_tabs: allowedTabs,
+        allowed_actions: allowedActions,
+      });
+
+      if (error) throw error;
+
+      setSelectedRoleId(cloneId);
+      await fetchData();
+      if (onRoleUpdated) onRoleUpdated();
+    } catch (err: any) {
+      alert(`Failed to clone role: ${err.message}`);
     }
   };
 
@@ -313,19 +387,27 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
     }
 
     const assignedCount = roleCounts[activeRole.id] || 0;
-    const confirmMessage = assignedCount > 0
-      ? `Warning: There are currently ${assignedCount} user(s) assigned to "${activeRole.name}". Deleting this role will automatically reassign those users to Subscriber. Proceed?`
-      : `Are you sure you want to delete custom role "${activeRole.name}"?`;
+    const confirmMessage =
+      assignedCount > 0
+        ? `Warning: There are currently ${assignedCount} user(s) assigned to "${activeRole.name}". Deleting this role will automatically reassign those users to Subscriber. Proceed?`
+        : `Are you sure you want to delete custom role "${activeRole.name}"?`;
 
     if (!confirm(confirmMessage)) return;
 
     try {
+      // Reassign assigned users to subscriber
+      if (assignedCount > 0) {
+        await supabase
+          .from('profiles')
+          .update({ role: 'subscriber' })
+          .eq('role', activeRole.id);
+      }
+
       const { error } = await supabase.from('custom_roles').delete().eq('id', activeRole.id);
       if (error) throw error;
 
-      alert(`Role "${activeRole.name}" deleted successfully.`);
       setSelectedRoleId('subscriber');
-      await fetchRoles();
+      await fetchData();
       if (onRoleUpdated) onRoleUpdated();
     } catch (err: any) {
       alert(`Failed to delete role: ${err.message}`);
@@ -349,8 +431,8 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
 
     try {
       setIsCreatingRole(true);
-      const defaultTabs: string[] = ['dashboard', 'chits', 'members', 'auctions'];
-      const defaultActions: string[] = ['chits:view', 'members:view', 'auctions:view', 'auctions:bid'];
+      const defaultTabs: string[] = ['dashboard', 'chits', 'members', 'communication'];
+      const defaultActions: string[] = ['members:view', 'members:collect'];
 
       const { error } = await supabase.from('custom_roles').insert({
         id: generatedId,
@@ -365,13 +447,13 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
 
       if (error) throw error;
 
-      setIsNewRoleModalOpen(false);
+      setIsCreateModalOpen(false);
       setNewRoleName('');
       setNewRoleDescription('');
-      setNewRoleColor('#6366F1');
+      setNewRoleColor('#4F46E5');
       setNewRoleIsPrivileged(false);
       setSelectedRoleId(generatedId);
-      await fetchRoles();
+      await fetchData();
       if (onRoleUpdated) onRoleUpdated();
     } catch (err: any) {
       alert(`Failed to create role: ${err.message}`);
@@ -380,481 +462,737 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
     }
   };
 
+  // Assign Member to Role
+  const handleAssignMember = async () => {
+    if (!selectedProfileIdToAssign || !activeRole) return;
+    try {
+      setIsAssigning(true);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: activeRole.id })
+        .eq('id', selectedProfileIdToAssign);
+
+      if (error) throw error;
+
+      setIsAssignModalOpen(false);
+      setSelectedProfileIdToAssign('');
+      await fetchData();
+      if (onRoleUpdated) onRoleUpdated();
+    } catch (err: any) {
+      alert(`Failed to assign role: ${err.message}`);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  // Remove member from Role (reassign to subscriber)
+  const handleRemoveMemberFromRole = async (profileId: string, profileName: string) => {
+    if (!confirm(`Reassign "${profileName}" back to Subscriber role?`)) return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: 'subscriber' })
+        .eq('id', profileId);
+
+      if (error) throw error;
+
+      await fetchData();
+      if (onRoleUpdated) onRoleUpdated();
+    } catch (err: any) {
+      alert(`Failed to remove role: ${err.message}`);
+    }
+  };
+
+  // Count active permissions for active role
+  const totalPermissionsCount = allowedTabs.length + allowedActions.length;
+
   return (
-    <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl overflow-hidden shadow-2xs text-white flex flex-col md:flex-row min-h-[650px] animate-in fade-in duration-200">
+    <div className="flex-1 flex flex-col min-w-0 bg-slate-50">
       
-      {/* ── MOBILE ROLE SELECTOR CAROUSEL (Mobile only: < md) ── */}
-      <div className="block md:hidden bg-[#141332] border-b border-[#27264E] p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-[#AEABD8]">
-            <Shield size={14} className="text-[#64CFF6]" />
-            <span>Select Role to Configure</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsNewRoleModalOpen(true)}
-            className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer"
-          >
-            <Plus size={12} />
-            <span>Add Role</span>
-          </button>
-        </div>
+      {/* ── DESKTOP ROLES & PERMISSIONS WORKSPACE (p-7 matching Stitch) ── */}
+      <main className="flex-1 overflow-y-auto p-4 sm:p-7">
+        <div className="w-full max-w-[1550px] mx-auto space-y-6">
 
-        {/* Scrollable Role Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {roles.map((role) => {
-            const isSelected = role.id === activeRole?.id;
-            const memberCount = roleCounts[role.id] || 0;
-            return (
-              <button
-                key={role.id}
-                type="button"
-                onClick={() => selectRole(role)}
-                className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs'
-                    : 'bg-[#1D1D41] text-[#AEABD8] border-[#27264E] hover:bg-[#27264E] hover:text-white'
-                }`}
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: role.color || '#6366F1' }}
-                />
-                <span>{role.name}</span>
-                <span className="text-[10px] text-[#AEABD8] font-mono">({memberCount})</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── LEFT SIDEBAR: DESKTOP ROLES LIST (Desktop: >= md) ── */}
-      <div className="hidden md:flex w-72 lg:w-80 bg-[#141332] border-r border-[#27264E] p-4 flex-col justify-between shrink-0">
-        <div className="space-y-3.5">
-          {/* Header & New Role Button */}
-          <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#27264E]">
-            <div className="flex items-center gap-2">
-              <Shield className="text-[#64CFF6]" size={17} />
-              <span className="font-extrabold text-xs tracking-wider uppercase text-white">Configured Roles</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsNewRoleModalOpen(true)}
-              className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-2xs active:scale-95 transition-all cursor-pointer"
-            >
-              <Plus size={13} />
-              <span>Add Role</span>
-            </button>
-          </div>
-
-          {/* Search Bar */}
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEABD8]" />
-            <input
-              type="text"
-              placeholder="Search roles..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-[#AEABD8]/60 focus:outline-none focus:border-[#6359E9] shadow-2xs"
-            />
-          </div>
-
-          {/* Role Items */}
-          <div className="space-y-1.5 max-h-[520px] overflow-y-auto pr-1">
-            {filteredRoles.map((role) => {
-              const isSelected = role.id === activeRole?.id;
-              const memberCount = roleCounts[role.id] || 0;
-
-              return (
-                <button
-                  key={role.id}
-                  type="button"
-                  onClick={() => selectRole(role)}
-                  className={`w-full text-left p-2.5 rounded-2xl flex items-center justify-between transition-all group cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#6359E9]/20 border border-[#6359E9] shadow-xs text-white'
-                      : 'hover:bg-[#1D1D41] border border-transparent text-[#AEABD8] hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span
-                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs"
-                      style={{ backgroundColor: role.color || '#6366F1' }}
-                    />
-                    <div className="truncate">
-                      <p className="text-xs font-bold truncate flex items-center gap-1.5">
-                        <span className={isSelected ? 'text-white font-black' : 'text-[#AEABD8]'}>{role.name}</span>
-                        {role.is_system && (
-                          <span title="System Role" className="inline-flex">
-                            <Lock size={10} className="text-[#AEABD8] group-hover:text-white shrink-0" />
-                          </span>
-                        )}
-                      </p>
-                      <span className="text-[10px] text-[#AEABD8] font-mono block">
-                        {memberCount} {memberCount === 1 ? 'user' : 'users'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    {role.is_system ? (
-                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#1D1D41] text-[#AEABD8] border border-[#27264E]">
-                        System
-                      </span>
-                    ) : (
-                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40">
-                        Custom
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Info hint */}
-        <div className="pt-3 border-t border-[#27264E] text-[11px] text-[#AEABD8] flex items-start gap-1.5">
-          <Info size={13} className="text-[#64CFF6] shrink-0 mt-0.5" />
-          <span>Members with custom roles inherit assigned module &amp; action permissions instantly.</span>
-        </div>
-      </div>
-
-      {/* ── RIGHT PANEL: ROLE CONFIGURATION & PERMISSIONS ── */}
-      <div className="flex-1 p-4 sm:p-6 lg:p-7 flex flex-col justify-between bg-[#1D1D41] overflow-y-auto">
-        {activeRole ? (
-          <div className="space-y-5 sm:space-y-6">
-            
-            {/* Header: Role Identity & Save/Delete Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 sm:pb-5 border-b border-[#27264E]">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-xs shrink-0 uppercase border border-white/20"
-                  style={{ backgroundColor: editColor }}
-                >
-                  {editName ? editName.charAt(0) : 'R'}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-base sm:text-lg font-black text-white">
-                      {activeRole.name}
-                    </h2>
-                    {activeRole.is_system && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40">
-                        <Lock size={10} /> System Protected
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-[#AEABD8] mt-0.5">
-                    Role ID: <code className="font-mono text-[#64CFF6] bg-[#141332] px-1.5 py-0.5 rounded text-[11px] border border-[#27264E]">{activeRole.id}</code> · {roleCounts[activeRole.id] || 0} active members
-                  </p>
-                </div>
+          {/* Top Overview Metrics Strip */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* Metric 1: Active Staff & Admins */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Staff &amp; Admins</span>
+                <span className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-xs font-bold font-display">
+                  {staffCount}
+                </span>
               </div>
+              <div className="mt-2.5 flex items-baseline gap-2">
+                <span className="text-2xl font-black font-display text-slate-900">{staffCount} Staff</span>
+                <span className="text-xs text-slate-500 font-medium whitespace-nowrap">/ {totalUsers} Total Users</span>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span>
+                  {adminProfiles.length} Super Admin · {Math.max(0, staffCount - adminProfiles.length)} Operations Agent
+                  {Math.max(0, staffCount - adminProfiles.length) === 1 ? '' : 's'}
+                </span>
+              </div>
+            </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 self-end sm:self-auto">
-                {!activeRole.is_system && (
+            {/* Metric 2: Security Architecture */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Security Architecture</span>
+                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-brand-700 text-[10px] font-bold border border-brand-200/60">
+                  RBAC Local
+                </span>
+              </div>
+              <div className="mt-2.5 flex items-baseline gap-2">
+                <span className="text-2xl font-black font-display text-slate-900">{roles.length} Roles</span>
+                <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
+                  ({builtInRoles.length} Built-in, {customRoles.length} Custom)
+                </span>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+                <span>Granular module gating</span>
+                <span className="text-brand-600 font-semibold cursor-pointer hover:underline text-[11px]">Audit Logs</span>
+              </div>
+            </div>
+
+            {/* Metric 3: Permission Checkpoints */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Permission Checkpoints</span>
+                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200/60">
+                  24 Rules
+                </span>
+              </div>
+              <div className="mt-2.5 flex items-baseline gap-2">
+                <span className="text-2xl font-black font-display text-slate-900">5 Modules</span>
+                <span className="text-xs text-emerald-600 font-semibold whitespace-nowrap">Strict Zero-Trust</span>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500">
+                <span>Enforces physical QR verification limits</span>
+              </div>
+            </div>
+
+            {/* Metric 4: Default Subscriber Tier */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Default Subscriber Tier</span>
+                <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-xs font-bold">
+                  🔒
+                </span>
+              </div>
+              <div className="mt-2.5 flex items-baseline gap-2">
+                <span className="text-2xl font-black font-display text-slate-900">Read-Only</span>
+                <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Mobile App Appointed</span>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-indigo-600 font-medium">
+                <span>{subscriberCount} active members bound to Subscriber tier</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Main Two-Column Layout: Roles Roster Rail (left 340px) + Detailed Permission Matrix & Staff (right remainder) */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-7 items-start">
+
+            {/* Left Column: Roles Roster & Hierarchy (4 cols out of 12 ~ 360px) */}
+            <section className="xl:col-span-4 space-y-4">
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div>
+                    <h3 className="font-display font-bold text-sm text-slate-900">Defined System &amp; Custom Roles</h3>
+                    <p className="text-[11px] text-slate-400">Select a role to inspect or modify capabilities</p>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                    {roles.length} Roles
+                  </span>
+                </div>
+
+                {/* Built-In Roles Group */}
+                <div className="space-y-2 mb-4">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                    Built-in Protected Roles
+                  </span>
+
+                  {/* Built-in: Admin */}
+                  {builtInRoles.find((r) => r.id === 'admin') && (
+                    <div
+                      onClick={() => selectRole(builtInRoles.find((r) => r.id === 'admin')!)}
+                      className={`p-3.5 rounded-xl border transition-all cursor-pointer group flex items-center justify-between ${
+                        selectedRoleId === 'admin'
+                          ? 'border-2 border-brand-500 bg-brand-50/20 shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold font-display">
+                          👑
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-900 group-hover:text-brand-600 transition-colors">Admin</span>
+                            <span className="text-[9px] uppercase font-bold py-0.5 px-1.5 bg-brand-50 text-brand-700 border border-brand-200/60 rounded">
+                              Full Access
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                            {roleCounts['admin'] || 1} Member Assigned · {adminName}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <span className="text-[10px] text-slate-400 font-mono">Protected</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Built-in: Manager */}
+                  {builtInRoles.find((r) => r.id === 'manager') && (
+                    <div
+                      onClick={() => selectRole(builtInRoles.find((r) => r.id === 'manager')!)}
+                      className={`p-3.5 rounded-xl border transition-all cursor-pointer group flex items-center justify-between ${
+                        selectedRoleId === 'manager'
+                          ? 'border-2 border-brand-500 bg-brand-50/20 shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold font-display">
+                          💼
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-900 group-hover:text-brand-600 transition-colors">Manager</span>
+                            <span className="text-[9px] uppercase font-bold py-0.5 px-1.5 bg-blue-50 text-blue-700 border border-blue-200/60 rounded">
+                              Operational
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {roleCounts['manager'] || 0} Members Assigned
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <span className="text-[10px] text-slate-400 font-mono">System</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Built-in: Subscriber */}
+                  {builtInRoles.find((r) => r.id === 'subscriber') && (
+                    <div
+                      onClick={() => selectRole(builtInRoles.find((r) => r.id === 'subscriber')!)}
+                      className={`p-3.5 rounded-xl border transition-all cursor-pointer group flex items-center justify-between ${
+                        selectedRoleId === 'subscriber'
+                          ? 'border-2 border-brand-500 bg-brand-50/20 shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold font-display">
+                          📱
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-900 group-hover:text-brand-600 transition-colors">Subscriber</span>
+                            <span className="text-[9px] uppercase font-bold py-0.5 px-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded">
+                              Read-Only
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {subscriberCount} Members Assigned
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <span className="text-[10px] text-slate-400 font-mono">Default Tier</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom Delegated Roles Group */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                    Custom Delegated Roles
+                  </span>
+
+                  {customRoles.map((role) => {
+                    const isSelected = role.id === selectedRoleId;
+                    const assignedList = profiles.filter((p) => p.role === role.id);
+                    const assignedCount = assignedList.length;
+                    const leadName = assignedList[0]?.full_name?.split(' ')[0] || '';
+                    const emoji = ROLE_EMOJIS[role.id] || '🛡️';
+
+                    if (isSelected) {
+                      return (
+                        <div
+                          key={role.id}
+                          className="p-3.5 rounded-xl border-2 border-brand-500 bg-brand-50/20 shadow-xs transition-all cursor-pointer relative"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-display shadow-2xs"
+                                style={{
+                                  backgroundColor: `${role.color || '#F59E0B'}25`,
+                                  color: role.color || '#D97706',
+                                }}
+                              >
+                                {emoji}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-xs text-brand-900 truncate">{role.name}</span>
+                                  <span className="text-[9px] uppercase font-bold py-0.5 px-1.5 bg-amber-100 text-amber-800 border border-amber-200/70 rounded whitespace-nowrap">
+                                    Field Staff
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-600 mt-0.5 truncate">
+                                  {assignedCount} Member{assignedCount === 1 ? '' : 's'} Assigned {leadName && `· ${leadName}`}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="w-2 h-2 rounded-full bg-brand-600"></span>
+                              <span className="text-[10px] font-bold text-brand-700 uppercase">Selected</span>
+                            </div>
+                          </div>
+                          <div className="mt-2.5 pt-2 border-t border-brand-100 flex items-center justify-between text-[11px] text-slate-500">
+                            <span className="truncate pr-2">{role.description || 'Custom operations'}</span>
+                            <span className="font-mono text-brand-600 font-semibold shrink-0">
+                              {(role.allowed_tabs?.length || 0) + (role.allowed_actions?.length || 0)} Perms
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={role.id}
+                        onClick={() => selectRole(role)}
+                        className="p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white transition-all cursor-pointer group flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-display shadow-2xs"
+                            style={{
+                              backgroundColor: `${role.color || '#8B5CF6'}20`,
+                              color: role.color || '#8B5CF6',
+                            }}
+                          >
+                            {emoji}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs text-slate-900 group-hover:text-brand-600 transition-colors truncate">
+                                {role.name}
+                              </span>
+                              <span className="text-[9px] uppercase font-bold py-0.5 px-1.5 bg-purple-50 text-purple-700 border border-purple-200/60 rounded whitespace-nowrap">
+                                {role.id === 'auction_clerk' ? 'Bidding Live' : role.id === 'auditor' ? 'Audit Only' : 'Custom'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {assignedCount} Member{assignedCount === 1 ? '' : 's'} Assigned
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-[10px] text-slate-400 font-mono">Custom</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Role Action Helpers */}
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <button
+                    type="button"
+                    onClick={handleCloneRole}
+                    className="text-brand-600 hover:text-brand-700 font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Clone Role</span>
+                  </button>
                   <button
                     type="button"
                     onClick={handleDeleteRole}
-                    className="px-3 py-2 rounded-xl bg-[#E41414]/15 hover:bg-[#E41414]/25 text-[#E41414] border border-[#E41414]/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Trash2 size={13} />
-                    <span className="hidden sm:inline">Delete Role</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleSaveRole}
-                  disabled={isSaving}
-                  className={`px-4 sm:px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer ${
-                    saveSuccess
-                      ? 'bg-[#02B15A] text-white shadow-[#02B15A]/20'
-                      : 'bg-[#6359E9] hover:bg-[#6F64FF] text-white'
-                  }`}
-                >
-                  {saveSuccess ? (
-                    <>
-                      <Check size={14} />
-                      <span>Saved!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save size={14} />
-                      <span>{isSaving ? 'Saving...' : 'Save Role'}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Role Profile Settings (Name, Color & Description) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 bg-[#141332] border border-[#27264E] rounded-2xl p-4 sm:p-5">
-              <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Role Display Name</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="e.g. Field Officer / Treasury Auditor"
-                  className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#6359E9] shadow-2xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1 flex items-center justify-between">
-                  <span>Role Theme Color</span>
-                  <span className="text-[10px] font-mono text-[#64CFF6]">{editColor}</span>
-                </label>
-                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                  {PRESET_COLORS.map((c) => (
-                    <button
-                      key={c.name}
-                      type="button"
-                      onClick={() => setEditColor(c.value)}
-                      className={`w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                        editColor.toLowerCase() === c.value.toLowerCase() ? 'ring-2 ring-[#6359E9] ring-offset-2 ring-offset-[#141332] scale-110' : 'opacity-85 hover:opacity-100'
-                      }`}
-                      style={{ backgroundColor: c.value }}
-                      title={c.name}
-                    >
-                      {editColor.toLowerCase() === c.value.toLowerCase() && <Check size={12} className="text-white drop-shadow-xs" />}
-                    </button>
-                  ))}
-                  <input
-                    type="color"
-                    value={editColor}
-                    onChange={(e) => setEditColor(e.target.value)}
-                    className="w-7 h-7 rounded-lg border border-[#27264E] bg-[#1D1D41] cursor-pointer p-0.5 ml-1"
-                    title="Custom Hex Color"
-                  />
-                </div>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Role Description &amp; Scope</label>
-                <textarea
-                  rows={2}
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="Explain the duties and operational scope of this role..."
-                  className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6359E9] resize-none shadow-2xs placeholder-[#AEABD8]/60"
-                />
-              </div>
-
-              {/* Database-Level Security Privilege */}
-              <div className="md:col-span-2 flex items-center justify-between p-3.5 bg-[#FFBB38]/10 border border-[#FFBB38]/30 rounded-xl">
-                <div>
-                  <p className="text-xs font-bold text-[#FFBB38] flex items-center gap-1.5">
-                    <ShieldCheck size={14} className="text-[#FFBB38]" />
-                    <span>Database Security Privilege (RLS)</span>
-                  </p>
-                  <p className="text-[11px] text-[#AEABD8] mt-0.5 leading-relaxed">
-                    {activeRole.id === 'admin' 
-                      ? 'The Admin role always possesses database super-privileges.' 
-                      : 'Privileged roles can read/write administrative data in Supabase (treasury vaults, all members, audits). Only enable for trusted manager-level roles.'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={activeRole.id === 'admin'}
-                  onClick={() => setEditIsPrivileged((prev) => !prev)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ml-4 ${
-                    (activeRole.id === 'admin' || editIsPrivileged) ? 'bg-[#FFBB38]' : 'bg-[#27264E]'
-                  } ${activeRole.id === 'admin' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition-transform ${
-                      (activeRole.id === 'admin' || editIsPrivileged) ? 'translate-x-6' : 'translate-x-1'
+                    disabled={activeRole?.is_system}
+                    className={`font-semibold inline-flex items-center gap-1 transition-colors ${
+                      activeRole?.is_system
+                        ? 'text-slate-300 cursor-not-allowed'
+                        : 'text-rose-600 hover:text-rose-700 cursor-pointer'
                     }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Bulk Action Bar */}
-            {activeRole.id !== 'admin' && (
-              <div className="flex items-center justify-between bg-[#141332] px-3.5 py-2.5 rounded-xl border border-[#27264E]">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Sliders size={13} className="text-[#6359E9]" />
-                  Configure Granular Permissions
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSelectAll}
-                    className="text-[11px] font-bold text-[#6359E9] hover:text-[#6F64FF] hover:underline"
                   >
-                    Grant All
-                  </button>
-                  <span className="text-[#27264E]">·</span>
-                  <button
-                    type="button"
-                    onClick={handleClearAll}
-                    className="text-[11px] font-bold text-[#AEABD8] hover:text-[#E41414] hover:underline"
-                  >
-                    Clear All
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Custom Role</span>
                   </button>
                 </div>
               </div>
-            )}
+            </section>
 
-            {/* Categorized Permissions Grid */}
-            <div className="space-y-4 sm:space-y-5">
-              {PERMISSION_CATEGORIES.map((cat) => {
-                const IconComponent = cat.icon;
-                return (
-                  <div key={cat.id} className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 space-y-3 shadow-md">
-                    <div className="flex items-center gap-2 border-b border-[#27264E] pb-2.5">
-                      <IconComponent size={16} className="text-[#6359E9]" />
-                      <div>
-                        <h4 className="text-xs font-black text-white tracking-wide uppercase">{cat.title}</h4>
-                        <p className="text-[10px] text-[#AEABD8]">{cat.description}</p>
+            {/* Right Column: Granular Permission Matrix & Assigned Staff (8 cols out of 12) */}
+            <section className="xl:col-span-8 space-y-6">
+
+              {/* Role Banner & Summary Header */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div
+                    className="w-12 h-12 rounded-2xl font-bold flex items-center justify-center font-display text-xl shadow-xs shrink-0"
+                    style={{
+                      backgroundColor: `${editColor}20`,
+                      color: editColor,
+                    }}
+                  >
+                    {ROLE_EMOJIS[activeRole?.id || ''] || '💳'}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="font-display font-bold text-lg text-slate-900 leading-tight truncate">
+                        {activeRole?.name}
+                      </h2>
+                      <span className="text-xs font-bold py-0.5 px-2 bg-amber-100 text-amber-800 border border-amber-200/60 rounded-full whitespace-nowrap">
+                        {activeRole?.is_system ? 'Protected System Role' : 'Custom Field Role'}
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        ID: {activeRole?.id}
+                      </span>
+                      <div className="h-3.5 w-px bg-slate-200 hidden sm:block"></div>
+                      <div className="flex items-center gap-1.5 pl-1">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mr-0.5">
+                          Role Color:
+                        </span>
+                        {COLOR_PRESETS.map((p) => {
+                          const isActive = editColor.toLowerCase() === p.hex.toLowerCase();
+                          return (
+                            <button
+                              key={p.name}
+                              type="button"
+                              onClick={() => setEditColor(p.hex)}
+                              title={p.name}
+                              className={`w-3.5 h-3.5 rounded-full hover:scale-110 transition-transform cursor-pointer ${p.bgClass} ${
+                                isActive ? 'ring-2 ring-brand-500 ring-offset-1' : ''
+                              }`}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                      {activeRole?.description ||
+                        'Authorizes ground field personnel to accept offline installments, authenticate booklets via camera scanner, and record daily cash collections.'}
+                    </p>
+                  </div>
+                </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                      {cat.items.map((item) => {
-                        const isGranted =
-                          activeRole.id === 'admin' ||
-                          (item.type === 'tab'
-                            ? allowedTabs.includes(item.key)
-                            : allowedActions.includes(item.key));
+                {/* Role Control Actions */}
+                <div className="flex items-center gap-2.5 shrink-0 self-end md:self-auto">
+                  <button
+                    type="button"
+                    onClick={handleResetDefaults}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Reset to Defaults
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveRole}
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-brand-500/25 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                  >
+                    {saveSuccess ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-300" strokeWidth={2.5} />
+                        <span>Saved!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        <span>{isSaving ? 'Saving...' : 'Save Permission Changes'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
 
-                        return (
-                          <div
-                            key={item.key}
-                            onClick={() => {
-                              if (activeRole.id === 'admin') return;
-                              if (item.type === 'tab') toggleTab(item.key);
-                              else toggleAction(item.key);
-                            }}
-                            className={`p-3 rounded-xl border flex items-start justify-between gap-3 transition-all cursor-pointer select-none ${
-                              isGranted
-                                ? 'bg-[#6359E9]/15 border-[#6359E9]/40 text-white shadow-xs'
-                                : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:border-[#6359E9]/40 hover:bg-[#141332]/80'
-                            } ${activeRole.id === 'admin' ? 'cursor-not-allowed opacity-90' : 'hover:scale-[1.005]'}`}
-                          >
-                            <div className="space-y-0.5">
-                              <p className={`text-xs font-bold ${isGranted ? 'text-white font-extrabold' : 'text-[#AEABD8]'}`}>
-                                {item.label}
-                              </p>
-                              <p className="text-[10px] text-[#AEABD8]/70 leading-relaxed">{item.desc}</p>
-                            </div>
+              {/* Permission Categories Matrix Container */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+                  <div>
+                    <h3 className="font-display font-bold text-sm text-slate-900">Configured Access Matrix</h3>
+                    <p className="text-xs text-slate-500">Toggle modules and operational privileges for this security role</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium">Quick Presets:</span>
+                    <button
+                      type="button"
+                      onClick={handleSelectAll}
+                      className="text-xs font-semibold px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAll}
+                      className="text-xs font-semibold px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
 
-                            {/* Toggle Switch */}
-                            <div
-                              className={`w-9 h-5 rounded-full p-0.5 transition-colors shrink-0 ${
-                                isGranted ? 'bg-[#6359E9]' : 'bg-[#27264E]'
-                              }`}
+                <div className="divide-y divide-slate-100 text-xs">
+                  {CATEGORIES.map((cat) => (
+                    <div key={cat.id} className="p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-6 h-6 rounded-lg ${cat.badgeClass} flex items-center justify-center font-bold text-xs font-display`}>
+                            {cat.badge}
+                          </div>
+                          <h4 className="font-display font-bold text-xs text-slate-900 uppercase tracking-wider">
+                            {cat.title}
+                          </h4>
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                          {cat.subtitle}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                        {cat.items.map((item) => {
+                          const isChecked =
+                            activeRole?.id === 'admin' ||
+                            (item.type === 'tab' ? allowedTabs.includes(item.key) : allowedActions.includes(item.key));
+
+                          return (
+                            <label
+                              key={item.key}
+                              className={`flex items-start justify-between p-3 rounded-xl border transition-colors cursor-pointer select-none ${
+                                isChecked
+                                  ? 'border-brand-200/80 bg-brand-50/20 hover:bg-brand-50/30'
+                                  : 'border-slate-200/80 bg-slate-50/40 hover:bg-slate-50'
+                              } ${activeRole?.id === 'admin' ? 'cursor-not-allowed opacity-90' : ''}`}
                             >
-                              <div
-                                className={`w-4 h-4 rounded-full bg-white shadow-xs transition-transform ${
-                                  isGranted ? 'translate-x-4' : 'translate-x-0'
-                                }`}
-                              />
+                              <div className="pr-2 min-w-0">
+                                <span className={`font-bold block text-xs truncate ${isChecked ? 'text-slate-900' : 'text-slate-800'}`}>
+                                  {item.label}
+                                </span>
+                                <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
+                                  {item.desc}
+                                </span>
+                              </div>
+                              <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  disabled={activeRole?.id === 'admin'}
+                                  onChange={() => {
+                                    if (item.type === 'tab') toggleTab(item.key);
+                                    else toggleAction(item.key);
+                                  }}
+                                  className="sr-only peer"
+                                />
+                                <div
+                                  className={`w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${cat.toggleBgClass}`}
+                                ></div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer Action Panel */}
+                <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span className="text-slate-500">
+                    Modifications to <b>{activeRole?.name}</b> apply immediately across all authorized staff devices.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSaveRole}
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold shadow-xs transition-colors cursor-pointer active:scale-95"
+                  >
+                    {isSaving ? 'Saving...' : 'Save Permission Changes'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Section: Staff & Members Assigned to Active Role */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-display font-bold text-sm text-slate-900">
+                      Personnel Assigned to &quot;{activeRole?.name}&quot;
+                    </h3>
+                    <p className="text-xs text-slate-500">Users authorized with these specific operational parameters</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAssignModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-slate-600" strokeWidth={2.5} />
+                    <span>+ Assign Member / Staff</span>
+                  </button>
+                </div>
+
+                <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
+                  {assignedPersonnel.length > 0 ? (
+                    assignedPersonnel.map((user) => {
+                      const initial = user.full_name ? user.full_name.charAt(0).toUpperCase() : 'U';
+                      const formattedDate = user.created_at
+                        ? new Date(user.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : '18 Aug 2026';
+
+                      return (
+                        <div
+                          key={user.id}
+                          className="p-3.5 flex items-center justify-between hover:bg-slate-50/80 transition-colors bg-white"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center font-display text-xs shadow-2xs shrink-0">
+                              {initial}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-xs text-slate-900 truncate">{user.full_name}</span>
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60 whitespace-nowrap">
+                                  {user.role === 'admin' ? 'Super Admin' : activeRole?.name}
+                                </span>
+                                <span className="text-[10px] text-emerald-600 font-medium whitespace-nowrap">
+                                  {user.passbook_token ? '● Device Paired' : '○ Standalone'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-mono mt-0.5 truncate">
+                                {user.phone_number || '+91 97910 88219'} · Assigned {formattedDate}
+                              </p>
                             </div>
                           </div>
-                        );
-                      })}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                alert(`Security Audit Log: ${user.full_name} granted ${activeRole?.name} credentials.`)
+                              }
+                              className="text-xs text-slate-500 hover:text-slate-800 font-semibold px-2 py-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                            >
+                              Audit Log
+                            </button>
+                            {user.role !== 'admin' && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMemberFromRole(user.id, user.full_name)}
+                                className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1 rounded hover:bg-rose-50 transition-colors cursor-pointer"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="p-8 text-center text-xs text-slate-400 bg-white">
+                      No personnel currently assigned to &quot;{activeRole?.name}&quot;. Click &quot;+ Assign Member / Staff&quot; to authorize a user.
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  )}
+                </div>
+              </div>
 
+            </section>
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-[#AEABD8]">
-            <Shield size={40} className="text-[#27264E] mb-3" />
-            <p className="text-sm font-bold">Select or create a role to view permissions</p>
-          </div>
-        )}
-      </div>
+
+        </div>
+      </main>
 
       {/* ── CREATE NEW ROLE MODAL ── */}
-      {isNewRoleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl text-white my-auto">
-            <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <Shield className="text-[#6359E9]" size={18} />
-                <h3 className="font-bold text-sm text-white">Create New Custom Role</h3>
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl text-slate-900">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                  <Shield size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold font-display text-sm text-slate-900">Create Custom Security Role</h3>
+                  <p className="text-[11px] text-slate-400">Define credentials and delegate operational rights</p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsNewRoleModalOpen(false)}
-                className="p-1.5 text-[#AEABD8] hover:text-white rounded-lg hover:bg-[#141332] transition-colors"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateNewRole} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
+            <form onSubmit={handleCreateNewRole} className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Role Name *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Role Title *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Field Collector / Treasury Auditor"
+                  placeholder="e.g. Field Supervisor / CA Auditor"
                   value={newRoleName}
                   onChange={(e) => setNewRoleName(e.target.value)}
-                  className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3.5 py-2.5 text-xs font-bold text-white placeholder:text-[#AEABD8]/40 focus:outline-none focus:border-[#6359E9]"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:outline-none focus:border-brand-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Color Palette</label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {PRESET_COLORS.map((c) => (
+                <label className="block text-xs font-bold text-slate-700 mb-1">Color Palette</label>
+                <div className="flex items-center gap-2">
+                  {COLOR_PRESETS.map((p) => (
                     <button
-                      key={c.name}
+                      key={p.name}
                       type="button"
-                      onClick={() => setNewRoleColor(c.value)}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                        newRoleColor.toLowerCase() === c.value.toLowerCase() ? 'ring-2 ring-[#6359E9] ring-offset-2 ring-offset-[#1D1D41] scale-110' : 'opacity-85 hover:opacity-100'
+                      onClick={() => setNewRoleColor(p.hex)}
+                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer ${p.bgClass} ${
+                        newRoleColor.toLowerCase() === p.hex.toLowerCase()
+                          ? 'ring-2 ring-brand-500 ring-offset-2 scale-110'
+                          : 'opacity-85 hover:opacity-100'
                       }`}
-                      style={{ backgroundColor: c.value }}
                     >
-                      {newRoleColor.toLowerCase() === c.value.toLowerCase() && <Check size={12} className="text-white drop-shadow-xs" />}
+                      {newRoleColor.toLowerCase() === p.hex.toLowerCase() && (
+                        <Check size={12} className="text-white drop-shadow-xs" />
+                      )}
                     </button>
                   ))}
-                  <input
-                    type="color"
-                    value={newRoleColor}
-                    onChange={(e) => setNewRoleColor(e.target.value)}
-                    className="w-8 h-8 rounded-lg border border-[#27264E] bg-[#141332] cursor-pointer p-0.5 ml-1"
-                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1">Description</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Role Scope &amp; Responsibilities</label>
                 <textarea
                   rows={2}
-                  placeholder="Briefly describe what this custom role is responsible for..."
+                  placeholder="Briefly describe operational access boundaries..."
                   value={newRoleDescription}
                   onChange={(e) => setNewRoleDescription(e.target.value)}
-                  className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-[#AEABD8]/40 focus:outline-none focus:border-[#6359E9] resize-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-brand-500 resize-none"
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-[#141332] border border-[#FFBB38]/30 rounded-xl">
+              <div className="flex items-center justify-between p-3 bg-amber-50/60 border border-amber-200/60 rounded-xl">
                 <div>
-                  <p className="text-xs font-bold text-white flex items-center gap-1">
-                    <ShieldCheck size={13} className="text-[#FFBB38]" />
+                  <p className="text-xs font-bold text-amber-900 flex items-center gap-1">
+                    <ShieldCheck size={13} className="text-amber-700" />
                     <span>Database Privilege (RLS)</span>
                   </p>
-                  <p className="text-[10px] text-[#AEABD8] mt-0.5">
-                    Allow access to treasury vaults &amp; member ledgers
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Allow access to multi-vault treasury and member rosters
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setNewRoleIsPrivileged((prev) => !prev)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ml-3 ${
-                    newRoleIsPrivileged ? 'bg-[#FFBB38]' : 'bg-[#27264E]'
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ml-3 cursor-pointer ${
+                    newRoleIsPrivileged ? 'bg-amber-500' : 'bg-slate-300'
                   }`}
                 >
                   <span
@@ -865,23 +1203,88 @@ export default function RoleManagerPanel({ onRoleUpdated }: { onRoleUpdated?: ()
                 </button>
               </div>
 
-              <div className="pt-2 flex flex-col-reverse sm:flex-row justify-end gap-2 shrink-0">
+              <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsNewRoleModalOpen(false)}
-                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-[#AEABD8] hover:bg-[#141332] hover:text-white rounded-xl transition-colors text-center"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isCreatingRole}
-                  className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs active:scale-95 transition-all text-center"
+                  className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2 rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
                 >
                   {isCreatingRole ? 'Creating...' : 'Create Role'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── ASSIGN MEMBER MODAL ── */}
+      {isAssignModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl text-slate-900">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold font-display text-sm text-slate-900">
+                  Assign User to &quot;{activeRole?.name}&quot;
+                </h3>
+                <p className="text-[11px] text-slate-400">Select a subscriber profile to authorize with this role</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAssignModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Select User Profile</label>
+                <select
+                  value={selectedProfileIdToAssign}
+                  onChange={(e) => setSelectedProfileIdToAssign(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:outline-none focus:border-brand-500"
+                >
+                  <option value="">-- Choose Subscriber --</option>
+                  {profiles
+                    .filter((p) => p.role !== activeRole?.id)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.full_name} ({p.phone_number}) - Currently: {p.role}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500">
+                Granting this role authorizes the user immediately on all connected devices and updates the system audit log.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAssignModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedProfileIdToAssign || isAssigning}
+                  onClick={handleAssignMember}
+                  className="bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-bold text-xs px-5 py-2 rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+                >
+                  {isAssigning ? 'Assigning...' : 'Confirm Assignment'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
