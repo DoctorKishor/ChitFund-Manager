@@ -83,7 +83,8 @@ import {
   ExternalLink,
   QrCode,
   Zap,
-  Clock
+  Clock,
+  Receipt
 } from 'lucide-react';
 
 // ── Utility: First Sunday on-or-after the 10th of a given month ──────────────
@@ -97,6 +98,10 @@ function getFirstSundayOnOrAfter10th(year: number, month: number): Date {
 
 function formatAuctionDate(d: Date): string {
   return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function formatAuctionDateCompact(d: Date): string {
+  return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // ── Utility: Phone Normalization (extract core 10 digits) ────────────────────
@@ -201,6 +206,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   // Chits Directory Switcher States (Loaded from Supabase)
   const [showWizard, setShowWizard] = useState(false);
   const [groupFilter, setGroupFilter] = useState<'all' | 'active' | 'draft' | 'completed' | 'bin'>('all');
+  const [chitsSearchQuery, setChitsSearchQuery] = useState('');
+  const [workspaceMemberFilter, setWorkspaceMemberFilter] = useState<'all' | 'eligible' | 'won'>('all');
+  const [workspaceMemberSearch, setWorkspaceMemberSearch] = useState('');
   const [localGroups, setLocalGroups] = useState<any[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [isDuplicatingGroupId, setIsDuplicatingGroupId] = useState<string | null>(null);
@@ -1264,16 +1272,19 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [scheduleModalGroup, setScheduleModalGroup] = useState<any | null>(null);
 
   // Compute canonical auction date for a group (uses computeNextAuctionDateTime for 100% unified math)
-  const getGroupAuctionDate = (groupId: string, monthNum: number = 1): { display: string; isOverride: boolean; isOrientation?: boolean } => {
+  const getGroupAuctionDate = (groupId: string, monthNum: number = 1, compact: boolean = false): { display: string; isOverride: boolean; isOrientation?: boolean } => {
     if (monthNum === 0) {
-      return { display: 'Orientation Collection Session (No Auction)', isOverride: false, isOrientation: true };
+      return { display: compact ? 'Orientation (No Auction)' : 'Orientation Collection Session (No Auction)', isOverride: false, isOrientation: true };
     }
     const group = localGroups.find(g => g.id === groupId);
     if (group?.nextAuctionDate) {
       const parts = group.nextAuctionDate.split('-');
       const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
       const timeDisplay = group?.nextAuctionTime || group?.auctionTime ? ` · ${formatTime12h(group?.nextAuctionTime || group?.auctionTime)}` : '';
-      return { display: formatAuctionDate(d) + timeDisplay + ' (Override)', isOverride: true };
+      return { 
+        display: (compact ? formatAuctionDateCompact(d) : formatAuctionDate(d)) + timeDisplay + (compact ? '' : ' (Override)'), 
+        isOverride: true 
+      };
     }
     const targetDate = computeNextAuctionDateTime({
       auction_day_of_month: group?.auctionDayOfMonth,
@@ -1284,7 +1295,10 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       current_month: monthNum,
     });
     const timeDisplay = group?.auctionTime ? ` · ${formatTime12h(group.auctionTime)}` : '';
-    return { display: formatAuctionDate(targetDate) + timeDisplay, isOverride: false };
+    return { 
+      display: (compact ? formatAuctionDateCompact(targetDate) : formatAuctionDate(targetDate)) + timeDisplay, 
+      isOverride: false 
+    };
   };
 
   // Reports Center Natural Language States
@@ -1322,6 +1336,8 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   // ── ChitBase Master Dashboard States ──────────────────────────────────────────
   const [activeDashboardGroupId, setActiveDashboardGroupId] = useState<string>('');
   const [selectedDashboardMonth, setSelectedDashboardMonth] = useState<number>(1);
+  const [memberRosterFilter, setMemberRosterFilter] = useState<'all' | 'unpaid' | 'partial' | 'paid'>('all');
+  const [memberRosterSort, setMemberRosterSort] = useState<'due' | 'ticket' | 'name'>('due');
   const [hidePaidMembers, setHidePaidMembers] = useState<boolean>(false);
   const [recordingPaymentMember, setRecordingPaymentMember] = useState<any | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<any | null>(null);
@@ -1394,6 +1410,12 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [showQuickCollectModal, setShowQuickCollectModal] = useState<boolean>(false);
   const [showQuickPersonalDrawModal, setShowQuickPersonalDrawModal] = useState<boolean>(false);
   const [showQuickAtmModal, setShowQuickAtmModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleOpenQuickCollectEvent = () => setShowQuickCollectModal(true);
+    window.addEventListener('open-quick-collect', handleOpenQuickCollectEvent);
+    return () => window.removeEventListener('open-quick-collect', handleOpenQuickCollectEvent);
+  }, []);
 
   // Handler for member selected from Quick Collect Modal (either via search or Passbook QR scan)
   const handleQuickMemberSelected = (member: CollectableMember) => {
@@ -3221,23 +3243,68 @@ Thank you for your prompt payment! 🙏`;
           .sort((a, b) => Number(a.month) - Number(b.month));
         const totalDiscountsRecorded = completedGroupAuctions.reduce((sum, l) => sum + Number(l.winning_discount ?? l.winning_bid ?? 0), 0);
 
+        // Filtered and sorted member list for roster
+        const filteredAndSortedMembers = memberStats
+          .filter(m => {
+            if (memberRosterFilter === 'unpaid') return m.status === 'unpaid';
+            if (memberRosterFilter === 'partial') return m.status === 'partial';
+            if (memberRosterFilter === 'paid') return m.status === 'paid';
+            return true;
+          })
+          .sort((a, b) => {
+            if (memberRosterSort === 'due') {
+              return b.remaining - a.remaining;
+            }
+            if (memberRosterSort === 'ticket') {
+              return (Number(a.ticket) || 0) - (Number(b.ticket) || 0);
+            }
+            if (memberRosterSort === 'name') {
+              return (a.name || '').localeCompare(b.name || '');
+            }
+            return 0;
+          });
+
+        // Lifted Auction Winner & Payout details for both Desktop & Mobile views
+        const winningBid = Number(currentMonthAuction?.winning_discount ?? currentMonthAuction?.winning_bid ?? 0);
+        const netPrizePot = Math.max(0, totalChitVal - winningBid);
+        const winnerProfileId = currentMonthAuction?.winning_bidder_id || currentMonthAuction?.winner_profile_id || currentMonthAuction?.winner_id;
+        const winnerMember = dashboardGroupMembers.find(m => 
+          (winnerProfileId && (m.profileId === winnerProfileId || m.id === winnerProfileId)) ||
+          (currentMonthAuction?.winner_name && m.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
+        );
+        const winnerName = winnerMember?.name || currentMonthAuction?.winner_name || currentMonthAuction?.winning_bidder?.full_name || 'Subscriber';
+        const winnerPhone = winnerMember?.phone || currentMonthAuction?.winner_phone || currentMonthAuction?.winning_bidder?.phone_number || '';
+        const winnerTicketNum = winnerMember?.ticket || currentMonthAuction?.winner_ticket;
+
+        const monthPattern = new RegExp(`\\bMonth\\s+${selectedDashboardMonth}\\b|\\bM${selectedDashboardMonth}\\b|\\bM\\s*${selectedDashboardMonth}\\b`, 'i');
+        const monthPayoutTxs = dashboardTransactions.filter(t =>
+          t.type === 'payout' && (
+            (t.notes && monthPattern.test(t.notes)) ||
+            (winnerProfileId && (t.profile_id === winnerProfileId || t.group_member_id === winnerProfileId)) ||
+            (winnerMember && (t.group_member_id === winnerMember.id || t.profile_id === winnerMember.profileId))
+          )
+        );
+        const totalPrizeDisbursed = monthPayoutTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        const remainingPrizeDue = Math.max(0, netPrizePot - totalPrizeDisbursed);
+        const isSettled = remainingPrizeDue === 0 && (totalPrizeDisbursed > 0 || netPrizePot === 0);
+        const isPartial = totalPrizeDisbursed > 0 && remainingPrizeDue > 0;
+
         return (
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-6">
             {/* ⚠️ HIGH-PRIORITY ALERT BANNER: Pending Physical Cash Box Verification */}
             {pendingAtmRelocations.length > 0 && (
-              <div className="bg-[#1D1D41] border border-amber-500/40 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-xl shadow-amber-500/5 space-y-2.5 sm:space-y-3 animate-in fade-in zoom-in-95 duration-200">
-                {/* Banner Header: Sleek single-line layout on mobile */}
-                <div className="flex items-center justify-between gap-2 border-b border-[#27264E] pb-2 sm:pb-2.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs animate-pulse">
-                      <AlertCircle size={15} />
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 shadow-xs space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between gap-2 border-b border-amber-200/60 pb-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs animate-pulse">
+                      <AlertCircle size={16} />
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="text-xs sm:text-sm font-black text-amber-300 uppercase tracking-tight truncate">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-bold text-amber-900 uppercase tracking-tight truncate">
                           Pending Cash Box Verification
                         </h3>
-                        <span className="text-[9px] sm:text-[10px] font-black bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded-full shadow-2xs shrink-0">
+                        <span className="text-[10px] font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full shrink-0">
                           {pendingAtmRelocations.length} Pending
                         </span>
                       </div>
@@ -3248,22 +3315,22 @@ Thank you for your prompt payment! 🙏`;
                     <button
                       type="button"
                       onClick={() => setActiveTab('cash')}
-                      className="text-[10px] sm:text-xs font-bold text-amber-300 hover:text-white bg-[#27264E] hover:bg-[#3A3A5A] px-2.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-amber-500/30 transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                      className="text-xs font-semibold text-amber-900 hover:text-slate-900 bg-white hover:bg-amber-100/70 px-3 py-1.5 rounded-xl border border-amber-200 transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
                       title="Open Treasury"
                     >
-                      <Banknote size={13} className="text-[#64CFF6]" />
-                      <span className="hidden xs:inline sm:inline">Treasury</span>
-                      <ArrowRight size={11} />
+                      <Banknote size={14} className="text-brand-600" />
+                      <span>Treasury</span>
+                      <ArrowRight size={12} />
                     </button>
                   )}
                 </div>
 
-                <p className="text-[10px] sm:text-xs text-[#AEABD8] font-medium leading-tight">
+                <p className="text-xs text-amber-800 font-medium leading-tight">
                   Bank balance was debited for ATM cash withdrawal. Confirm once physical currency notes are placed inside the Physical Cash Box:
                 </p>
 
                 {/* Pending Inflow Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {pendingAtmRelocations.map((item) => {
                     let sourceName = 'Kishor Bank';
                     let sourceIcon = '📱';
@@ -3283,18 +3350,18 @@ Thank you for your prompt payment! 🙏`;
                     return (
                       <div
                         key={item.id}
-                        className="bg-[#141332] border border-[#27264E] rounded-xl sm:rounded-2xl p-2.5 sm:p-3.5 flex items-center justify-between gap-2.5 shadow-2xs hover:border-amber-400/50 transition-colors"
+                        className="bg-white border border-amber-200/80 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs"
                       >
                         <div className="min-w-0 space-y-0.5">
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs">{sourceIcon}</span>
-                            <span className="text-xs font-extrabold text-white truncate">{sourceName}</span>
+                            <span className="text-xs font-bold text-slate-900 truncate">{sourceName}</span>
                           </div>
-                          <div className="text-base sm:text-xl font-black text-white font-mono tracking-tight leading-none">
+                          <div className="text-lg font-black text-slate-900 font-mono tracking-tight leading-none">
                             ₹{Number(item.amount || 0).toLocaleString('en-IN')}
                           </div>
-                          <div className="text-[9px] sm:text-[10px] text-[#AEABD8] font-mono flex items-center gap-1 mt-0.5">
-                            <Clock size={9} />
+                          <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                            <Clock size={10} />
                             <span>Debited on {dateStr}, {timeStr}</span>
                           </div>
                         </div>
@@ -3303,7 +3370,7 @@ Thank you for your prompt payment! 🙏`;
                           type="button"
                           onClick={() => handleConfirmAtmInflowFromDashboard(item)}
                           disabled={isVerifying}
-                          className="bg-[#02B15A] hover:bg-[#029B4F] active:scale-95 text-white font-black text-xs px-3 sm:px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
+                          className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
                         >
                           {isVerifying ? (
                             <RefreshCw size={12} className="animate-spin" />
@@ -3319,15 +3386,19 @@ Thank you for your prompt payment! 🙏`;
               </div>
             )}
 
-            {/* Top Chit Groups Pill Switcher Bar (Matches Figma Frame #1:290) */}
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-2.5 sm:p-3 shadow-lg flex items-center justify-between">
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none flex-nowrap scroll-smooth w-full">
-                <span className="text-[11px] font-bold text-[#AEABD8] uppercase tracking-wider shrink-0 px-1.5 sm:px-2 flex items-center gap-1.5">
-                  <Briefcase size={13} className="text-[#64CFF6]" />
+            {/* ======================================================== */}
+            {/* DESKTOP VIEW: Stitch Admin Dashboard (Large Screens)      */}
+            {/* ======================================================== */}
+            <div className="hidden lg:block space-y-6">
+              {/* Top Chit Groups Pill Switcher Bar */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-2.5 sm:p-3 shadow-xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none flex-nowrap scroll-smooth flex-1 min-w-0">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 px-1.5 flex items-center gap-1.5">
+                  <Briefcase size={13} className="text-brand-600" />
                   CHITS:
                 </span>
                 {localGroups.filter(g => g.status !== 'deleted').length === 0 ? (
-                  <span className="text-xs text-[#AEABD8] italic">No active chit groups found</span>
+                  <span className="text-xs text-slate-400 italic">No active chit groups found</span>
                 ) : (
                   localGroups.filter(g => g.status !== 'deleted').map((group) => {
                     const isSelected = (activeGroup?.id === group.id);
@@ -3345,255 +3416,193 @@ Thank you for your prompt payment! 🙏`;
                           setActiveDashboardGroupId(group.id);
                           setSelectedDashboardMonth(group.currentMonth !== undefined && group.currentMonth !== null ? group.currentMonth : 0);
                         }}
-                        className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border whitespace-nowrap active:scale-95 cursor-pointer ${
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
                           isSelected
-                            ? 'bg-[#6359E9] text-white border-[#6F64FF] shadow-[0_4px_15px_rgba(99,89,233,0.4)] ring-2 ring-[#6359E9]/30'
-                            : 'bg-[#27264E] hover:bg-[#323062] text-[#AEABD8] hover:text-white border-transparent'
+                            ? 'bg-brand-50 text-brand-700 border border-brand-200/80 shadow-xs ring-1 ring-brand-500/20'
+                            : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600 hover:text-slate-900 border border-transparent'
                         }`}
                       >
-                        <span className={`w-2 h-2 rounded-full ${
-                          group.status === 'active' 
-                            ? 'bg-[#02B15A]' 
-                            : group.status === 'draft' 
-                            ? 'bg-[#FFBB38]' 
-                            : 'bg-[#64CFF6]'
-                        }`} />
-                        <span className={isSelected ? 'text-white font-bold' : 'text-slate-200 font-bold'}>{group.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ${
-                          isSelected ? 'bg-[#5044D4] text-white' : 'bg-[#141332] text-[#AEABD8]'
+                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-brand-600 animate-pulse' : 'bg-amber-400'}`} />
+                        <span>{group.name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold font-mono ${
+                          isSelected ? 'bg-brand-100 text-brand-800' : 'bg-white text-slate-600 border border-slate-200/60'
                         }`}>
                           {formatCurrency(group.totalValue)}
                         </span>
-                        {(group.kaiIruppuPool || 0) > 0 && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold flex items-center gap-1 ${
-                            isSelected ? 'bg-[#FFBB38] text-slate-950 shadow-2xs' : 'bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30'
-                          }`} title={`Kai Iruppu Pool: ${formatCurrency(group.kaiIruppuPool)}`}>
-                            <span>💰 {formatCurrency(group.kaiIruppuPool)}</span>
-                          </span>
-                        )}
+                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                          isSelected ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          M{group.currentMonth ?? 0} / {group.duration ?? group.memberCount ?? 20}
+                        </span>
                       </button>
                     );
                   })
                 )}
               </div>
+
+              {/* Primary Quick Action: Record Payment */}
+              <button
+                type="button"
+                onClick={() => setShowQuickCollectModal(true)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all shrink-0 cursor-pointer"
+              >
+                <Plus size={14} className="stroke-[2.5]" />
+                <span>Record Payment</span>
+              </button>
             </div>
 
-            {/* Horizontal Month Carousel Navigator */}
+            {/* BEGIN: CycleTimelineBar */}
             {activeGroup && (
-              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-2 sm:p-3 shadow-lg flex items-center justify-between gap-1.5 sm:gap-2">
-                <button
-                  onClick={() => setSelectedDashboardMonth(prev => Math.max(0, prev - 1))}
-                  disabled={selectedDashboardMonth <= 0}
-                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl border border-[#27264E] text-[#AEABD8] hover:bg-[#27264E] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0 active:scale-95 cursor-pointer"
-                  aria-label="Previous month"
-                >
-                  <ChevronLeft size={16} />
-                </button>
+              <section className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs flex items-center justify-between gap-4 overflow-x-auto scrollbar-none" data-purpose="cycle-timeline">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1 flex items-center gap-1.5 shrink-0">
+                    <Calendar size={14} className="text-slate-400" />
+                    Cycle Timeline:
+                  </span>
+                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-nowrap py-0.5">
+                    {monthsRange.map((mNum, idx) => {
+                      const isSelected = (selectedDashboardMonth === mNum);
+                      const isPast = (mNum < activeCycle);
+                      const label = getDashboardMonthLabel(activeGroup, mNum);
+                      const isFinale = (mNum === totalDuration);
 
-                <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none py-1 px-1 flex-nowrap scroll-smooth">
-                  {monthsRange.map((mNum) => {
-                    const isSelected = (selectedDashboardMonth === mNum);
-                    const isOngoingCurrent = ((activeGroup.currentMonth ?? 0) === mNum);
-                    const label = getDashboardMonthLabel(activeGroup, mNum);
-
-                    return (
-                      <button
-                        key={mNum}
-                        ref={(el) => {
-                          if (el) {
-                            monthButtonsRef.current.set(mNum, el);
-                          } else {
-                            monthButtonsRef.current.delete(mNum);
-                          }
-                        }}
-                        onClick={() => setSelectedDashboardMonth(mNum)}
-                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border whitespace-nowrap active:scale-95 cursor-pointer ${
-                          isSelected
-                            ? mNum === 0
-                              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md ring-2 ring-amber-400/30'
-                              : 'bg-[#6359E9] text-white border-[#6F64FF] shadow-[0_4px_15px_rgba(99,89,233,0.4)] ring-2 ring-[#6359E9]/30'
-                            : isOngoingCurrent
-                            ? mNum === 0
-                              ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/40'
-                              : 'bg-[#27264E] hover:bg-[#323062] text-[#64CFF6] border-[#64CFF6]/40'
-                            : 'bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]'
-                        }`}
-                      >
-                        {isSelected ? (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#02B15A]" />
-                        ) : mNum === 0 ? (
-                          <span className="text-[10px]">👑</span>
-                        ) : null}
-                        <span>{label}</span>
-                        {isOngoingCurrent && (
-                          <span className={`text-[9px] uppercase tracking-wider px-1 py-0.2 rounded font-semibold ${
-                            isSelected ? 'bg-black/30 text-white' : mNum === 0 ? 'bg-amber-500/30 text-amber-300' : 'bg-[#64CFF6]/20 text-[#64CFF6]'
-                          }`}>
-                            Current
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                      return (
+                        <React.Fragment key={mNum}>
+                          {idx > 0 && (
+                            <span className="text-slate-300 font-bold px-0.5 select-none">→</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDashboardMonth(mNum)}
+                            className={`px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer whitespace-nowrap ${
+                              isSelected
+                                ? 'bg-brand-600 text-white font-bold shadow-sm'
+                                : isPast
+                                ? 'font-semibold text-slate-600 hover:bg-slate-100'
+                                : 'font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                            }`}
+                          >
+                            {isSelected ? (
+                              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                            ) : isPast ? (
+                              <CheckCircle2 size={13} className="text-emerald-500" />
+                            ) : null}
+                            <span>
+                              {mNum === 0 
+                                ? `${label} Launch` 
+                                : isSelected 
+                                ? `${label} (Current Cycle)` 
+                                : isFinale 
+                                ? `${label} (Finale)` 
+                                : label}
+                            </span>
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <button
-                  onClick={() => setSelectedDashboardMonth(prev => Math.min(totalDuration, prev + 1))}
-                  disabled={selectedDashboardMonth >= totalDuration}
-                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl border border-[#27264E] text-[#AEABD8] hover:bg-[#27264E] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors shrink-0 active:scale-95 cursor-pointer"
-                  aria-label="Next month"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
+                <div className="flex items-center gap-2 text-xs text-slate-600 font-medium shrink-0">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>
+                    Next scheduled auction: <strong>{getGroupAuctionDate(activeGroup.id, activeCycle || 1).display}</strong>
+                  </span>
+                </div>
+              </section>
             )}
+            {/* END: CycleTimelineBar */}
 
-            {/* ── Compact Kai Iruppu (கை இருப்பு) Auction Accumulated Pool Ribbon ── */}
+            {/* BEGIN: TopMetricsGrid (12 cols) */}
             {activeGroup && (
-              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3 sm:px-4 sm:py-3 shadow-lg space-y-2.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                  {/* Left: Pool Amount & Label */}
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#FFBB38] bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.2 rounded">
-                          KAI IRUPPU POOL
+              <section className="grid grid-cols-1 xl:grid-cols-12 gap-6" data-purpose="metrics-and-hero-banner">
+                {/* Main Cycle Progress Card (6 cols) */}
+                <div className="xl:col-span-6 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden flex flex-col justify-between space-y-4">
+                  <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-indigo-50/60 blur-2xl pointer-events-none" />
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold tracking-wide uppercase bg-brand-50 text-brand-700 border border-brand-200/60">
+                          {selectedDashboardMonth === 0 ? 'Month 0 Launch Month' : `Month ${selectedDashboardMonth} of ${totalDuration}`}
                         </span>
-                        {isLaabaActive && (
-                          <span className="bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded flex items-center gap-1">
+                        <span className="text-xs font-medium text-slate-600">
+                          {activeGroup.name} ({formatCurrency(totalChitVal)} Target)
+                        </span>
+                        {isLaaba && selectedDashboardMonth > 0 && (
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1">
                             <Sparkles size={10} /> Laaba Seetu Active
                           </span>
                         )}
                       </div>
-                      <div className="flex items-baseline gap-1.5 mt-0.5">
-                        <span className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">
-                          {formatCurrency(activeKaiIruppuPool)}
-                        </span>
-                        <span className="text-xs text-[#AEABD8] font-mono">
-                          / {formatCurrency(totalChitVal)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Middle / Right: Extended Progress Bar & Breakdown Button */}
-                  <div className="flex-1 flex items-center gap-3 sm:gap-4 justify-between sm:justify-end max-w-full sm:max-w-[740px]">
-                    <div className="flex-1 flex items-center gap-2.5 min-w-[160px]">
-                      <div className="flex-1 bg-[#141332] rounded-full h-2 overflow-hidden border border-[#27264E]">
-                        <div
-                          className="bg-gradient-to-r from-[#FFBB38] via-[#6359E9] to-[#02B15A] h-full rounded-full transition-all duration-500"
-                          style={{ width: `${Math.max(activeKaiIruppuPool > 0 ? 5 : 0, laabaGoalPct)}%` }}
-                        />
-                      </div>
-                      <span className="text-[11px] font-bold font-mono text-[#AEABD8] shrink-0">
-                        {laabaGoalPct}%
-                      </span>
-                    </div>
-
-                    {completedGroupAuctions.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowKaiIruppuBreakdown(prev => !prev)}
-                        className="flex items-center gap-1 text-[11px] font-bold text-[#AEABD8] hover:text-white bg-[#27264E] hover:bg-[#323062] border border-[#3A3A5A] px-2.5 py-1.5 rounded-xl transition-all shrink-0 active:scale-95 cursor-pointer"
-                        title="Toggle monthly auction discounts history"
-                      >
-                        <span>History ({completedGroupAuctions.length})</span>
-                        {showKaiIruppuBreakdown ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Compact Expandable Discount History */}
-                {showKaiIruppuBreakdown && (
-                  <div className="pt-2 border-t border-[#27264E] space-y-2 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between text-[11px] text-[#AEABD8]">
-                      <span className="font-bold text-white">Monthly Auction Discount Contributions:</span>
-                      <span>Total: <strong className="text-[#02B15A] font-mono">{formatCurrency(totalDiscountsRecorded)}</strong></span>
-                    </div>
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-nowrap scrollbar-none">
-                      {completedGroupAuctions.map((log) => {
-                        const disc = Number(log.winning_discount ?? log.winning_bid ?? 0);
-                        return (
-                          <div
-                            key={log.id || log.month}
-                            className="bg-[#141332] border border-[#27264E] rounded-xl px-3 py-1.5 shrink-0 flex items-center gap-2 text-xs"
+                      <div className="flex items-center gap-1.5">
+                        {(activeGroup.currentMonth ?? 0) > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleRevertMonth}
+                            disabled={isClosingMonth}
+                            className="px-2.5 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                            title={`Roll back active cycle to Month ${(activeGroup.currentMonth ?? 1) - 1}`}
                           >
-                            <span className="font-extrabold text-[#64CFF6]">M{log.month}</span>
-                            <span className="text-[#AEABD8] font-medium truncate max-w-[120px]">{log.winner_name || 'Subscriber'}</span>
-                            <span className="font-black font-mono text-[#02B15A]">+{formatCurrency(disc)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Collection Progress Hero Card (Single Full-Width Card) */}
-            {activeGroup && (
-              <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-5 sm:p-7 shadow-xl relative overflow-hidden space-y-5 sm:space-y-6">
-                <div className="flex flex-col lg:flex-row justify-between lg:items-start gap-4 sm:gap-6">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <span className={`text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-lg border ${
-                        selectedDashboardMonth === 0
-                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                          : 'bg-[#6359E9]/15 text-[#64CFF6] border-[#6359E9]/30'
-                      }`}>
-                        {selectedDashboardMonth === 0 ? (
-                          <>👑 {activeGroup.name} · Month 0 (Launch Month — Organizer Profit Phase)</>
-                        ) : (
-                          <>{activeGroup.name} · Month {selectedDashboardMonth} of {totalDuration}</>
+                            <RotateCcw size={12} />
+                            Revert to M{(activeGroup.currentMonth ?? 1) - 1}
+                          </button>
                         )}
-                      </span>
-                      {isLaaba && selectedDashboardMonth > 0 && (
-                        <span className="bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg flex items-center gap-1">
-                          <Sparkles size={11} /> Laaba Seetu Active
-                        </span>
-                      )}
+                      </div>
                     </div>
-                    
-                    <div className="flex items-baseline gap-2.5 mt-2">
-                      <span className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none">
+
+                    {/* Collected Big Numbers */}
+                    <div className="flex items-baseline gap-3 mb-2 flex-wrap">
+                      <span className="text-3xl font-black font-display text-slate-900 tracking-tight font-mono">
                         {formatCurrency(actualCollectionsTotal)}
                       </span>
-                      <span className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider">
-                        COLLECTED
+                      <span className="text-sm font-semibold text-slate-600 uppercase tracking-wide">
+                        Collected so far
+                      </span>
+                      <span className="ml-auto text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200/60 px-2.5 py-0.5 rounded-full">
+                        Pending: {formatCurrency(pendingCollectionsTotal)}
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 sm:gap-5 mt-2.5 text-xs text-[#AEABD8] font-medium">
-                      <span>Target: <strong className="text-white font-bold">{formatCurrency(targetCollectionsTotal)}</strong></span>
-                      <span className="text-[#27264E] hidden sm:inline">•</span>
-                      <span>Pending: <strong className="text-[#FFBB38] font-bold">{formatCurrency(pendingCollectionsTotal)}</strong></span>
+                    {/* Progress Bar */}
+                    <div className="space-y-1.5 my-4">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-brand-700 flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-brand-600 inline-block" />
+                          {completionPct.toFixed(1)}% Collected
+                        </span>
+                        <span className="text-slate-600 font-medium">
+                          {pendingList.length} Members Remaining ({partialCount} Partial, {unpaidCount} Unpaid)
+                        </span>
+                      </div>
+                      <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-gradient-to-r from-brand-600 to-indigo-500 rounded-full transition-all duration-500"
+                          style={{ width: `${completionPct}%` }}
+                        />
+                        {partialCount > 0 && (
+                          <div
+                            className="h-full bg-amber-400 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100 - completionPct, (partialCount / Math.max(1, dashboardGroupMembers.length)) * 100)}%` }}
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Actions & Paid Progress */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    <div className="bg-[#27264E] border border-[#64CFF6]/30 shadow-2xs flex items-center gap-2 h-9 px-3.5 py-1 rounded-xl shrink-0">
-                      <Users size={14} className="text-[#64CFF6]" />
-                      <span className="text-[11px] font-bold text-[#AEABD8] uppercase tracking-wider">PAID</span>
-                      <div className="text-sm font-black text-[#02B15A] flex items-center gap-1 font-mono">
-                        <span>{paidList.length}</span>
-                        <span className="text-white">/</span>
-                        <span className="text-white">{dashboardGroupMembers.length}</span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
+                  {/* Bottom Action Buttons Row */}
+                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={handleMarkAllPaid}
                         disabled={isMarkingAllPaid || pendingList.length === 0}
-                        className="flex items-center justify-center gap-1.5 bg-[#02B15A] hover:bg-[#029B4F] text-white font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#02B15A]/20 disabled:opacity-40 disabled:pointer-events-none active:scale-95 cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors disabled:opacity-40 cursor-pointer"
                       >
-                        <CheckCheck size={14} />
-                        <span className="truncate">{isMarkingAllPaid ? 'Recording...' : 'Mark All Paid'}</span>
+                        <Check size={14} className="stroke-[2.5]" />
+                        <span>{isMarkingAllPaid ? 'Recording...' : 'Mark All Paid'}</span>
                       </button>
 
-                      {/* Remind All Pending Members WhatsApp Hub Button */}
                       {pendingList.length > 0 && (
                         <button
                           type="button"
@@ -3601,281 +3610,252 @@ Thank you for your prompt payment! 🙏`;
                             setRemindModalTab('individual');
                             setShowRemindModal(true);
                           }}
-                          className="flex items-center justify-center gap-1.5 bg-[#27264E] hover:bg-[#323062] text-[#64CFF6] border border-[#64CFF6]/30 font-bold text-xs px-3.5 sm:px-4 py-2.5 rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
-                          title="Send individual or group WhatsApp reminders to pending members"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
                         >
-                          <Send size={13} className="text-[#64CFF6]" />
-                          <span className="truncate">Remind All ({pendingList.length})</span>
-                        </button>
-                      )}
-
-                      {/* In-App Revert Active Month Button */}
-                      {(activeGroup.currentMonth ?? 0) > 0 && (
-                        <button
-                          onClick={handleRevertMonth}
-                          disabled={isClosingMonth}
-                          className="flex items-center justify-center gap-1.5 bg-[#27264E] hover:bg-[#323062] text-[#AEABD8] hover:text-white font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-xs border border-[#3A3A5A] active:scale-95 cursor-pointer"
-                          title={`Roll back active cycle to Month ${(activeGroup.currentMonth ?? 1) - 1}`}
-                        >
-                          <RotateCcw size={13} className="text-[#AEABD8]" />
-                          <span className="truncate">Revert to M{(activeGroup.currentMonth ?? 1) - 1}</span>
-                        </button>
-                      )}
-
-                      {selectedDashboardMonth === 0 ? (
-                        <button
-                          onClick={handleCloseMonth}
-                          disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
-                          className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 bg-[#FFBB38] hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-amber-500/20 disabled:opacity-40 disabled:pointer-events-none active:scale-95 cursor-pointer"
-                        >
-                          <Rocket size={14} />
-                          <span className="truncate">{isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M1'}</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleCloseMonth}
-                          disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
-                          className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#6359E9]/30 disabled:opacity-40 disabled:pointer-events-none active:scale-95 cursor-pointer"
-                        >
-                          <ArrowRight size={14} />
-                          <span className="truncate">{isClosingMonth ? 'Closing...' : 'Close Month'}</span>
+                          <Send size={13} className="text-brand-600" />
+                          <span>Remind All ({pendingList.length})</span>
                         </button>
                       )}
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={handleCloseMonth}
+                      disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100/80 text-brand-700 text-xs font-bold transition-colors border border-brand-200/50 disabled:opacity-40 cursor-pointer"
+                    >
+                      <span>
+                        {selectedDashboardMonth === 0 
+                          ? (isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M1') 
+                          : (isClosingMonth ? 'Closing...' : 'Close Month Cycle')}
+                      </span>
+                      <ArrowRight size={14} />
+                    </button>
                   </div>
                 </div>
 
-                {/* Smooth Progress Bar */}
-                <div className="space-y-2 pt-1">
-                  <div className="w-full bg-[#141332] rounded-full h-3.5 overflow-hidden p-0.5 border border-[#27264E]">
-                    <div
-                      className="bg-gradient-to-r from-[#6359E9] via-[#64CFF6] to-[#02B15A] h-full rounded-full transition-all duration-500 shadow-xs"
-                      style={{ width: `${completionPct}%` }}
-                    />
+                {/* Kai Iruppu Pool Card (3 cols) */}
+                <div className="xl:col-span-3 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[11px] font-bold tracking-wider uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                        KAI IRUPPU POOL
+                      </span>
+                      {completedGroupAuctions.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowKaiIruppuBreakdown(prev => !prev)}
+                          className="text-xs text-brand-600 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                        >
+                          History ({completedGroupAuctions.length})
+                          <ChevronDown size={12} className={showKaiIruppuBreakdown ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-2">
+                      <h3 className="text-3xl font-black font-display text-slate-900 tracking-tight font-mono">
+                        {formatCurrency(activeKaiIruppuPool)}
+                      </h3>
+                      <p className="text-xs font-medium text-slate-600 mt-0.5">
+                        Pool Ceiling: {formatCurrency(totalChitVal)}
+                      </p>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-600">Reserve Capacity</span>
+                        <span className="font-bold text-slate-800">{laabaGoalPct}% Allocated</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.max(activeKaiIruppuPool > 0 ? 5 : 0, laabaGoalPct)}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-xs text-[#AEABD8] font-semibold">
-                    <span className="text-white font-bold">{completionPct}% Collected</span>
-                    <span>{pendingList.length} members remaining</span>
+
+                  {/* Expandable Discount History */}
+                  {showKaiIruppuBreakdown && (
+                    <div className="pt-2 border-t border-slate-100 space-y-2 text-xs">
+                      <div className="flex justify-between text-[11px] text-slate-600">
+                        <span className="font-semibold text-slate-800">Contributions:</span>
+                        <span className="font-mono font-bold text-emerald-600">+{formatCurrency(totalDiscountsRecorded)}</span>
+                      </div>
+                      <div className="max-h-28 overflow-y-auto space-y-1 scrollbar-thin">
+                        {completedGroupAuctions.map(log => (
+                          <div key={log.id || log.month} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded">
+                            <span className="font-bold text-brand-600">M{log.month}</span>
+                            <span className="text-slate-600 truncate max-w-[90px]">{log.winner_name || 'Subscriber'}</span>
+                            <span className="font-mono font-bold text-emerald-600">+{formatCurrency(Number(log.winning_discount ?? log.winning_bid ?? 0))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-4 pt-3 flex items-center justify-between text-xs text-slate-600 border-t border-slate-100">
+                    <span className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${isLaabaActive ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                      <span>{isLaabaActive ? 'Laaba Seetu Active (₹0 Due)' : 'Interest accruing: 1.2%/mo'}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowKaiIruppuBreakdown(p => !p)}
+                      className="text-slate-600 hover:text-slate-900 font-semibold cursor-pointer"
+                      title="Breakdown"
+                    >
+                      Breakdown
+                    </button>
                   </div>
                 </div>
 
-                {/* ── Prominent Winner Prize Pot & Disbursal Hub Card ────────────────────────── */}
-                {(() => {
-                  if (selectedDashboardMonth === 0) {
-                    return (
-                      <div className="bg-[#141332] border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-[#FFBB38] border border-amber-500/40 flex items-center justify-center shrink-0 shadow-xs">
-                            <Rocket size={20} />
-                          </div>
+                {/* Auction Summary & Winner Disbursal Card (3 cols) */}
+                <div className="xl:col-span-3 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between relative overflow-hidden space-y-4">
+                  <div className="absolute top-0 right-0 transform translate-x-3 -translate-y-3 w-16 h-16 bg-amber-100/40 rounded-full blur-xl pointer-events-none" />
+                  {(() => {
+                    if (selectedDashboardMonth === 0) {
+                      return (
+                        <>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-extrabold text-[#FFBB38] uppercase tracking-wider">
-                                Month 0: Launch Month — Organizer Profit Phase
-                              </span>
-                              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
-                                No Auction
-                              </span>
-                            </div>
-                            <p className="text-xs text-[#AEABD8] mt-0.5">
-                              The full <strong className="text-white">{formatCurrency(totalChitVal)}</strong> collected pool is reserved and allocated directly to the Organizer as <strong className="text-white">Organizer Profit</strong>.
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#27264E]">
-                          {(() => {
-                            const { display } = getGroupAuctionDate(activeGroup.id, 0);
-                            return (
-                              <span className="text-xs text-amber-300 font-bold flex items-center gap-1.5 bg-[#27264E] border border-amber-500/30 px-3 py-1.5 rounded-xl shadow-2xs">
-                                <CalendarDays size={13} className="text-[#FFBB38]" />
-                                <span>{display}</span>
-                              </span>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (!currentMonthAuction) {
-                    return (
-                      <div className="bg-[#141332] border border-dashed border-[#27264E] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-[#27264E] text-[#64CFF6] flex items-center justify-center shrink-0">
-                            <Trophy size={16} />
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-white">
-                              Auction for Month {selectedDashboardMonth} has not taken place yet
-                            </div>
-                            <p className="text-[11px] text-[#AEABD8]">
-                              Conduct live bidding in the Live Auction Engine to declare this month's winning subscriber and unlock prize disbursal.
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          {(() => {
-                            const { display } = getGroupAuctionDate(activeGroup.id, selectedDashboardMonth);
-                            return (
-                              <span className="text-xs text-[#64CFF6] font-bold flex items-center gap-1.5 bg-[#27264E] border border-[#64CFF6]/30 px-3 py-1.5 rounded-xl">
-                                <CalendarDays size={13} className="text-[#64CFF6]" />
-                                <span>Scheduled: <strong className="text-white">{display}</strong></span>
-                              </span>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Auction Won Month — Render full Disbursal Hub Card!
-                  const winningBid = Number(currentMonthAuction.winning_discount ?? currentMonthAuction.winning_bid ?? 0);
-                  const netPrizePot = Math.max(0, totalChitVal - winningBid);
-                  const winnerProfileId = currentMonthAuction.winning_bidder_id || currentMonthAuction.winner_profile_id || currentMonthAuction.winner_id;
-                  const winnerMember = dashboardGroupMembers.find(m => 
-                    (winnerProfileId && (m.profileId === winnerProfileId || m.id === winnerProfileId)) ||
-                    (currentMonthAuction.winner_name && m.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
-                  );
-                  const winnerName = winnerMember?.name || currentMonthAuction.winner_name || currentMonthAuction.winning_bidder?.full_name || 'Subscriber';
-                  const winnerPhone = winnerMember?.phone || currentMonthAuction.winner_phone || currentMonthAuction.winning_bidder?.phone_number || '';
-                  const winnerTicketNum = winnerMember?.ticket || currentMonthAuction.winner_ticket;
-
-                  // Find payout transactions for this month
-                  const monthPattern = new RegExp(`\\bMonth\\s+${selectedDashboardMonth}\\b|\\bM${selectedDashboardMonth}\\b|\\bM\\s*${selectedDashboardMonth}\\b`, 'i');
-                  const monthPayoutTxs = dashboardTransactions.filter(t =>
-                    t.type === 'payout' && (
-                      (t.notes && monthPattern.test(t.notes)) ||
-                      (winnerProfileId && (t.profile_id === winnerProfileId || t.group_member_id === winnerProfileId)) ||
-                      (winnerMember && (t.group_member_id === winnerMember.id || t.profile_id === winnerMember.profileId))
-                    )
-                  );
-                  const totalPrizeDisbursed = monthPayoutTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-                  const remainingPrizeDue = Math.max(0, netPrizePot - totalPrizeDisbursed);
-                  const isSettled = remainingPrizeDue === 0 && (totalPrizeDisbursed > 0 || netPrizePot === 0);
-                  const isPartial = totalPrizeDisbursed > 0 && remainingPrizeDue > 0;
-
-                  return (
-                    <div className={`rounded-2xl border p-4 sm:p-5 shadow-lg space-y-4 transition-all ${
-                      isSettled 
-                        ? 'bg-[#141332] border-[#02B15A]/40' 
-                        : isPartial
-                        ? 'bg-[#141332] border-amber-500/40'
-                        : 'bg-[#141332] border-[#6359E9]/40'
-                    }`}>
-                      {/* Top Header: Winner Badge & Disbursal Status */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-[#27264E] pb-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
-                            isSettled ? 'bg-[#02B15A] text-white' : isPartial ? 'bg-amber-500 text-slate-950' : 'bg-[#6359E9] text-white'
-                          }`}>
-                            <Trophy size={20} />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#AEABD8]">
-                                Month {selectedDashboardMonth} Auction Winner
-                              </span>
-                              {winnerTicketNum && (
-                                <span className="text-[10px] font-bold bg-[#27264E] text-[#64CFF6] px-2 py-0.2 rounded-md border border-[#3A3A5A]">
-                                  Ticket #{winnerTicketNum}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="p-1.5 rounded-lg bg-amber-100 text-amber-700">
+                                  <Rocket size={16} />
                                 </span>
-                              )}
+                                <span className="text-xs font-bold text-slate-800">Launch Month Phase</span>
+                              </div>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                                Month 0
+                              </span>
                             </div>
-                            <div className="text-base sm:text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
-                              <span>{winnerName}</span>
-                              {winnerPhone && (
-                                <a 
-                                  href={`tel:${normalizePhone(winnerPhone)}`} 
-                                  className="text-[#AEABD8] hover:text-[#02B15A] transition-colors p-1"
-                                  title={`Call ${winnerName}`}
-                                >
-                                  <Phone size={13} />
-                                </a>
-                              )}
+                            <div className="mt-2">
+                              <h4 className="text-base font-bold text-slate-900 font-display">Organizer Profit</h4>
+                              <p className="text-[11px] text-slate-600 mt-0.5">No live auction in Month 0. Pool is taken by Organizer.</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
+                              <div className="bg-slate-50 p-2 rounded-xl">
+                                <span className="text-slate-500 text-[10px] uppercase font-semibold">Chit Value</span>
+                                <p className="font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
+                              </div>
+                              <div className="bg-slate-50 p-2 rounded-xl">
+                                <span className="text-slate-500 text-[10px] uppercase font-semibold">Net Retained</span>
+                                <p className="font-bold text-brand-700 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                            <span>Scheduled Launch:</span>
+                            <strong className="text-slate-900">{getGroupAuctionDate(activeGroup.id, 0).display}</strong>
+                          </div>
+                        </>
+                      );
+                    }
+
+                    if (!currentMonthAuction) {
+                      return (
+                        <>
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="p-1.5 rounded-lg bg-indigo-50 text-brand-600">
+                                  <Trophy size={16} />
+                                </span>
+                                <span className="text-xs font-bold text-slate-800">Month {selectedDashboardMonth} Auction</span>
+                              </div>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                Pending
+                              </span>
+                            </div>
+                            <div className="mt-2">
+                              <h4 className="text-base font-bold text-slate-900 font-display">Auction Not Held Yet</h4>
+                              <p className="text-[11px] text-slate-600 mt-0.5">Conduct bidding in Live Auction tab to declare winner.</p>
+                            </div>
+                            <div className="bg-slate-50 p-3 rounded-xl mt-3 text-xs text-slate-600">
+                              <span>Next Scheduled Auction:</span>
+                              <p className="font-bold text-slate-900 font-mono mt-0.5">{getGroupAuctionDate(activeGroup.id, selectedDashboardMonth).display}</p>
+                            </div>
+                          </div>
+                          {setActiveTab && (
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('auctions')}
+                              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                            >
+                              <Trophy size={14} />
+                              <span>Open Live Auction</span>
+                            </button>
+                          )}
+                        </>
+                      );
+                    }
+
+                    // Auction Winner details (using lifted variables)
+                    return (
+                      <>
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="p-1 rounded-lg bg-amber-100 text-amber-700">
+                                <Trophy size={16} />
+                              </span>
+                              <span className="text-xs font-bold text-slate-800">Month {selectedDashboardMonth} Auction Winner</span>
+                            </div>
+                            {isSettled ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Fully Disbursed
+                              </span>
+                            ) : isPartial ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                                Partial Disbursed
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                Disbursal Pending
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2">
+                            <div className="flex items-baseline justify-between">
+                              <h4 className="text-base font-bold text-slate-900 font-display">{winnerName}</h4>
+                              <span className="text-xs font-mono font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                Ticket #{winnerTicketNum}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 mt-0.5">
+                              📞 {winnerPhone || 'No phone'} · Won via Bidding
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
+                            <div className="bg-slate-50 p-2 rounded-xl">
+                              <span className="text-slate-500 text-[10px] uppercase font-semibold">Bid Discount</span>
+                              <p className="font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(winningBid)}</p>
+                            </div>
+                            <div className="bg-slate-50 p-2 rounded-xl">
+                              <span className="text-slate-500 text-[10px] uppercase font-semibold">Net Prize Due</span>
+                              <p className="font-bold text-brand-700 mt-0.5 font-mono">{formatCurrency(netPrizePot)}</p>
                             </div>
                           </div>
                         </div>
 
-                        {/* Disbursal Status Badge */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          {isSettled ? (
-                            <span className="bg-[#02B15A] text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5">
-                              <CheckCheck size={14} /> Fully Disbursed
-                            </span>
-                          ) : isPartial ? (
-                            <span className="bg-amber-500 text-slate-950 font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5">
-                              <AlertCircle size={14} /> Partially Disbursed
-                            </span>
-                          ) : (
-                            <span className="bg-[#E41414] text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 animate-pulse">
-                              <AlertCircle size={14} /> Disbursal Pending
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Financial Figures Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 shadow-2xs">
-                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">WINNING DISCOUNT</span>
-                          <span className="text-base sm:text-lg font-bold text-[#64CFF6] font-mono block mt-0.5">
-                            {formatCurrency(winningBid)}
-                          </span>
-                        </div>
-
-                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 shadow-2xs">
-                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">NET PRIZE POT DUE</span>
-                          <span className="text-base sm:text-lg font-bold text-white font-mono block mt-0.5">
-                            {formatCurrency(netPrizePot)}
-                          </span>
-                        </div>
-
-                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 shadow-2xs">
-                          <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">DISBURSED SO FAR</span>
-                          <span className={`text-base sm:text-lg font-bold font-mono block mt-0.5 ${totalPrizeDisbursed > 0 ? 'text-[#02B15A]' : 'text-[#AEABD8]'}`}>
-                            {formatCurrency(totalPrizeDisbursed)}
-                          </span>
-                        </div>
-
-                        <div className={`border rounded-xl p-3 shadow-2xs ${
-                          remainingPrizeDue > 0 ? 'bg-[#1D1D41] border-[#E41414]/30' : 'bg-[#1D1D41] border-[#02B15A]/30'
-                        }`}>
-                          <span className={`text-[10px] font-bold uppercase tracking-wider block ${
-                            remainingPrizeDue > 0 ? 'text-[#FF6B6B]' : 'text-[#02B15A]'
-                          }`}>
-                            {remainingPrizeDue > 0 ? 'BALANCE PENDING' : 'BALANCE SETTLED'}
-                          </span>
-                          <span className={`text-base sm:text-lg font-bold font-mono block mt-0.5 ${
-                            remainingPrizeDue > 0 ? 'text-[#FF6B6B]' : 'text-[#02B15A]'
-                          }`}>
-                            {formatCurrency(remainingPrizeDue)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons & Recent Payout Receipts */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {/* Disburse Prize Button when pending or Settled Badge */}
+                        <div className="mt-4 pt-3 flex items-center gap-2 border-t border-slate-100">
                           {remainingPrizeDue > 0 ? (
                             <button
+                              type="button"
                               onClick={() => handleOpenDisburseModal(remainingPrizeDue)}
-                              className="flex items-center justify-center gap-1.5 bg-[#02B15A] hover:bg-[#029B4F] text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#02B15A]/20 active:scale-95 cursor-pointer"
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
                             >
-                              <Banknote size={15} />
+                              <Banknote size={14} />
                               <span>Disburse Prize ({formatCurrency(remainingPrizeDue)})</span>
                             </button>
                           ) : (
-                            <div className="flex items-center gap-1.5 px-3.5 py-2 bg-[#02B15A]/15 border border-[#02B15A]/30 text-[#02B15A] text-xs font-bold rounded-xl shadow-2xs">
-                              <CheckCheck size={14} className="text-[#02B15A]" />
-                              <span>Prize Pot Fully Disbursed</span>
+                            <div className="flex-1 text-center py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-200">
+                              ✓ Prize Settled
                             </div>
                           )}
 
-                          {/* WhatsApp Payout Receipt Generator Button */}
                           <button
+                            type="button"
                             onClick={() => handleSharePayoutWhatsApp(
                               activeGroup,
                               winnerName,
@@ -3887,410 +3867,1187 @@ Thank you for your prompt payment! 🙏`;
                               remainingPrizeDue,
                               monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
                             )}
-                            className="flex items-center justify-center gap-1.5 bg-[#27264E] hover:bg-[#323062] text-[#64CFF6] border border-[#64CFF6]/30 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer"
-                            title="Generate & Send WhatsApp Payout Receipt"
+                            className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
+                            title="Send WhatsApp Receipt"
                           >
-                            <Send size={13} className="text-[#64CFF6]" />
-                            <span>WhatsApp Receipt</span>
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z" />
+                            </svg>
                           </button>
                         </div>
-
-                        {/* Recent Disbursals Miniature Tag */}
-                        {monthPayoutTxs.length > 0 && (
-                          <div className="flex items-center gap-2 overflow-x-auto text-[11px] text-[#AEABD8]">
-                            <span className="font-bold text-[#AEABD8] uppercase text-[9px]">Receipts:</span>
-                            {monthPayoutTxs.map((tx, idx) => (
-                              <span key={tx.id || idx} className="bg-[#1D1D41] border border-[#27264E] px-2.5 py-1 rounded-lg font-medium shrink-0 flex items-center gap-1.5 shadow-2xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#02B15A]" />
-                                <strong className="text-white">{formatCurrency(tx.amount)}</strong>
-                                <span className="text-[#AEABD8] capitalize">({tx.wallet_type?.replace(/_/g, ' ')})</span>
-                                {tx.verification_proof_url && (
-                                  <a href={tx.verification_proof_url} target="_blank" rel="noopener noreferrer" className="text-[#64CFF6] hover:underline" title="View attached receipt">
-                                    <Paperclip size={11} />
-                                  </a>
-                                )}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </section>
             )}
+            {/* END: TopMetricsGrid */}
 
-            {/* "Yet to Pay" Section (Pending Member Action Cards) */}
-            {activeGroup && (
-              <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-xl">
-                <div className="flex justify-between items-center border-b border-[#27264E] pb-3.5">
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                      <Users size={18} className="text-[#64CFF6]" />
-                      <span>{pendingList.length} yet to pay</span>
-                      <span className="text-xs font-normal text-[#AEABD8] hidden sm:inline">
-                        ({partialCount} partial · {unpaidCount} unpaid)
-                      </span>
-                      <HelpTooltip text="Subscribers with unpaid or partial dues for the selected month cycle." />
-                    </h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {pendingList.length > 0 && (
+            {/* BEGIN: Main2ColumnLayout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
+              {/* Left 8 Columns: Member Collection & Installments Ledger */}
+              <section className="lg:col-span-8 space-y-4" data-purpose="member-collection-roster">
+                <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+                  {/* Table Header Toolbar */}
+                  <div className="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-display font-bold text-base text-slate-900">Member Installments Breakdown</h3>
+                        <span className="text-xs bg-slate-100 text-slate-700 font-bold px-2.5 py-0.5 rounded-full">
+                          {selectedDashboardMonth === 0 ? 'Month 0 Launch' : `Month ${selectedDashboardMonth} Cycle`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {dashboardGroupMembers.length} active subscription slots registered in this chit group
+                      </p>
+                    </div>
+
+                    {/* Filter Tabs */}
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
                       <button
                         type="button"
-                        onClick={() => {
-                          setRemindModalTab('individual');
-                          setShowRemindModal(true);
-                        }}
-                        className="flex items-center gap-1.5 text-xs font-bold text-[#64CFF6] bg-[#27264E] hover:bg-[#323062] border border-[#64CFF6]/30 px-3 py-1.5 rounded-xl transition-all active:scale-95 shadow-2xs cursor-pointer"
+                        onClick={() => setMemberRosterFilter('all')}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                          memberRosterFilter === 'all'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
                       >
-                        <Send size={13} className="text-[#64CFF6]" />
-                        <span>Remind All</span>
+                        All ({dashboardGroupMembers.length})
                       </button>
-                    )}
-                    <span className="bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg">
-                      Month {selectedDashboardMonth} Dues
-                    </span>
+                      <button
+                        type="button"
+                        onClick={() => setMemberRosterFilter('unpaid')}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                          memberRosterFilter === 'unpaid'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Unpaid ({unpaidCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemberRosterFilter('partial')}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                          memberRosterFilter === 'partial'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Partial ({partialCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemberRosterFilter('paid')}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                          memberRosterFilter === 'paid'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Paid ({paidList.length})
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {loadingDashboardData ? (
-                  <div className="py-10 text-center text-[#AEABD8] text-xs flex items-center justify-center gap-2">
-                    <RefreshCw size={15} className="animate-spin text-[#64CFF6]" />
-                    <span>Loading subscriber dues...</span>
+                  {/* Bulk Control Actions Strip */}
+                  <div className="px-5 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setMemberRosterSort(s => s === 'due' ? 'ticket' : s === 'ticket' ? 'name' : 'due')}
+                        className="text-slate-600 hover:text-slate-900 font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Filter size={13} />
+                        <span>Sort: {memberRosterSort === 'due' ? 'Due Amount' : memberRosterSort === 'ticket' ? 'Ticket #' : 'Name'}</span>
+                      </button>
+                    </div>
                   </div>
-                ) : pendingList.length === 0 ? (
-                  <div className="py-10 text-center bg-[#141332] border border-[#02B15A]/30 rounded-2xl space-y-1.5">
-                    <CheckCircle2 size={28} className="mx-auto text-[#02B15A]" />
-                    <p className="text-sm font-bold text-white">All subscribers have paid for Month {selectedDashboardMonth}!</p>
-                    <p className="text-xs text-[#02B15A] font-medium">Total collected: {formatCurrency(actualCollectionsTotal)}</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    {pendingList.map((member) => {
-                      const initial = member.name.charAt(0).toUpperCase() || 'S';
-                      return (
-                        <div
-                          key={member.id}
-                          className="bg-[#141332] hover:bg-[#1D1D41] border border-[#27264E] hover:border-[#6359E9] rounded-2xl p-4 sm:p-4.5 flex items-center justify-between gap-3 sm:gap-4 transition-all shadow-md group"
-                        >
-                          <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
-                            {/* Avatar */}
-                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#9C2CF3] to-[#3A6FF9] text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-md">
-                              {initial}
-                            </div>
 
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-white text-sm leading-snug">{member.name}</span>
-                                <span className="text-[10px] font-bold bg-[#27264E] text-[#64CFF6] px-2 py-0.5 rounded-md font-mono shrink-0 border border-[#3A3A5A]">
-                                  #{member.ticket}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-2 text-xs leading-normal flex-wrap">
-                                {member.status === 'partial' ? (
-                                  <span className="text-amber-300 font-extrabold bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md text-[9px] uppercase tracking-wider shrink-0">
-                                    Partial
-                                  </span>
-                                ) : (
-                                  <span className="text-[#FF6B6B] font-extrabold bg-[#E41414]/15 border border-[#E41414]/30 px-2 py-0.5 rounded-md text-[9px] uppercase tracking-wider shrink-0">
-                                    Unpaid
-                                  </span>
-                                )}
-                                <span className="text-[#AEABD8] font-medium whitespace-nowrap">
-                                  Due: <strong className="text-white font-extrabold">{formatCurrency(member.remaining)}</strong>
-                                </span>
-                                {member.paid > 0 && (
-                                  <span className="text-[#02B15A] font-medium hidden sm:inline">
-                                    (Paid: {formatCurrency(member.paid)})
-                                  </span>
-                                )}
-                              </div>
-
-                              {member.status === 'partial' && (
-                                <div className="w-28 sm:w-32 bg-[#27264E] rounded-full h-1.5 overflow-hidden mt-1.5">
-                                  <div
-                                    className="bg-amber-400 h-full rounded-full"
-                                    style={{ width: `${Math.min(100, (member.paid / member.effectiveDue) * 100)}%` }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            {/* Remind Button (Matches Figma Frame #1:560) */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                triggerHapticFeedback('light');
-                                const msg = encodeURIComponent(
-                                  `*CHIT INSTALLMENT DUE REMINDER* 🔔\n` +
-                                  `Group: ${activeGroup?.name}\n` +
-                                  `Month: Month ${selectedDashboardMonth} (${getDashboardMonthLabel(activeGroup, selectedDashboardMonth)})\n` +
-                                  `Ticket: #${member.ticket}\n` +
-                                  `Subscriber: ${member.name}\n` +
-                                  `Pending Due: ${formatCurrency(member.remaining)}\n\n` +
-                                  `Kindly clear your installment due for this month. Thank you! 🙏`
-                                );
-                                const cleanPhone = normalizePhone(member.phone);
-                                const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${msg}` : `https://wa.me/?text=${msg}`;
-                                window.open(url, '_blank');
-                              }}
-                              className="bg-[#27264E] hover:bg-[#323062] text-[#64CFF6] border border-[#64CFF6]/30 font-bold text-xs px-3 py-2 sm:py-2.5 rounded-xl transition-all shadow-2xs shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                              title={`Send WhatsApp dues reminder to ${member.name}`}
-                            >
-                              <Send size={12} className="text-[#64CFF6]" />
-                              <span>Remind</span>
-                            </button>
-
-                            {/* 1-Tap Record Payment Button */}
-                            <button
-                              onClick={() => {
-                                setRecordingPaymentMember(member);
-                                setEditingTransaction(null);
-                                const defaultAmount = (member.totalPendingToday > 0 
-                                  ? member.totalPendingToday 
-                                  : (member.remaining > 0 ? member.remaining : 20000));
-                                setQuickPaymentAmount(defaultAmount.toString());
-                                setPaymentWalletType('cash_in_hand');
-                                setPaymentAllocationMode('auto');
-                                setPaymentCustomMonths([selectedDashboardMonth]);
-                                setPaymentDateType('today');
-                                setCustomPaymentDate(new Date().toISOString().split('T')[0]);
-                                setPaymentNote('');
-                                setPaymentReceiptUrl('');
-                              }}
-                              className="bg-[#02B15A] hover:bg-[#029B4F] text-white font-bold text-xs px-3 py-2 sm:py-2.5 rounded-xl transition-all shadow-md shadow-[#02B15A]/20 shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                              title={`Record payment from ${member.name}`}
-                            >
-                              <Coins size={13} />
-                              <span className="hidden sm:inline">Record</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Collapsible Paid Members Section */}
-                {paidList.length > 0 && (
-                  <div className="pt-2 border-t border-[#27264E]">
-                    <button
-                      onClick={() => setHidePaidMembers(!hidePaidMembers)}
-                      className="text-xs font-bold text-[#AEABD8] hover:text-white flex items-center gap-1.5 py-1 active:scale-95 cursor-pointer"
-                    >
-                      {hidePaidMembers ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                      <span>{hidePaidMembers ? 'Show' : 'Hide'} Paid Members ({paidList.length})</span>
-                    </button>
-
-                    {!hidePaidMembers && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                        {paidList.map((member) => {
-                          const memTx = dashboardTransactions.find(t => 
-                            t.type === 'collection' && 
-                            (t.profile_id === member.profileId || t.group_member_id === member.id) &&
-                            (t.notes?.includes(`Month ${selectedDashboardMonth}`) || !t.notes)
-                          );
-
-                          return (
-                            <div
-                              key={member.id}
-                              className="bg-[#141332] border border-[#02B15A]/20 rounded-xl p-2.5 flex items-center justify-between text-xs hover:border-[#02B15A]/50 transition-colors"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <CheckCircle2 size={15} className="text-[#02B15A] shrink-0" />
-                                <span className="font-semibold text-white truncate">{member.name}</span>
-                                <span className="text-[10px] text-[#AEABD8] font-mono">#{member.ticket}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="font-bold text-[#02B15A] mr-0.5">
-                                  {formatCurrency(member.paid)} paid
-                                </span>
-                                {memTx && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        triggerHapticFeedback('light');
-                                        setViewingReceiptTx({ tx: memTx, member });
-                                      }}
-                                      title="Share Receipt PNG"
-                                      className="p-1 text-[#02B15A] hover:text-white hover:bg-[#02B15A]/20 rounded-md transition-colors cursor-pointer"
-                                    >
-                                      <Share2 size={12} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenEditPayment(memTx)}
-                                      title="Edit payment receipt"
-                                      className="p-1 text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#27264E] rounded-md transition-colors cursor-pointer"
-                                    >
-                                      <Edit3 size={12} />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
+                  {/* Members Data Rows List */}
+                  <div className="divide-y divide-slate-100">
+                    {filteredAndSortedMembers.length === 0 ? (
+                      <div className="py-12 text-center text-xs text-slate-400">
+                        No members match the selected filter.
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+                    ) : (
+                      filteredAndSortedMembers.map((member) => {
+                        const initial = member.name.charAt(0).toUpperCase() || 'M';
+                        const isWinner = currentMonthAuction && (
+                          (currentMonthAuction.winning_bidder_id && (member.profileId === currentMonthAuction.winning_bidder_id || member.id === currentMonthAuction.winning_bidder_id)) ||
+                          (currentMonthAuction.winner_name && member.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
+                        );
 
-            {/* Payments Breakdown Ledger & WhatsApp Sharing */}
-            {activeGroup && (
-              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-5 space-y-3 sm:space-y-4 shadow-xl">
-                <div className="flex justify-between items-center border-b border-[#27264E] pb-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Banknote size={16} className="text-[#64CFF6]" />
-                      <span>Payments Breakdown Ledger</span>
-                      <HelpTooltip text={`Live payment receipts logged for Month ${selectedDashboardMonth}. Includes instant WhatsApp sharing and receipt editing.`} />
-                    </h3>
-                  </div>
-                  <span className="text-xs font-bold text-[#AEABD8] shrink-0">
-                    {currentMonthTransactions.length} receipts
-                  </span>
-                </div>
+                        return (
+                          <div
+                            key={member.id}
+                            className={`p-4 hover:bg-slate-50/75 transition-colors flex items-center justify-between gap-4 ${
+                              member.status === 'partial' ? 'bg-amber-50/20' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={`w-10 h-10 rounded-full font-bold text-xs flex items-center justify-center shrink-0 font-display ${
+                                isWinner
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : member.status === 'partial'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : member.status === 'paid'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-indigo-100 text-brand-700'
+                              }`}>
+                                {initial}
+                              </div>
 
-                {currentMonthTransactions.length === 0 ? (
-                  <div className="py-6 text-center text-[#AEABD8] text-xs">
-                    No payment receipts logged for Month {selectedDashboardMonth} yet. Use "Record" above to log collections.
-                  </div>
-                ) : (
-                  <div className="divide-y divide-[#27264E]">
-                    {currentMonthTransactions.map((tx) => {
-                      const matchedMember = dashboardGroupMembers.find(m => m.profileId === tx.profile_id || m.id === tx.group_member_id);
-                      const memberName = matchedMember?.name || 'Subscriber';
-                      const ticketNum = matchedMember?.ticket || '?';
-                      const dateStr = tx.created_at 
-                        ? new Date(tx.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) + ', ' + new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-                        : 'Today';
-
-                      return (
-                        <div key={tx.id} className="py-2.5 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#27264E]/40 rounded-xl px-2.5 transition-colors">
-                          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-lg bg-[#27264E] border border-[#3A3A5A] text-[#64CFF6] flex items-center justify-center font-bold text-xs shrink-0">
-                              #{ticketNum}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                <span className="text-xs font-bold text-white truncate">{memberName}</span>
-                                <span className="text-[10px] font-mono bg-[#141332] text-[#AEABD8] px-1.5 py-0.2 rounded shrink-0 border border-[#27264E]">
-                                  {tx.wallet_type === 'kishor_bank'
-                                    ? 'KISHOR BANK (UPI)'
-                                    : tx.wallet_type === 'dad_bank'
-                                    ? 'DAD BANK'
-                                    : tx.wallet_type === 'mom_bank'
-                                    ? 'MOM BANK'
-                                    : 'CASH IN HAND'}
-                                </span>
-                                {tx.verification_proof_url && (
-                                  <span className="text-[9px] font-bold bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 px-1 py-0.2 rounded flex items-center gap-0.5 shrink-0">
-                                    <Paperclip size={9} /> Receipt
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-sm font-bold text-slate-900 truncate">{member.name}</h4>
+                                  <span className="text-[11px] font-mono font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                                    #{member.ticket}
                                   </span>
+
+                                  {member.status === 'paid' ? (
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                                      PAID
+                                    </span>
+                                  ) : member.status === 'partial' ? (
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full">
+                                      PARTIAL ({Math.round((member.paid / Math.max(1, member.effectiveDue)) * 100)}%)
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200/60 px-2 py-0.5 rounded-full">
+                                      UNPAID
+                                    </span>
+                                  )}
+
+                                  {isWinner && (
+                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                      Auction Winner
+                                    </span>
+                                  )}
+                                </div>
+
+                                {member.status === 'partial' ? (
+                                  <>
+                                    <div className="flex items-center gap-3 text-xs mt-1">
+                                      <span className="text-slate-600">
+                                        Remaining Due: <strong className="text-rose-600">{formatCurrency(member.remaining)}</strong>
+                                      </span>
+                                      <span className="text-slate-300">•</span>
+                                      <span className="text-emerald-700 font-semibold">
+                                        Paid: {formatCurrency(member.paid)}
+                                      </span>
+                                    </div>
+                                    <div className="w-48 bg-slate-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                                      <div
+                                        className="bg-amber-500 h-full rounded-full transition-all duration-300"
+                                        style={{ width: `${Math.min(100, Math.round((member.paid / Math.max(1, member.effectiveDue)) * 100))}%` }}
+                                      />
+                                    </div>
+                                  </>
+                                ) : member.status === 'paid' ? (
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    Paid: <strong className="text-emerald-700 font-mono">{formatCurrency(member.paid)}</strong> · Mobile: {member.phone || 'N/A'}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-slate-600 mt-0.5">
+                                    Due: <strong className="text-slate-900 font-mono">{formatCurrency(member.remaining)}</strong> · Mobile: {member.phone || 'N/A'}
+                                  </p>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2 text-[10px] text-[#AEABD8] flex-wrap">
-                                <span>{dateStr}</span>
-                                {tx.notes && (() => {
-                                  const clean = tx.notes.replace(/\[Batch:[^\]]+\]/g, '').trim();
-                                  const batchMatch = tx.notes.match(/\[Batch:([A-Za-z0-9_-]+)\|Total:([0-9.]+)\|Alloc:([^\]]+)\]/);
-                                  const total = batchMatch ? parseFloat(batchMatch[2]) : null;
-                                  return (
-                                    <>
-                                      {clean && <span className="text-[#AEABD8]/80 italic max-w-[150px] sm:max-w-xs truncate">· {clean}</span>}
-                                      {total && total !== Number(tx.amount) && (
-                                        <span className="text-[9px] font-bold text-[#64CFF6] bg-[#27264E] border border-[#3A3A5A] px-1.5 py-0.2 rounded">
-                                          Part of {formatCurrency(total)} Batch
-                                        </span>
-                                      )}
-                                    </>
-                                  );
-                                })()}
-                              </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center gap-2 justify-between sm:justify-end shrink-0 pt-1 sm:pt-0">
-                            <span className="text-xs font-bold text-[#02B15A] mr-1">
-                              +{formatCurrency(Number(tx.amount || 0))}
-                            </span>
-
-                            <div className="flex items-center gap-1.5">
-                              {/* Rendered PNG Receipt Share Button */}
-                              {matchedMember && (
+                            <div className="flex items-center gap-2 shrink-0">
+                              {member.status !== 'paid' && (
                                 <button
                                   type="button"
                                   onClick={() => {
                                     triggerHapticFeedback('light');
-                                    setViewingReceiptTx({ tx, member: matchedMember });
+                                    const msg = encodeURIComponent(
+                                      `*CHIT INSTALLMENT DUE REMINDER* 🔔\n` +
+                                      `Group: ${activeGroup?.name}\n` +
+                                      `Month: Month ${selectedDashboardMonth} (${getDashboardMonthLabel(activeGroup, selectedDashboardMonth)})\n` +
+                                      `Ticket: #${member.ticket}\n` +
+                                      `Subscriber: ${member.name}\n` +
+                                      `Pending Due: ${formatCurrency(member.remaining)}\n\n` +
+                                      `Kindly clear your installment due for this month. Thank you! 🙏`
+                                    );
+                                    const cleanPhone = normalizePhone(member.phone);
+                                    const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${msg}` : `https://wa.me/?text=${msg}`;
+                                    window.open(url, '_blank');
                                   }}
-                                  title="Share Receipt PNG"
-                                  className="flex items-center gap-1 text-[11px] font-bold text-[#02B15A] bg-[#02B15A]/15 hover:bg-[#02B15A]/25 border border-[#02B15A]/30 px-2.5 py-1 rounded-lg transition-colors active:scale-95 cursor-pointer shadow-2xs"
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+                                  title={`Remind ${member.name} via WhatsApp`}
                                 >
-                                  <Share2 size={12} />
-                                  <span className="text-[10px]">Share</span>
+                                  <Send size={13} className="text-brand-600" />
+                                  <span>Remind</span>
                                 </button>
                               )}
 
-                              {/* Edit Payment Button */}
                               <button
                                 type="button"
-                                onClick={() => handleOpenEditPayment(tx)}
-                                title="Edit payment"
-                                className="p-1.5 text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#27264E] border border-[#27264E] hover:border-[#64CFF6]/40 rounded-lg transition-colors active:scale-95 cursor-pointer"
+                                onClick={() => {
+                                  setRecordingPaymentMember(member);
+                                  setEditingTransaction(null);
+                                  const defaultAmount = (member.totalPendingToday > 0 
+                                    ? member.totalPendingToday 
+                                    : (member.remaining > 0 ? member.remaining : 20000));
+                                  setQuickPaymentAmount(defaultAmount.toString());
+                                  setPaymentWalletType('cash_in_hand');
+                                  setPaymentAllocationMode('auto');
+                                  setPaymentCustomMonths([selectedDashboardMonth]);
+                                  setPaymentDateType('today');
+                                  setCustomPaymentDate(new Date().toISOString().split('T')[0]);
+                                  setPaymentNote('');
+                                  setPaymentReceiptUrl('');
+                                }}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
                               >
-                                <Edit3 size={13} />
+                                <Coins size={13} />
+                                <span>Record</span>
                               </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
 
-                              {/* Delete/Void Payment Button */}
+                  {/* Footer summary inside table */}
+                  <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 flex-wrap gap-2">
+                    <span>
+                      Showing {filteredAndSortedMembers.length} of {dashboardGroupMembers.length} enrolled subscribers
+                    </span>
+                    <div className="flex items-center gap-4">
+                      <span>Total Expected: <strong className="text-slate-900 font-mono">{formatCurrency(targetCollectionsTotal)}</strong></span>
+                      <span>Total Outstanding: <strong className="text-rose-600 font-mono">{formatCurrency(pendingCollectionsTotal)}</strong></span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+              {/* END: Left 8 Columns */}
+
+              {/* Right 4 Columns: Payment Breakdown Ledger & Live Audit Log */}
+              <aside className="lg:col-span-4 space-y-6" data-purpose="ledger-and-audit-sidebar">
+                {/* Card 1: Payments Breakdown Ledger */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-indigo-50 text-brand-600">
+                        <Banknote size={16} />
+                      </div>
+                      <h3 className="font-display font-bold text-sm text-slate-900">Payments Breakdown</h3>
+                    </div>
+                    <span className="text-xs font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
+                      {currentMonthTransactions.length} Receipts
+                    </span>
+                  </div>
+
+                  {currentMonthTransactions.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-slate-400">
+                      No payment receipts logged for Month {selectedDashboardMonth} yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-0.5 scrollbar-thin">
+                      {currentMonthTransactions.map((tx) => {
+                        const matchedMember = dashboardGroupMembers.find(m => m.profileId === tx.profile_id || m.id === tx.group_member_id);
+                        const memberName = matchedMember?.name || 'Subscriber';
+                        const ticketNum = matchedMember?.ticket || '?';
+                        const dateStr = tx.created_at 
+                          ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ', ' + new Date(tx.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                          : 'Today';
+
+                        const walletLabel = tx.wallet_type === 'kishor_bank'
+                          ? 'KISHOR BANK'
+                          : tx.wallet_type === 'dad_bank'
+                          ? 'DAD BANK'
+                          : tx.wallet_type === 'mom_bank'
+                          ? 'MOM BANK'
+                          : 'CASH IN HAND';
+
+                        return (
+                          <div
+                            key={tx.id}
+                            className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 transition-colors"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-2.5">
+                                <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center justify-center font-mono">
+                                  #{ticketNum}
+                                </span>
+                                <div>
+                                  <h5 className="text-xs font-bold text-slate-900">{memberName}</h5>
+                                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                    {walletLabel}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="text-sm font-bold text-emerald-600 font-mono">
+                                +{formatCurrency(Number(tx.amount || 0))}
+                              </span>
+                            </div>
+
+                            <div className="mt-2 text-[11px] text-slate-600 leading-snug">
+                              <p>{dateStr}</p>
+                              {tx.notes && (
+                                <p className="text-slate-500 text-[10px] italic truncate">
+                                  {tx.notes.replace(/\[Batch:[^\]]+\]/g, '').trim()}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                              {(() => {
+                                const batchMatch = (tx.notes || '').match(/\[Batch:([A-Za-z0-9_-]+)\|Total:([0-9.]+)\|Alloc:([^\]]+)\]/);
+                                const total = batchMatch ? parseFloat(batchMatch[2]) : null;
+                                return total && total !== Number(tx.amount) ? (
+                                  <span className="text-[10px] font-mono text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
+                                    Part of {formatCurrency(total)} Batch
+                                  </span>
+                                ) : <span />;
+                              })()}
+
+                              <div className="flex items-center gap-1.5 text-slate-500">
+                                {matchedMember && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      triggerHapticFeedback('light');
+                                      setViewingReceiptTx({ tx, member: matchedMember });
+                                    }}
+                                    className="hover:text-brand-600 transition-colors p-1 cursor-pointer"
+                                    title="Share Receipt"
+                                  >
+                                    <Share2 size={13} />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditPayment(tx)}
+                                  className="hover:text-slate-900 transition-colors p-1 cursor-pointer"
+                                  title="Edit Entry"
+                                >
+                                  <Edit3 size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePayment(tx)}
+                                  className="hover:text-rose-600 transition-colors p-1 cursor-pointer"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {setActiveTab && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('cash')}
+                      className="w-full mt-2 py-2 text-center text-xs font-semibold text-brand-600 hover:text-brand-700 hover:bg-brand-50/60 rounded-xl transition-colors cursor-pointer"
+                    >
+                      View All Ledger Receipts →
+                    </button>
+                  )}
+                </div>
+
+                {/* Card 2: Live System Audit Log */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3.5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                        <ShieldAlert size={16} />
+                      </div>
+                      <h3 className="font-display font-bold text-sm text-slate-900">Live System Audit Log</h3>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Connected
+                    </span>
+                  </div>
+
+                  {/* Structured Audit Feed */}
+                  <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-0.5 scrollbar-thin">
+                    {auditLogs.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-slate-400">
+                        No transactions logged yet. Real database actions will appear here live.
+                      </div>
+                    ) : (
+                      auditLogs.slice(0, 5).map((log, index) => (
+                        <div key={index} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1">
+                          <div className="flex items-center justify-between font-mono text-[10px] text-slate-500 mb-0.5">
+                            <span>{log.timestamp}</span>
+                            <span className="text-brand-600 font-semibold uppercase">{log.table}</span>
+                          </div>
+                          <p className="font-semibold text-slate-800 text-[11px] leading-tight">{log.desc}</p>
+                          <div className="flex items-center justify-between mt-1 text-[10px] text-slate-500">
+                            <span>Executor: {log.executor}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span className="italic text-[11px]">Database stream synced</span>
+                    {setActiveTab && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('reports')}
+                        className="font-semibold text-brand-600 hover:underline cursor-pointer"
+                      >
+                        Full Log Report
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card 3: Quick WhatsApp Broadcast Card */}
+                <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
+                        Automation
+                      </span>
+                      <span className="text-xs text-emerald-400 font-semibold">Ready to Send</span>
+                    </div>
+                    <h4 className="font-display font-bold text-sm mt-3">
+                      Broadcast Reminder to {unpaidCount + partialCount} Unpaid Members
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-1">
+                      Send personalized reminders via WhatsApp in 1-tap
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRemindModalTab('group');
+                        setShowRemindModal(true);
+                      }}
+                      className="mt-4 w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z" />
+                      </svg>
+                      <span>Trigger WhatsApp Dues Alert</span>
+                    </button>
+                  </div>
+                </div>
+              </aside>
+              {/* END: Right 4 Columns */}
+            </div>
+            {/* END: Main2ColumnLayout */}
+          </div>
+          {/* END: DESKTOP VIEW */}
+
+            {/* ======================================================== */}
+            {/* MOBILE VIEW: Stitch Admin Dashboard (Mobile Screens)      */}
+            {/* ======================================================== */}
+            <div className="block lg:hidden space-y-4 max-w-md mx-auto">
+              {/* Chit Group Switcher Tabs */}
+              <div className="px-1">
+                <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none py-1 text-xs">
+                  {localGroups.filter(g => g.status !== 'deleted').map((group) => {
+                    const isSelected = activeGroup?.id === group.id;
+                    return (
+                      <button
+                        key={group.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveDashboardGroupId(group.id);
+                          setSelectedDashboardMonth(group.currentMonth !== undefined && group.currentMonth !== null ? group.currentMonth : 0);
+                        }}
+                        className={`flex-shrink-0 flex items-center space-x-1.5 px-3.5 py-1.5 font-medium rounded-full transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-brand-600 text-white shadow-sm'
+                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                        <span>{group.name}</span>
+                        <span className="text-[10px] opacity-80">({formatCurrency(group.totalValue)})</span>
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (setShowWizard) setShowWizard(true);
+                      else if (setActiveTab) setActiveTab('chits');
+                    }}
+                    aria-label="Add chit group"
+                    className="flex-shrink-0 p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-pointer"
+                  >
+                    <Plus size={14} className="stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+
+              {!activeGroup ? (
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-6 text-center text-xs text-slate-500 shadow-xs">
+                  <p className="font-semibold text-slate-700">No Chit Group Available</p>
+                  <p className="mt-1 text-slate-400">Please select or create a chit group to view live overview.</p>
+                </div>
+              ) : (
+                <>
+                  {/* BEGIN: HeroFinancialCard */}
+                  <section className="rounded-3xl p-5 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20" data-purpose="hero-fund-card">
+                <div className="absolute -right-12 -top-12 w-48 h-48 bg-brand-500/25 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none" />
+
+                {/* Top Badge & Kai Iruppu Floating Pill */}
+                <div className="relative z-10 flex justify-between items-start gap-2">
+                  <div>
+                    <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[11px] text-indigo-200 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{selectedDashboardMonth === 0 ? 'Launch Month' : `Month ${selectedDashboardMonth} of ${totalDuration}`}</span>
+                      <span className="text-indigo-400">•</span>
+                      <span className="text-white font-semibold">Cycle #{selectedDashboardMonth}</span>
+                    </div>
+                    <div className="mt-3">
+                      <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Total Collected</p>
+                      <p className="text-3xl font-extrabold tracking-tight text-white mt-0.5 font-mono">{formatCurrency(actualCollectionsTotal)}</p>
+                      <p className="text-xs text-indigo-200/90 mt-1 flex items-center gap-1 font-mono">
+                        <span>Target:</span>
+                        <span className="font-bold text-white">{formatCurrency(targetCollectionsTotal)}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-white/10 rounded-md text-emerald-300 ml-1 font-semibold">{completionPct}%</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Kai Iruppu Reserve Pill */}
+                  <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-3 text-right shadow-sm min-w-[120px]">
+                    <div className="flex items-center justify-end space-x-1 mb-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span className="text-[9px] uppercase font-bold text-amber-300 tracking-wider">Kai Iruppu</span>
+                    </div>
+                    <span className="text-base font-extrabold text-white tracking-tight block font-mono">{formatCurrency(activeKaiIruppuPool)}</span>
+                  </div>
+                </div>
+
+                {/* Progress Bar & Remainder Stats */}
+                <div className="relative z-10 mt-5 pt-3 border-t border-white/10">
+                  <div className="flex justify-between items-center text-xs font-medium text-slate-300 mb-2">
+                    <div className="flex items-center space-x-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <span className="font-semibold text-white font-mono">{formatCurrency(pendingCollectionsTotal)} to collect</span>
+                    </div>
+                    <span className="text-indigo-200 font-medium">{pendingList.length} members pending</span>
+                  </div>
+                  <div className="w-full bg-white/15 h-2.5 rounded-full overflow-hidden p-0.5 backdrop-blur-sm">
+                    <div
+                      className="bg-gradient-to-r from-emerald-400 to-teal-300 h-full rounded-full transition-all duration-500 shadow-sm"
+                      style={{ width: `${Math.max(actualCollectionsTotal > 0 ? 5 : 0, completionPct)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Action Grid CTA Inside Hero */}
+                <div className="relative z-10 mt-5 grid grid-cols-3 gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={handleMarkAllPaid}
+                    disabled={isMarkingAllPaid || pendingList.length === 0}
+                    className="py-2.5 px-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl font-semibold flex items-center justify-center space-x-1.5 transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+                  >
+                    <Check size={14} className="stroke-[2.5]" />
+                    <span>{isMarkingAllPaid ? 'Recording...' : 'Mark Paid'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRemindModalTab('individual');
+                      setShowRemindModal(true);
+                    }}
+                    disabled={pendingList.length === 0}
+                    className="py-2.5 px-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl font-semibold flex items-center justify-center space-x-1.5 transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+                  >
+                    <Send size={14} />
+                    <span>Remind ({pendingList.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCloseMonth}
+                    disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup?.currentMonth ?? 0)}
+                    className="py-2.5 px-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold flex items-center justify-center space-x-1 shadow-md transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+                  >
+                    <span className="truncate">
+                      {selectedDashboardMonth === 0 ? 'Roll M1' : 'Close Month'}
+                    </span>
+                    <ArrowRight size={14} className="shrink-0" />
+                  </button>
+                </div>
+              </section>
+              {/* END: HeroFinancialCard */}
+
+              {/* BEGIN: CycleMilestonesAndCountdown */}
+              <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="auction-milestones-widget">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>Auction Timeline</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {activeGroup ? getGroupAuctionDate(activeGroup.id, selectedDashboardMonth).display : 'No scheduled auction'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 font-mono">
+                    <Clock size={12} className="text-brand-600" />
+                    <span>{selectedDashboardMonth === 0 ? 'Month 0' : `Cycle M${selectedDashboardMonth}`}</span>
+                  </div>
+                </div>
+
+                {/* Step Indicators for Months */}
+                <div className="flex items-center gap-1.5 pt-1 overflow-x-auto scrollbar-none">
+                  {monthsRange.map((m) => {
+                    const isCompleted = m < (activeGroup?.currentMonth ?? 0);
+                    const isActive = m === selectedDashboardMonth;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setSelectedDashboardMonth(m)}
+                        className="flex-1 min-w-[50px] flex flex-col items-center group cursor-pointer"
+                      >
+                        <div
+                          className={`w-full h-1.5 rounded-full mb-1.5 transition-all ${
+                            isActive
+                              ? 'bg-brand-500 ring-2 ring-brand-500/30'
+                              : isCompleted
+                              ? 'bg-emerald-500'
+                              : 'bg-slate-200'
+                          }`}
+                        />
+                        <span
+                          className={`text-[10px] ${
+                            isActive
+                              ? 'font-extrabold text-brand-600'
+                              : isCompleted
+                              ? 'font-bold text-emerald-700'
+                              : 'font-medium text-slate-500'
+                          }`}
+                        >
+                          M{m}
+                        </span>
+                        <span className="text-[9px] text-slate-400">
+                          {isActive ? 'Active' : isCompleted ? 'Completed' : 'Upcoming'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+              {/* END: CycleMilestonesAndCountdown */}
+
+              {/* BEGIN: CurrentMonthAuctionWinnerCard */}
+              <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="auction-winner-card">
+                {selectedDashboardMonth === 0 ? (
+                  <div>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold text-lg shadow-inner">
+                          <Rocket size={20} className="text-amber-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h2 className="text-sm font-bold text-slate-900 leading-none">Organizer Profit</h2>
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-md border border-amber-200">Month 0</span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Launch Month • No Live Auction Held
+                          </p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Organizer Phase
+                      </span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Chit Value</p>
+                        <p className="text-xs font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
+                      </div>
+                      <div className="border-l border-slate-200 pl-2.5">
+                        <p className="text-[10px] uppercase font-bold text-brand-600 leading-tight">Organizer Return</p>
+                        <p className="text-xs font-extrabold text-brand-600 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : !currentMonthAuction ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-brand-600 border border-indigo-100 flex items-center justify-center font-bold text-lg shadow-inner">
+                          <Trophy size={20} className="text-brand-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h2 className="text-sm font-bold text-slate-900 leading-none">Month {selectedDashboardMonth} Auction</h2>
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-600 rounded-md border border-slate-200">Pending</span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Auction Not Held Yet
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    {setActiveTab && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('auctions')}
+                        className="w-full py-2.5 px-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+                      >
+                        <Trophy size={14} />
+                        <span>Open Live Auction Tab</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold text-lg shadow-inner">
+                          🏆
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h2 className="text-sm font-bold text-slate-900 leading-none">{winnerName}</h2>
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-md border border-amber-200">
+                              Ticket #{winnerTicketNum}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1 flex items-center">
+                            <span className="font-medium text-slate-700">Month {selectedDashboardMonth} Winner</span>
+                            {winnerPhone && (
+                              <>
+                                <span className="mx-1.5 text-slate-300">•</span>
+                                <span className="text-slate-500 font-medium font-mono">{winnerPhone}</span>
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      {isSettled ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          ✓ Fully Disbursed
+                        </span>
+                      ) : isPartial ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                          Partial Disbursed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 animate-pulse" />
+                          Disbursal Pending
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Key Financial Matrix Grid */}
+                    <div className="mt-4 grid grid-cols-3 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Discount</p>
+                        <p className="text-xs font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(winningBid)}</p>
+                      </div>
+                      <div className="border-l border-slate-200 pl-2.5">
+                        <p className="text-[10px] uppercase font-bold text-brand-600 leading-tight">Prize Due</p>
+                        <p className="text-xs font-extrabold text-brand-600 mt-0.5 font-mono">{formatCurrency(netPrizePot)}</p>
+                      </div>
+                      <div className="border-l border-slate-200 pl-2.5">
+                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Disbursed</p>
+                        <p className="text-xs font-bold text-slate-600 mt-0.5 font-mono">{formatCurrency(totalPrizeDisbursed)}</p>
+                      </div>
+                    </div>
+
+                    {/* Action CTA Buttons */}
+                    <div className="mt-3.5 flex items-center space-x-2">
+                      {remainingPrizeDue > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDisburseModal(remainingPrizeDue)}
+                          className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center space-x-1.5 transition-colors active:scale-95 cursor-pointer"
+                        >
+                          <Banknote size={14} />
+                          <span>Disburse Prize ({formatCurrency(remainingPrizeDue)})</span>
+                        </button>
+                      ) : (
+                        <div className="flex-1 text-center py-2 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-200">
+                          ✓ Prize Settled
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleSharePayoutWhatsApp(
+                          activeGroup,
+                          winnerName,
+                          winnerPhone,
+                          selectedDashboardMonth,
+                          netPrizePot,
+                          winningBid,
+                          totalPrizeDisbursed,
+                          remainingPrizeDue,
+                          monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
+                        )}
+                        aria-label="Share WhatsApp Receipt"
+                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-700 flex items-center justify-center transition-colors active:scale-95 shadow-xs cursor-pointer"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12.031 2C6.495 2 2 6.495 2 12.031c0 1.97.57 3.81 1.558 5.372L2.5 22l4.808-1.047a9.98 9.98 0 0 0 4.723 1.18c5.536 0 10.031-4.496 10.031-10.032S17.567 2 12.031 2zm5.727 14.198c-.24.673-1.393 1.285-1.922 1.343-.497.054-1.127.08-3.266-.807-2.734-1.135-4.498-3.906-4.636-4.088-.137-.182-1.1-1.464-1.1-2.793 0-1.328.694-1.982.942-2.247.248-.266.541-.332.723-.332.183 0 .365.002.525.01.17.009.398-.065.621.472.23.555.787 1.92.855 2.06.068.14.113.303.023.483-.09.18-.135.292-.27.45-.135.158-.284.354-.405.474-.136.136-.278.283-.12.553.158.271.7 1.155 1.503 1.868 1.033.918 1.905 1.203 2.176 1.339.27.135.43.113.589-.069.158-.18.677-.788.857-1.059.18-.27.36-.226.602-.136.241.09 1.536.724 1.799.855.263.131.439.196.502.304.064.108.064.629-.176 1.302z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+              {/* END: CurrentMonthAuctionWinnerCard */}
+
+              {/* BEGIN: MemberDuesSection */}
+              <section className="space-y-3" data-purpose="member-dues-section">
+                {/* Section Controls */}
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-1.5">
+                      <span>Collection Status</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                        {pendingList.length} Pending
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500">Month {selectedDashboardMonth} installments breakdown</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRemindModalTab('group');
+                      setShowRemindModal(true);
+                    }}
+                    className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center space-x-1 transition-colors cursor-pointer"
+                  >
+                    <span>Remind All</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+
+                {/* Filter Chips with Paid count included */}
+                <div className="flex items-center space-x-2 text-xs overflow-x-auto scrollbar-none py-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setMemberRosterFilter('all')}
+                    className={`px-3.5 py-1 rounded-lg font-semibold flex-shrink-0 transition-colors cursor-pointer ${
+                      memberRosterFilter === 'all'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    All ({memberStats.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMemberRosterFilter('unpaid')}
+                    className={`px-3 py-1 rounded-lg font-medium flex-shrink-0 transition-colors cursor-pointer ${
+                      memberRosterFilter === 'unpaid'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    Unpaid ({unpaidCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMemberRosterFilter('partial')}
+                    className={`px-3 py-1 rounded-lg font-medium flex-shrink-0 transition-colors cursor-pointer ${
+                      memberRosterFilter === 'partial'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    Partial ({partialCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMemberRosterFilter('paid')}
+                    className={`px-3 py-1 rounded-lg font-medium flex-shrink-0 transition-colors cursor-pointer ${
+                      memberRosterFilter === 'paid'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    Paid ({paidList.length})
+                  </button>
+                </div>
+
+                {/* Member Dues Cards List */}
+                <div className="space-y-2.5">
+                  {filteredAndSortedMembers.length === 0 ? (
+                    <div className="p-6 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
+                      No members match the current filter
+                    </div>
+                  ) : (
+                    filteredAndSortedMembers.map((member) => {
+                      const isPaid = member.status === 'paid';
+                      const isPartial = member.status === 'partial';
+                      const isUnpaid = member.status === 'unpaid';
+                      const avatarLetter = (member.name || 'M').charAt(0).toUpperCase();
+
+                      return (
+                        <div
+                          key={member.id}
+                          className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-card hover:border-slate-300 transition-all space-y-2.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3 min-w-0">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-xs shrink-0 ${
+                                isPaid
+                                  ? 'bg-emerald-50 border border-emerald-100 text-emerald-600'
+                                  : isPartial
+                                  ? 'bg-amber-50 border border-amber-100 text-amber-600'
+                                  : 'bg-indigo-50 border border-indigo-100 text-brand-600'
+                              }`}>
+                                {avatarLetter}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center space-x-1.5 flex-wrap">
+                                  <h4 className="text-xs font-bold text-slate-900 leading-tight truncate">{member.name}</h4>
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">
+                                    #{member.ticket}
+                                  </span>
+                                  {member.hasWon && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-50 text-amber-600 border border-amber-200 rounded">
+                                      🏆 Winner
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center space-x-2 mt-1 flex-wrap">
+                                  {isPaid ? (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                      PAID
+                                    </span>
+                                  ) : isPartial ? (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                                      PARTIAL
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-100">
+                                      UNPAID
+                                    </span>
+                                  )}
+                                  <span className="text-xs font-extrabold text-slate-900 font-mono">
+                                    Due: {formatCurrency(member.remaining)}
+                                  </span>
+                                  {isPartial && (
+                                    <span className="text-[10px] text-emerald-600 font-semibold font-mono">
+                                      (Paid: {formatCurrency(member.paid)})
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-1.5 shrink-0">
+                              {!isPaid && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    triggerHapticFeedback('light');
+                                    const msg = encodeURIComponent(
+                                      `*CHIT INSTALLMENT DUE REMINDER* 🔔\n` +
+                                      `Group: ${activeGroup?.name}\n` +
+                                      `Month: Month ${selectedDashboardMonth} (${getDashboardMonthLabel(activeGroup, selectedDashboardMonth)})\n` +
+                                      `Ticket: #${member.ticket}\n` +
+                                      `Subscriber: ${member.name}\n` +
+                                      `Pending Due: ${formatCurrency(member.remaining)}\n\n` +
+                                      `Kindly clear your installment due for this month. Thank you! 🙏`
+                                    );
+                                    const cleanPhone = normalizePhone(member.phone);
+                                    const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${msg}` : `https://wa.me/?text=${msg}`;
+                                    window.open(url, '_blank');
+                                  }}
+                                  className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Send Reminder"
+                                >
+                                  <Send size={14} />
+                                </button>
+                              )}
                               <button
                                 type="button"
-                                onClick={() => handleDeletePayment(tx)}
-                                title="Delete payment receipt"
-                                className="p-1.5 text-[#AEABD8] hover:text-[#FF6B6B] hover:bg-[#E41414]/15 border border-[#27264E] hover:border-[#E41414]/40 rounded-lg transition-colors active:scale-95 cursor-pointer"
+                                onClick={() => {
+                                  setRecordingPaymentMember(member);
+                                  setEditingTransaction(null);
+                                  const defaultAmount = (member.totalPendingToday > 0 
+                                    ? member.totalPendingToday 
+                                    : (member.remaining > 0 ? member.remaining : 20000));
+                                  setQuickPaymentAmount(defaultAmount.toString());
+                                  setPaymentWalletType('cash_in_hand');
+                                  setPaymentAllocationMode('auto');
+                                  setPaymentCustomMonths([selectedDashboardMonth]);
+                                  setPaymentDateType('today');
+                                  setCustomPaymentDate(new Date().toISOString().split('T')[0]);
+                                  setPaymentNote('');
+                                  setPaymentReceiptUrl('');
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center space-x-1 shadow-xs cursor-pointer"
                               >
-                                <Trash2 size={13} />
+                                <span>Record</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Progress indication for partial member */}
+                          {isPartial && (
+                            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
+                              <span>
+                                {Math.round((member.paid / (member.effectiveDue || 1)) * 100)}% Completed
+                              </span>
+                              <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                <div
+                                  className="bg-amber-500 h-full rounded-full"
+                                  style={{ width: `${Math.round((member.paid / (member.effectiveDue || 1)) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+              {/* END: MemberDuesSection */}
+
+              {/* BEGIN: RecentPaymentsLedgerSection */}
+              <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="ledger-preview">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-brand-600 flex items-center justify-center shadow-xs">
+                      <Receipt size={16} />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-900 leading-tight">Payment Ledger</h3>
+                      <p className="text-[10px] text-slate-400">
+                        {currentMonthTransactions.length} recent {currentMonthTransactions.length === 1 ? 'transaction' : 'transactions'} recorded
+                      </p>
+                    </div>
+                  </div>
+                  {setActiveTab && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('reports')}
+                      className="text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors cursor-pointer"
+                    >
+                      View All
+                    </button>
+                  )}
+                </div>
+
+                {/* Ledger Item Cards List */}
+                <div className="space-y-2">
+                  {currentMonthTransactions.length === 0 ? (
+                    <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center text-xs text-slate-400">
+                      No payment records for Month {selectedDashboardMonth} yet
+                    </div>
+                  ) : (
+                    currentMonthTransactions.slice(0, 5).map((tx) => {
+                      const member = dashboardGroupMembers.find(m => m.profileId === tx.profile_id || m.id === tx.group_member_id);
+                      const memberName = member?.name || 'Subscriber';
+                      const ticketNum = member?.ticket || '?';
+                      const walletLabel = tx.wallet_type === 'cash_in_hand' 
+                        ? 'Cash in Hand' 
+                        : tx.wallet_type === 'kishor_bank' 
+                        ? 'Kishor Bank' 
+                        : tx.wallet_type === 'dad_bank' 
+                        ? "Dad's Bank" 
+                        : "Mom's Bank";
+                      const dateStr = new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                      const timeStr = new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                      return (
+                        <div
+                          key={tx.id}
+                          className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center justify-between hover:bg-slate-100/70 transition-all"
+                        >
+                          <div className="flex items-center space-x-3 min-w-0">
+                            <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center shrink-0 font-mono">
+                              #{ticketNum}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="flex items-center space-x-1.5">
+                                <h4 className="text-xs font-bold text-slate-800 truncate">{memberName}</h4>
+                                <span className="text-[9px] px-1 py-0.5 bg-slate-200/70 text-slate-700 rounded font-semibold shrink-0">
+                                  {walletLabel}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-0.5 truncate font-mono">
+                                {dateStr}, {timeStr}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs font-bold text-emerald-600 font-mono">
+                              +{formatCurrency(Number(tx.amount || 0))}
+                            </span>
+                            <div className="flex items-center justify-end space-x-1.5 mt-1 text-slate-400">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  triggerHapticFeedback('light');
+                                  setViewingReceiptTx({ tx, member });
+                                }}
+                                className="hover:text-slate-600 cursor-pointer"
+                                title="Share receipt"
+                              >
+                                <Share2 size={13} />
                               </button>
                             </div>
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+                    })
+                  )}
+                </div>
+              </section>
+              {/* END: RecentPaymentsLedgerSection */}
+            </>
+          )}
+        </div>
+        {/* END: MOBILE VIEW */}
 
-            {/* Unified Quick Record & Edit Payment Modal */}
+            {/* Floating Quick Record FAB (Desktop Only) */}
+            <button
+              type="button"
+              onClick={() => setShowQuickCollectModal(true)}
+              className="hidden lg:flex fixed bottom-6 right-6 w-12 h-12 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white rounded-full shadow-lg shadow-brand-600/35 items-center justify-center transition-transform hover:scale-105 z-40 cursor-pointer"
+              data-purpose="floating-quick-action"
+              title="Quick Record Cash Entry"
+            >
+              <Plus size={22} className="stroke-[2.5]" />
+            </button>
+
+            {/* Unified Quick Record & Edit Payment Modal (Fintech White Theme) */}
             {(recordingPaymentMember || editingTransaction) && (
-              <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
                 <form
                   onSubmit={editingTransaction ? handleSavePaymentEdit : handleRecordQuickPayment}
-                  className="bg-[#1D1D41] rounded-3xl border border-[#27264E] p-4 sm:p-6 w-full max-w-md space-y-3.5 sm:space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto text-white"
+                  className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 w-full max-w-md space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto text-slate-800"
                 >
                   {/* Modal Header */}
-                  <div className="flex justify-between items-center border-b border-[#27264E] pb-3">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2.5">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                         editingTransaction 
-                          ? 'bg-[#6359E9]/20 text-[#64CFF6]' 
-                          : 'bg-[#02B15A]/20 text-[#02B15A]'
+                          ? 'bg-brand-50 text-brand-600' 
+                          : 'bg-emerald-50 text-emerald-600'
                       }`}>
                         {editingTransaction ? <Edit3 size={16} /> : <Coins size={16} />}
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-white">
+                        <h4 className="text-sm font-bold text-slate-900">
                           {editingTransaction ? 'Edit payment' : 'Record Installment Payment'}
                         </h4>
-                        <p className="text-[10px] text-[#AEABD8]">
+                        <p className="text-[10px] text-slate-500">
                           {editingTransaction 
                             ? `Receipt #${editingTransaction.id.slice(0, 8)} · Month ${selectedDashboardMonth}`
                             : `Month ${selectedDashboardMonth} · ${activeGroup?.name}`}
@@ -4303,7 +5060,7 @@ Thank you for your prompt payment! 🙏`;
                         setRecordingPaymentMember(null);
                         setEditingTransaction(null);
                       }}
-                      className="text-[#AEABD8] hover:text-white p-1 rounded-lg hover:bg-[#27264E] transition-colors cursor-pointer"
+                      className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <X size={16} />
                     </button>
@@ -4318,28 +5075,28 @@ Thank you for your prompt payment! 🙏`;
                     const ticketNum = matchedMember?.ticket || (recordingPaymentMember ? recordingPaymentMember.ticket : '?');
 
                     return (
-                      <div className="bg-[#141332] border border-[#27264E] rounded-xl p-3 flex justify-between items-center text-xs">
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex justify-between items-center text-xs">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#9C2CF3] to-[#3A6FF9] text-white font-bold text-xs flex items-center justify-center shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-brand-600 text-white font-bold text-xs flex items-center justify-center shrink-0 font-display">
                             {subscriberName.charAt(0).toUpperCase()}
                           </div>
                           <div className="truncate">
-                            <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Subscriber</span>
-                            <span className="font-bold text-white truncate block">{subscriberName}</span>
-                            <span className="text-[#64CFF6] text-[10px] font-mono">#{ticketNum}</span>
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Subscriber</span>
+                            <span className="font-bold text-slate-900 truncate block">{subscriberName}</span>
+                            <span className="text-brand-600 text-[10px] font-mono font-semibold">#{ticketNum}</span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
                           {recordingPaymentMember ? (
                             <>
-                              <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
+                              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
                                 {recordingPaymentMember.totalPendingToday > recordingPaymentMember.remaining ? 'Total Due Today' : 'Remaining Due'}
                               </span>
-                              <span className="font-extrabold text-[#FFBB38] text-sm">
+                              <span className="font-extrabold text-amber-700 text-sm font-mono">
                                 {formatCurrency(recordingPaymentMember.totalPendingToday > 0 ? recordingPaymentMember.totalPendingToday : recordingPaymentMember.remaining)}
                               </span>
                               {recordingPaymentMember.totalPendingToday > recordingPaymentMember.remaining && (
-                                <span className="text-[9px] text-[#AEABD8] font-medium block">
+                                <span className="text-[9px] text-slate-500 font-medium block">
                                   (M{selectedDashboardMonth} Due: {formatCurrency(recordingPaymentMember.remaining)})
                                 </span>
                               )}
@@ -4350,11 +5107,11 @@ Thank you for your prompt payment! 🙏`;
                               const batchTotal = match ? parseFloat(match[2]) : null;
                               return (
                                 <>
-                                  <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Logged Amount</span>
+                                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Logged Amount</span>
                                   <div className="flex items-center gap-1.5 justify-end flex-wrap">
-                                    <span className="font-bold text-[#64CFF6]">{formatCurrency(Number(editingTransaction.amount || 0))}</span>
+                                    <span className="font-bold text-brand-700 font-mono">{formatCurrency(Number(editingTransaction.amount || 0))}</span>
                                     {batchTotal && batchTotal !== Number(editingTransaction.amount) && (
-                                      <span className="text-[9.5px] font-extrabold bg-[#27264E] text-[#64CFF6] border border-[#3A3A5A] px-1.5 py-0.2 rounded">
+                                      <span className="text-[9.5px] font-extrabold bg-brand-50 text-brand-700 border border-brand-200/60 px-1.5 py-0.2 rounded">
                                         Part of {formatCurrency(batchTotal)} Total
                                       </span>
                                     )}
@@ -4368,13 +5125,13 @@ Thank you for your prompt payment! 🙏`;
                     );
                   })()}
 
-                  {/* Payment Amount Input (Large Centered High-Legibility Input) */}
+                  {/* Payment Amount Input */}
                   <div className="space-y-1.5 text-center">
-                    <label className="text-[11px] text-[#AEABD8] font-extrabold uppercase tracking-wider block">
+                    <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
                       Payment Amount (₹)
                     </label>
                     <div className="relative max-w-[320px] mx-auto">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-[#AEABD8] select-none">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-400 select-none">
                         ₹
                       </span>
                       <input
@@ -4383,20 +5140,20 @@ Thank you for your prompt payment! 🙏`;
                         placeholder="0"
                         value={quickPaymentAmount}
                         onChange={(e) => setQuickPaymentAmount(e.target.value)}
-                        className="w-full bg-[#141332] border-2 border-[#27264E] focus:border-[#6359E9] rounded-2xl pl-10 pr-6 py-3.5 text-2xl sm:text-3xl font-black text-white tracking-tight shadow-xs text-center focus:outline-none transition-all"
+                        className="w-full bg-slate-50 border-2 border-slate-200 focus:border-brand-600 focus:bg-white rounded-2xl pl-10 pr-6 py-3 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight shadow-xs text-center focus:outline-none transition-all font-mono"
                       />
                     </div>
                   </div>
 
                   {/* Payment Distribution Preview Card */}
                   {recordingPaymentMember && parseFloat(quickPaymentAmount) > 0 && (
-                    <div className="space-y-2 bg-[#141332] border border-[#27264E] rounded-xl p-3 animate-in fade-in duration-150">
-                      <div className="flex justify-between items-center border-b border-[#27264E] pb-1.5">
-                        <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Coins size={12} className="text-[#02B15A]" />
+                    <div className="space-y-2 bg-slate-50 border border-slate-200/80 rounded-xl p-3 animate-in fade-in duration-150">
+                      <div className="flex justify-between items-center border-b border-slate-200/60 pb-1.5">
+                        <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Coins size={12} className="text-emerald-600" />
                           <span>How this payment applies:</span>
                         </span>
-                        <span className="text-xs font-black text-white">
+                        <span className="text-xs font-black text-slate-900 font-mono">
                           Total: {formatCurrency(parseFloat(quickPaymentAmount))}
                         </span>
                       </div>
@@ -4425,38 +5182,38 @@ Thank you for your prompt payment! 🙏`;
                               const monthName = d.toLocaleDateString('en-US', { month: 'short' });
                               const yearShort = d.getFullYear().toString().slice(-2);
                               const formattedMonthLabel = alloc.month === 0 
-                                ? `${monthName} '${yearShort} (M0 Launch)`
+                                ? `${monthName} '${yearShort} (M0 Launch)` 
                                 : `${monthName} '${yearShort} (M${alloc.month})`;
 
                               const badgeStyle = alloc.type === 'arrear'
-                                ? 'bg-[#02B15A]/20 text-[#02B15A] border-[#02B15A]/30'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 : alloc.type === 'current'
-                                  ? 'bg-[#6359E9]/20 text-[#64CFF6] border-[#6359E9]/30'
-                                  : 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+                                ? 'bg-brand-50 text-brand-700 border-brand-200'
+                                : 'bg-purple-50 text-purple-700 border-purple-200';
 
                               const typeName = alloc.type === 'arrear'
                                 ? 'Old Dues Cleared'
                                 : alloc.type === 'current'
-                                  ? 'Month Settled'
-                                  : 'Advance Credit';
+                                ? 'Month Settled'
+                                : 'Advance Credit';
 
                               return (
                                 <div
                                   key={alloc.month}
-                                  className="flex items-center justify-between text-xs bg-[#1D1D41] border border-[#27264E] rounded-lg px-2.5 py-2 shadow-2xs"
+                                  className="flex items-center justify-between text-xs bg-white border border-slate-200/80 rounded-lg px-2.5 py-1.5 shadow-2xs"
                                 >
                                   <div className="flex items-center gap-2">
-                                    <span className="font-extrabold text-white">{formattedMonthLabel}</span>
+                                    <span className="font-bold text-slate-800">{formattedMonthLabel}</span>
                                     <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${badgeStyle}`}>
                                       {typeName}
                                     </span>
                                     {alloc.statusAfter === 'partial' && (
-                                      <span className="text-[9px] font-bold text-[#FFBB38] bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30">
+                                      <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
                                         Partial (Remaining: {formatCurrency(Math.max(0, alloc.due - (alloc.priorPaid + alloc.amount)))})
                                       </span>
                                     )}
                                   </div>
-                                  <span className="font-black text-white">
+                                  <span className="font-black text-slate-900 font-mono">
                                     {formatCurrency(alloc.amount)}
                                   </span>
                                 </div>
@@ -4468,9 +5225,9 @@ Thank you for your prompt payment! 🙏`;
                     </div>
                   )}
 
-                  {/* 4-Wallet Selector (Receiving Account / Vault) */}
+                  {/* 4-Wallet Selector */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Receiving Account / Vault</label>
+                    <label className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block">Receiving Account / Vault</label>
                     <div className="grid grid-cols-2 gap-2">
                       {[
                         { id: 'cash_in_hand', label: 'Cash in Hand', icon: Banknote },
@@ -4487,11 +5244,11 @@ Thank you for your prompt payment! 🙏`;
                             onClick={() => setPaymentWalletType(w.id)}
                             className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer ${
                               isSelected
-                                ? 'bg-[#6359E9] border-[#6F64FF] text-white shadow-md shadow-[#6359E9]/30'
-                                : 'bg-[#141332] border-[#27264E] hover:bg-[#27264E] text-[#AEABD8] hover:text-white'
+                                ? 'bg-brand-50 border-brand-500 text-brand-700 shadow-2xs ring-1 ring-brand-500/20'
+                                : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100 text-slate-600 hover:text-slate-900'
                             }`}
                           >
-                            <Icon size={14} className={isSelected ? 'text-white' : 'text-[#64CFF6]'} />
+                            <Icon size={14} className={isSelected ? 'text-brand-600' : 'text-slate-400'} />
                             <span className="truncate">{w.label}</span>
                           </button>
                         );
@@ -4499,9 +5256,9 @@ Thank you for your prompt payment! 🙏`;
                     </div>
                   </div>
 
-                  {/* Date Selector (Today / Yesterday / Custom) */}
+                  {/* Date Selector */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Date</label>
+                    <label className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block">Date</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { id: 'today', label: 'Today' },
@@ -4516,8 +5273,8 @@ Thank you for your prompt payment! 🙏`;
                             onClick={() => setPaymentDateType(d.id as any)}
                             className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
                               isSelected
-                                ? 'bg-[#6359E9] border-[#6F64FF] text-white shadow-md shadow-[#6359E9]/30'
-                                : 'bg-[#141332] border-[#27264E] hover:bg-[#27264E] text-[#AEABD8] hover:text-white'
+                                ? 'bg-brand-50 border-brand-500 text-brand-700 shadow-2xs'
+                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-slate-900'
                             }`}
                           >
                             {d.label}
@@ -4532,7 +5289,7 @@ Thank you for your prompt payment! 🙏`;
                           type="date"
                           value={customPaymentDate}
                           onChange={(e) => setCustomPaymentDate(e.target.value)}
-                          className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-900 focus:outline-none"
                         />
                       </div>
                     )}
@@ -4540,36 +5297,36 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* Note (optional) */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Note (optional)</label>
+                    <label className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block">Note (optional)</label>
                     <input
                       type="text"
                       placeholder="e.g. Paid via GPay / Handed cash to Dad"
                       value={paymentNote}
                       onChange={(e) => setPaymentNote(e.target.value)}
-                      className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-medium text-white placeholder-[#AEABD8]/60 focus:outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none"
                     />
                   </div>
 
                   {/* Receipt Photo Attachment */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">Receipt Attachment</label>
+                    <label className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block">Receipt Attachment</label>
                     {paymentReceiptUrl ? (
-                      <div className="flex items-center justify-between p-2.5 bg-[#02B15A]/15 border border-[#02B15A]/30 rounded-xl">
+                      <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
                         <div className="flex items-center gap-2.5">
                           <img
                             src={paymentReceiptUrl}
                             alt="Receipt preview"
-                            className="w-10 h-10 object-cover rounded-lg border border-[#02B15A]"
+                            className="w-10 h-10 object-cover rounded-lg border border-emerald-300"
                           />
                           <div className="text-left">
-                            <span className="text-xs font-bold text-white block">Receipt Attached</span>
-                            <span className="text-[10px] text-[#02B15A]">Photo ready</span>
+                            <span className="text-xs font-bold text-slate-900 block">Receipt Attached</span>
+                            <span className="text-[10px] text-emerald-700">Photo ready</span>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => setPaymentReceiptUrl('')}
-                          className="text-[#FF6B6B] hover:text-white text-xs font-bold px-2 py-1 rounded-lg hover:bg-[#E41414]/20 cursor-pointer"
+                          className="text-rose-600 hover:text-rose-800 text-xs font-bold px-2 py-1 rounded-lg hover:bg-rose-50 cursor-pointer"
                         >
                           Remove
                         </button>
@@ -4585,9 +5342,9 @@ Thank you for your prompt payment! 🙏`;
                         />
                         <label
                           htmlFor="dashboard-receipt-upload"
-                          className="flex items-center justify-center gap-2 border border-dashed border-[#27264E] hover:border-[#6359E9] bg-[#141332] hover:bg-[#27264E]/60 rounded-xl py-2.5 px-3 text-xs text-[#AEABD8] hover:text-white font-semibold cursor-pointer transition-colors"
+                          className="flex items-center justify-center gap-2 border border-dashed border-slate-300 hover:border-brand-500 bg-slate-50 hover:bg-slate-100 rounded-xl py-2.5 px-3 text-xs text-slate-600 hover:text-slate-900 font-semibold cursor-pointer transition-colors"
                         >
-                          <Paperclip size={14} className="text-[#64CFF6]" />
+                          <Paperclip size={14} className="text-brand-600" />
                           <span>Attach receipt photo</span>
                         </label>
                       </div>
@@ -4595,13 +5352,13 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
+                  <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
                     {editingTransaction ? (
                       <button
                         type="button"
                         onClick={() => handleDeletePayment(editingTransaction)}
                         disabled={isProcessingPayment}
-                        className="w-full sm:w-auto text-[#FF6B6B] hover:text-white hover:bg-[#E41414]/20 border border-[#E41414]/30 px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                        className="w-full sm:w-auto text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
                       >
                         <Trash2 size={13} />
                         <span>Delete</span>
@@ -4615,16 +5372,16 @@ Thank you for your prompt payment! 🙏`;
                           setRecordingPaymentMember(null);
                           setEditingTransaction(null);
                         }}
-                        className="w-full sm:w-auto border border-[#27264E] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-all text-center cursor-pointer"
+                        className="w-full sm:w-auto border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs px-4 py-2 rounded-xl transition-all text-center cursor-pointer"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={isProcessingPayment}
-                        className="w-full sm:w-auto bg-[#02B15A] hover:bg-[#029B4F] text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-all shadow-md shadow-[#02B15A]/20 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                        className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2 rounded-xl transition-all shadow-sm shadow-brand-500/25 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                       >
-                        <Check size={14} />
+                        <Check size={14} className="stroke-[2.5]" />
                         <span>
                           {isProcessingPayment 
                             ? 'Saving...' 
@@ -4674,48 +5431,6 @@ Thank you for your prompt payment! 🙏`;
                 />
               );
             })()}
-
-            {/* Live System Activity and Audit Log */}
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-5 space-y-4 shadow-xl">
-              <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <ShieldAlert size={16} className="text-[#64CFF6]" />
-                Live System Audit Log
-              </h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left text-[#AEABD8]">
-                  <thead className="text-[10px] text-[#AEABD8] uppercase bg-[#141332] rounded-lg border-b border-[#27264E]">
-                    <tr>
-                      <th className="py-2.5 px-3">Timestamp</th>
-                      <th className="py-2.5 px-3">Table</th>
-                      <th className="py-2.5 px-3">Action Description</th>
-                      <th className="py-2.5 px-3 text-right">Executor</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#27264E]">
-                    {auditLogs.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="py-6 text-center text-[#AEABD8] text-xs">
-                          No transactions logged yet. Real database transactions will appear here live.
-                        </td>
-                      </tr>
-                    ) : (
-                      auditLogs.map((log, index) => (
-                        <tr key={index} className="hover:bg-[#27264E]/40 transition-colors">
-                          <td className="py-3 px-3 font-medium text-[#AEABD8]">{log.timestamp}</td>
-                          <td className="py-3 px-3">
-                            <span className="bg-[#27264E] text-[#64CFF6] px-1.5 py-0.5 rounded font-mono border border-[#3A3A5A]">
-                              {log.table}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-white">{log.desc}</td>
-                          <td className="py-3 px-3 text-right font-medium text-[#64CFF6]">{log.executor}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
         );
       }
@@ -4790,99 +5505,203 @@ Thank you for your prompt payment! 🙏`;
     case 'settings':
       return <SettingsManager />;
 
-    case 'chits':
+    case 'chits': {
       const selectedWorkspaceGroup = localGroups.find(g => g.id === selectedWorkspaceGroupId);
+
+      // Calculations for Chit Directory
+      const allNonDeletedGroups = localGroups.filter(g => g.status !== 'deleted');
+      const deletedGroups = localGroups.filter(g => g.status === 'deleted');
+      const activeGroupsCount = allNonDeletedGroups.filter(g => g.status === 'active' || (!g.status && g.active)).length;
+      const draftGroupsCount = allNonDeletedGroups.filter(g => g.status === 'draft').length;
+      const completedGroupsCount = allNonDeletedGroups.filter(g => g.status === 'completed').length;
+      const totalCirculatingValue = allNonDeletedGroups.reduce((acc, g) => acc + (Number(g.totalValue) || 0), 0);
+      const totalKaiIruppuCirculating = allNonDeletedGroups.reduce((acc, g) => acc + (Number(g.kaiIruppuPool || g.kai_iruppu_pool) || 0), 0);
+      const totalEnrolledSlotsCount = allNonDeletedGroups.reduce((acc, g) => acc + (Number(g.memberCount || g.duration) || 0), 0);
+
+      const filteredGroups = localGroups.filter(g => {
+        if (g.status === 'deleted') return false;
+        if (groupFilter === 'draft') return g.status === 'draft';
+        if (groupFilter === 'completed') return g.status === 'completed';
+        if (groupFilter === 'active') return g.status === 'active' || (!g.status && g.active);
+        return true;
+      }).filter(g => {
+        if (!chitsSearchQuery.trim()) return true;
+        return g.name.toLowerCase().includes(chitsSearchQuery.toLowerCase());
+      });
+
+      const filteredDeletedGroups = deletedGroups.filter(g => {
+        if (!chitsSearchQuery.trim()) return true;
+        return g.name.toLowerCase().includes(chitsSearchQuery.toLowerCase());
+      });
 
       return (
         <div className="space-y-4 sm:space-y-6">
           
-          {/* 1. CHIT GROUP WORKSPACE VIEW */}
+          {/* ═══════════════════════════════════════════════════════════════════
+              1. CHIT GROUP WORKSPACE VIEW
+              ═══════════════════════════════════════════════════════════════════ */}
           {selectedWorkspaceGroupId && selectedWorkspaceGroup && !showWizard ? (
             <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200">
               
               {/* Workspace Top Navigation Bar */}
-              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-sm">
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 shadow-subtle flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3">
                   <button
                     type="button"
-                    onClick={() => setSelectedWorkspaceGroupId(null)}
-                    className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs w-fit active:scale-95"
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setSelectedWorkspaceGroupId(null);
+                    }}
+                    className="border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs w-fit active:scale-95 cursor-pointer"
                   >
-                    <ArrowLeft size={14} /> Back to Directory
+                    <ArrowLeft size={14} className="text-slate-500" />
+                    <span>Back to Groups</span>
                   </button>
-                  <div className="h-5 w-px bg-[#27264E] hidden sm:block"></div>
+                  <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`w-2.5 h-2.5 rounded-full ${
-                      selectedWorkspaceGroup.status === 'draft' ? 'bg-[#FFBB38]' : selectedWorkspaceGroup.status === 'completed' ? 'bg-[#9C2CF3]' : 'bg-[#02B15A] animate-pulse'
+                      selectedWorkspaceGroup.status === 'draft' ? 'bg-amber-500' : selectedWorkspaceGroup.status === 'completed' ? 'bg-purple-500' : 'bg-emerald-500 animate-pulse'
                     }`}></span>
-                    <h3 className="text-sm sm:text-base font-bold text-white truncate max-w-[180px] sm:max-w-none">{selectedWorkspaceGroup.name}</h3>
-                    <span className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate max-w-[200px] sm:max-w-none">{selectedWorkspaceGroup.name}</h3>
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                       selectedWorkspaceGroup.status === 'draft'
-                        ? 'bg-[#FFBB38]/10 text-[#FFBB38] border-[#FFBB38]/30'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
                         : selectedWorkspaceGroup.status === 'completed'
-                          ? 'bg-[#9C2CF3]/10 text-[#C084FC] border-[#9C2CF3]/30'
-                          : 'bg-[#02B15A]/10 text-[#02B15A] border-[#02B15A]/30'
+                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     }`}>
                       {selectedWorkspaceGroup.status ? selectedWorkspaceGroup.status.toUpperCase() : 'ACTIVE'}
                     </span>
-                    <span className="text-[9px] sm:text-[10px] font-bold bg-[#6359E9]/15 text-[#64CFF6] border border-[#6359E9]/30 px-2 py-0.5 rounded">
+                    <span className="text-[10px] font-bold bg-brand-50 text-brand-700 border border-brand-200 px-2 py-0.5 rounded-full font-mono">
                       Month {selectedWorkspaceGroup.currentMonth} of {selectedWorkspaceGroup.duration}
                     </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#27264E]">
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                   <button
                     type="button"
                     onClick={() => openEditGroupModal(selectedWorkspaceGroup)}
-                    className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors active:scale-95"
+                    className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs active:scale-95 cursor-pointer"
                   >
-                    <Edit3 size={13} className="text-[#AEABD8]" /> Edit Details
+                    <Edit3 size={13} className="text-slate-500" />
+                    <span>Edit Details</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => openSoftDeleteModal(selectedWorkspaceGroup)}
-                    className="border border-[#E41414]/30 bg-[#E41414]/10 hover:bg-[#E41414]/20 text-[#E41414] font-bold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs active:scale-95"
+                    className="border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs active:scale-95 cursor-pointer"
                     title="Move group to Recycle Bin"
                   >
-                    <Trash2 size={13} className="text-[#E41414]" /> Move to Bin
+                    <Trash2 size={13} className="text-rose-600" />
+                    <span>Move to Bin</span>
                   </button>
                 </div>
               </div>
 
-              {/* Group Key Metric Statistics (2x2 on mobile, 4 on desktop) */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-                <div className="bg-[#1D1D41] border border-[#27264E] p-3 sm:p-3.5 rounded-2xl shadow-2xs">
-                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block truncate">Total Pool Value</span>
-                  <span className="text-base sm:text-lg font-bold text-white mt-0.5 block truncate">{formatCurrency(selectedWorkspaceGroup.totalValue)}</span>
-                  <span className="text-[10px] text-[#AEABD8]/70 truncate block">{selectedWorkspaceGroup.duration} Tickets</span>
+              {/* Cycle Stepper / Timeline Anatomy (Inspired by Design Spec Section 3) */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-subtle space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                      <CalendarDays size={14} className="text-brand-600" /> Cycle Timeline:
+                    </span>
+                    <span className="text-xs font-semibold text-slate-700">{selectedWorkspaceGroup.name}</span>
+                  </div>
+                  <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Next scheduled auction: </span>
+                    <strong className="font-semibold text-slate-800">{getGroupAuctionDate(selectedWorkspaceGroup.id).display}</strong>
+                  </div>
                 </div>
 
-                <div className="bg-[#1D1D41] border border-[#27264E] p-3 sm:p-3.5 rounded-2xl shadow-2xs">
-                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block truncate">Monthly Installment</span>
-                  <span className="text-base sm:text-lg font-bold text-[#64CFF6] mt-0.5 block truncate">
-                    {formatCurrency(selectedWorkspaceGroup.totalValue / selectedWorkspaceGroup.duration)}
+                <div className="overflow-x-auto pb-2 scrollbar-none">
+                  <div className="flex items-center gap-2 min-w-max">
+                    {Array.from({ length: selectedWorkspaceGroup.duration + 1 }, (_, i) => i).map((m, idx) => {
+                      const isM0 = m === 0;
+                      const isCurrent = m === selectedWorkspaceGroup.currentMonth;
+                      const isCompleted = m < selectedWorkspaceGroup.currentMonth;
+                      const isFinale = m === selectedWorkspaceGroup.duration;
+
+                      let label = isM0 ? 'M0 Launch' : isFinale ? `M${m} (Finale)` : isCurrent ? `M${m} (Current)` : `M${m}`;
+                      if (m === 1 && !isCurrent && !isCompleted) label = 'M1 (1st Auction)';
+
+                      return (
+                        <React.Fragment key={m}>
+                          {idx > 0 && <ChevronRight size={12} className="text-slate-300 shrink-0" />}
+                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 ${
+                            isCompleted
+                              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                              : isCurrent
+                                ? 'bg-[#4338CA] text-white shadow-md shadow-indigo-500/20 ring-2 ring-indigo-200'
+                                : 'bg-slate-50 border border-slate-200 text-slate-400'
+                          }`}>
+                            {isCompleted ? (
+                              <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                            ) : isCurrent ? (
+                              <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0"></span>
+                            ) : null}
+                            <span>{label}</span>
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Group Key Metric Statistics Cards (2x2 on mobile, 4 on desktop) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Pool Value</span>
+                    <span className="text-xl sm:text-2xl font-black text-slate-900 mt-1 block font-mono tracking-tight truncate">
+                      {formatCurrency(selectedWorkspaceGroup.totalValue)}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-2 block font-medium">
+                    {selectedWorkspaceGroup.duration} Tickets Enrolled
                   </span>
-                  <span className="text-[10px] text-[#AEABD8]/70 truncate block">per member</span>
                 </div>
 
-                <div className="bg-[#1D1D41] border border-[#27264E] p-3 sm:p-3.5 rounded-2xl shadow-2xs">
-                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block truncate">Accumulated Pool</span>
-                  <span className="text-base sm:text-lg font-bold text-[#02B15A] mt-0.5 block truncate">
-                    {formatCurrency(selectedWorkspaceGroup.kaiIruppuPool || 0)}
+                <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Monthly Installment</span>
+                    <span className="text-xl sm:text-2xl font-black text-brand-700 mt-1 block font-mono tracking-tight truncate">
+                      {formatCurrency(selectedWorkspaceGroup.totalValue / selectedWorkspaceGroup.duration)}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-2 block font-medium">
+                    Per Member / Month
                   </span>
-                  <span className="text-[10px] text-[#02B15A] font-medium truncate block">Kai Iruppu</span>
                 </div>
 
-                <div className="bg-[#1D1D41] border border-[#27264E] p-3 sm:p-3.5 rounded-2xl shadow-2xs">
-                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block truncate">Scheduled Auction</span>
-                  <span className="text-xs sm:text-xs font-bold text-white mt-1 block truncate">
-                    {getGroupAuctionDate(selectedWorkspaceGroup.id).display}
+                <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Accumulated Pool</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">Kai Iruppu</span>
+                    </div>
+                    <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-1 block font-mono tracking-tight truncate">
+                      {formatCurrency(selectedWorkspaceGroup.kaiIruppuPool || 0)}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-emerald-600 mt-2 block font-medium">
+                    Discounts Carried Forward
                   </span>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Scheduled Auction</span>
+                    <span className="text-sm sm:text-base font-bold text-slate-900 mt-1 block truncate">
+                      {getGroupAuctionDate(selectedWorkspaceGroup.id).display}
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setScheduleModalGroup(selectedWorkspaceGroup)}
-                    className="text-[9px] font-bold text-[#64CFF6] hover:underline mt-0.5 block cursor-pointer"
+                    className="text-[11px] font-semibold text-brand-600 hover:text-brand-700 hover:underline mt-2 block text-left cursor-pointer"
                   >
                     Configure Schedule →
                   </button>
@@ -4891,16 +5710,16 @@ Thank you for your prompt payment! 🙏`;
 
               {/* Month 0 / Launch Status Banner */}
               {selectedWorkspaceGroup.currentMonth === 0 && (
-                <div className="bg-[#1D1D41] border border-[#FFBB38]/40 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-subtle">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#FFBB38] animate-pulse"></span>
-                      <h4 className="text-xs font-bold text-[#FFBB38] uppercase tracking-wider">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">
                         Month 0: Launch Month — Organizer Profit Phase
                       </h4>
                     </div>
-                    <p className="text-xs text-[#AEABD8]">
-                      All {selectedWorkspaceGroup.duration} member installments are pooled and allocated directly to the Organizer as Organizer Profit ({formatCurrency(selectedWorkspaceGroup.totalValue)}).
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      All {selectedWorkspaceGroup.duration} member installments are pooled and allocated directly to the Organizer as Organizer Profit ({formatCurrency(selectedWorkspaceGroup.totalValue)}). No live auction is held in Month 0.
                     </p>
                   </div>
                   <button
@@ -4943,9 +5762,10 @@ Thank you for your prompt payment! 🙏`;
                         alert('Error updating group: ' + err.message);
                       }
                     }}
-                    className="bg-gradient-to-r from-[#FFBB38] to-[#E5A82E] text-[#141332] font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shrink-0 active:scale-95 w-full sm:w-auto cursor-pointer"
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0 active:scale-95 w-full sm:w-auto cursor-pointer"
                   >
-                    <Rocket size={14} /> Confirm Launch &amp; Roll to M1
+                    <Rocket size={14} />
+                    <span>Confirm Launch &amp; Roll to M1</span>
                   </button>
                 </div>
               )}
@@ -4966,14 +5786,14 @@ Thank you for your prompt payment! 🙏`;
               />
 
               {/* Enrolled Member Ticket Roster Matrix */}
-              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3.5 sm:p-5 space-y-3 sm:space-y-4 shadow-2xs">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[#27264E] pb-3">
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-subtle">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-3">
                   <div>
-                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Users size={16} className="text-[#64CFF6]" />
+                    <h4 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                      <Users size={18} className="text-brand-600" />
                       Enrolled Ticket Matrix
                     </h4>
-                    <p className="text-xs text-[#AEABD8] mt-0.5">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       Live status of assigned tickets and auction winning eligibility
                     </p>
                   </div>
@@ -4984,318 +5804,655 @@ Thank you for your prompt payment! 🙏`;
                         triggerHapticFeedback('light');
                         setPrintChecklistGroup(selectedWorkspaceGroup);
                       }}
-                      className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
                       title="Print monthly payment checklist sheet / PDF"
                     >
-                      <Printer size={13} className="text-[#AEABD8]" />
+                      <Printer size={13} className="text-slate-500" />
                       <span>Print Checklist</span>
                     </button>
 
-                    <span className="text-[10px] font-bold bg-[#141332] text-[#AEABD8] px-3 py-1.5 rounded-xl w-fit border border-[#27264E]">
+                    <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200">
                       Total: {workspaceMembers.length} / {selectedWorkspaceGroup.duration} Tickets
                     </span>
                   </div>
                 </div>
 
+                {/* Filter and Search Bar for Workspace Members */}
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5">
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold w-fit">
+                    <button
+                      type="button"
+                      onClick={() => setWorkspaceMemberFilter('all')}
+                      className={`px-3 py-1 rounded-lg transition-all ${
+                        workspaceMemberFilter === 'all'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      All ({workspaceMembers.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWorkspaceMemberFilter('eligible')}
+                      className={`px-3 py-1 rounded-lg transition-all ${
+                        workspaceMemberFilter === 'eligible'
+                          ? 'bg-white text-emerald-800 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Eligible ({workspaceMembers.filter(m => !m.hasWon).length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWorkspaceMemberFilter('won')}
+                      className={`px-3 py-1 rounded-lg transition-all ${
+                        workspaceMemberFilter === 'won'
+                          ? 'bg-white text-amber-800 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Won ({workspaceMembers.filter(m => m.hasWon).length})
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search member or ticket..."
+                      value={workspaceMemberSearch}
+                      onChange={(e) => setWorkspaceMemberSearch(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 w-full sm:w-56"
+                    />
+                    {workspaceMemberSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceMemberSearch('')}
+                        className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {loadingWorkspaceMembers ? (
-                  <div className="py-8 text-center text-xs text-[#AEABD8] flex items-center justify-center gap-2">
-                    <RefreshCw size={14} className="animate-spin text-[#6359E9]" /> Loading enrolled ticket matrix from Supabase...
+                  <div className="py-12 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                    <RefreshCw size={14} className="animate-spin text-brand-600" />
+                    <span>Loading enrolled ticket matrix from Supabase...</span>
                   </div>
                 ) : workspaceMembers.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-[#AEABD8] bg-[#141332] rounded-xl border border-dashed border-[#27264E]">
+                  <div className="py-8 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                     No individual member tickets linked to this group yet.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
-                    {workspaceMembers.map((member) => (
-                      <div 
-                        key={member.id} 
-                        className={`p-3 sm:p-3.5 rounded-2xl border transition-all space-y-2 ${
-                          member.hasWon
-                            ? 'bg-[#141332]/60 border-[#27264E] opacity-70'
-                            : 'bg-[#141332] border-[#27264E] shadow-2xs hover:border-[#6359E9]/40'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-xs font-bold w-7 h-7 rounded-xl bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 flex items-center justify-center shrink-0">
-                              #{member.ticket}
-                            </span>
-                            <div className="min-w-0">
-                              <strong className="text-xs text-white block truncate max-w-[140px] sm:max-w-[170px]">{member.name}</strong>
-                              <span className="text-[10px] text-[#AEABD8] flex items-center gap-1 mt-0.5 truncate">
-                                <Phone size={10} className="shrink-0" /> {member.phone || 'No phone'}
-                              </span>
-                            </div>
-                          </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {workspaceMembers
+                      .filter(m => {
+                        if (workspaceMemberFilter === 'eligible') return !m.hasWon;
+                        if (workspaceMemberFilter === 'won') return m.hasWon;
+                        return true;
+                      })
+                      .filter(m => {
+                        if (!workspaceMemberSearch.trim()) return true;
+                        const q = workspaceMemberSearch.toLowerCase();
+                        return (m.name || '').toLowerCase().includes(q) || 
+                               String(m.ticket).includes(q) || 
+                               (m.phone || '').includes(q);
+                      })
+                      .map((member) => {
+                        const monogram = (member.name || 'S').trim().charAt(0).toUpperCase();
 
-                          {member.hasWon ? (
-                            <span className="text-[9px] font-bold text-[#FFBB38] bg-[#FFBB38]/10 border border-[#FFBB38]/30 px-2.5 py-0.5 rounded-full shrink-0">
-                              Won
-                            </span>
-                          ) : (
-                            <span className="text-[9px] font-bold text-[#02B15A] bg-[#02B15A]/10 border border-[#02B15A]/30 px-2.5 py-0.5 rounded-full shrink-0">
-                              Eligible
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                        return (
+                          <div 
+                            key={member.id} 
+                            className={`p-3.5 sm:p-4 rounded-2xl border transition-all space-y-2.5 ${
+                              member.hasWon
+                                ? 'bg-slate-50/70 border-slate-200/80'
+                                : 'bg-white border-slate-200/80 shadow-subtle hover:border-brand-300'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                                  member.hasWon
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                    : 'bg-blue-100 text-blue-700 border border-blue-200'
+                                }`}>
+                                  {monogram}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <strong className="text-sm font-bold text-slate-900 block truncate max-w-[140px] sm:max-w-[160px]">
+                                      {member.name}
+                                    </strong>
+                                    <span className="text-[11px] font-mono font-bold text-slate-400">
+                                      #{member.ticket}
+                                    </span>
+                                  </div>
+                                  <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate">
+                                    <Phone size={10} className="shrink-0 text-slate-400" />
+                                    <span>{member.phone || 'No phone'}</span>
+                                  </span>
+                                </div>
+                              </div>
+
+                              {member.hasWon ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
+                                  <Trophy size={10} className="text-amber-600" />
+                                  <span>Won</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                  <CheckCircle2 size={10} className="text-emerald-600" />
+                                  <span>Eligible</span>
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Sub-status pills for split ticket or custom installments */}
+                            {(member.splitPool || member.customInstallment || member.exitMonth) && (
+                              <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-100 text-[10px]">
+                                {member.splitPool && (
+                                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200">
+                                    Split Ticket ({member.splitPool.length} payers)
+                                  </span>
+                                )}
+                                {member.customInstallment && (
+                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold border border-slate-200">
+                                    Custom: {formatCurrency(member.customInstallment)}
+                                  </span>
+                                )}
+                                {member.exitMonth && (
+                                  <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 font-semibold border border-rose-200">
+                                    Exits Month {member.exitMonth}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
               </div>
 
             </div>
           ) : !showWizard ? (
-            /* 2. DIRECTORY VIEW */
-            <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-200">
-               {/* Summary Header banner */}
-              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-4">
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-white">Chit Groups Directory</h3>
-                  <p className="text-xs text-[#AEABD8] mt-0.5">
-                    Active Groups: <strong className="text-white">{localGroups.filter(g => g.status !== 'deleted' && (g.status === 'active' || (!g.status && g.active))).length}</strong> · Total Value: <strong className="text-[#64CFF6]">{formatCurrency(localGroups.filter(g => g.status !== 'deleted').reduce((acc, g) => acc + g.totalValue, 0))}</strong>
-                  </p>
+            /* ═══════════════════════════════════════════════════════════════════
+               2. CHITS DIRECTORY VIEW (DESKTOP & MOBILE FINTECH EXPERIENCE)
+               ═══════════════════════════════════════════════════════════════════ */
+            <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
+
+              {/* ─────────────────────────────────────────────────────────────
+                  MOBILE APP BAR (NATIVE ANDROID FINTECH APP HEADER)
+                  ───────────────────────────────────────────────────────────── */}
+              <div className="block lg:hidden bg-white border border-slate-200/80 rounded-3xl p-4 shadow-subtle space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-brand-700 to-brand-500 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-brand-500/20">
+                      <Briefcase size={18} />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Chit Groups</h2>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        {activeGroupsCount} Active Pools · <strong className="text-brand-700 font-mono">{formatCurrency(totalCirculatingValue)}</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setShowWizard(true);
+                    }}
+                    className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1 active:scale-95 cursor-pointer"
+                  >
+                    <Plus size={14} />
+                    <span>New Chit</span>
+                  </button>
                 </div>
 
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    onClick={() => setShowWizard(true)}
-                    className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-4 py-2 sm:py-2 rounded-xl transition-all shadow-[0_4px_15px_rgba(99,89,233,0.35)] active:scale-95 w-full sm:w-auto text-center cursor-pointer"
-                  >
-                    + New Group
-                  </button>
+                {/* Mobile Search Input */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search chit groups..."
+                    value={chitsSearchQuery}
+                    onChange={(e) => setChitsSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 transition-colors"
+                  />
+                  {chitsSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setChitsSearchQuery('')}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Filter Actions row (Horizontally scrollable on small mobile screens) */}
-              <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-1 flex-nowrap sm:flex-wrap">
+              {/* ─────────────────────────────────────────────────────────────
+                  DESKTOP EXECUTIVE METRICS STRIP (1440w DESIGN SPECIFICATION)
+                  ───────────────────────────────────────────────────────────── */}
+              <div className="hidden lg:grid grid-cols-4 gap-4">
+                {/* Metric 1: Active Groups */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Chit Groups</span>
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Verified
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">{activeGroupsCount}</span>
+                    <span className="text-xs text-slate-500 ml-2 font-medium">of {allNonDeletedGroups.length} total</span>
+                  </div>
+                </div>
+
+                {/* Metric 2: Total Circulating Value */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Circulating Pool</span>
+                    <span className="text-[10px] font-mono text-brand-700 font-semibold bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
+                      LEDGER TOTAL
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+                      {formatCurrency(totalCirculatingValue)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Metric 3: Kai Iruppu Reserve */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Kai Iruppu Reserve</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                      DISCOUNTS
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-3xl font-black text-emerald-700 font-mono tracking-tight">
+                      {formatCurrency(totalKaiIruppuCirculating)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Metric 4: Enrolled Tickets */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Enrolled Tickets</span>
+                    <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      CAPACITY
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+                      {totalEnrolledSlotsCount}
+                    </span>
+                    <span className="text-xs text-slate-500 ml-2 font-medium">member tickets</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ─────────────────────────────────────────────────────────────
+                  DESKTOP TOOLBAR (SEARCH + FILTER PILLS + CREATE CTA)
+                  ───────────────────────────────────────────────────────────── */}
+              <div className="hidden lg:flex items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-subtle">
+                {/* Search */}
+                <div className="relative flex-1 max-w-sm">
+                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by chit group name..."
+                    value={chitsSearchQuery}
+                    onChange={(e) => setChitsSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 transition-colors"
+                  />
+                  {chitsSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setChitsSearchQuery('')}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Pills Cluster */}
+                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                  <button
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setGroupFilter('all');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      groupFilter === 'all'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All ({allNonDeletedGroups.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setGroupFilter('active');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      groupFilter === 'active'
+                        ? 'bg-white text-emerald-800 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span>Active ({activeGroupsCount})</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setGroupFilter('draft');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      groupFilter === 'draft'
+                        ? 'bg-white text-amber-800 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    <span>Draft ({draftGroupsCount})</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setGroupFilter('completed');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      groupFilter === 'completed'
+                        ? 'bg-white text-purple-800 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Completed ({completedGroupsCount})
+                  </button>
+                  <button
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setGroupFilter('bin');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                      groupFilter === 'bin'
+                        ? 'bg-rose-50 text-rose-700 shadow-xs border border-rose-200'
+                        : 'text-rose-600 hover:text-rose-800'
+                    }`}
+                  >
+                    <Trash2 size={12} />
+                    <span>Bin ({deletedGroups.length})</span>
+                  </button>
+                </div>
+
+                {/* Primary New Chit Button */}
                 <button
-                  onClick={() => setGroupFilter('all')}
-                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 cursor-pointer ${
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setShowWizard(true);
+                  }}
+                  className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 active:scale-95 cursor-pointer"
+                >
+                  <Plus size={14} />
+                  <span>+ New Chit Group</span>
+                </button>
+              </div>
+
+              {/* ─────────────────────────────────────────────────────────────
+                  MOBILE SEGMENTED HORIZONTAL FILTER CHIPS (ANDROID TOUCH CAROUSEL)
+                  ───────────────────────────────────────────────────────────── */}
+              <div className="block lg:hidden flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
+                <button
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setGroupFilter('all');
+                  }}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 active:scale-95 cursor-pointer ${
                     groupFilter === 'all'
-                      ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-md ring-2 ring-[#6359E9]/30'
-                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-700'
                   }`}
                 >
-                  All ({localGroups.filter(g => g.status !== 'deleted').length})
+                  All ({allNonDeletedGroups.length})
                 </button>
                 <button
-                  onClick={() => setGroupFilter('active')}
-                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 cursor-pointer ${
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setGroupFilter('active');
+                  }}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer ${
                     groupFilter === 'active'
-                      ? 'bg-[#02B15A] text-white border-[#02B15A] shadow-md ring-2 ring-[#02B15A]/30'
-                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-700'
                   }`}
                 >
-                  Active ({localGroups.filter(g => g.status !== 'deleted' && (g.status === 'active' || (!g.status && g.active))).length})
+                  <span className={`w-1.5 h-1.5 rounded-full ${groupFilter === 'active' ? 'bg-white' : 'bg-emerald-500'}`}></span>
+                  <span>Active ({activeGroupsCount})</span>
                 </button>
                 <button
-                  onClick={() => setGroupFilter('draft')}
-                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 cursor-pointer ${
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setGroupFilter('draft');
+                  }}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer ${
                     groupFilter === 'draft'
-                      ? 'bg-[#FFBB38] text-[#141332] border-[#FFBB38] shadow-md ring-2 ring-[#FFBB38]/30'
-                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-700'
                   }`}
                 >
-                  Draft ({localGroups.filter(g => g.status === 'draft').length})
+                  <span className={`w-1.5 h-1.5 rounded-full ${groupFilter === 'draft' ? 'bg-white' : 'bg-amber-500'}`}></span>
+                  <span>Draft ({draftGroupsCount})</span>
                 </button>
                 <button
-                  onClick={() => setGroupFilter('completed')}
-                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 cursor-pointer ${
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setGroupFilter('completed');
+                  }}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 active:scale-95 cursor-pointer ${
                     groupFilter === 'completed'
-                      ? 'bg-[#9C2CF3] text-white border-[#9C2CF3] shadow-md ring-2 ring-[#9C2CF3]/30'
-                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
+                      ? 'bg-purple-700 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-700'
                   }`}
                 >
-                  Completed ({localGroups.filter(g => g.status === 'completed').length})
+                  Completed ({completedGroupsCount})
                 </button>
                 <button
-                  onClick={() => setGroupFilter('bin')}
-                  className={`text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-xl border transition-all shrink-0 whitespace-nowrap active:scale-95 flex items-center gap-1.5 cursor-pointer ${
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setGroupFilter('bin');
+                  }}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 flex items-center gap-1 active:scale-95 cursor-pointer ${
                     groupFilter === 'bin'
-                      ? 'bg-[#E41414] text-white border-[#E41414] shadow-md ring-2 ring-[#E41414]/30'
-                      : 'bg-[#1D1D41] border-[#E41414]/30 text-[#E41414] hover:bg-[#E41414]/15'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-rose-50 border border-rose-200 text-rose-700'
                   }`}
                 >
                   <Trash2 size={12} />
-                  <span>Recycle Bin ({localGroups.filter(g => g.status === 'deleted').length})</span>
+                  <span>Bin ({deletedGroups.length})</span>
                 </button>
               </div>
 
-              {/* ── RECYCLE BIN VIEW ── */}
+              {/* ─────────────────────────────────────────────────────────────
+                  RECYCLE BIN VIEW (SOFT-DELETED GROUPS)
+                  ───────────────────────────────────────────────────────────── */}
               {groupFilter === 'bin' ? (
-                <div className="space-y-3">
-                  <div className="bg-[#1D1D41] border border-[#E41414]/30 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="space-y-4">
+                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-subtle">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#E41414]/20 border border-[#E41414]/40 text-[#E41414] flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 border border-rose-200">
                         <Trash2 size={20} />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-rose-900 flex items-center gap-2">
                           Recycle Bin
-                          <span className="text-[10px] font-extrabold bg-[#E41414]/20 text-[#E41414] px-2 py-0.5 rounded-full">
-                            {localGroups.filter(g => g.status === 'deleted').length} Groups
+                          <span className="text-[10px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
+                            {deletedGroups.length} Soft-Deleted Groups
                           </span>
                         </h4>
-                        <p className="text-xs text-[#AEABD8] mt-0.5">
-                          Soft-deleted groups are securely preserved here. You can restore them to Draft anytime or permanently purge them.
+                        <p className="text-xs text-rose-700 mt-0.5">
+                          Soft-deleted groups are securely preserved. Restore them to Draft anytime or permanently purge them.
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                    {localGroups.filter(g => g.status === 'deleted').length === 0 ? (
-                      <div className="col-span-full py-12 px-6 bg-[#1D1D41] border border-dashed border-[#27264E] rounded-2xl text-center flex flex-col items-center justify-center space-y-2 shadow-2xs">
-                        <div className="w-12 h-12 rounded-2xl bg-[#E41414]/10 text-[#E41414] flex items-center justify-center">
+                    {filteredDeletedGroups.length === 0 ? (
+                      <div className="col-span-full py-12 px-6 bg-white border border-dashed border-slate-200 rounded-2xl text-center flex flex-col items-center justify-center space-y-2 shadow-subtle">
+                        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200">
                           <Trash2 size={24} />
                         </div>
-                        <h4 className="text-sm font-bold text-white">Recycle Bin is Empty</h4>
-                        <p className="text-xs text-[#AEABD8]">No deleted chit groups found.</p>
+                        <h4 className="text-sm font-bold text-slate-900">Recycle Bin is Empty</h4>
+                        <p className="text-xs text-slate-500">No deleted chit groups found.</p>
                       </div>
                     ) : (
-                      localGroups
-                        .filter(g => g.status === 'deleted')
-                        .map((g) => (
-                          <div key={g.id} className="bg-[#1D1D41] border-2 border-[#E41414]/30 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs hover:border-[#E41414]/60 transition-colors flex flex-col justify-between">
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-start">
-                                <div className="flex flex-col space-y-1 min-w-0">
-                                  <div className="flex items-center space-x-2">
-                                    <span className="w-2 h-2 rounded-full shrink-0 bg-[#E41414]"></span>
-                                    <h4 className="text-xs sm:text-sm font-bold text-white truncate max-w-[150px] sm:max-w-[180px]">{g.name}</h4>
-                                  </div>
-                                  <div>
-                                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border inline-block bg-[#E41414]/10 text-[#E41414] border-[#E41414]/30">
-                                      IN RECYCLE BIN
-                                    </span>
-                                  </div>
+                      filteredDeletedGroups.map((g) => (
+                        <div key={g.id} className="bg-white border-2 border-rose-200 rounded-3xl p-4 sm:p-5 space-y-3.5 shadow-subtle hover:border-rose-300 transition-colors flex flex-col justify-between">
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-start">
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center space-x-2">
+                                  <span className="w-2 h-2 rounded-full shrink-0 bg-rose-500"></span>
+                                  <h4 className="text-sm font-bold text-slate-900 truncate max-w-[170px]">{g.name}</h4>
                                 </div>
-                                <div className="p-1.5 rounded-lg bg-[#E41414]/15 text-[#E41414]">
-                                  <Trash2 size={15} />
-                                </div>
+                                <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded border inline-block bg-rose-50 text-rose-700 border-rose-200">
+                                  IN RECYCLE BIN
+                                </span>
                               </div>
-
-                              <div className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 space-y-1 text-[11px] text-white">
-                                <div className="flex justify-between">
-                                  <span className="text-[#AEABD8] font-medium">Total Pool:</span>
-                                  <strong className="font-bold text-white">{formatCurrency(g.totalValue)}</strong>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-[#AEABD8] font-medium">Duration:</span>
-                                  <strong>{g.duration} Months ({g.memberCount || g.duration} Tickets)</strong>
-                                </div>
-                                {g.deletedAt && (
-                                  <div className="flex justify-between pt-1 border-t border-[#27264E] text-[10px]">
-                                    <span className="text-[#AEABD8]">Deleted:</span>
-                                    <span className="font-medium text-[#E41414]">
-                                      {new Date(g.deletedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  </div>
-                                )}
+                              <div className="p-1.5 rounded-lg bg-rose-100 text-rose-700">
+                                <Trash2 size={15} />
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#27264E]">
-                              <button
-                                type="button"
-                                disabled={isRestoringGroupId === g.id}
-                                onClick={() => handleRestoreGroup(g)}
-                                className="bg-[#02B15A]/15 hover:bg-[#02B15A]/25 border border-[#02B15A]/40 text-[#02B15A] font-bold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
-                              >
-                                {isRestoringGroupId === g.id ? (
-                                  <RefreshCw size={13} className="animate-spin" />
-                                ) : (
-                                  <RotateCcw size={13} />
-                                )}
-                                <span>Restore Group</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openPermanentDeleteModal(g)}
-                                className="bg-[#E41414]/15 hover:bg-[#E41414]/25 border border-[#E41414]/40 text-[#E41414] font-bold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
-                              >
-                                <Trash2 size={13} />
-                                <span>Delete Perm</span>
-                              </button>
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1 text-xs text-slate-700 font-mono">
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Total Pool:</span>
+                                <strong className="font-bold text-slate-900">{formatCurrency(g.totalValue)}</strong>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Duration:</span>
+                                <strong>{g.duration} Months ({g.memberCount || g.duration} Tickets)</strong>
+                              </div>
+                              {g.deletedAt && (
+                                <div className="flex justify-between pt-1 border-t border-slate-200 text-[10px]">
+                                  <span className="text-slate-500">Deleted:</span>
+                                  <span className="text-rose-600 font-medium">
+                                    {new Date(g.deletedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        ))
+
+                          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
+                            <button
+                              type="button"
+                              disabled={isRestoringGroupId === g.id}
+                              onClick={() => handleRestoreGroup(g)}
+                              className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-semibold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+                            >
+                              {isRestoringGroupId === g.id ? (
+                                <RefreshCw size={13} className="animate-spin text-emerald-600" />
+                              ) : (
+                                <RotateCcw size={13} />
+                              )}
+                              <span>Restore</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openPermanentDeleteModal(g)}
+                              className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-semibold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+                            >
+                              <Trash2 size={13} />
+                              <span>Purge</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
                 </div>
               ) : (
-                /* ── ACTIVE / DRAFT / COMPLETED DIRECTORY GRID ── */
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                  {localGroups.filter(g => {
-                    if (g.status === 'deleted') return false;
-                    if (groupFilter === 'all') return true;
-                    if (groupFilter === 'draft') return g.status === 'draft';
-                    if (groupFilter === 'completed') return g.status === 'completed';
-                    return g.status === 'active' || (!g.status && g.active);
-                  }).length === 0 ? (
-                    <div className="col-span-full py-12 px-6 bg-[#1D1D41] border border-[#27264E] rounded-2xl text-center flex flex-col items-center justify-center space-y-3 shadow-2xs">
-                      <div className="w-12 h-12 rounded-2xl bg-[#6359E9]/20 text-[#64CFF6] flex items-center justify-center">
-                        <Briefcase size={24} />
+                /* ─────────────────────────────────────────────────────────────
+                   ACTIVE / DRAFT / COMPLETED DIRECTORY GRID
+                   (Fintech Cards for Desktop & Native Android for Mobile)
+                   ───────────────────────────────────────────────────────────── */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-5">
+                  {filteredGroups.length === 0 ? (
+                    <div className="col-span-full py-16 px-6 bg-white border border-dashed border-slate-200 rounded-3xl text-center flex flex-col items-center justify-center space-y-3 shadow-subtle">
+                      <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 border border-brand-200 flex items-center justify-center">
+                        <Briefcase size={28} />
                       </div>
                       <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-white">No Groups in this Category</h4>
-                        <p className="text-xs text-[#AEABD8] max-w-sm">
-                          There are no chit groups with status <strong>{groupFilter}</strong> currently.
+                        <h4 className="text-base font-bold text-slate-900">No Groups in this Category</h4>
+                        <p className="text-xs text-slate-500 max-w-sm">
+                          {chitsSearchQuery.trim()
+                            ? `No chit groups matching "${chitsSearchQuery}".`
+                            : `There are no chit groups with status "${groupFilter}" currently.`}
                         </p>
                       </div>
                       <button
-                        onClick={() => setShowWizard(true)}
-                        className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
+                        onClick={() => {
+                          triggerHapticFeedback('light');
+                          setShowWizard(true);
+                        }}
+                        className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
                       >
-                        + Create First Group
+                        + Create Chit Group
                       </button>
                     </div>
                   ) : (
-                  localGroups
-                    .filter(g => {
-                      if (g.status === 'deleted') return false;
-                      if (groupFilter === 'all') return true;
-                      if (groupFilter === 'draft') return g.status === 'draft';
-                      if (groupFilter === 'completed') return g.status === 'completed';
-                      return g.status === 'active' || (!g.status && g.active);
-                    })
-                    .map((g) => {
-                      const progressPercent = (g.currentMonth / g.duration) * 100;
-                      
+                    filteredGroups.map((g) => {
+                      const progressPercent = Math.min(100, Math.round((g.currentMonth / g.duration) * 100));
+
                       return (
-                        <div key={g.id} className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 shadow-sm hover:border-[#6359E9]/50 transition-colors flex flex-col justify-between">
+                        <div 
+                          key={g.id} 
+                          className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 shadow-subtle hover:border-brand-300 hover:shadow-card transition-all flex flex-col justify-between"
+                        >
                           <div className="space-y-3">
-                            {/* Card Top */}
-                            <div className="flex justify-between items-start">
-                              <div className="flex flex-col space-y-1 min-w-0">
-                                <div className="flex items-center space-x-2">
-                                  <span className={`w-2 h-2 rounded-full shrink-0 ${
-                                    g.status === 'draft' ? 'bg-[#FFBB38]' : g.status === 'completed' ? 'bg-[#9C2CF3]' : 'bg-[#02B15A] animate-pulse'
+                            {/* Card Top: Status & Duration Pill & Quick Actions */}
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${
+                                  g.status === 'draft'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : g.status === 'completed'
+                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                    g.status === 'draft' ? 'bg-amber-500' : g.status === 'completed' ? 'bg-purple-500' : 'bg-emerald-500 animate-pulse'
                                   }`}></span>
-                                  <h4 className="text-xs sm:text-sm font-bold text-white truncate max-w-[150px] sm:max-w-[180px]">{g.name}</h4>
-                                </div>
-                                <div>
-                                  <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border inline-block ${
-                                    g.status === 'draft'
-                                      ? 'bg-[#FFBB38]/10 text-[#FFBB38] border-[#FFBB38]/30'
-                                      : g.status === 'completed'
-                                        ? 'bg-[#9C2CF3]/10 text-[#C084FC] border-[#9C2CF3]/30'
-                                        : 'bg-[#02B15A]/10 text-[#02B15A] border-[#02B15A]/30'
-                                  }`}>
-                                    {g.status ? g.status.toUpperCase() : 'ACTIVE'}
-                                  </span>
-                                </div>
+                                  <span className="whitespace-nowrap">{g.status ? g.status.toUpperCase() : 'ACTIVE'}</span>
+                                </span>
+
+                                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap shrink-0">
+                                  M{g.currentMonth} / {g.duration}
+                                </span>
                               </div>
 
-                              {/* Quick Action Icons */}
+                              {/* Quick Action Menu */}
                               <div className="flex items-center gap-1 shrink-0">
                                 <button
                                   type="button"
                                   title="Edit chit details"
                                   onClick={() => openEditGroupModal(g)}
-                                  className="p-1.5 rounded-lg text-[#AEABD8] hover:text-[#64CFF6] hover:bg-[#27264E] transition-colors active:scale-95 cursor-pointer"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors active:scale-95 cursor-pointer"
                                 >
                                   <Edit3 size={14} />
                                 </button>
@@ -5303,74 +6460,90 @@ Thank you for your prompt payment! 🙏`;
                                   type="button"
                                   title="Move to Recycle Bin"
                                   onClick={() => openSoftDeleteModal(g)}
-                                  className="p-1.5 rounded-lg text-[#AEABD8] hover:text-[#E41414] hover:bg-[#E41414]/10 transition-colors active:scale-95 cursor-pointer"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors active:scale-95 cursor-pointer"
                                 >
                                   <Trash2 size={14} />
                                 </button>
                               </div>
                             </div>
 
-                            {/* Horizontal Progress bar — or Launch Month badge */}
+                            {/* Hero Pool Value & Name */}
+                            <div>
+                              <h4 className="text-sm sm:text-base font-bold text-slate-900 truncate">{g.name}</h4>
+                              <div className="mt-1 flex items-baseline gap-2 flex-wrap sm:flex-nowrap">
+                                <span className="font-mono text-xl sm:text-2xl font-black text-slate-900 tracking-tight whitespace-nowrap">
+                                  {formatCurrency(g.totalValue)}
+                                </span>
+                                <span className="text-[10.5px] sm:text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                                  Target ({g.duration} Tickets)
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Cycle Progress Bar */}
                             {g.currentMonth === 0 ? (
-                              <div className="flex items-center gap-2 py-1">
-                                <span className="w-2 h-2 rounded-full bg-[#FFBB38] animate-pulse shrink-0"></span>
-                                <span className="text-[10px] font-bold text-[#FFBB38] uppercase tracking-wider">Launch Month — Organizer Profit Phase</span>
+                              <div className="flex items-center gap-1.5 py-1 px-2.5 rounded-xl bg-amber-50 border border-amber-200 min-w-0">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                                <span className="text-[9.5px] sm:text-[10px] font-bold text-amber-900 uppercase tracking-wider whitespace-nowrap truncate">
+                                  Launch Month — Organizer Profit Phase
+                                </span>
                               </div>
                             ) : (
                               <div className="space-y-1">
-                                <div className="flex justify-between text-[9px] text-[#AEABD8] font-bold uppercase tracking-wider">
-                                  <span>Progress</span>
-                                  <span>Month {g.currentMonth} of {g.duration}</span>
+                                <div className="flex justify-between text-[10px] text-slate-500 font-semibold uppercase tracking-wider whitespace-nowrap">
+                                  <span>Cycle Progress</span>
+                                  <span className="font-mono">{progressPercent}%</span>
                                 </div>
-                                <div className="w-full bg-[#141332] rounded-full h-1.5 overflow-hidden">
+                                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                                   <div 
-                                    className="bg-gradient-to-r from-[#6359E9] to-[#64CFF6] h-full rounded-full transition-all duration-300"
+                                    className="bg-gradient-to-r from-brand-600 to-indigo-500 h-full rounded-full transition-all duration-300"
                                     style={{ width: `${progressPercent}%` }}
                                   ></div>
                                 </div>
                               </div>
                             )}
 
-                            {/* Metadata Tracks */}
-                            <div className="space-y-1.5 text-[10px] sm:text-[11px] text-[#AEABD8]">
-                              <div className="flex justify-between">
-                                <span>Total Pool:</span>
-                                <strong className="text-white">{formatCurrency(g.totalValue)}</strong>
+                            {/* 2x2 Clean Financial Grid */}
+                            <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                              <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 min-w-0">
+                                <span className="text-[9.5px] sm:text-[10px] font-bold uppercase text-slate-400 block whitespace-nowrap">Monthly Due</span>
+                                <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm block mt-0.5 whitespace-nowrap truncate">
+                                  {formatCurrency(g.totalValue / g.duration)}
+                                </span>
                               </div>
-                              <div className="flex justify-between">
-                                <span>Monthly Installment:</span>
-                                <strong className="text-[#64CFF6]">{formatCurrency(g.totalValue / g.duration)}</strong>
+
+                              <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 min-w-0">
+                                <span className="text-[9.5px] sm:text-[10px] font-bold uppercase text-slate-400 block whitespace-nowrap">Kai Iruppu</span>
+                                <span className="font-mono font-bold text-emerald-700 text-xs sm:text-sm block mt-0.5 whitespace-nowrap truncate">
+                                  {formatCurrency(g.kaiIruppuPool || 0)}
+                                </span>
                               </div>
-                              {g.currentMonth === 0 && (
-                                <div className="flex justify-between">
-                                  <span>Organizer Profit:</span>
-                                  <strong className="text-[#FFBB38]">{formatCurrency(g.totalValue)}</strong>
-                                </div>
-                              )}
-                              {(() => {
-                                const { display, isOverride } = getGroupAuctionDate(g.id);
-                                return (
-                                  <div className="flex justify-between items-center">
-                                    <span>Auction Date:</span>
-                                    <div className="flex items-center gap-1">
-                                      <strong className={isOverride ? 'text-[#FFBB38]' : 'text-white'}>{display}</strong>
-                                      <button
-                                        onClick={() => setScheduleModalGroup(g)}
-                                        className="text-[8px] font-bold text-[#64CFF6] bg-[#6359E9]/20 border border-[#6359E9]/30 px-1 py-0.5 rounded hover:bg-[#6359E9]/40 transition-colors cursor-pointer"
-                                      >
-                                        Edit
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })()}
+                            </div>
+
+                            {/* Auction Date Row — strictly single line on mobile */}
+                            <div className="flex items-center justify-between pt-1 text-[10.5px] sm:text-xs text-slate-500 whitespace-nowrap gap-1.5 min-w-0">
+                              <span className="flex items-center gap-1 shrink-0 text-slate-500 font-medium whitespace-nowrap">
+                                <CalendarDays size={12} className="text-slate-400 shrink-0" />
+                                <span className="whitespace-nowrap">Next Auction:</span>
+                              </span>
+                              <div className="flex items-center gap-1.5 min-w-0 shrink-0 text-right whitespace-nowrap">
+                                <strong className="text-slate-800 font-semibold text-[10.5px] sm:text-xs whitespace-nowrap">
+                                  {getGroupAuctionDate(g.id, g.currentMonth || 1, true).display}
+                                </strong>
+                                <button
+                                  type="button"
+                                  onClick={() => setScheduleModalGroup(g)}
+                                  className="text-[10px] sm:text-[10.5px] font-bold text-brand-700 hover:underline cursor-pointer shrink-0 whitespace-nowrap"
+                                >
+                                  Edit
+                                </button>
+                              </div>
                             </div>
                           </div>
 
-                          {/* Footer Split Button containers */}
+                          {/* Footer Touch Actions */}
                           {g.currentMonth === 0 ? (
-                            // Month-0 Launch: show a single Confirm Launch CTA spanning full width
-                            <div className="pt-3 border-t border-[#27264E]">
+                            <div className="pt-3 border-t border-slate-100">
                               <button
                                 onClick={async () => {
                                   try {
@@ -5410,38 +6583,42 @@ Thank you for your prompt payment! 🙏`;
                                     alert('Error updating group: ' + err.message);
                                   }
                                 }}
-                                className="w-full bg-gradient-to-r from-[#FFBB38] to-[#E5A82E] text-[#141332] font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
                               >
-                                <Rocket size={13} /> Confirm Launch &amp; Roll to M1
+                                <Rocket size={14} className="shrink-0" />
+                                <span className="whitespace-nowrap">Confirm Launch &amp; Roll to M1</span>
                               </button>
                             </div>
                           ) : (
-                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#27264E]">
+                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
                               <button
                                 type="button"
                                 onClick={() => {
+                                  triggerHapticFeedback('light');
                                   setSelectedWorkspaceGroupId(g.id);
                                   fetchWorkspaceMembers(g.id);
                                 }}
-                                className="bg-[#6359E9]/20 hover:bg-[#6359E9]/35 border border-[#6359E9]/40 text-[#64CFF6] font-bold text-xs py-2 rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
+                                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
                               >
-                                <Briefcase size={12} /> Workspace
+                                <Briefcase size={13} className="shrink-0" />
+                                <span className="whitespace-nowrap">Workspace</span>
                               </button>
+
                               <button
                                 type="button"
                                 disabled={isDuplicatingGroupId === g.id}
                                 onClick={() => handleDuplicateGroup(g)}
-                                className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-60"
+                                className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 shadow-2xs whitespace-nowrap"
                               >
                                 {isDuplicatingGroupId === g.id ? (
                                   <>
-                                    <RefreshCw size={12} className="animate-spin text-[#64CFF6]" />
-                                    <span>Cloning...</span>
+                                    <RefreshCw size={12} className="animate-spin text-brand-600 shrink-0" />
+                                    <span className="whitespace-nowrap">Cloning...</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Copy size={12} />
-                                    <span>Duplicate</span>
+                                    <Copy size={12} className="text-slate-400 shrink-0" />
+                                    <span className="whitespace-nowrap">Duplicate</span>
                                   </>
                                 )}
                               </button>
@@ -5453,26 +6630,32 @@ Thank you for your prompt payment! 🙏`;
                   )}
                 </div>
               )}
+
             </div>
           ) : (
-            /* 3. UPGRADED CHIT SETUP WIZARD VIEW */
-            <div className="space-y-3.5 sm:space-y-5 animate-in fade-in duration-200">
+            /* ═══════════════════════════════════════════════════════════════════
+               3. UPGRADED CHIT SETUP WIZARD VIEW
+               ═══════════════════════════════════════════════════════════════════ */
+            <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200">
               
               {/* Setup Wizard Progress Navigation Bar */}
-              <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 sm:gap-3 text-white">
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 shadow-subtle flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-[#6359E9]/15 text-[#64CFF6] border border-[#6359E9]/30 rounded-lg">
-                      <Sparkles size={15} />
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 border border-brand-200 flex items-center justify-center">
+                      <Sparkles size={16} />
                     </div>
-                    <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">Chit Setup Wizard</h3>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Chit Setup Wizard</h3>
+                      <p className="text-[11px] text-slate-500 font-medium">Step {wizardStep} of 3</p>
+                    </div>
                   </div>
                   <button
                     onClick={() => {
                       triggerHapticFeedback('light');
                       setShowWizard(false);
                     }}
-                    className="text-[11px] text-[#AEABD8] hover:text-white underline font-semibold transition-colors py-1 px-1.5"
+                    className="text-xs text-slate-500 hover:text-slate-800 underline font-semibold transition-colors py-1 px-2"
                   >
                     Exit Wizard
                   </button>
@@ -5488,27 +6671,27 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setWizardStep(1);
                     }}
-                    className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl transition-all ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${
                       wizardStep === 1 
-                        ? 'bg-[#6359E9]/20 text-white ring-1 ring-[#6359E9]/40' 
-                        : 'hover:bg-[#27264E] text-[#AEABD8]'
+                        ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300' 
+                        : 'hover:bg-slate-50 text-slate-500'
                     }`}
                   >
                     <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                       wizardStep === 1 
-                        ? 'bg-[#6359E9] text-white shadow-xs' 
+                        ? 'bg-brand-600 text-white shadow-xs' 
                         : wizardStep > 1 
-                          ? 'bg-[#02B15A] text-white' 
-                          : 'bg-[#141332] text-[#AEABD8]'
+                          ? 'bg-emerald-600 text-white' 
+                          : 'bg-slate-200 text-slate-600'
                     }`}>
                       {wizardStep > 1 ? <Check size={11} /> : '1'}
                     </span>
-                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 1 ? 'font-bold text-white' : 'font-semibold text-[#AEABD8]'}`}>
-                      <span className="hidden sm:inline">1. </span>Basic<span className="hidden md:inline"> & Schedule</span>
+                    <span className={`text-xs truncate ${wizardStep === 1 ? 'font-bold text-brand-900' : 'font-semibold text-slate-600'}`}>
+                      <span className="hidden sm:inline">1. </span>Parameters
                     </span>
                   </button>
                   
-                  <div className="flex-1 sm:w-4 h-px bg-[#27264E]"></div>
+                  <div className="flex-1 sm:w-4 h-px bg-slate-200"></div>
 
                   {/* Step 2 Pill */}
                   <button
@@ -5518,27 +6701,27 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setWizardStep(2);
                     }}
-                    className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl transition-all ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${
                       wizardStep === 2 
-                        ? 'bg-[#6359E9]/20 text-white ring-1 ring-[#6359E9]/40' 
-                        : 'hover:bg-[#27264E] text-[#AEABD8] disabled:opacity-40 disabled:cursor-not-allowed'
+                        ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300' 
+                        : 'hover:bg-slate-50 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed'
                     }`}
                   >
                     <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                       wizardStep === 2 
-                        ? 'bg-[#6359E9] text-white shadow-xs' 
+                        ? 'bg-brand-600 text-white shadow-xs' 
                         : wizardStep > 2 
-                          ? 'bg-[#02B15A] text-white' 
-                          : 'bg-[#141332] text-[#AEABD8]'
+                          ? 'bg-emerald-600 text-white' 
+                          : 'bg-slate-200 text-slate-600'
                     }`}>
                       {wizardStep > 2 ? <Check size={11} /> : '2'}
                     </span>
-                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 2 ? 'font-bold text-white' : 'font-semibold text-[#AEABD8]'}`}>
+                    <span className={`text-xs truncate ${wizardStep === 2 ? 'font-bold text-brand-900' : 'font-semibold text-slate-600'}`}>
                       <span className="hidden sm:inline">2. </span>Members
                     </span>
                   </button>
 
-                  <div className="flex-1 sm:w-4 h-px bg-[#27264E]"></div>
+                  <div className="flex-1 sm:w-4 h-px bg-slate-200"></div>
 
                   {/* Step 3 Pill */}
                   <button
@@ -5548,21 +6731,21 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setWizardStep(3);
                     }}
-                    className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl transition-all ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${
                       wizardStep === 3 
-                        ? 'bg-[#6359E9]/20 text-white ring-1 ring-[#6359E9]/40' 
-                        : 'hover:bg-[#27264E] text-[#AEABD8] disabled:opacity-40 disabled:cursor-not-allowed'
+                        ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300' 
+                        : 'hover:bg-slate-50 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed'
                     }`}
                   >
                     <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                       wizardStep === 3 
-                        ? 'bg-[#6359E9] text-white shadow-xs' 
-                        : 'bg-[#141332] text-[#AEABD8]'
+                        ? 'bg-brand-600 text-white shadow-xs' 
+                        : 'bg-slate-200 text-slate-600'
                     }`}>
                       3
                     </span>
-                    <span className={`text-[11px] sm:text-xs truncate ${wizardStep === 3 ? 'font-bold text-white' : 'font-semibold text-[#AEABD8]'}`}>
-                      <span className="hidden sm:inline">3. </span>Review<span className="hidden md:inline"> & Launch</span>
+                    <span className={`text-xs truncate ${wizardStep === 3 ? 'font-bold text-brand-900' : 'font-semibold text-slate-600'}`}>
+                      <span className="hidden sm:inline">3. </span>Review
                     </span>
                   </button>
                 </div>
@@ -5570,29 +6753,30 @@ Thank you for your prompt payment! 🙏`;
 
               {/* ── STEP 1: BASIC INFO & SCHEDULE ── */}
               {wizardStep === 1 && (
-                <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-150">
+                <div className="space-y-4 animate-in fade-in duration-150">
                   
                   {/* Step 1 Main Form Card */}
-                  <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs">
-                    <div className="border-b border-[#27264E] pb-3 flex items-center justify-between gap-2">
-                      <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                        <span>Step 1: Chit Parameters &amp; Schedule</span>
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-subtle">
+                    <div className="border-b border-slate-100 pb-3 flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-bold text-slate-900">
+                        Step 1: Chit Parameters &amp; Schedule
                       </h4>
                       <button
                         type="button"
                         onClick={handleAutoGenerateName}
-                        className="text-[11px] font-bold text-[#64CFF6] hover:text-white bg-[#64CFF6]/10 hover:bg-[#64CFF6]/20 border border-[#64CFF6]/30 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shrink-0 active:scale-95"
+                        className="text-[11px] font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shrink-0 active:scale-95 cursor-pointer"
                       >
-                        <Sparkles size={12} /> Auto-Name
+                        <Sparkles size={12} />
+                        <span>Auto-Name</span>
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
                       
                       {/* 1. Group Name */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
-                          Group Name <span className="text-rose-400">*</span>
+                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                          Group Name <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
                           <input
@@ -5601,13 +6785,13 @@ Thank you for your prompt payment! 🙏`;
                             placeholder="e.g. G-2L-10M-OCT26"
                             value={newGroupName}
                             onChange={(e) => setNewGroupName(e.target.value)}
-                            className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-white placeholder:text-[#AEABD8]/50 focus:outline-none transition-colors"
+                            className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors"
                           />
                           {newGroupName && (
                             <button
                               type="button"
                               onClick={() => setNewGroupName('')}
-                              className="absolute right-2.5 top-2.5 text-[#AEABD8] hover:text-white p-0.5"
+                              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5"
                             >
                               <X size={13} />
                             </button>
@@ -5617,18 +6801,18 @@ Thank you for your prompt payment! 🙏`;
 
                       {/* 2. Total Pool Value */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
-                          Total Pool Value (₹) <span className="text-rose-400">*</span>
+                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                          Total Pool Value (₹) <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-xs font-bold text-[#AEABD8]">₹</span>
+                          <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">₹</span>
                           <input
                             type="number"
                             required
                             placeholder="100000"
                             value={newGroupValue}
                             onChange={(e) => setNewGroupValue(e.target.value)}
-                            className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-7 pr-3.5 py-2.5 text-xs font-bold text-white placeholder:text-[#AEABD8]/50 focus:outline-none transition-colors"
+                            className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl pl-7 pr-3.5 py-2.5 text-xs font-bold font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors"
                           />
                         </div>
                         {/* Target Presets */}
@@ -5648,10 +6832,10 @@ Thank you for your prompt payment! 🙏`;
                                   triggerHapticFeedback('light');
                                   setNewGroupValue(preset.val.toString());
                                 }}
-                                className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border ${
+                                className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border cursor-pointer ${
                                   isSelected
-                                    ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs ring-2 ring-[#6359E9]/40'
-                                    : 'bg-[#141332] hover:bg-[#1D1D41] border-[#27264E] text-[#AEABD8]'
+                                    ? 'bg-brand-600 text-white border-brand-600 shadow-xs ring-2 ring-brand-300'
+                                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
                                 }`}
                               >
                                 {preset.label}
@@ -5663,8 +6847,8 @@ Thank you for your prompt payment! 🙏`;
 
                       {/* 3. Duration & Member Count */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
-                          Duration / Tickets (Months) <span className="text-rose-400">*</span>
+                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                          Duration / Tickets (Months) <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
                           <input
@@ -5675,7 +6859,7 @@ Thank you for your prompt payment! 🙏`;
                             placeholder="20"
                             value={newGroupDuration}
                             onChange={(e) => handleDurationChange(e.target.value)}
-                            className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-bold text-white placeholder:text-[#AEABD8]/50 focus:outline-none transition-colors"
+                            className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors"
                           />
                         </div>
                         {/* Duration Presets */}
@@ -5690,10 +6874,10 @@ Thank you for your prompt payment! 🙏`;
                                   triggerHapticFeedback('light');
                                   handleDurationChange(val.toString());
                                 }}
-                                className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border ${
+                                className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border cursor-pointer ${
                                   isSelected
-                                    ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs ring-2 ring-[#6359E9]/40'
-                                    : 'bg-[#141332] hover:bg-[#1D1D41] border-[#27264E] text-[#AEABD8]'
+                                    ? 'bg-brand-600 text-white border-brand-600 shadow-xs ring-2 ring-brand-300'
+                                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
                                 }`}
                               >
                                 {val}m
@@ -5706,12 +6890,12 @@ Thank you for your prompt payment! 🙏`;
                     </div>
 
                     {/* Schedule Row */}
-                    <div className="border-t border-[#27264E] pt-3.5 grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5">
+                    <div className="border-t border-slate-100 pt-4 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
                       
                       {/* Launch Date */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
-                          Launch Date (Month 0) <span className="text-rose-400">*</span>
+                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                          Launch Date (Month 0) <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
                           <input
@@ -5719,14 +6903,14 @@ Thank you for your prompt payment! 🙏`;
                             required
                             value={newGroupStartDate}
                             onChange={(e) => setNewGroupStartDate(e.target.value)}
-                            className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none font-semibold"
+                            className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none font-semibold"
                           />
                         </div>
                       </div>
 
                       {/* Recurring Auction Rule Dropdown */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
+                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
                           Monthly Auction Rule
                         </label>
                         <select
@@ -5737,10 +6921,10 @@ Thank you for your prompt payment! 🙏`;
                             updateLaunchDateFromRule(day, newGroupStartDate);
                             triggerHapticFeedback('light');
                           }}
-                          className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3 py-2.5 text-xs text-white font-semibold focus:outline-none"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none cursor-pointer"
                         >
                           {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
-                            <option key={day} value={day} className="bg-[#1D1D41] text-white">
+                            <option key={day} value={day}>
                               1st Sunday on/after {day}th {day === 10 ? '(Default)' : ''}
                             </option>
                           ))}
@@ -5749,61 +6933,61 @@ Thank you for your prompt payment! 🙏`;
 
                       {/* Recurring Auction Time */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
+                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
                           Auction Bidding Time
                         </label>
                         <input
                           type="time"
                           value={newGroupAuctionTime}
                           onChange={(e) => setNewGroupAuctionTime(e.target.value)}
-                          className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs text-white font-semibold focus:outline-none"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none"
                         />
                       </div>
 
                     </div>
                   </div>
 
-                  {/* Dynamic Real-time Chit Math Breakdown Card */}
+                  {/* Financial Projections Breakdown Card */}
                   {Number(newGroupValue) > 0 && Number(newGroupDuration) > 0 && (
-                    <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-2.5">
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-subtle space-y-3">
                       <div className="flex items-center justify-between">
-                        <h5 className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <Coins size={14} className="text-[#6359E9]" />
-                          Financial Projections
+                        <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                          <Coins size={14} className="text-brand-600" />
+                          <span>Financial Projections</span>
                         </h5>
-                        <span className="text-[10px] font-semibold text-[#6359E9] bg-[#6359E9]/15 border border-[#6359E9]/30 px-2 py-0.5 rounded-md">
+                        <span className="text-[10px] font-semibold text-brand-700 bg-brand-50 border border-brand-200 px-2.5 py-0.5 rounded-full font-mono">
                           {newGroupDuration} Tickets
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
-                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#AEABD8] block">Monthly Due</span>
-                          <strong className="text-sm sm:text-base font-extrabold text-[#6359E9] mt-0.5 block">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                          <span className="text-[10px] font-bold uppercase text-slate-500 block">Monthly Due</span>
+                          <strong className="text-sm sm:text-base font-extrabold text-brand-700 mt-0.5 block font-mono">
                             {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}
                           </strong>
-                          <span className="text-[10px] text-[#AEABD8]">per member / mo</span>
+                          <span className="text-[10px] text-slate-500">per member / mo</span>
                         </div>
 
-                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#AEABD8] block">Month 0 Launch</span>
-                          <strong className="text-sm sm:text-base font-extrabold text-[#FFBB38] mt-0.5 block">
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                          <span className="text-[10px] font-bold uppercase text-slate-500 block">Month 0 Launch</span>
+                          <strong className="text-sm sm:text-base font-extrabold text-amber-700 mt-0.5 block font-mono">
                             {formatCurrency(Number(newGroupValue))}
                           </strong>
-                          <span className="text-[10px] text-[#FFBB38] font-semibold">Organizer Profit</span>
+                          <span className="text-[10px] text-amber-600 font-semibold">Organizer Profit</span>
                         </div>
 
-                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#AEABD8] block">Total Lifecycle</span>
-                          <strong className="text-sm sm:text-base font-extrabold text-white mt-0.5 block">
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                          <span className="text-[10px] font-bold uppercase text-slate-500 block">Total Lifecycle</span>
+                          <strong className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5 block">
                             {Number(newGroupDuration) + 1} Months
                           </strong>
-                          <span className="text-[10px] text-[#AEABD8]">M0 to M{newGroupDuration}</span>
+                          <span className="text-[10px] text-slate-500">M0 to M{newGroupDuration}</span>
                         </div>
 
-                        <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#AEABD8] block">1st Live Auction (M1)</span>
-                          <strong className="text-xs sm:text-sm font-extrabold text-white mt-0.5 block truncate">
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                          <span className="text-[10px] font-bold uppercase text-slate-500 block">1st Auction (M1)</span>
+                          <strong className="text-xs sm:text-sm font-extrabold text-slate-900 mt-0.5 block truncate">
                             {(() => {
                               const targetDate = computeNextAuctionDateTime({
                                 auction_day_of_month: newGroupAuctionDay,
@@ -5816,7 +7000,7 @@ Thank you for your prompt payment! 🙏`;
                               return targetDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
                             })()}
                           </strong>
-                          <span className="text-[10px] text-[#AEABD8]">{formatTime12h(newGroupAuctionTime)}</span>
+                          <span className="text-[10px] text-slate-500">{formatTime12h(newGroupAuctionTime)}</span>
                         </div>
                       </div>
                     </div>
@@ -5831,7 +7015,7 @@ Thank you for your prompt payment! 🙏`;
                         triggerHapticFeedback('light');
                         setWizardStep(2);
                       }}
-                      className="bg-[#6359E9] hover:bg-[#6F64FF] disabled:bg-[#27264E] disabled:text-[#AEABD8]/40 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all w-full sm:w-auto cursor-pointer disabled:cursor-not-allowed"
+                      className="bg-brand-600 hover:bg-brand-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all w-full sm:w-auto cursor-pointer disabled:cursor-not-allowed"
                     >
                       <span>Proceed to Step 2: Assign Members</span>
                       <ArrowRight size={14} />
@@ -5842,20 +7026,20 @@ Thank you for your prompt payment! 🙏`;
 
               {/* ── STEP 2: ASSIGN GROUP MEMBERS ── */}
               {wizardStep === 2 && (
-                <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs animate-in fade-in duration-150">
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-subtle animate-in fade-in duration-150">
                   
                   {/* Step 2 Header & Quick Actions Bar */}
-                  <div className="border-b border-[#27264E] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-xs sm:text-sm font-bold text-white">
+                      <h4 className="text-sm font-bold text-slate-900">
                         Step 2: Assign Subscribers ({enrollments.filter(e => e.name !== '').length}/{newGroupDuration})
                       </h4>
                       {enrollments.every(e => e.name !== '') ? (
-                        <span className="text-[10px] font-bold bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                           <Check size={11} /> 100% Enrolled
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold bg-[#FFBB38]/15 text-[#FFBB38] border border-[#FFBB38]/30 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full">
                           {enrollments.filter(e => !e.name).length} Open
                         </span>
                       )}
@@ -5866,7 +7050,7 @@ Thank you for your prompt payment! 🙏`;
                         <button
                           type="button"
                           onClick={handleClearAllSlots}
-                          className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors active:scale-95"
+                          className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors active:scale-95 cursor-pointer"
                         >
                           <RotateCcw size={12} />
                           <span>Clear</span>
@@ -5881,7 +7065,7 @@ Thank you for your prompt payment! 🙏`;
                           setNewMemberPhone('');
                           setShowCreateMemberModal(true);
                         }}
-                        className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-xs active:scale-95"
+                        className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-xs active:scale-95 cursor-pointer"
                       >
                         <UserPlus size={13} />
                         <span>+ Register</span>
@@ -5890,16 +7074,16 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Fast Search & Auto-Suggest Combobox */}
-                  <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-2.5 sm:p-3 space-y-1.5">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block flex items-center gap-1">
+                      <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block flex items-center gap-1">
                         <Search size={11} /> Search &amp; Assign {targetSlotForAssign !== null ? `(Slot #${targetSlotForAssign + 1})` : ''}
                       </label>
                       {targetSlotForAssign !== null && (
                         <button
                           type="button"
                           onClick={() => setTargetSlotForAssign(null)}
-                          className="text-[10px] text-[#AEABD8] hover:text-white underline font-semibold"
+                          className="text-[10px] text-brand-600 hover:underline font-semibold"
                         >
                           Cancel Slot #{targetSlotForAssign + 1}
                         </button>
@@ -5914,7 +7098,7 @@ Thank you for your prompt payment! 🙏`;
 
                       return (
                         <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-[#AEABD8]">
+                          <span className="absolute left-3 top-2.5 text-slate-400">
                             <Search size={13} />
                           </span>
                           <input
@@ -5966,7 +7150,7 @@ Thank you for your prompt payment! 🙏`;
                                 setIsSearchDropdownOpen(false);
                               }
                             }}
-                            className="w-full bg-[#1D1D41] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-10 py-2 text-xs font-semibold text-white placeholder:text-[#AEABD8]/50 focus:outline-none shadow-2xs"
+                            className="w-full bg-white border border-slate-200 focus:border-brand-500 rounded-xl pl-8 pr-10 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs"
                           />
                           {memberSearchQuery && (
                             <button
@@ -5975,7 +7159,7 @@ Thank you for your prompt payment! 🙏`;
                                 setMemberSearchQuery('');
                                 setIsSearchDropdownOpen(false);
                               }}
-                              className="absolute right-2 top-2 text-[#AEABD8] hover:text-white p-1"
+                              className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 p-1"
                             >
                               <X size={13} />
                             </button>
@@ -5983,7 +7167,7 @@ Thank you for your prompt payment! 🙏`;
 
                           {/* Dropdown Suggestions */}
                           {isSearchDropdownOpen && memberSearchQuery.trim().length > 0 && (
-                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-[#1D1D41] border border-[#27264E] rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-[#27264E]">
+                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-slate-100">
                               {/* Create Option (Index 0) */}
                               <div
                                 onClick={() => {
@@ -5994,15 +7178,15 @@ Thank you for your prompt payment! 🙏`;
                                 }}
                                 className={`p-2.5 cursor-pointer flex items-center justify-between text-xs transition-colors ${
                                   dropdownHighlightedIndex === 0
-                                    ? 'bg-[#6359E9]/20 text-white font-bold ring-1 ring-inset ring-[#6359E9]'
-                                    : 'hover:bg-[#141332] text-[#64CFF6] font-semibold bg-[#64CFF6]/10'
+                                    ? 'bg-brand-50 text-brand-900 font-bold ring-1 ring-inset ring-brand-300'
+                                    : 'hover:bg-slate-50 text-brand-700 font-semibold'
                                 }`}
                               >
                                 <span className="flex items-center gap-1.5">
                                   <UserPlus size={14} />
-                                  Create &quot;{memberSearchQuery}&quot;
+                                  <span>Create &quot;{memberSearchQuery}&quot;</span>
                                 </span>
-                                <span className="text-[10px] bg-[#6359E9] text-white px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                                <span className="text-[10px] bg-brand-600 text-white px-2 py-0.5 rounded font-semibold flex items-center gap-1">
                                   {dropdownHighlightedIndex === 0 && <span>↵</span>} + New
                                 </span>
                               </div>
@@ -6024,25 +7208,25 @@ Thank you for your prompt payment! 🙏`;
                                     }}
                                     className={`p-2.5 flex items-center justify-between text-xs transition-colors ${
                                       isAlreadyEnrolled
-                                        ? 'bg-[#141332] text-[#AEABD8]/40 cursor-not-allowed opacity-60'
+                                        ? 'bg-slate-50 text-slate-400 cursor-not-allowed opacity-60'
                                         : isHighlighted
-                                          ? 'bg-[#6359E9]/20 text-white font-bold ring-1 ring-inset ring-[#6359E9]'
-                                          : 'hover:bg-[#141332] cursor-pointer text-white'
+                                          ? 'bg-brand-50 text-brand-900 font-bold ring-1 ring-inset ring-brand-300'
+                                          : 'hover:bg-slate-50 cursor-pointer text-slate-900'
                                     }`}
                                   >
                                     <div>
                                       <span className="font-bold block">{member.name}</span>
-                                      <span className="text-[10px] text-[#AEABD8]">{member.phone}</span>
+                                      <span className="text-[10px] text-slate-500">{member.phone}</span>
                                     </div>
                                     <div>
                                       {isAlreadyEnrolled ? (
-                                        <span className="text-[9px] font-bold text-[#AEABD8] bg-[#141332] px-2 py-0.5 rounded border border-[#27264E]">Enrolled</span>
+                                        <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Enrolled</span>
                                       ) : isHighlighted ? (
-                                        <span className="text-[10px] font-bold text-white bg-[#6359E9] px-2.5 py-0.5 rounded shadow-sm">
+                                        <span className="text-[10px] font-bold text-white bg-brand-600 px-2.5 py-0.5 rounded shadow-sm">
                                           ↵ Assign
                                         </span>
                                       ) : (
-                                        <span className="text-[10px] font-bold text-[#64CFF6] bg-[#64CFF6]/10 border border-[#64CFF6]/30 px-2 py-0.5 rounded hover:bg-[#64CFF6]/20">
+                                        <span className="text-[10px] font-bold text-brand-700 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded hover:bg-brand-100">
                                           Assign →
                                         </span>
                                       )}
@@ -6060,26 +7244,28 @@ Thank you for your prompt payment! 🙏`;
                   {/* Group Enrollment Slots Grid */}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <h5 className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider">
+                      <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                         Enrolled Tickets ({enrollments.filter(e => e.name !== '').length}/{newGroupDuration})
                       </h5>
-                      <span className="text-[10px] text-[#AEABD8]">
+                      <span className="text-[10px] text-slate-500">
                         {enrollments.some(e => e.name === '') ? 'Tap slot to assign' : '✓ All tickets assigned'}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[340px] sm:max-h-[420px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[340px] sm:max-h-[420px] overflow-y-auto pr-1">
                       {enrollments.map((slot, index) => {
                         const isTargeted = targetSlotForAssign === index;
+                        const monogram = slot.name ? slot.name.trim().charAt(0).toUpperCase() : `${index + 1}`;
+
                         return (
                           <div 
                             key={index} 
-                            className={`flex gap-2.5 items-center p-2.5 sm:p-3 rounded-xl border transition-all ${
+                            className={`flex gap-2.5 items-center p-3 rounded-2xl border transition-all ${
                               slot.name 
-                                ? 'bg-[#141332] border-[#27264E] shadow-2xs hover:border-[#6359E9]/40' 
+                                ? 'bg-white border-slate-200 shadow-2xs hover:border-brand-300' 
                                 : isTargeted
-                                  ? 'border-[#6359E9] bg-[#6359E9]/15 ring-2 ring-[#6359E9]/40'
-                                  : 'border-dashed border-[#27264E] bg-[#141332]/40 hover:bg-[#141332] hover:border-[#6359E9]/40 cursor-pointer'
+                                  ? 'border-brand-500 bg-brand-50/50 ring-2 ring-brand-200'
+                                  : 'border-dashed border-slate-300 bg-slate-50 hover:bg-white hover:border-brand-300 cursor-pointer'
                             }`}
                             onClick={() => {
                               if (!slot.name) {
@@ -6089,23 +7275,26 @@ Thank you for your prompt payment! 🙏`;
                               }
                             }}
                           >
-                            <span className={`text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                            <span className={`text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
                               slot.name
-                                ? 'bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40'
+                                ? 'bg-brand-50 text-brand-700 border border-brand-200'
                                 : isTargeted
-                                  ? 'bg-[#6359E9] text-white'
-                                  : 'bg-[#27264E] text-[#AEABD8]'
+                                  ? 'bg-brand-600 text-white'
+                                  : 'bg-slate-200 text-slate-600'
                             }`}>
-                              {index + 1}
+                              {monogram}
                             </span>
 
                             {slot.name ? (
                               <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                                 <div className="truncate">
-                                  <span className="text-xs font-bold text-white block truncate">{slot.name}</span>
-                                  <span className="text-[10px] text-[#AEABD8] block truncate flex items-center gap-1 mt-0.5">
-                                    <Phone size={10} className="text-[#AEABD8]/70 shrink-0" />
-                                    {slot.phone}
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-bold text-slate-900 truncate">{slot.name}</span>
+                                    <span className="text-[10px] text-slate-400 font-mono">#{index + 1}</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 block truncate flex items-center gap-1 mt-0.5">
+                                    <Phone size={10} className="text-slate-400 shrink-0" />
+                                    <span>{slot.phone}</span>
                                   </span>
                                 </div>
                                 <button
@@ -6116,17 +7305,18 @@ Thank you for your prompt payment! 🙏`;
                                     handleClearSlot(index);
                                   }}
                                   title="Unassign member"
-                                  className="text-rose-400 hover:text-rose-300 text-[10px] font-bold px-2 py-1 rounded-lg border border-rose-500/30 shrink-0 bg-rose-500/10 hover:bg-rose-500/20 transition-colors flex items-center gap-1 active:scale-95"
+                                  className="text-rose-600 hover:text-rose-700 text-[10px] font-semibold px-2 py-1 rounded-lg border border-rose-200 shrink-0 bg-rose-50 hover:bg-rose-100 transition-colors flex items-center gap-1 active:scale-95 cursor-pointer"
                                 >
-                                  <Trash2 size={10} /> Clear
+                                  <Trash2 size={10} />
+                                  <span>Clear</span>
                                 </button>
                               </div>
                             ) : (
                               <div className="flex-1 min-w-0 flex items-center justify-between">
-                                <span className={`text-xs font-semibold truncate ${isTargeted ? 'text-[#64CFF6]' : 'text-[#AEABD8]/60'}`}>
-                                  {isTargeted ? 'Selected' : 'Open Slot'}
+                                <span className={`text-xs font-semibold truncate ${isTargeted ? 'text-brand-700' : 'text-slate-400'}`}>
+                                  {isTargeted ? 'Selected' : `Open Slot #${index + 1}`}
                                 </span>
-                                <span className="text-[10px] font-bold text-[#64CFF6] bg-[#64CFF6]/10 border border-[#64CFF6]/30 px-2 py-0.5 rounded-lg shrink-0">
+                                <span className="text-[10px] font-bold text-brand-700 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-lg shrink-0">
                                   + Fill
                                 </span>
                               </div>
@@ -6138,18 +7328,18 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Master Member Directory */}
-                  <div className="space-y-2 border-t border-[#27264E] pt-3.5">
+                  <div className="space-y-2 border-t border-slate-100 pt-3.5">
                     <div className="flex items-center justify-between">
-                      <h5 className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider">
+                      <h5 className="text-[10px] font-bold text-brand-700 uppercase tracking-wider">
                         Master Directory ({masterDirectory.length})
                       </h5>
-                      <span className="text-[10px] text-[#AEABD8]">Tap to assign to open slot</span>
+                      <span className="text-[10px] text-slate-500">Tap subscriber to assign to first open slot</span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[280px] overflow-y-auto pr-1">
                       {masterDirectory.length === 0 ? (
-                        <div className="col-span-full py-4 text-center text-xs text-[#AEABD8] bg-[#141332] rounded-xl border border-dashed border-[#27264E]">
-                          No subscribers found. Tap <strong>&quot;+ Register&quot;</strong> to add one.
+                        <div className="col-span-full py-4 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                          No subscribers found in database. Tap <strong>&quot;+ Register&quot;</strong> to add one.
                         </div>
                       ) : (
                         masterDirectory.map((member, i) => {
@@ -6161,23 +7351,23 @@ Thank you for your prompt payment! 🙏`;
                               type="button"
                               disabled={isAlreadyAdded}
                               onClick={() => handleAssignExistingMember(member)}
-                              className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all relative active:scale-95 flex flex-col justify-between ${
+                              className={`p-3 rounded-2xl border text-left transition-all relative active:scale-95 flex flex-col justify-between ${
                                 isAlreadyAdded 
-                                  ? 'bg-[#141332]/40 border-[#27264E] opacity-50 cursor-not-allowed' 
-                                  : 'bg-[#141332] hover:bg-[#1D1D41] border-[#27264E] hover:border-[#6359E9] shadow-2xs'
+                                  ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed' 
+                                  : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-brand-300 shadow-2xs cursor-pointer'
                               }`}
                             >
                               <div className="flex items-start justify-between gap-1 w-full">
-                                <span className="text-xs sm:text-sm font-bold text-white block truncate">{member.name}</span>
+                                <span className="text-xs font-bold text-slate-900 block truncate">{member.name}</span>
                                 {isAlreadyAdded && (
-                                  <span className="text-[8px] font-bold text-[#02B15A] bg-[#02B15A]/15 border border-[#02B15A]/30 px-1.5 py-0.5 rounded shrink-0">
+                                  <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">
                                     Enrolled
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] sm:text-[11px] text-[#AEABD8] block truncate mt-1 flex items-center gap-1">
-                                <Phone size={10} className="text-[#AEABD8]/70 shrink-0" />
-                                {member.phone}
+                              <span className="text-[10px] text-slate-500 block truncate mt-1 flex items-center gap-1 font-mono">
+                                <Phone size={10} className="text-slate-400 shrink-0" />
+                                <span>{member.phone}</span>
                               </span>
                             </button>
                           );
@@ -6187,23 +7377,24 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Navigation Step 2 Buttons */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-[#27264E]">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-slate-100">
                     <button
                       type="button"
                       onClick={() => {
                         triggerHapticFeedback('light');
                         setWizardStep(1);
                       }}
-                      className="border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
+                      className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center cursor-pointer"
                     >
-                      <ArrowLeft size={13} className="inline mr-1" /> Back
+                      <ArrowLeft size={13} className="inline mr-1" />
+                      <span>Back to Parameters</span>
                     </button>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-                      <span className="text-[11px] text-[#AEABD8] font-medium text-center sm:text-right">
-                        <strong className="text-white">{enrollments.filter(e => e.name && e.name.trim() !== '').length}/{newGroupDuration}</strong> tickets
+                      <span className="text-xs text-slate-500 font-medium text-center sm:text-right">
+                        <strong className="text-slate-900">{enrollments.filter(e => e.name && e.name.trim() !== '').length}/{newGroupDuration}</strong> tickets
                         {enrollments.some(e => !e.name || e.name.trim() === '') && (
-                          <span className="text-[#FFBB38] font-bold ml-1.5">(Draft)</span>
+                          <span className="text-amber-600 font-bold ml-1.5">(Draft)</span>
                         )}
                       </span>
                       <button
@@ -6212,7 +7403,7 @@ Thank you for your prompt payment! 🙏`;
                           triggerHapticFeedback('light');
                           setWizardStep(3);
                         }}
-                        className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
+                        className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
                       >
                         <span>Proceed to Review</span>
                         <ArrowRight size={14} />
@@ -6224,16 +7415,16 @@ Thank you for your prompt payment! 🙏`;
 
               {/* ── STEP 3: REVIEW & LAUNCH PLAN ── */}
               {wizardStep === 3 && (
-                <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-2xs animate-in fade-in duration-150">
-                  <div className="border-b border-[#27264E] pb-3 flex items-center justify-between gap-2">
-                    <h4 className="text-xs sm:text-sm font-bold text-white">Step 3: Review &amp; Launch</h4>
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-subtle animate-in fade-in duration-150">
+                  <div className="border-b border-slate-100 pb-3 flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-bold text-slate-900">Step 3: Review &amp; Launch</h4>
                     <div>
                       {enrollments.every(e => e.name !== '') ? (
-                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center gap-1">
+                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                           <CheckCircle2 size={12} /> Active Launch
                         </span>
                       ) : (
-                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-[#FFBB38]/15 text-[#FFBB38] border border-[#FFBB38]/30">
+                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                           Draft ({enrollments.filter(e => !e.name).length} Open)
                         </span>
                       )}
@@ -6242,110 +7433,111 @@ Thank you for your prompt payment! 🙏`;
 
                   {/* Summary Metric Cards */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
-                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
-                      <span className="text-[#AEABD8] block text-[10px] uppercase font-bold">Group</span>
-                      <strong className="text-white mt-0.5 block truncate text-xs sm:text-sm font-bold">{newGroupName}</strong>
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Group</span>
+                      <strong className="text-slate-900 mt-0.5 block truncate text-xs sm:text-sm font-bold">{newGroupName}</strong>
                     </div>
-                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
-                      <span className="text-[#AEABD8] block text-[10px] uppercase font-bold">Pool Value</span>
-                      <strong className="text-[#64CFF6] mt-0.5 block truncate text-xs sm:text-sm font-extrabold">{formatCurrency(Number(newGroupValue))}</strong>
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Pool Value</span>
+                      <strong className="text-brand-700 mt-0.5 block truncate text-xs sm:text-sm font-extrabold font-mono">{formatCurrency(Number(newGroupValue))}</strong>
                     </div>
-                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
-                      <span className="text-[#AEABD8] block text-[10px] uppercase font-bold">Lifecycle</span>
-                      <strong className="text-white mt-0.5 block truncate text-xs sm:text-sm font-bold">{Number(newGroupDuration) + 1} Months (M0-M{newGroupDuration})</strong>
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Lifecycle</span>
+                      <strong className="text-slate-900 mt-0.5 block truncate text-xs sm:text-sm font-bold">{Number(newGroupDuration) + 1} Months (M0-M{newGroupDuration})</strong>
                     </div>
-                    <div className="bg-[#141332] border border-[#27264E] rounded-xl p-2.5 sm:p-3">
-                      <span className="text-[#AEABD8] block text-[10px] uppercase font-bold">Monthly Due</span>
-                      <strong className="text-[#02B15A] mt-0.5 block truncate text-xs sm:text-sm font-extrabold">
-                        {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))} / member
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Monthly Due</span>
+                      <strong className="text-emerald-700 mt-0.5 block truncate text-xs sm:text-sm font-extrabold font-mono">
+                        {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))} / mo
                       </strong>
                     </div>
                   </div>
 
                   {/* Operational Timeline Preview Box */}
-                  <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3 sm:p-4 space-y-2.5">
-                    <h5 className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <CalendarDays size={14} className="text-[#6359E9]" />
-                      Timeline
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5">
+                    <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <CalendarDays size={14} className="text-brand-600" />
+                      <span>Operational Timeline</span>
                     </h5>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
                       
                       {/* Month 0 Card */}
-                      <div className="bg-[#1D1D41] border border-[#FFBB38]/40 rounded-xl p-2.5 sm:p-3 space-y-1">
+                      <div className="bg-white border border-amber-200 rounded-xl p-3 space-y-1 shadow-2xs">
                         <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-[#FFBB38] flex items-center gap-1">
-                            <Rocket size={12} className="text-[#FFBB38]" /> Month 0: Launch
+                          <span className="font-extrabold text-amber-900 flex items-center gap-1">
+                            <Rocket size={12} className="text-amber-600" /> Month 0: Launch
                           </span>
-                          <span className="text-[9px] font-bold bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30 px-1.5 py-0.5 rounded">
+                          <span className="text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded">
                             Organizer Profit
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#AEABD8]">
+                        <p className="text-[11px] text-slate-600">
                           {newGroupStartDate} · All {newGroupDuration} members pay first installment ({formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}). No auction held.
                         </p>
                       </div>
 
                       {/* Month 1 Card */}
-                      <div className="bg-[#1D1D41] border border-[#6359E9]/40 rounded-xl p-2.5 sm:p-3 space-y-1">
+                      <div className="bg-white border border-brand-200 rounded-xl p-3 space-y-1 shadow-2xs">
                         <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-white flex items-center gap-1">
-                            <Trophy size={12} className="text-[#6359E9]" /> Month 1: 1st Auction
+                          <span className="font-extrabold text-brand-900 flex items-center gap-1">
+                            <Trophy size={12} className="text-brand-600" /> Month 1: 1st Auction
                           </span>
-                          <span className="text-[9px] font-bold bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 px-1.5 py-0.5 rounded">
+                          <span className="text-[9px] font-bold bg-brand-50 text-brand-700 border border-brand-200 px-1.5 py-0.5 rounded">
                             Live Bidding
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#AEABD8]">
-                          {newGroupAuctionDay}th of next month · {formatTime12h(newGroupAuctionTime)}. Winning discount accumulates to <code>kai_iruppu_pool</code>.
+                        <p className="text-[11px] text-slate-600">
+                          {newGroupAuctionDay}th of next month · {formatTime12h(newGroupAuctionTime)}. Winning discount accumulates into <code>kai_iruppu_pool</code>.
                         </p>
                       </div>
 
                     </div>
                   </div>
 
-                  {/* Enrolled Subscribers Grid */}
+                  {/* Enrolled Subscribers Pill Grid */}
                   <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
                       Enrolled Subscribers ({enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration})
                     </span>
                     <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
                       {enrollments.map((slot, index) => (
-                        <span key={index} className={`border text-[11px] px-2.5 py-1 rounded-lg shadow-2xs flex items-center gap-1.5 ${
+                        <span key={index} className={`border text-xs px-2.5 py-1 rounded-xl shadow-2xs flex items-center gap-1.5 ${
                           slot.name 
-                            ? 'bg-[#141332] border-[#27264E] text-white font-semibold' 
-                            : 'bg-[#FFBB38]/10 border-[#FFBB38]/30 text-[#FFBB38] italic'
+                            ? 'bg-white border-slate-200 text-slate-800 font-semibold' 
+                            : 'bg-amber-50 border-amber-200 text-amber-800 italic'
                         }`}>
-                          <span className="w-3.5 h-3.5 rounded-full bg-[#27264E] text-[#AEABD8] text-[8px] font-bold flex items-center justify-center">
+                          <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold font-mono flex items-center justify-center">
                             {index + 1}
                           </span>
                           <span>{slot.name || 'Open Slot'}</span>
-                          {slot.phone && <span className="text-[10px] text-[#AEABD8]">({slot.phone})</span>}
+                          {slot.phone && <span className="text-[10px] text-slate-400 font-mono">({slot.phone})</span>}
                         </span>
                       ))}
                     </div>
                   </div>
 
                   {/* Navigation Step 3 Buttons */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-[#27264E]">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-slate-100">
                     <button
                       type="button"
                       onClick={() => {
                         triggerHapticFeedback('light');
                         setWizardStep(2);
                       }}
-                      className="border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center"
+                      className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center cursor-pointer"
                     >
-                      <ArrowLeft size={13} className="inline mr-1" /> Back to Members
+                      <ArrowLeft size={13} className="inline mr-1" />
+                      <span>Back to Members</span>
                     </button>
                     <button
                       type="button"
                       disabled={isCreatingGroup}
                       onClick={handleCreateGroup}
-                      className={`font-bold text-xs px-7 py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs active:scale-95 cursor-pointer ${
+                      className={`font-bold text-xs px-7 py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 cursor-pointer ${
                         isCreatingGroup
-                          ? 'bg-[#27264E] text-[#AEABD8] cursor-not-allowed'
-                          : 'bg-[#6359E9] hover:bg-[#6F64FF] text-white'
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : 'bg-brand-600 hover:bg-brand-700 text-white'
                       }`}
                     >
                       {isCreatingGroup ? (
@@ -6369,6 +7561,7 @@ Thank you for your prompt payment! 🙏`;
 
         </div>
       );
+    }
 
       default:
         return null;
@@ -6381,23 +7574,23 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── UPGRADED CHITBASE-INSPIRED CHIT GROUP SETTINGS MODAL ──────── */}
       {editingGroup && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden my-auto">
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-slate-200/90 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden my-auto">
             
             {/* 1. Modal Top Bar */}
-            <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between bg-[#1D1D41] z-10">
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-white z-10">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setEditingGroup(null)}
-                  className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm"
+                  className="border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs active:scale-95 cursor-pointer"
                 >
                   <ArrowLeft size={13} /> Back
                 </button>
                 <div>
-                  <h3 className="text-base font-bold text-white">Edit Chit Group</h3>
-                  <p className="text-[11px] text-[#AEABD8] font-medium">
-                    {formatCurrency(editGroupValue)} · {editGroupMemberCount} Members · <span className="capitalize font-semibold text-[#64CFF6]">{editGroupStatus}</span>
+                  <h3 className="text-base font-bold text-slate-900">Edit Chit Group</h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    {formatCurrency(editGroupValue)} · {editGroupMemberCount} Members · <span className="capitalize font-semibold text-brand-600">{editGroupStatus}</span>
                   </p>
                 </div>
               </div>
@@ -6405,21 +7598,21 @@ Thank you for your prompt payment! 🙏`;
               <button 
                 type="button" 
                 onClick={() => setEditingGroup(null)}
-                className="text-[#AEABD8] hover:text-white p-1.5 rounded-full hover:bg-[#141332] transition-colors"
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* 2. Top Tab Switcher */}
-            <div className="flex border-b border-[#27264E] bg-[#141332] px-5 pt-2 gap-2">
+            <div className="flex border-b border-slate-200 bg-slate-50/80 px-5 pt-2 gap-2">
               <button
                 type="button"
                 onClick={() => setEditActiveTab('details')}
-                className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 ${
+                className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
                   editActiveTab === 'details'
-                    ? 'bg-[#1D1D41] text-white border-[#6359E9] shadow-sm'
-                    : 'text-[#AEABD8] hover:text-white border-transparent'
+                    ? 'bg-white text-brand-700 border-brand-600 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 border-transparent'
                 }`}
               >
                 <Briefcase size={14} /> Chit Details
@@ -6427,21 +7620,21 @@ Thank you for your prompt payment! 🙏`;
               <button
                 type="button"
                 onClick={() => setEditActiveTab('members')}
-                className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 ${
+                className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
                   editActiveTab === 'members'
-                    ? 'bg-[#1D1D41] text-white border-[#6359E9] shadow-sm'
-                    : 'text-[#AEABD8] hover:text-white border-transparent'
+                    ? 'bg-white text-brand-700 border-brand-600 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-900 border-transparent'
                 }`}
               >
                 <Users size={14} /> Members
-                <span className="bg-[#6359E9]/20 text-[#64CFF6] text-[10px] px-1.5 py-0.2 rounded-full font-extrabold border border-[#6359E9]/40">
+                <span className="bg-brand-50 text-brand-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold border border-brand-200">
                   {editGroupMembers.length}
                 </span>
               </button>
             </div>
 
             {/* 3. Scrollable Content Body */}
-            <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6">
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6 bg-slate-50/30">
 
               {editActiveTab === 'details' ? (
                 <form id="edit-chit-form" onSubmit={handleSaveEditGroup} className="space-y-6">
@@ -6449,64 +7642,64 @@ Thank you for your prompt payment! 🙏`;
                   {/* Section A: Name & Status */}
                   <div className="space-y-3">
                     <div>
-                      <span className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider block">Chit details</span>
-                      <h4 className="text-xs font-bold text-[#AEABD8] uppercase mt-0.5">Name &amp; status</h4>
+                      <span className="text-[10px] font-bold text-brand-700 uppercase tracking-wider block">Chit details</span>
+                      <h4 className="text-xs font-bold text-slate-600 uppercase mt-0.5">Name &amp; status</h4>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-[#AEABD8] block">Chit Name *</label>
+                      <label className="text-[11px] font-bold text-slate-700 block">Chit Name *</label>
                       <input
                         type="text"
                         required
                         value={editGroupName}
                         onChange={(e) => setEditGroupName(e.target.value)}
                         placeholder="e.g. Sample Test Group"
-                        className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-white focus:outline-none transition-colors"
+                        className="w-full bg-white border border-slate-200 focus:border-brand-600 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:outline-none transition-colors shadow-2xs"
                       />
                     </div>
 
                     {/* Status 3-Pills */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-[#AEABD8] block">Status</label>
+                      <label className="text-[11px] font-bold text-slate-700 block">Status</label>
                       <div className="grid grid-cols-3 gap-2.5">
                         <button
                           type="button"
                           onClick={() => setEditGroupStatus('draft')}
-                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                             editGroupStatus === 'draft'
-                              ? 'bg-[#FFBB38]/20 border-[#FFBB38] text-[#FFBB38] shadow-sm'
-                              : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
+                              ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-2xs ring-1 ring-amber-200'
+                              : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                           }`}
                         >
-                          <Edit3 size={14} className={editGroupStatus === 'draft' ? 'text-[#FFBB38]' : 'text-[#AEABD8]'} />
+                          <Edit3 size={14} className={editGroupStatus === 'draft' ? 'text-amber-600' : 'text-slate-400'} />
                           Draft
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditGroupStatus('active')}
-                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                             editGroupStatus === 'active'
-                              ? 'bg-[#02B15A]/20 border-[#02B15A] text-[#02B15A] shadow-sm ring-1 ring-[#02B15A]'
-                              : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs ring-1 ring-emerald-300'
+                              : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                           }`}
                         >
-                          <CheckCircle2 size={14} className={editGroupStatus === 'active' ? 'text-[#02B15A]' : 'text-[#AEABD8]'} />
+                          <CheckCircle2 size={14} className={editGroupStatus === 'active' ? 'text-emerald-600' : 'text-slate-400'} />
                           Active
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditGroupStatus('completed')}
-                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                             editGroupStatus === 'completed'
-                              ? 'bg-[#6359E9]/20 border-[#6359E9] text-white shadow-sm ring-1 ring-[#6359E9]'
-                              : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
+                              ? 'bg-brand-50 border-brand-300 text-brand-700 shadow-2xs ring-1 ring-brand-300'
+                              : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                           }`}
                         >
-                          <Trophy size={14} className={editGroupStatus === 'completed' ? 'text-[#64CFF6]' : 'text-[#AEABD8]'} />
+                          <Trophy size={14} className={editGroupStatus === 'completed' ? 'text-brand-600' : 'text-slate-400'} />
                           Completed
                         </button>
                       </div>
-                      <p className="text-[10px] text-[#AEABD8] italic mt-1">
+                      <p className="text-[10px] text-slate-500 italic mt-1">
                         {editGroupStatus === 'draft' && 'Draft mode: Enrollment open, no auction bids or treasury postings yet.'}
                         {editGroupStatus === 'active' && 'Active: In-progress chit fund for monthly collections and live auctions.'}
                         {editGroupStatus === 'completed' && 'Completed: All monthly cycles and winner payouts concluded.'}
@@ -6515,40 +7708,40 @@ Thank you for your prompt payment! 🙏`;
 
                     {/* Active Month Selector */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-[#AEABD8] block">Current Active Month *</label>
+                      <label className="text-[11px] font-bold text-slate-700 block">Current Active Month *</label>
                       <select
                         value={editGroupCurrentMonth}
                         onChange={(e) => setEditGroupCurrentMonth(parseInt(e.target.value) || 0)}
-                        className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-white focus:outline-none"
+                        className="w-full bg-white border border-slate-200 focus:border-brand-600 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:outline-none shadow-2xs"
                       >
-                        <option value={0} className="bg-[#1D1D41] text-white">Month 0 (Launch Month — Organizer Profit Phase)</option>
+                        <option value={0} className="bg-white text-slate-900">Month 0 (Launch Month — Organizer Profit Phase)</option>
                         {Array.from({ length: editGroupMemberCount }).map((_, idx) => (
-                          <option key={idx + 1} value={idx + 1} className="bg-[#1D1D41] text-white">
+                          <option key={idx + 1} value={idx + 1} className="bg-white text-slate-900">
                             Month {idx + 1} {idx === 0 ? '(1st Live Auction)' : ''}
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-[#AEABD8]">
+                      <p className="text-[10px] text-slate-500">
                         Directly controls the ongoing monthly cycle. You can advance or revert this anytime.
                       </p>
                     </div>
                   </div>
 
-                  <hr className="border-[#27264E]" />
+                  <hr className="border-slate-200" />
 
                   {/* Section B: Size & Timing */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <h4 className="text-xs font-bold text-white">Size &amp; timing</h4>
-                      <span className="text-[10px] text-[#AEABD8] font-bold uppercase">Key fields</span>
+                      <h4 className="text-xs font-bold text-slate-900">Size &amp; timing</h4>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">Key fields</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Member Shares Stepper */}
-                      <div className="p-3.5 bg-[#141332] border border-[#27264E] rounded-2xl space-y-2">
+                      <div className="p-3.5 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-2xs">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-white">Member shares *</span>
-                          <div className="flex items-center gap-1.5 bg-[#1D1D41] border border-[#27264E] rounded-xl p-1 shadow-sm">
+                          <span className="text-xs font-bold text-slate-900">Member shares *</span>
+                          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl p-1 shadow-2xs">
                             <button
                               type="button"
                               onClick={() => {
@@ -6556,7 +7749,7 @@ Thank you for your prompt payment! 🙏`;
                                   setEditGroupMemberCount(prev => prev - 1);
                                 }
                               }}
-                              className="w-7 h-7 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-sm"
+                              className="w-7 h-7 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 font-bold text-sm cursor-pointer"
                             >
                               <Minus size={13} />
                             </button>
@@ -6569,27 +7762,27 @@ Thank you for your prompt payment! 🙏`;
                                 const val = Math.max(1, parseInt(e.target.value) || 1);
                                 setEditGroupMemberCount(val);
                               }}
-                              className="w-10 text-center font-bold text-xs text-white bg-transparent focus:outline-none"
+                              className="w-10 text-center font-bold text-xs text-slate-900 bg-transparent focus:outline-none"
                             />
                             <button
                               type="button"
                               onClick={() => setEditGroupMemberCount(prev => prev + 1)}
-                              className="w-7 h-7 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-sm"
+                              className="w-7 h-7 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 font-bold text-sm cursor-pointer"
                             >
                               <Plus size={13} />
                             </button>
                           </div>
                         </div>
-                        <span className="text-[11px] text-[#AEABD8] block">
+                        <span className="text-[11px] text-slate-500 block">
                           {editGroupMembers.length} of {editGroupMemberCount} assigned
                         </span>
                       </div>
 
                       {/* Duration Stepper (Synced 1:1) */}
-                      <div className="p-3.5 bg-[#141332] border border-[#27264E] rounded-2xl space-y-2">
+                      <div className="p-3.5 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-2xs">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-white">Duration (Months) *</span>
-                          <div className="flex items-center gap-1.5 bg-[#1D1D41] border border-[#27264E] rounded-xl p-1 shadow-sm">
+                          <span className="text-xs font-bold text-slate-900">Duration (Months) *</span>
+                          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl p-1 shadow-2xs">
                             <button
                               type="button"
                               onClick={() => {
@@ -6597,23 +7790,23 @@ Thank you for your prompt payment! 🙏`;
                                   setEditGroupMemberCount(prev => prev - 1);
                                 }
                               }}
-                              className="w-7 h-7 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-sm"
+                              className="w-7 h-7 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 font-bold text-sm cursor-pointer"
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="w-10 text-center font-bold text-xs text-white">
+                            <span className="w-10 text-center font-bold text-xs text-slate-900">
                               {editGroupMemberCount}
                             </span>
                             <button
                               type="button"
                               onClick={() => setEditGroupMemberCount(prev => prev + 1)}
-                              className="w-7 h-7 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-sm"
+                              className="w-7 h-7 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 font-bold text-sm cursor-pointer"
                             >
                               <Plus size={13} />
                             </button>
                           </div>
                         </div>
-                        <span className="text-[11px] text-[#AEABD8] block">
+                        <span className="text-[11px] text-slate-500 block">
                           {editGroupMemberCount} planned, {editGroupMemberCount} months
                         </span>
                       </div>
@@ -6621,13 +7814,13 @@ Thank you for your prompt payment! 🙏`;
 
                     {/* Validation Badges */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="p-3 bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl flex items-start gap-2.5 text-white">
-                        <CheckCircle2 size={16} className="text-[#02B15A] shrink-0 mt-0.5" />
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-emerald-950 shadow-2xs">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#02B15A] block">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">
                             SHARES LIVE {editGroupMembers.length} / {editGroupMemberCount}
                           </span>
-                          <p className="text-[11px] text-[#AEABD8] mt-0.5">
+                          <p className="text-[11px] text-slate-600 mt-0.5">
                             {editGroupMembers.length === editGroupMemberCount 
                               ? 'Share count matches the members assigned.' 
                               : `${editGroupMemberCount - editGroupMembers.length} tickets need member assignment.`}
@@ -6635,13 +7828,13 @@ Thank you for your prompt payment! 🙏`;
                         </div>
                       </div>
 
-                      <div className="p-3 bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl flex items-start gap-2.5 text-white">
-                        <CheckCircle2 size={16} className="text-[#02B15A] shrink-0 mt-0.5" />
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-emerald-950 shadow-2xs">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#02B15A] block">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">
                             MONTHS LIVE {editGroupMemberCount} / {editGroupMemberCount}
                           </span>
-                          <p className="text-[11px] text-[#AEABD8] mt-0.5">
+                          <p className="text-[11px] text-slate-600 mt-0.5">
                             Duration and monthly plan are ready.
                           </p>
                         </div>
@@ -6650,35 +7843,35 @@ Thank you for your prompt payment! 🙏`;
 
                     {/* Start Month Picker */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-[#AEABD8] block">Start Month *</label>
+                      <label className="text-[11px] font-bold text-slate-700 block">Start Month *</label>
                       <input
                         type="date"
                         value={editGroupStartDate}
                         onChange={(e) => setEditGroupStartDate(e.target.value)}
-                        className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none"
+                        className="w-full bg-white border border-slate-200 focus:border-brand-600 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-900 focus:outline-none shadow-2xs"
                       />
-                      <p className="text-[10px] text-[#AEABD8]">
+                      <p className="text-[10px] text-slate-500">
                         Changing the start month shifts dashboard months only before this chit has payments, lifts, or closed months.
                       </p>
                     </div>
                   </div>
 
-                  <hr className="border-[#27264E]" />
+                  <hr className="border-slate-200" />
 
                   {/* Section C: Set up the money */}
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-sm font-bold text-white">Set up the money</h4>
-                      <p className="text-[11px] text-[#AEABD8] mt-0.5">Summary of monthly contributions, Organizer profit, and Laaba Seetu</p>
+                      <h4 className="text-sm font-bold text-slate-900">Set up the money</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Summary of monthly contributions, Organizer profit, and Laaba Seetu</p>
                     </div>
 
                     {/* Total Chit Value Input */}
-                    <div className="p-4 bg-[#141332] border border-[#27264E] rounded-2xl space-y-2">
-                      <label className="text-[11px] font-bold text-[#AEABD8] block">
+                    <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-2xs">
+                      <label className="text-[11px] font-bold text-slate-700 block">
                         Total chit value — the prize pot (₹) *
                       </label>
                       <div className="relative">
-                        <span className="absolute left-3.5 top-2.5 text-[#AEABD8] font-bold text-sm">₹</span>
+                        <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm">₹</span>
                         <input
                           type="number"
                           min={1000}
@@ -6686,76 +7879,76 @@ Thank you for your prompt payment! 🙏`;
                           required
                           value={editGroupValue}
                           onChange={(e) => setEditGroupValue(Math.max(1000, parseInt(e.target.value) || 0))}
-                          className="w-full bg-[#1D1D41] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-3 py-2 text-sm font-bold text-white focus:outline-none"
+                          className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand-600 rounded-xl pl-8 pr-3 py-2 text-sm font-bold text-slate-900 focus:outline-none"
                         />
                       </div>
-                      <p className="text-[10px] text-[#AEABD8] font-medium">
+                      <p className="text-[10px] text-slate-500 font-medium">
                         Roughly {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))} per member each month.
                       </p>
                     </div>
 
                     {/* 3-Stage Formula Flow */}
-                    <div className="p-3 bg-[#141332] border border-[#27264E] rounded-2xl flex items-center justify-around text-center shadow-sm">
+                    <div className="p-3 bg-white border border-slate-200 rounded-2xl flex items-center justify-around text-center shadow-2xs">
                       <div>
-                        <span className="text-[9px] font-bold text-[#AEABD8] uppercase block">MEMBERS</span>
-                        <strong className="text-xs font-extrabold text-white">{editGroupMemberCount}</strong>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase block">MEMBERS</span>
+                        <strong className="text-xs font-extrabold text-slate-900">{editGroupMemberCount}</strong>
                       </div>
-                      <ArrowRight size={14} className="text-[#27264E]" />
+                      <ArrowRight size={14} className="text-slate-300" />
                       <div>
-                        <span className="text-[9px] font-bold text-[#AEABD8] uppercase block">EACH PAYS / MO</span>
-                        <strong className="text-xs font-extrabold text-[#6359E9]">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase block">EACH PAYS / MO</span>
+                        <strong className="text-xs font-extrabold text-brand-700">
                           {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}
                         </strong>
                       </div>
-                      <ArrowRight size={14} className="text-[#27264E]" />
+                      <ArrowRight size={14} className="text-slate-300" />
                       <div>
-                        <span className="text-[9px] font-bold text-[#AEABD8] uppercase block">WINNER TAKES</span>
-                        <strong className="text-xs font-extrabold text-[#FFBB38]">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase block">WINNER TAKES</span>
+                        <strong className="text-xs font-extrabold text-amber-700">
                           {formatCurrency(editGroupValue)}
                         </strong>
                       </div>
                     </div>
 
                     {/* Step 1 Card: How much does each member pay */}
-                    <div className="p-4 bg-[#141332] border border-[#27264E] rounded-2xl space-y-3 shadow-sm">
+                    <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-2xs">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-[#6359E9] text-white text-[10px] font-bold flex items-center justify-center">1</span>
-                          <h5 className="text-xs font-bold text-white">How much does each member pay every month?</h5>
+                          <span className="w-5 h-5 rounded-full bg-brand-600 text-white text-[10px] font-bold flex items-center justify-center">1</span>
+                          <h5 className="text-xs font-bold text-slate-900">How much does each member pay every month?</h5>
                         </div>
-                        <span className="bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                           <Check size={11} /> All set
                         </span>
                       </div>
 
-                      <div className="p-3 bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl text-xs text-white font-medium">
-                        Everyone pays <strong className="text-[#02B15A]">{formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}</strong> every month — that&apos;s a <strong className="text-[#64CFF6]">{formatCurrency(editGroupValue)}</strong> pot collected each month.
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 font-medium">
+                        Everyone pays <strong className="text-emerald-700">{formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}</strong> every month — that&apos;s a <strong className="text-brand-700">{formatCurrency(editGroupValue)}</strong> pot collected each month.
                       </div>
                     </div>
 
                     {/* Step 2 Card: Month 0 Organizer Profit */}
-                    <div className="p-4 bg-[#141332] border border-[#27264E] rounded-2xl space-y-2 shadow-sm">
+                    <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-2xs">
                       <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-[#FFBB38] text-black text-[10px] font-bold flex items-center justify-center">2</span>
-                        <h5 className="text-xs font-bold text-white">Month 0 Launch Month (Organizer Profit)</h5>
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">2</span>
+                        <h5 className="text-xs font-bold text-slate-900">Month 0 Launch Month (Organizer Profit)</h5>
                       </div>
-                      <div className="p-3 bg-[#FFBB38]/10 border border-[#FFBB38]/30 rounded-xl text-xs text-white">
-                        <p className="font-semibold text-[#FFBB38]">Launch Month Allocation:</p>
-                        <p className="text-[11px] text-[#AEABD8] mt-0.5">
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+                        <p className="font-semibold text-amber-800">Launch Month Allocation:</p>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
                           All {editGroupMemberCount} members pay their first installment (<strong>{formatCurrency(editGroupValue)}</strong> total), which is taken directly by the Organizer as <strong>Organizer Profit</strong>. No auction occurs in Month 0.
                         </p>
                       </div>
                     </div>
 
                     {/* Step 3 Card: Laaba Seetu Bonus Month */}
-                    <div className="p-4 bg-[#141332] border border-[#27264E] rounded-2xl space-y-2 shadow-sm">
+                    <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-2xs">
                       <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-[#02B15A] text-white text-[10px] font-bold flex items-center justify-center">3</span>
-                        <h5 className="text-xs font-bold text-white">Laaba Seetu (லாப சீட்டு — Profit Month)</h5>
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">3</span>
+                        <h5 className="text-xs font-bold text-slate-900">Laaba Seetu (லாப சீட்டு — Profit Month)</h5>
                       </div>
-                      <div className="p-3 bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl text-xs text-white space-y-1">
-                        <p className="font-semibold text-[#02B15A]">Threshold: When Kai Iruppu Pool &ge; {formatCurrency(editGroupValue)}</p>
-                        <p className="text-[11px] text-[#AEABD8]">
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1">
+                        <p className="font-semibold text-emerald-700">Threshold: When Kai Iruppu Pool &ge; {formatCurrency(editGroupValue)}</p>
+                        <p className="text-[11px] text-slate-600">
                           Subscribers pay <strong>₹0 installment due</strong>. The prize pot is funded entirely by accumulated auction discounts, and auction bidding continues normally!
                         </p>
                       </div>
@@ -6763,61 +7956,61 @@ Thank you for your prompt payment! 🙏`;
 
                   </div>
 
-                  <hr className="border-[#27264E]" />
+                  <hr className="border-slate-200" />
 
                   {/* Section D: REVIEW — Does this look right? */}
-                  <div className="p-4 bg-[#141332] border border-[#27264E] rounded-2xl space-y-3">
-                    <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">REVIEW — does this look right?</span>
+                  <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">REVIEW — does this look right?</span>
                     <div className="space-y-1.5 text-xs">
-                      <div className="flex justify-between py-1 border-b border-[#27264E]">
-                        <span className="text-[#AEABD8]">Members</span>
-                        <strong className="text-white">{editGroupMemberCount}</strong>
+                      <div className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">Members</span>
+                        <strong className="text-slate-900">{editGroupMemberCount}</strong>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-[#27264E]">
-                        <span className="text-[#AEABD8]">Each member pays / month</span>
-                        <strong className="text-white">{formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}</strong>
+                      <div className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">Each member pays / month</span>
+                        <strong className="text-slate-900">{formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}</strong>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-[#27264E]">
-                        <span className="text-[#AEABD8]">Collected each month</span>
-                        <strong className="text-white">{formatCurrency(editGroupValue)}</strong>
+                      <div className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">Collected each month</span>
+                        <strong className="text-slate-900">{formatCurrency(editGroupValue)}</strong>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-[#27264E]">
-                        <span className="text-[#AEABD8]">Prize pot — winner takes</span>
-                        <strong className="text-[#FFBB38]">{formatCurrency(editGroupValue)}</strong>
+                      <div className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">Prize pot — winner takes</span>
+                        <strong className="text-amber-700">{formatCurrency(editGroupValue)}</strong>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-[#27264E]">
-                        <span className="text-[#AEABD8]">Monthly draws</span>
-                        <strong className="text-white">{editGroupMemberCount} · from {editGroupStartDate || 'Active cycle'}</strong>
+                      <div className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">Monthly draws</span>
+                        <strong className="text-slate-900">{editGroupMemberCount} · from {editGroupStartDate || 'Active cycle'}</strong>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-[#27264E]">
-                        <span className="text-[#AEABD8]">Organizer Profit</span>
-                        <strong className="text-[#FFBB38]">{formatCurrency(editGroupValue)} (Month 0)</strong>
+                      <div className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">Organizer Profit</span>
+                        <strong className="text-amber-700">{formatCurrency(editGroupValue)} (Month 0)</strong>
                       </div>
                     </div>
 
-                    <div className="pt-2 flex items-center gap-1.5 text-[#02B15A] text-xs font-bold">
+                    <div className="pt-2 flex items-center gap-1.5 text-emerald-700 text-xs font-bold">
                       <CheckCircle2 size={14} /> The money adds up — collection matches the pot.
                     </div>
                   </div>
 
                   {/* Section E: Advanced & Danger Zone */}
-                  <div className="border border-[#27264E] rounded-2xl overflow-hidden">
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-2xs">
                     <button
                       type="button"
                       onClick={() => setIsAdvancedExpanded(prev => !prev)}
-                      className="w-full p-3.5 bg-[#141332] hover:bg-[#1D1D41] flex justify-between items-center text-xs font-bold text-white transition-colors"
+                      className="w-full p-3.5 bg-slate-50 hover:bg-slate-100 flex justify-between items-center text-xs font-bold text-slate-800 transition-colors cursor-pointer"
                     >
                       <span>ADVANCED</span>
-                      <span className="text-[#64CFF6] text-[11px] font-bold">
+                      <span className="text-brand-600 text-[11px] font-bold">
                         {isAdvancedExpanded ? 'Hide' : 'Show'}
                       </span>
                     </button>
 
                     {isAdvancedExpanded && (
-                      <div className="p-4 bg-rose-500/10 border-t border-rose-500/30 space-y-3">
-                        <span className="text-[10px] font-extrabold text-rose-400 uppercase tracking-wider block">DANGER ZONE</span>
+                      <div className="p-4 bg-rose-50 border-t border-rose-200 space-y-3">
+                        <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-wider block">DANGER ZONE</span>
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                          <p className="text-xs text-rose-300">
+                          <p className="text-xs text-rose-800">
                             Permanently delete this chit group and all its enrolled tickets &amp; auction data.
                           </p>
                           <button
@@ -6829,9 +8022,9 @@ Thank you for your prompt payment! 🙏`;
                               setDeletePhraseInput('');
                               setDeleteSliderVal(0);
                             }}
-                            className="border border-rose-500/40 bg-[#1D1D41] hover:bg-rose-500/20 text-rose-300 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm shrink-0 self-start sm:self-auto"
+                            className="border border-rose-300 bg-white hover:bg-rose-100 text-rose-700 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs shrink-0 self-start sm:self-auto cursor-pointer"
                           >
-                            <Trash2 size={13} className="text-rose-400" /> Delete Group
+                            <Trash2 size={13} className="text-rose-600" /> Delete Group
                           </button>
                         </div>
                       </div>
@@ -6843,24 +8036,24 @@ Thank you for your prompt payment! 🙏`;
                 /* TAB 2: MEMBERS MANAGEMENT (ChitBase Architecture) */
                 <div className="space-y-3.5">
                   {/* Top Members Header */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pb-3 border-b border-[#27264E]">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pb-3 border-b border-slate-200">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-sm font-bold text-white">Members &amp; Tickets</h4>
-                        <span className="text-[10px] font-bold bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40 px-2 py-0.5 rounded-full">
+                        <h4 className="text-sm font-bold text-slate-900">Members &amp; Tickets</h4>
+                        <span className="text-[10px] font-bold bg-brand-50 text-brand-700 border border-brand-200 px-2 py-0.5 rounded-full">
                           {editGroupMembers.filter(m => m.profileId).length}/{editGroupMemberCount} Assigned
                         </span>
                         {editGroupStatus === 'draft' ? (
-                          <span className="text-[10px] font-bold bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/40 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full">
                             Draft (Reordering Open)
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold bg-[#141332] text-[#AEABD8] border border-[#27264E] px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full flex items-center gap-1">
                             <Lock size={10} /> Tickets Locked ({editGroupStatus.toUpperCase()})
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-[#AEABD8] mt-0.5">
+                      <p className="text-[11px] text-slate-500 mt-0.5">
                         {editGroupStatus === 'draft'
                           ? '↕️ Drag cards or use arrows to reorder ticket slots (Draft mode only)'
                           : '🔒 Ticket numbers cannot be changed once the chit group becomes active.'}
@@ -6879,19 +8072,19 @@ Thank you for your prompt payment! 🙏`;
                             setExpandedEditTicketIds(Array.from({ length: editGroupMemberCount }, (_, i) => i + 1));
                           }
                         }}
-                        className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white font-semibold text-[11px] px-2.5 py-1.5 rounded-xl transition-colors shrink-0"
+                        className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-[11px] px-2.5 py-1.5 rounded-xl transition-colors shrink-0 shadow-2xs cursor-pointer"
                       >
                         {expandedEditTicketIds.length > 0 ? 'Collapse All' : 'Expand All'}
                       </button>
 
                       <div className="relative">
-                        <Search size={12} className="absolute left-2.5 top-2.5 text-[#AEABD8]" />
+                        <Search size={12} className="absolute left-2.5 top-2.5 text-slate-400" />
                         <input
                           type="text"
                           placeholder="Filter..."
                           value={editMemberSearchQuery}
                           onChange={(e) => setEditMemberSearchQuery(e.target.value)}
-                          className="bg-[#141332] border border-[#27264E] rounded-xl pl-7 pr-3 py-1.5 text-xs text-white placeholder:text-[#AEABD8]/50 focus:outline-none w-28 sm:w-36"
+                          className="bg-white border border-slate-200 rounded-xl pl-7 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-600 w-28 sm:w-36 shadow-2xs"
                         />
                       </div>
 
@@ -6902,7 +8095,7 @@ Thank you for your prompt payment! 🙏`;
                           setNewMemberPhone('');
                           setShowCreateMemberModal(true);
                         }}
-                        className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-[11px] px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-sm shrink-0"
+                        className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-[11px] px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-sm shrink-0 cursor-pointer"
                       >
                         <UserPlus size={13} /> + Member
                       </button>
@@ -6966,12 +8159,12 @@ Thank you for your prompt payment! 🙏`;
                           }}
                           className={`rounded-2xl border transition-all ${
                             isDragOver
-                              ? 'border-[#6359E9] ring-2 ring-[#6359E9]/40 bg-[#6359E9]/20 scale-[1.01]'
+                              ? 'border-brand-600 ring-2 ring-brand-400/30 bg-brand-50/40 scale-[1.01]'
                               : isBeingDragged
-                                ? 'opacity-40 border-dashed border-[#6359E9] bg-[#141332]'
+                                ? 'opacity-40 border-dashed border-brand-500 bg-slate-50'
                                 : member?.profileId 
-                                  ? 'bg-[#141332] border-[#27264E] shadow-2xs hover:border-[#6359E9]/40' 
-                                  : 'border-dashed border-[#27264E] bg-[#141332]/50'
+                                  ? 'bg-white border-slate-200/90 shadow-2xs hover:border-brand-300' 
+                                  : 'border-dashed border-slate-300 bg-slate-50/60'
                           }`}
                         >
                           {/* ── CARD HEADER (Always visible & Clickable to Expand) ── */}
@@ -6990,7 +8183,7 @@ Thank you for your prompt payment! 🙏`;
                                 <div
                                   title="Drag to reorder ticket"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="cursor-grab active:cursor-grabbing p-1 text-[#AEABD8] hover:text-white shrink-0 hidden sm:block"
+                                  className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-slate-700 shrink-0 hidden sm:block"
                                 >
                                   <GripVertical size={16} />
                                 </div>
@@ -6998,7 +8191,7 @@ Thank you for your prompt payment! 🙏`;
                                 <div
                                   title="Ticket order is locked for active groups"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="p-1 text-[#AEABD8]/60 shrink-0 hidden sm:block"
+                                  className="p-1 text-slate-400 shrink-0 hidden sm:block"
                                 >
                                   <Lock size={13} />
                                 </div>
@@ -7014,7 +8207,7 @@ Thank you for your prompt payment! 🙏`;
                                     type="button"
                                     disabled={ticketNum === 1}
                                     onClick={() => handleSwapTicketSlots(ticketNum, ticketNum - 1)}
-                                    className="p-0.5 text-[#AEABD8] hover:text-white disabled:opacity-20"
+                                    className="p-0.5 text-slate-400 hover:text-slate-800 disabled:opacity-20 cursor-pointer"
                                   >
                                     <ArrowUp size={11} />
                                   </button>
@@ -7022,7 +8215,7 @@ Thank you for your prompt payment! 🙏`;
                                     type="button"
                                     disabled={ticketNum === editGroupMemberCount}
                                     onClick={() => handleSwapTicketSlots(ticketNum, ticketNum + 1)}
-                                    className="p-0.5 text-[#AEABD8] hover:text-white disabled:opacity-20"
+                                    className="p-0.5 text-slate-400 hover:text-slate-800 disabled:opacity-20 cursor-pointer"
                                   >
                                     <ArrowDown size={11} />
                                   </button>
@@ -7032,8 +8225,8 @@ Thank you for your prompt payment! 🙏`;
                               {/* Ticket Badge */}
                               <span className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
                                 member?.profileId
-                                  ? 'bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/40'
-                                  : 'bg-[#27264E] text-[#AEABD8]'
+                                  ? 'bg-brand-50 text-brand-700 border border-brand-200'
+                                  : 'bg-slate-100 text-slate-400 border border-slate-200'
                               }`}>
                                 #{ticketNum}
                               </span>
@@ -7041,34 +8234,34 @@ Thank you for your prompt payment! 🙏`;
                               {/* Member Identity & Details */}
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className={`text-xs sm:text-sm font-bold truncate ${member?.profileId ? 'text-white' : 'text-[#AEABD8]/60 italic'}`}>
+                                  <span className={`text-xs sm:text-sm font-bold truncate ${member?.profileId ? 'text-slate-900' : 'text-slate-400 italic'}`}>
                                     {member?.name || (member?.profileId ? 'Subscriber' : 'Unassigned Ticket')}
                                   </span>
                                   {member?.phone && (
-                                    <span className="text-[10px] text-[#AEABD8] font-medium hidden sm:inline">
+                                    <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
                                       ({member.phone})
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[10px] text-[#AEABD8] font-medium truncate flex items-center gap-1.5 mt-0.5">
-                                  <span>Pays <strong className="text-[#02B15A]">≈ {formatCurrency(effectiveDue)}/mo</strong></span>
+                                <div className="text-[10px] text-slate-500 font-medium truncate flex items-center gap-1.5 mt-0.5">
+                                  <span>Pays <strong className="text-emerald-700 font-mono">≈ {formatCurrency(effectiveDue)}/mo</strong></span>
                                   {totalShares > 1 && (
-                                    <span className="text-[#64CFF6] font-bold bg-[#6359E9]/20 border border-[#6359E9]/40 px-1.5 py-0.2 rounded text-[9px]">
+                                    <span className="text-brand-700 font-bold bg-brand-50 border border-brand-200 px-1.5 py-0.2 rounded text-[9px]">
                                       {totalShares}x shares
                                     </span>
                                   )}
                                   {member?.profileId && member?.splitPool && (
-                                    <span className="text-[#9C2CF3] font-bold bg-[#9C2CF3]/20 border border-[#9C2CF3]/40 px-1.5 py-0.2 rounded text-[9px]">
+                                    <span className="text-purple-700 font-bold bg-purple-50 border border-purple-200 px-1.5 py-0.2 rounded text-[9px]">
                                       👥 Pool
                                     </span>
                                   )}
                                   {member?.profileId && member?.exitMonth && (
-                                    <span className="text-rose-400 font-bold bg-rose-500/20 border border-rose-500/40 px-1.5 py-0.2 rounded text-[9px]">
+                                    <span className="text-rose-700 font-bold bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded text-[9px]">
                                       ⚠️ Exits M{member.exitMonth}
                                     </span>
                                   )}
                                   {member?.profileId && member?.transferredFrom && (
-                                    <span className="text-[#FFBB38] font-bold bg-[#FFBB38]/20 border border-[#FFBB38]/40 px-1.5 py-0.2 rounded text-[9px]">
+                                    <span className="text-amber-800 font-bold bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded text-[9px]">
                                       🔄 Transferred
                                     </span>
                                   )}
@@ -7083,7 +8276,7 @@ Thank you for your prompt payment! 🙏`;
                                   type="button"
                                   title="Unassign ticket"
                                   onClick={() => handleUnassignTicket(member.id, ticketNum)}
-                                  className="p-1.5 rounded-lg text-[#AEABD8] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                                 >
                                   <Trash2 size={13} />
                                 </button>
@@ -7096,7 +8289,7 @@ Thank you for your prompt payment! 🙏`;
                                     isExpanded ? prev.filter(id => id !== ticketNum) : [...prev, ticketNum]
                                   );
                                 }}
-                                className="p-1 rounded-lg text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors cursor-pointer"
+                                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                               >
                                 {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                               </div>
@@ -7105,13 +8298,13 @@ Thank you for your prompt payment! 🙏`;
 
                           {/* ── EXPANDED CONTROLS BODY ── */}
                           {isExpanded && (
-                            <div className="px-3.5 pb-3.5 pt-1 space-y-3 border-t border-[#27264E] animate-in fade-in duration-150 text-xs">
+                            <div className="px-3.5 pb-3.5 pt-2 space-y-3 border-t border-slate-100 bg-slate-50/50 animate-in fade-in duration-150 text-xs">
                               
                               {/* Shares Stepper & Timing Line */}
                               <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider">Shares:</span>
-                                  <div className="flex items-center gap-1 bg-[#1D1D41] border border-[#27264E] rounded-xl p-0.5 shadow-2xs">
+                                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Shares:</span>
+                                  <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -7122,11 +8315,11 @@ Thank you for your prompt payment! 🙏`;
                                           }
                                         }
                                       }}
-                                      className="w-6 h-6 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-xs"
+                                      className="w-6 h-6 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-slate-900 font-bold text-xs cursor-pointer"
                                     >
                                       <Minus size={11} />
                                     </button>
-                                    <span className="w-7 text-center font-bold text-xs text-white">
+                                    <span className="w-7 text-center font-bold text-xs text-slate-900">
                                       {member?.profileId ? `${totalShares}x` : '0x'}
                                     </span>
                                     <button
@@ -7141,7 +8334,7 @@ Thank you for your prompt payment! 🙏`;
                                           }
                                         }
                                       }}
-                                      className="w-6 h-6 rounded-lg hover:bg-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white font-bold text-xs"
+                                      className="w-6 h-6 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-slate-900 font-bold text-xs cursor-pointer"
                                     >
                                       <Plus size={11} />
                                     </button>
@@ -7155,7 +8348,7 @@ Thank you for your prompt payment! 🙏`;
                                       isTimingExpanded ? prev.filter(id => id !== ticketNum) : [...prev, ticketNum]
                                     );
                                   }}
-                                  className="text-xs font-semibold text-[#AEABD8] hover:text-white flex items-center gap-1 transition-colors"
+                                  className="text-xs font-semibold text-slate-500 hover:text-slate-900 flex items-center gap-1 transition-colors cursor-pointer"
                                 >
                                   Share timing {isTimingExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                                 </button>
@@ -7171,10 +8364,10 @@ Thank you for your prompt payment! 🙏`;
                                     setCustomAmountVal(member?.customInstallment || standardDue);
                                   }}
                                   disabled={!member?.profileId}
-                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
                                     member?.profileId && member?.customInstallment
-                                      ? 'bg-[#6359E9]/20 text-[#64CFF6] border-[#6359E9]/40'
-                                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E] disabled:opacity-40 disabled:cursor-not-allowed'
+                                      ? 'bg-brand-50 text-brand-700 border-brand-300 shadow-2xs'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
                                   }`}
                                 >
                                   {member?.profileId && member?.customInstallment ? `Custom: ₹${member.customInstallment.toLocaleString('en-IN')}` : 'Set custom amount'}
@@ -7191,10 +8384,10 @@ Thank you for your prompt payment! 🙏`;
                                     ]);
                                   }}
                                   disabled={!member?.profileId}
-                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
                                     member?.profileId && member?.splitPool
-                                      ? 'bg-[#9C2CF3]/20 text-[#9C2CF3] border-[#9C2CF3]/40'
-                                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E] disabled:opacity-40 disabled:cursor-not-allowed'
+                                      ? 'bg-purple-50 text-purple-700 border-purple-300 shadow-2xs'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
                                   }`}
                                 >
                                   {member?.profileId && member?.splitPool ? `Pool (${member.splitPool.length} payers)` : 'Split into pool'}
@@ -7208,10 +8401,10 @@ Thank you for your prompt payment! 🙏`;
                                     setExitMonthVal(member?.exitMonth || (editingGroup?.currentMonth || 1) + 1);
                                   }}
                                   disabled={!member?.profileId}
-                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
                                     member?.profileId && member?.exitMonth
-                                      ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
-                                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E] disabled:opacity-40 disabled:cursor-not-allowed'
+                                      ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-2xs'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
                                   }`}
                                 >
                                   {member?.profileId && member?.exitMonth ? `Exits M${member.exitMonth}` : 'Member leaves chit...'}
@@ -7226,10 +8419,10 @@ Thank you for your prompt payment! 🙏`;
                                     setTransferMonthVal((editingGroup?.currentMonth || 1) + 1);
                                   }}
                                   disabled={!member?.profileId}
-                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
                                     member?.profileId && member?.transferredFrom
-                                      ? 'bg-[#FFBB38]/20 text-[#FFBB38] border-[#FFBB38]/40'
-                                      : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8] hover:text-white hover:bg-[#27264E] disabled:opacity-40 disabled:cursor-not-allowed'
+                                      ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-2xs'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
                                   }`}
                                 >
                                   {member?.profileId && member?.transferredFrom ? 'Transferred' : 'Transfer shares...'}
@@ -7238,16 +8431,16 @@ Thank you for your prompt payment! 🙏`;
 
                               {/* Expanded Share Timing Details */}
                               {isTimingExpanded && (
-                                <div className="p-2.5 bg-[#1D1D41] border border-[#27264E] rounded-xl space-y-1.5 text-xs animate-in fade-in duration-150">
-                                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Share Timeline</span>
+                                <div className="p-2.5 bg-white border border-slate-200 rounded-xl space-y-1.5 text-xs animate-in fade-in duration-150 shadow-2xs">
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Share Timeline</span>
                                   <div className="space-y-1 text-[11px]">
-                                    <div className="flex justify-between py-0.5 border-b border-[#27264E]">
-                                      <span className="text-white">Month 1 (Launch)</span>
-                                      <span className="text-[#AEABD8] font-semibold">1x · Collected</span>
+                                    <div className="flex justify-between py-0.5 border-b border-slate-100">
+                                      <span className="text-slate-700">Month 1 (Launch)</span>
+                                      <span className="text-slate-500 font-semibold">1x · Collected</span>
                                     </div>
                                     <div className="flex justify-between py-0.5">
-                                      <span className="text-white">Month 2 onward</span>
-                                      <span className="text-[#64CFF6] font-semibold">
+                                      <span className="text-slate-700">Month 2 onward</span>
+                                      <span className="text-brand-700 font-semibold">
                                         {member?.profileId ? `${totalShares}x active` : 'Unassigned'}
                                       </span>
                                     </div>
@@ -7257,11 +8450,11 @@ Thank you for your prompt payment! 🙏`;
 
                               {/* Active Split Pool Summary Tag */}
                               {member?.profileId && member?.splitPool && (
-                                <div className="p-2 bg-[#9C2CF3]/15 border border-[#9C2CF3]/40 rounded-xl text-xs text-white space-y-1">
-                                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#9C2CF3] block">👥 Joint Split Pool Active:</span>
+                                <div className="p-2 bg-purple-50 border border-purple-200 rounded-xl text-xs space-y-1">
+                                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 block">👥 Joint Split Pool Active:</span>
                                   <div className="flex flex-wrap gap-1.5 text-[11px]">
                                     {member.splitPool.map((p: any, pIdx: number) => (
-                                      <span key={pIdx} className="bg-[#1D1D41] border border-[#9C2CF3]/30 px-2 py-0.5 rounded-md font-semibold text-white">
+                                      <span key={pIdx} className="bg-white border border-purple-200 px-2 py-0.5 rounded-md font-semibold text-purple-900 shadow-2xs">
                                         {p.name}: {formatCurrency(p.part)}
                                       </span>
                                     ))}
@@ -7271,12 +8464,12 @@ Thank you for your prompt payment! 🙏`;
 
                               {/* Active Exit Warning Tag */}
                               {member?.profileId && member?.exitMonth && (
-                                <div className="p-2 bg-rose-500/15 border border-rose-500/40 rounded-xl text-xs text-white flex justify-between items-center">
-                                  <span>⚠️ Scheduled to exit on <strong className="text-rose-400">Month {member.exitMonth}</strong></span>
+                                <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl text-xs flex justify-between items-center text-rose-800">
+                                  <span>⚠️ Scheduled to exit on <strong className="text-rose-700">Month {member.exitMonth}</strong></span>
                                   <button
                                     type="button"
                                     onClick={() => handleSaveExit(member.id, null)}
-                                    className="text-[10px] font-bold text-rose-400 hover:text-rose-300 underline"
+                                    className="text-[10px] font-bold text-rose-700 hover:text-rose-800 underline cursor-pointer"
                                   >
                                     Re-instate
                                   </button>
@@ -7284,8 +8477,8 @@ Thank you for your prompt payment! 🙏`;
                               )}
 
                               {/* Reassign Subscriber Selector */}
-                              <div className="pt-2 border-t border-[#27264E] flex items-center justify-between gap-2 text-[11px]">
-                                <span className="text-[#AEABD8] font-medium">Reassign Subscriber:</span>
+                              <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-2 text-[11px]">
+                                <span className="text-slate-600 font-medium">Reassign Subscriber:</span>
                                 <select
                                   value={member?.profileId || ''}
                                   onChange={(e) => {
@@ -7295,11 +8488,11 @@ Thank you for your prompt payment! 🙏`;
                                       handleReassignTicketMember(ticketNum, member?.id, targetProfile.id!, targetProfile.name, targetProfile.phone);
                                     }
                                   }}
-                                  className="bg-[#1D1D41] border border-[#27264E] text-white text-[11px] font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#6359E9] max-w-[200px]"
+                                  className="bg-white border border-slate-200 text-slate-800 text-[11px] font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-600 max-w-[200px] shadow-2xs cursor-pointer"
                                 >
-                                  <option value="" disabled className="bg-[#1D1D41] text-[#AEABD8]">Select Subscriber</option>
+                                  <option value="" disabled className="bg-white text-slate-400">Select Subscriber</option>
                                   {masterDirectory.map(p => (
-                                    <option key={p.id} value={p.id} className="bg-[#1D1D41] text-white">{p.name} ({p.phone})</option>
+                                    <option key={p.id} value={p.id} className="bg-white text-slate-900">{p.name} ({p.phone})</option>
                                   ))}
                                 </select>
                               </div>
@@ -7317,11 +8510,11 @@ Thank you for your prompt payment! 🙏`;
             </div>
 
             {/* 4. Modal Sticky Action Footer */}
-            <div className="p-4 sm:p-5 border-t border-[#27264E] bg-[#1D1D41] flex justify-between items-center z-10">
+            <div className="p-4 sm:p-5 border-t border-slate-200 bg-white flex justify-between items-center z-10">
               <button
                 type="button"
                 onClick={() => setEditingGroup(null)}
-                className="border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors"
+                className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
               >
                 Cancel
               </button>
@@ -7330,7 +8523,7 @@ Thank you for your prompt payment! 🙏`;
                 type="button"
                 onClick={() => handleSaveEditGroup()}
                 disabled={isSavingEdit || !editGroupName.trim()}
-                className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
                 {isSavingEdit ? (
                   <>
@@ -7350,22 +8543,22 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 1. SUB-MODAL: SPLIT INTO A POOL (Screenshot 3) ──────── */}
       {splitModalTicket && (
-        <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-start border-b border-[#27264E] pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-start border-b border-slate-200 pb-3">
               <div>
-                <h4 className="text-sm font-bold text-white">Split {splitModalTicket.name}&apos;s share</h4>
-                <p className="text-[11px] text-[#AEABD8] mt-0.5">
-                  Add each person who pays a part of this one share. Their payments are collected and tracked...
+                <h4 className="text-sm font-bold text-slate-900">Split {splitModalTicket.name}&apos;s share</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Add each person who pays a part of this one share. Their payments are collected and tracked individually.
                 </p>
               </div>
-              <button onClick={() => setSplitModalTicket(null)} className="text-[#AEABD8] hover:text-white p-1">
+              <button onClick={() => setSplitModalTicket(null)} className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer">
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
-              <div className="flex justify-between text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider">
+              <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 <span>Who Pays</span>
                 <span>Their Part</span>
               </div>
@@ -7381,10 +8574,10 @@ Thank you for your prompt payment! 🙏`;
                       copy[pIdx].name = e.target.value;
                       setSplitPayers(copy);
                     }}
-                    className="flex-1 bg-[#141332] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-semibold text-white placeholder:text-[#AEABD8]/50 focus:outline-none focus:border-[#6359E9]"
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-brand-600 shadow-2xs"
                   />
                   <div className="relative w-28">
-                    <span className="absolute left-2.5 top-2 text-[#AEABD8] text-xs font-bold">₹</span>
+                    <span className="absolute left-2.5 top-2 text-slate-400 text-xs font-bold">₹</span>
                     <input
                       type="number"
                       value={payer.part || ''}
@@ -7394,14 +8587,14 @@ Thank you for your prompt payment! 🙏`;
                         copy[pIdx].part = Number(e.target.value) || 0;
                         setSplitPayers(copy);
                       }}
-                      className="w-full bg-[#141332] border border-[#27264E] rounded-xl pl-6 pr-2 py-2 text-xs font-bold text-white placeholder:text-[#AEABD8]/50 focus:outline-none focus:border-[#6359E9]"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-6 pr-2 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-brand-600 shadow-2xs font-mono"
                     />
                   </div>
                   {splitPayers.length > 2 && (
                     <button
                       type="button"
                       onClick={() => setSplitPayers(splitPayers.filter((_, i) => i !== pIdx))}
-                      className="text-[#AEABD8] hover:text-rose-400 p-1"
+                      className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
                     >
                       <X size={14} />
                     </button>
@@ -7412,31 +8605,31 @@ Thank you for your prompt payment! 🙏`;
               <button
                 type="button"
                 onClick={() => setSplitPayers([...splitPayers, { name: `Person ${splitPayers.length + 1}`, part: 0 }])}
-                className="text-xs font-bold text-[#64CFF6] hover:text-white flex items-center gap-1 mt-1"
+                className="text-xs font-bold text-brand-700 hover:text-brand-800 flex items-center gap-1 mt-1 cursor-pointer"
               >
                 + Add person
               </button>
             </div>
 
             {/* Total Payers Summary Bar */}
-            <div className="bg-[#141332] border border-[#27264E] text-white rounded-2xl p-3 flex justify-between items-center text-xs">
-              <span className="font-bold flex items-center gap-1.5 text-[#AEABD8]">
-                <Users size={14} className="text-[#64CFF6]" /> {splitPayers.filter(p => p.name.trim()).length} PAYERS
+            <div className="bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl p-3 flex justify-between items-center text-xs shadow-2xs">
+              <span className="font-bold flex items-center gap-1.5 text-slate-600">
+                <Users size={14} className="text-brand-600" /> {splitPayers.filter(p => p.name.trim()).length} PAYERS
               </span>
-              <strong className="text-sm font-extrabold text-[#02B15A]">
+              <strong className="text-sm font-extrabold text-emerald-700 font-mono">
                 {formatCurrency(splitPayers.reduce((sum, p) => sum + (p.part || 0), 0))}/mo
               </strong>
             </div>
 
-            <p className="text-[10px] text-[#AEABD8] text-center">
+            <p className="text-[10px] text-slate-500 text-center">
               Target ticket due: {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}/mo.
             </p>
 
-            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-[#27264E]">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setSplitModalTicket(null)}
-                className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                className="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center shadow-2xs cursor-pointer"
               >
                 Cancel
               </button>
@@ -7444,7 +8637,7 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   type="button"
                   onClick={() => handleSaveSplit(splitModalTicket.id, [])}
-                  className="w-full sm:w-auto border border-rose-500/40 text-rose-300 hover:bg-rose-500/20 font-bold text-xs px-3 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto border border-rose-300 text-rose-700 hover:bg-rose-50 font-bold text-xs px-3 py-2.5 sm:py-2 rounded-xl transition-colors text-center shadow-2xs cursor-pointer"
                 >
                   Clear Split
                 </button>
@@ -7452,7 +8645,7 @@ Thank you for your prompt payment! 🙏`;
               <button
                 type="button"
                 onClick={() => handleSaveSplit(splitModalTicket.id, splitPayers)}
-                className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
+                className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center cursor-pointer"
               >
                 Save split
               </button>
@@ -7463,31 +8656,31 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 2. SUB-MODAL: MEMBER LEAVES THE CHIT (Screenshot 4) ──────── */}
       {exitModalTicket && (
-        <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-start border-b border-[#27264E] pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-start border-b border-slate-200 pb-3">
               <div>
-                <h4 className="text-sm font-bold text-white">Member leaves the chit</h4>
-                <p className="text-[11px] text-[#AEABD8] mt-0.5">
+                <h4 className="text-sm font-bold text-slate-900">Member leaves the chit</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
                   {exitModalTicket.name} · Ticket #{exitModalTicket.ticket}
                 </p>
               </div>
-              <button onClick={() => setExitModalTicket(null)} className="text-[#AEABD8] hover:text-white p-1">
+              <button onClick={() => setExitModalTicket(null)} className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer">
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[11px] font-bold text-[#AEABD8] block">Member stops paying from:</label>
+              <label className="text-[11px] font-bold text-slate-700 block">Member stops paying from:</label>
               <select
                 value={exitMonthVal}
                 onChange={(e) => setExitMonthVal(Number(e.target.value))}
-                className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#6359E9]"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-brand-600 shadow-2xs"
               >
                 {Array.from({ length: editGroupMemberCount }).map((_, i) => {
                   const mNum = i + 1;
                   return (
-                    <option key={mNum} value={mNum} className="bg-[#1D1D41] text-white">
+                    <option key={mNum} value={mNum} className="bg-white text-slate-900">
                       Month {mNum} {mNum <= (editingGroup?.currentMonth || 1) ? '(Current/Past)' : ''}
                     </option>
                   );
@@ -7496,52 +8689,52 @@ Thank you for your prompt payment! 🙏`;
             </div>
 
             {/* Now vs After Table */}
-            <div className="border border-[#27264E] rounded-2xl overflow-hidden text-xs">
-              <div className="grid grid-cols-4 bg-[#141332] p-2.5 font-bold text-[10px] text-[#AEABD8] uppercase tracking-wider">
+            <div className="border border-slate-200 rounded-2xl overflow-hidden text-xs bg-white shadow-2xs">
+              <div className="grid grid-cols-4 bg-slate-50 p-2.5 font-bold text-[10px] text-slate-500 uppercase tracking-wider border-b border-slate-200">
                 <span>Month</span>
                 <span>Member</span>
                 <span>Now</span>
                 <span className="text-right">After</span>
               </div>
-              <div className="divide-y divide-[#27264E] max-h-[140px] overflow-y-auto">
+              <div className="divide-y divide-slate-100 max-h-[140px] overflow-y-auto">
                 {Array.from({ length: editGroupMemberCount }).slice(exitMonthVal - 1).map((_, idx) => {
                   const mNum = exitMonthVal + idx;
                   const stdDue = Math.round(editGroupValue / (editGroupMemberCount || 1));
                   return (
-                    <div key={mNum} className="grid grid-cols-4 p-2.5 text-xs items-center bg-[#1D1D41]">
-                      <span className="font-bold text-white">M{mNum}</span>
-                      <span className="truncate text-[#AEABD8]">{exitModalTicket.name}</span>
-                      <span className="text-[#AEABD8]">{formatCurrency(stdDue)}</span>
-                      <span className="text-right font-bold text-rose-400">₹0</span>
+                    <div key={mNum} className="grid grid-cols-4 p-2.5 text-xs items-center bg-white hover:bg-slate-50">
+                      <span className="font-bold text-slate-900">M{mNum}</span>
+                      <span className="truncate text-slate-600">{exitModalTicket.name}</span>
+                      <span className="text-slate-500 font-mono">{formatCurrency(stdDue)}</span>
+                      <span className="text-right font-bold text-rose-600 font-mono">₹0</span>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            <div className="p-3 bg-[#141332] border border-[#27264E] rounded-xl text-xs flex justify-between items-center font-bold">
-              <span className="text-[#AEABD8]">These months collect in total:</span>
-              <span className="text-white">
-                {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)) * Math.max(1, editGroupMemberCount - exitMonthVal + 1))} → <strong className="text-rose-400">₹0</strong>
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs flex justify-between items-center font-bold shadow-2xs">
+              <span className="text-slate-600">These months collect in total:</span>
+              <span className="text-slate-900 font-mono">
+                {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)) * Math.max(1, editGroupMemberCount - exitMonthVal + 1))} → <strong className="text-rose-600">₹0</strong>
               </span>
             </div>
 
-            <p className="text-[10px] text-[#AEABD8]">
+            <p className="text-[10px] text-slate-500">
               They pay up to the month before. Payments and wins stay on record; nothing is deleted.
             </p>
 
-            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-[#27264E]">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setExitModalTicket(null)}
-                className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                className="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center shadow-2xs cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => handleSaveExit(exitModalTicket.id, exitMonthVal)}
-                className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
+                className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center cursor-pointer"
               >
                 End shares
               </button>
@@ -7552,48 +8745,48 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 3. SUB-MODAL: TRANSFER SHARES ──────── */}
       {transferModalTicket && (
-        <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-start border-b border-[#27264E] pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-start border-b border-slate-200 pb-3">
               <div>
-                <h4 className="text-sm font-bold text-white">Transfer Ticket #{transferModalTicket.ticket}</h4>
-                <p className="text-[11px] text-[#AEABD8] mt-0.5">
+                <h4 className="text-sm font-bold text-slate-900">Transfer Ticket #{transferModalTicket.ticket}</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
                   Transfer future payments and bidding rights from {transferModalTicket.name} to another subscriber
                 </p>
               </div>
-              <button onClick={() => setTransferModalTicket(null)} className="text-[#AEABD8] hover:text-white p-1">
+              <button onClick={() => setTransferModalTicket(null)} className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer">
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-[#AEABD8] block">Select New Subscriber *</label>
+                <label className="text-[11px] font-bold text-slate-700 block">Select New Subscriber *</label>
                 <select
                   value={transferRecipientId}
                   onChange={(e) => setTransferRecipientId(e.target.value)}
-                  className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-[#6359E9]"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:bg-white focus:border-brand-600 shadow-2xs"
                 >
-                  <option value="" disabled className="bg-[#1D1D41] text-[#AEABD8]">Choose recipient subscriber</option>
+                  <option value="" disabled className="bg-white text-slate-400">Choose recipient subscriber</option>
                   {masterDirectory
                     .filter(p => p.id !== transferModalTicket.profileId)
                     .map(p => (
-                      <option key={p.id} value={p.id} className="bg-[#1D1D41] text-white">{p.name} ({p.phone})</option>
+                      <option key={p.id} value={p.id} className="bg-white text-slate-900">{p.name} ({p.phone})</option>
                     ))}
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-[#AEABD8] block">Transfer Effective From:</label>
+                <label className="text-[11px] font-bold text-slate-700 block">Transfer Effective From:</label>
                 <select
                   value={transferMonthVal}
                   onChange={(e) => setTransferMonthVal(Number(e.target.value))}
-                  className="w-full bg-[#141332] border border-[#27264E] rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#6359E9]"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:bg-white focus:border-brand-600 shadow-2xs"
                 >
                   {Array.from({ length: editGroupMemberCount }).map((_, i) => {
                     const mNum = i + 1;
                     return (
-                      <option key={mNum} value={mNum} className="bg-[#1D1D41] text-white">
+                      <option key={mNum} value={mNum} className="bg-white text-slate-900">
                         Month {mNum} {mNum <= (editingGroup?.currentMonth || 1) ? '(Upcoming)' : ''}
                       </option>
                     );
@@ -7602,17 +8795,17 @@ Thank you for your prompt payment! 🙏`;
               </div>
             </div>
 
-            <div className="p-3 bg-[#FFBB38]/15 border border-[#FFBB38]/40 rounded-xl text-[11px] text-white space-y-1">
-              <p className="font-bold text-[#FFBB38]">Transfer Summary:</p>
-              <p className="text-[#AEABD8]">• Previous payments remain credited to {transferModalTicket.name}.</p>
-              <p className="text-[#AEABD8]">• Dues and live bidding rights from Month {transferMonthVal} transfer to the new subscriber.</p>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 space-y-1 shadow-2xs">
+              <p className="font-bold text-amber-800">Transfer Summary:</p>
+              <p className="text-slate-600">• Previous payments remain credited to {transferModalTicket.name}.</p>
+              <p className="text-slate-600">• Dues and live bidding rights from Month {transferMonthVal} transfer to the new subscriber.</p>
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-[#27264E]">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setTransferModalTicket(null)}
-                className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                className="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center shadow-2xs cursor-pointer"
               >
                 Cancel
               </button>
@@ -7620,7 +8813,7 @@ Thank you for your prompt payment! 🙏`;
                 type="button"
                 disabled={!transferRecipientId}
                 onClick={() => handleSaveTransfer(transferModalTicket.id, transferRecipientId, transferMonthVal)}
-                className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm disabled:opacity-50 text-center"
+                className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm disabled:opacity-50 text-center cursor-pointer"
               >
                 Confirm Transfer
               </button>
@@ -7631,24 +8824,24 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── 4. SUB-MODAL: CUSTOM AMOUNT ──────── */}
       {customAmountModalTicket && (
-        <div className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-start border-b border-[#27264E] pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-start border-b border-slate-200 pb-3">
               <div>
-                <h4 className="text-sm font-bold text-white">Custom Monthly Due</h4>
-                <p className="text-[11px] text-[#AEABD8] mt-0.5">
+                <h4 className="text-sm font-bold text-slate-900">Custom Monthly Due</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
                   Ticket #{customAmountModalTicket.ticket} · {customAmountModalTicket.name}
                 </p>
               </div>
-              <button onClick={() => setCustomAmountModalTicket(null)} className="text-[#AEABD8] hover:text-white p-1">
+              <button onClick={() => setCustomAmountModalTicket(null)} className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer">
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-[#AEABD8] block">Monthly Amount (₹)</label>
+              <label className="text-[11px] font-bold text-slate-700 block">Monthly Amount (₹)</label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-[#AEABD8] font-bold text-xs">₹</span>
+                <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-xs">₹</span>
                 <input
                   type="number"
                   min={1}
@@ -7656,20 +8849,20 @@ Thank you for your prompt payment! 🙏`;
                   value={customAmountVal || ''}
                   placeholder="e.g. 15000"
                   onChange={(e) => setCustomAmountVal(Number(e.target.value) || 0)}
-                  className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-3 py-2 text-xs font-bold text-white placeholder:text-[#AEABD8]/50 focus:outline-none"
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-brand-600 focus:bg-white rounded-xl pl-8 pr-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs font-mono"
                   autoFocus
                 />
               </div>
-              <p className="text-[10px] text-[#AEABD8]">
+              <p className="text-[10px] text-slate-500">
                 Standard baseline installment: {formatCurrency(Math.round(editGroupValue / (editGroupMemberCount || 1)))}/mo.
               </p>
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-[#27264E]">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setCustomAmountModalTicket(null)}
-                className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                className="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center shadow-2xs cursor-pointer"
               >
                 Cancel
               </button>
@@ -7677,7 +8870,7 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   type="button"
                   onClick={() => handleSaveCustomAmount(customAmountModalTicket.id, null)}
-                  className="w-full sm:w-auto border border-rose-500/40 text-rose-300 hover:bg-rose-500/20 font-bold text-xs px-3 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto border border-rose-300 text-rose-700 hover:bg-rose-50 font-bold text-xs px-3 py-2.5 sm:py-2 rounded-xl transition-colors text-center shadow-2xs cursor-pointer"
                 >
                   Clear Custom
                 </button>
@@ -7685,7 +8878,7 @@ Thank you for your prompt payment! 🙏`;
               <button
                 type="button"
                 onClick={() => handleSaveCustomAmount(customAmountModalTicket.id, customAmountVal > 0 ? customAmountVal : null)}
-                className="w-full sm:w-auto bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center"
+                className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center cursor-pointer"
               >
                 Save Custom Amount
               </button>
@@ -7704,27 +8897,27 @@ Thank you for your prompt payment! 🙏`;
           deletePhraseInput.trim().toLowerCase() === deletingGroup.name.toLowerCase();
 
         return (
-          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
-            <div className={`bg-[#1D1D41] border-2 rounded-2xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto ${
-              isSoft ? 'border-[#FFBB38]/40' : 'border-rose-500/40'
+          <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+            <div className={`bg-white border-2 rounded-3xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto ${
+              isSoft ? 'border-amber-300' : 'border-rose-300'
             }`}>
               
               {/* Header */}
               <div className={`flex justify-between items-start border-b pb-3 ${
-                isSoft ? 'border-[#FFBB38]/30' : 'border-rose-500/30'
+                isSoft ? 'border-amber-200' : 'border-rose-200'
               }`}>
                 <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-xl ${
-                    isSoft ? 'bg-[#FFBB38]/20 text-[#FFBB38]' : 'bg-rose-500/20 text-rose-400'
+                  <div className={`p-2.5 rounded-2xl ${
+                    isSoft ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
                   }`}>
                     <AlertTriangle size={22} />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-white">
+                    <h4 className="text-sm font-bold text-slate-900">
                       {isSoft ? 'Move Chit Group to Recycle Bin' : 'Permanent Deletion Warning'}
                     </h4>
                     <p className={`text-xs font-semibold mt-0.5 ${
-                      isSoft ? 'text-[#FFBB38]' : 'text-rose-400'
+                      isSoft ? 'text-amber-800' : 'text-rose-700'
                     }`}>
                       &quot;{deletingGroup.name}&quot; ({formatCurrency(deletingGroup.totalValue)})
                     </p>
@@ -7733,7 +8926,7 @@ Thank you for your prompt payment! 🙏`;
                 <button 
                   type="button" 
                   onClick={() => setDeletingGroup(null)}
-                  className="text-[#AEABD8] hover:text-white p-1 rounded-lg hover:bg-[#141332] transition-colors"
+                  className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   <X size={16} />
                 </button>
@@ -7741,24 +8934,24 @@ Thank you for your prompt payment! 🙏`;
 
               {/* Warning Description Box */}
               {isSoft ? (
-                <div className="bg-[#FFBB38]/10 border border-[#FFBB38]/30 rounded-xl p-3.5 space-y-2 text-xs text-white">
-                  <p className="font-bold flex items-center gap-1.5 text-[#FFBB38]">
-                    <AlertCircle size={14} className="text-[#FFBB38] shrink-0" />
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2 text-xs text-amber-950 shadow-2xs">
+                  <p className="font-bold flex items-center gap-1.5 text-amber-800">
+                    <AlertCircle size={14} className="text-amber-600 shrink-0" />
                     This group will be moved to the Recycle Bin.
                   </p>
-                  <ul className="list-disc list-inside space-y-1 text-[11px] text-[#AEABD8] pl-1">
+                  <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-600 pl-1">
                     <li>The group will be hidden from active lists and dashboard calculations.</li>
                     <li>All subscriber assignments, tickets, and logs remain safely preserved.</li>
                     <li>You can restore this group back to active status at any time from the Recycle Bin tab.</li>
                   </ul>
                 </div>
               ) : (
-                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3.5 space-y-2 text-xs text-white">
-                  <p className="font-bold flex items-center gap-1.5 text-rose-400">
-                    <AlertCircle size={14} className="text-rose-400 shrink-0" />
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 space-y-2 text-xs text-rose-950 shadow-2xs">
+                  <p className="font-bold flex items-center gap-1.5 text-rose-700">
+                    <AlertCircle size={14} className="text-rose-600 shrink-0" />
                     This action is permanent and completely irreversible!
                   </p>
-                  <ul className="list-disc list-inside space-y-1 text-[11px] text-[#AEABD8] pl-1">
+                  <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-600 pl-1">
                     <li>All {deletingGroup.duration} enrolled subscriber tickets will be unlinked.</li>
                     <li>All historical auction bidding logs and discount pool records will be purged.</li>
                     <li>The group configuration will be permanently removed from Supabase.</li>
@@ -7768,11 +8961,11 @@ Thank you for your prompt payment! 🙏`;
 
               {/* Safety Verification Step 1: Type Required Phrase */}
               <div className="space-y-1.5 pt-1">
-                <label className="text-[11px] text-[#AEABD8] font-bold block">
+                <label className="text-[11px] text-slate-700 font-bold block">
                   Step 1: Type <span className={`font-mono px-1.5 py-0.5 rounded select-all font-bold ${
-                    isSoft ? 'bg-[#FFBB38]/20 text-[#FFBB38]' : 'bg-rose-500/20 text-rose-400'
+                    isSoft ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'
                   }`}>DELETE {deletingGroup.name}</span> (or <span className={`font-mono px-1.5 py-0.5 rounded font-bold ${
-                    isSoft ? 'bg-[#FFBB38]/20 text-[#FFBB38]' : 'bg-rose-500/20 text-rose-400'
+                    isSoft ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'
                   }`}>DELETE</span>) below:
                 </label>
                 <div className="relative">
@@ -7781,15 +8974,15 @@ Thank you for your prompt payment! 🙏`;
                     placeholder={`Type DELETE ${deletingGroup.name}`}
                     value={deletePhraseInput}
                     onChange={(e) => setDeletePhraseInput(e.target.value)}
-                    className={`w-full bg-[#141332] border rounded-lg px-3 py-2 text-xs font-mono font-bold text-white placeholder:text-[#AEABD8]/40 focus:outline-none transition-colors ${
+                    className={`w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors shadow-2xs ${
                       isPhraseMatched
-                        ? 'border-[#02B15A] bg-[#02B15A]/15 text-[#02B15A]'
-                        : isSoft ? 'border-[#27264E] focus:border-[#FFBB38]' : 'border-[#27264E] focus:border-rose-400'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                        : isSoft ? 'border-slate-200 focus:border-amber-500' : 'border-slate-200 focus:border-rose-500'
                     }`}
                     autoFocus
                   />
                   {isPhraseMatched && (
-                    <span className="absolute right-3 top-2 text-[#02B15A] text-xs font-bold flex items-center gap-1">
+                    <span className="absolute right-3 top-2 text-emerald-700 text-xs font-bold flex items-center gap-1">
                       <Check size={14} /> Verified
                     </span>
                   )}
@@ -7797,18 +8990,18 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* Safety Verification Step 2: Slide to Confirm Slider */}
-              <div className="space-y-2 pt-2 border-t border-[#27264E]">
+              <div className="space-y-2 pt-2 border-t border-slate-200">
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="font-bold text-[#AEABD8] flex items-center gap-1.5">
+                  <span className="font-bold text-slate-700 flex items-center gap-1.5">
                     {isPhraseMatched ? (
-                      <Unlock size={13} className="text-[#02B15A]" />
+                      <Unlock size={13} className="text-emerald-600" />
                     ) : (
-                      <Lock size={13} className="text-[#AEABD8]/60" />
+                      <Lock size={13} className="text-slate-400" />
                     )}
                     Step 2: {isSoft ? 'Slide to move to Recycle Bin' : 'Slide to confirm permanent deletion'}
                   </span>
                   {isPhraseMatched && (
-                    <span className="text-[10px] font-bold text-[#02B15A]">
+                    <span className="text-[10px] font-bold text-emerald-700">
                       Unlocked
                     </span>
                   )}
@@ -7824,7 +9017,7 @@ Thank you for your prompt payment! 🙏`;
                   colorVariant={isSoft ? "amber" : "red"}
                 />
 
-                <p className="text-[10px] text-[#AEABD8] text-center">
+                <p className="text-[10px] text-slate-500 text-center">
                   {!isPhraseMatched
                     ? '🔒 Complete Step 1 above to unlock the confirmation slider'
                     : isSoft ? '👉 Drag the circular button to the right to move to Recycle Bin' : '👉 Drag the circular button to the right to confirm deletion'}
@@ -7832,11 +9025,11 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* Action Controls Footer */}
-              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-[#27264E]">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setDeletingGroup(null)}
-                  className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center shadow-2xs cursor-pointer"
                 >
                   Cancel &amp; Keep Group
                 </button>
@@ -7847,9 +9040,9 @@ Thank you for your prompt payment! 🙏`;
                   className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center ${
                     isPhraseMatched && !isDeletingGroup
                       ? isSoft
-                        ? 'bg-[#FFBB38] hover:bg-[#FFBB38]/90 text-black cursor-pointer'
+                        ? 'bg-amber-500 hover:bg-amber-600 text-white cursor-pointer'
                         : 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
-                      : 'bg-[#27264E] text-[#AEABD8]/40 cursor-not-allowed opacity-60'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
                   }`}
                 >
                   {isDeletingGroup ? (
@@ -7903,22 +9096,22 @@ Thank you for your prompt payment! 🙏`;
 
       {/* Global Create / Register Subscriber Modal Popup */}
       {showCreateMemberModal && (
-        <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 sm:p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-center border-b border-[#27264E] pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-[#6359E9]/20 text-[#64CFF6] rounded-lg">
+                <div className="p-2 bg-brand-50 text-brand-700 rounded-xl border border-brand-200">
                   <UserPlus size={18} />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-white">Register New Subscriber</h4>
-                  <p className="text-[11px] text-[#AEABD8]">Saves to Supabase directory and assigns to open slot</p>
+                  <h4 className="text-sm font-bold text-slate-900">Register New Subscriber</h4>
+                  <p className="text-[11px] text-slate-500">Saves to Supabase directory and assigns to open slot</p>
                 </div>
               </div>
               <button 
                 type="button" 
                 onClick={() => setShowCreateMemberModal(false)}
-                className="text-[#AEABD8] hover:text-white p-1"
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -7927,11 +9120,11 @@ Thank you for your prompt payment! 🙏`;
             <form onSubmit={handleCreateAndAssignMember} className="space-y-4">
               {/* Subscriber Name Field */}
               <div className="space-y-1.5">
-                <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
                   Subscriber Full Name *
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-[#AEABD8]">
+                  <span className="absolute left-3 top-2.5 text-slate-400">
                     <User size={14} />
                   </span>
                   <input
@@ -7940,20 +9133,20 @@ Thank you for your prompt payment! 🙏`;
                     placeholder="e.g. Ramesh Kumar"
                     value={newMemberName}
                     onChange={(e) => setNewMemberName(e.target.value)}
-                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-white placeholder:text-[#AEABD8]/50 focus:outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-brand-600 focus:bg-white rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs"
                     autoFocus
                   />
                 </div>
 
                 {/* Similar / Fuzzy Name Suggestion (e.g. Kishor vs Kishore) */}
                 {similarNameSubscriber && (
-                  <div className="bg-[#6359E9]/15 border border-[#6359E9]/30 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-white animate-in fade-in duration-200">
+                  <div className="bg-brand-50 border border-brand-200 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-slate-900 animate-in fade-in duration-200 shadow-2xs">
                     <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5 font-bold text-[#64CFF6]">
+                      <div className="flex items-center gap-1.5 font-bold text-brand-700">
                         <span>💡</span>
                         <span>Similar subscriber found in directory</span>
                       </div>
-                      <p className="text-[11px] text-[#AEABD8]">
+                      <p className="text-[11px] text-slate-600">
                         Did you mean <strong>{similarNameSubscriber.name}</strong> ({similarNameSubscriber.phone})?
                       </p>
                     </div>
@@ -7970,7 +9163,7 @@ Thank you for your prompt payment! 🙏`;
                           handleAssignExistingMember(similarNameSubscriber);
                         }
                       }}
-                      className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-[10px] px-3 py-1.5 rounded-lg shrink-0 transition-colors shadow-sm self-start sm:self-auto"
+                      className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg shrink-0 transition-colors shadow-2xs self-start sm:self-auto cursor-pointer"
                     >
                       Assign {similarNameSubscriber.name} →
                     </button>
@@ -7981,16 +9174,16 @@ Thank you for your prompt payment! 🙏`;
               {/* Phone Number Field */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <label className="text-[10px] text-[#AEABD8] font-bold uppercase tracking-wider block">
+                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
                     Phone Number (10 Digits) *
                   </label>
                   {newMemberPhone.trim() && (
                     <span className={`text-[10px] font-bold ${
                       normalizePhone(newMemberPhone).length === 10
-                        ? 'text-[#02B15A]'
+                        ? 'text-emerald-700'
                         : normalizePhone(newMemberPhone).length < 10
-                          ? 'text-[#FFBB38]'
-                          : 'text-rose-400'
+                          ? 'text-amber-700'
+                          : 'text-rose-600'
                     }`}>
                       {normalizePhone(newMemberPhone).length === 10
                         ? '✓ Valid 10 digits'
@@ -7999,7 +9192,7 @@ Thank you for your prompt payment! 🙏`;
                   )}
                 </div>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-[#AEABD8]">
+                  <span className="absolute left-3 top-2.5 text-slate-400">
                     <Phone size={14} />
                   </span>
                   <input
@@ -8008,32 +9201,32 @@ Thank you for your prompt payment! 🙏`;
                     placeholder="e.g. 9842235740"
                     value={newMemberPhone}
                     onChange={(e) => setNewMemberPhone(e.target.value)}
-                    className={`w-full bg-[#141332] border rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-white placeholder:text-[#AEABD8]/50 focus:outline-none transition-colors font-mono ${
+                    className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors font-mono shadow-2xs ${
                       duplicatePhoneSubscriber
-                        ? 'border-[#FFBB38] focus:border-[#FFBB38] bg-[#FFBB38]/10'
+                        ? 'border-amber-400 focus:border-amber-500 bg-amber-50'
                         : !newMemberPhone.trim()
-                          ? 'border-[#27264E] focus:border-[#6359E9]'
+                          ? 'border-slate-200 focus:border-brand-600 focus:bg-white'
                           : normalizePhone(newMemberPhone).length === 10
-                            ? 'border-[#02B15A] focus:border-[#02B15A] bg-[#02B15A]/10'
-                            : 'border-[#FFBB38] focus:border-[#FFBB38] bg-[#FFBB38]/10'
+                            ? 'border-emerald-400 focus:border-emerald-500 bg-emerald-50/50'
+                            : 'border-amber-400 focus:border-amber-500 bg-amber-50/50'
                     }`}
                   />
                 </div>
                 {newMemberPhone.trim() && normalizePhone(newMemberPhone).length !== 10 && (
-                  <p className="text-[10px] text-[#FFBB38] font-medium">
+                  <p className="text-[10px] text-amber-700 font-medium">
                     ⚠️ Phone number must be exactly 10 digits ({normalizePhone(newMemberPhone).length > 10 ? `${normalizePhone(newMemberPhone).length - 10} digits too many` : `${10 - normalizePhone(newMemberPhone).length} digits remaining`})
                   </p>
                 )}
-                <p className="text-[10px] text-[#AEABD8]">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
+                <p className="text-[10px] text-slate-500">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
 
                 {/* Duplicate Phone Warning Alert */}
                 {duplicatePhoneSubscriber && (
-                  <div className="bg-[#FFBB38]/15 border border-[#FFBB38]/40 rounded-xl p-3.5 space-y-2.5 text-xs text-white animate-in fade-in duration-200">
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2.5 text-xs text-amber-950 animate-in fade-in duration-200 shadow-2xs">
                     <div className="flex items-start gap-2">
-                      <AlertCircle size={16} className="text-[#FFBB38] shrink-0 mt-0.5" />
+                      <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
                       <div>
-                        <span className="font-bold text-[#FFBB38] block">Phone number already registered</span>
-                        <p className="text-[11px] text-[#AEABD8] mt-0.5">
+                        <span className="font-bold text-amber-800 block">Phone number already registered</span>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
                           This phone number is already registered to <strong>{duplicatePhoneSubscriber.name}</strong> ({duplicatePhoneSubscriber.phone}).
                         </p>
                       </div>
@@ -8052,7 +9245,7 @@ Thank you for your prompt payment! 🙏`;
                           handleAssignExistingMember(duplicatePhoneSubscriber);
                         }
                       }}
-                      className="w-full bg-[#FFBB38] hover:bg-[#FFBB38]/90 text-black font-bold text-xs py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                      className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-2 px-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
                     >
                       <UserPlus size={13} /> Assign {duplicatePhoneSubscriber.name} to Open Slot Instead →
                     </button>
@@ -8060,21 +9253,21 @@ Thank you for your prompt payment! 🙏`;
                 )}
               </div>
 
-              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-[#27264E]">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowCreateMemberModal(false)}
-                  className="w-full sm:w-auto border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 sm:py-2 rounded-xl transition-colors text-center shadow-2xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isCreatingMember || !newMemberName.trim() || !newMemberPhone.trim() || duplicatePhoneSubscriber !== null}
-                  className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center ${
+                  className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center cursor-pointer ${
                     duplicatePhoneSubscriber !== null
-                      ? 'bg-[#27264E] text-[#AEABD8]/40 cursor-not-allowed opacity-60'
-                      : 'bg-[#6359E9] hover:bg-[#6F64FF] text-white disabled:opacity-50'
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
+                      : 'bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50'
                   }`}
                 >
                   {isCreatingMember ? (

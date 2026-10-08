@@ -71,37 +71,27 @@ export default function FontSizeSwitcher() {
   const canDecrease = stepIndex > 0;
 
   return (
-    <div className="flex items-center space-x-1.5" role="group" aria-label="Font size controls">
-      {/* Individual Action Button: A⁺ (Increase Font) */}
+    <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200/60 shadow-2xs" role="group" aria-label="Font size controls">
+      {/* Individual Action Button: A+ (Increase Font) */}
       <button
         type="button"
         onClick={handleIncrease}
         disabled={!canIncrease}
         title={`Increase font size (${currentStep.size}px -> ${canIncrease ? FONT_STEPS[stepIndex + 1].size : currentStep.size}px)`}
-        className={`px-2.5 py-1 sm:px-3 sm:py-1 rounded-xl border text-sm sm:text-base font-black tracking-tight transition-all duration-150 flex items-center justify-center select-none shadow-sm ${
-          canIncrease
-            ? 'bg-[#27264E] hover:bg-[#3A3A5A] border-[#3A3A5A] text-white hover:text-[#64CFF6] active:scale-95 cursor-pointer'
-            : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8]/40 cursor-not-allowed opacity-40'
-        }`}
+        className="px-2 py-1 text-xs font-bold text-slate-600 hover:text-slate-900 rounded hover:bg-white disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
       >
-        <span className="font-extrabold leading-none">A</span>
-        <span className="text-xs sm:text-sm font-black text-[#64CFF6] ml-0.5 leading-none">+</span>
+        A+
       </button>
 
-      {/* Individual Action Button: A⁻ (Decrease Font) */}
+      {/* Individual Action Button: A- (Decrease Font) */}
       <button
         type="button"
         onClick={handleDecrease}
         disabled={!canDecrease}
         title={`Decrease font size (${currentStep.size}px -> ${canDecrease ? FONT_STEPS[stepIndex - 1].size : currentStep.size}px)`}
-        className={`px-2.5 py-1 sm:px-3 sm:py-1 rounded-xl border text-sm sm:text-base font-black tracking-tight transition-all duration-150 flex items-center justify-center select-none shadow-sm ${
-          canDecrease
-            ? 'bg-[#27264E] hover:bg-[#3A3A5A] border-[#3A3A5A] text-white hover:text-[#64CFF6] active:scale-95 cursor-pointer'
-            : 'bg-[#1D1D41] border-[#27264E] text-[#AEABD8]/40 cursor-not-allowed opacity-40'
-        }`}
+        className="px-2 py-1 text-xs font-bold text-slate-600 hover:text-slate-900 rounded hover:bg-white disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
       >
-        <span className="font-extrabold leading-none">A</span>
-        <span className="text-xs sm:text-sm font-black text-[#64CFF6] ml-0.5 leading-none">-</span>
+        A-
       </button>
 
       {/* Reset Pill Indicator if changed from default 16px */}
@@ -110,10 +100,9 @@ export default function FontSizeSwitcher() {
           type="button"
           onClick={handleReset}
           title="Reset to default font size (16px)"
-          className="hidden md:inline-flex items-center gap-1 text-[11px] font-bold text-[#64CFF6] bg-[#6359E9]/20 hover:bg-[#6359E9]/30 border border-[#6359E9]/40 px-2 py-0.5 rounded-full cursor-pointer transition-colors"
+          className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold text-brand-600 hover:text-brand-700 bg-white rounded border border-slate-200 transition-colors cursor-pointer"
         >
-          <span>{currentStep.size}px</span>
-          <span className="text-[#AEABD8] hover:text-white font-normal">↺</span>
+          {currentStep.size}px ↺
         </button>
       )}
     </div>

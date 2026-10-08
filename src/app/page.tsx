@@ -55,19 +55,49 @@ export default function Home() {
       case 'dashboard':
         return 'Overview Dashboard';
       case 'chits':
-        return 'Chit Groups & Enrollment';
+        return (
+          <>
+            <span className="sm:hidden">Chit Groups</span>
+            <span className="hidden sm:inline">Chit Groups &amp; Enrollment</span>
+          </>
+        );
       case 'members':
-        return 'Members & Access Control';
+        return (
+          <>
+            <span className="sm:hidden">Members</span>
+            <span className="hidden sm:inline">Members &amp; Access Control</span>
+          </>
+        );
       case 'communication':
-        return 'Communication Broadcaster';
+        return (
+          <>
+            <span className="sm:hidden">Broadcaster</span>
+            <span className="hidden sm:inline">Communication Broadcaster</span>
+          </>
+        );
       case 'auctions':
-        return 'Live Bidding Arena';
+        return (
+          <>
+            <span className="sm:hidden">Live Bidding</span>
+            <span className="hidden sm:inline">Live Bidding Arena</span>
+          </>
+        );
       case 'reports':
         return 'Reports Center';
       case 'cash':
-        return 'Treasury & Vault Ledger';
+        return (
+          <>
+            <span className="sm:hidden">Treasury</span>
+            <span className="hidden sm:inline">Treasury &amp; Vault Ledger</span>
+          </>
+        );
       case 'users':
-        return 'Members & Access Control';
+        return (
+          <>
+            <span className="sm:hidden">Members</span>
+            <span className="hidden sm:inline">Members &amp; Access Control</span>
+          </>
+        );
       case 'settings':
         return 'Settings & Profile';
       default:
@@ -76,7 +106,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#141332] text-white font-sans antialiased">
+    <div className="flex min-h-screen bg-slate-50 text-slate-800 font-sans antialiased">
       {/* 1. Sidebar Navigation (Sticky on Desktop, Slide-over Drawer on Mobile) */}
       <Sidebar 
         activeTab={activeTab} 
@@ -86,33 +116,38 @@ export default function Home() {
       />
 
       {/* Main Layout Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#141332]">
+      <div className="flex-1 flex flex-col min-w-0 bg-slate-50">
         
-        {/* Top Header Bar (from Figma 64du8N06PrqF7hekhaTR5z) */}
-        <header className="h-16 sm:h-20 border-b border-[#27264E] bg-[#1D1D41] flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
+        {/* Top Header Bar matching Stitch top-navigation */}
+        <header className="h-16 border-b border-slate-200/80 bg-white hidden md:flex items-center justify-between px-4 sm:px-8 sticky top-0 z-20 shadow-xs" data-purpose="top-navigation">
           {/* Left: Mobile Drawer Trigger + Page Heading */}
           <div className="flex items-center space-x-3 min-w-0">
             <button 
               onClick={() => setMobileDrawerOpen(true)}
-              className="p-2 -ml-1 rounded-xl bg-[#27264E] hover:bg-[#3A3A5A] text-[#AEABD8] hover:text-white transition-colors md:hidden"
+              className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors md:hidden"
               aria-label="Open navigation drawer"
             >
-              <Menu size={20} />
+              <Menu size={18} />
             </button>
 
-            <div>
-              <h1 className="font-extrabold text-lg sm:text-2xl text-white tracking-tight truncate">
+            <div className="flex items-center gap-2.5">
+              <h1 className="font-display font-bold text-base sm:text-lg text-slate-900 tracking-tight flex items-center gap-2 truncate">
                 {getTabTitle(activeTab)}
+                {activeTab === 'dashboard' && (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 hidden sm:inline-flex">
+                    Live Cycle
+                  </span>
+                )}
               </h1>
               {isMaintenanceMode && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse mt-0.5">
-                  <Wrench size={10} className="text-amber-400" /> Maintenance Active
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+                  <Wrench size={10} className="text-amber-500" /> Maintenance
                 </span>
               )}
             </div>
           </div>
 
-          {/* Right Header Actions: Font Size Switcher + Profile Badge (Matches Figma Desktop Frame) */}
+          {/* Right Header Actions: Font Size Switcher + Profile Badge */}
           <div className="flex items-center space-x-3 sm:space-x-4 shrink-0">
             <FontSizeSwitcher />
 
@@ -121,7 +156,7 @@ export default function Home() {
             </div>
 
             {/* Mobile Profile Avatar */}
-            <div className="sm:hidden w-8 h-8 rounded-full bg-gradient-to-tr from-[#9C2CF3] to-[#3A6FF9] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+            <div className="sm:hidden w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
               {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'U'}
             </div>
           </div>
@@ -129,11 +164,11 @@ export default function Home() {
 
         {/* Maintenance Alert Ribbon for Admin */}
         {isMaintenanceMode && (
-          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-between shadow-xs sticky top-16 sm:top-20 z-20">
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-between shadow-xs sticky top-16 z-20">
             <div className="flex items-center gap-2">
               <AlertTriangle size={15} className="shrink-0 animate-bounce" />
               <span>
-                <strong>System Maintenance Mode is ON:</strong> Non-admin users (Subscribers &amp; Managers) are currently redirected to the Maintenance Notice.
+                <strong>System Maintenance Mode is ON:</strong> Non-admin users are currently redirected to the Maintenance Notice.
               </span>
             </div>
             <span className="text-[10px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md text-slate-950">
@@ -142,8 +177,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* 2. Main Content Board Canvas (Wide on desktop, touch-friendly with bottom-safe padding on mobile) */}
-        <main className="flex-1 p-3.5 sm:p-7 pb-24 sm:pb-7 space-y-4 sm:space-y-6 overflow-y-auto w-full max-w-[1600px] mx-auto">
+        {/* 2. Main Content Board Canvas */}
+        <main className="flex-1 p-4 sm:p-8 pb-24 sm:pb-8 space-y-6 overflow-y-auto w-full max-w-[1700px] mx-auto bg-slate-50" data-purpose="dashboard-workspace">
           {/* Dynamic Content Panel Board */}
           <div className="w-full">
             <DashboardContent activeTab={activeTab} setActiveTab={setActiveTab} />

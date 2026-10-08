@@ -2,85 +2,116 @@
 
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { canAccessTab, MainTabId } from '@/utils/rbac';
 import { 
   LayoutDashboard, 
   Briefcase, 
   Users, 
   Gavel, 
-  Vault, 
-  Menu 
+  Plus 
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onOpenDrawer: () => void;
+  onQuickRecord?: () => void;
 }
 
 export default function MobileBottomNav({ 
   activeTab, 
   setActiveTab, 
-  onOpenDrawer 
+  onOpenDrawer,
+  onQuickRecord 
 }: MobileBottomNavProps) {
   const { profile } = useAuth();
-  const activeUserRole = profile?.role || 'subscriber';
+  const isSubscriber = profile?.role === 'subscriber';
 
-  const allPossibleItems: { id: MainTabId; name: string; icon: any }[] = [
-    { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
-    { id: 'chits', name: 'Chits', icon: Briefcase },
-    { id: 'members', name: 'Members', icon: Users },
-    { id: 'auctions', name: 'Auctions', icon: Gavel },
-    { id: 'cash', name: 'Treasury', icon: Vault },
-  ];
-
-  const bottomItems = allPossibleItems.filter(item => canAccessTab(activeUserRole, item.id));
+  const handleTriggerQuickRecord = () => {
+    if (onQuickRecord) {
+      onQuickRecord();
+    } else {
+      window.dispatchEvent(new CustomEvent('open-quick-collect'));
+    }
+  };
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 bg-[#1D1D41]/95 backdrop-blur-md border-t border-[#27264E] px-3 py-2 shadow-[0_-4px_24px_rgba(0,0,0,0.5)] md:hidden pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-      <div className="flex items-center justify-around max-w-md mx-auto">
-        {bottomItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all duration-200 active:scale-95 min-w-[56px] relative ${
-                isActive 
-                  ? 'text-[#64CFF6] font-bold' 
-                  : 'text-[#AEABD8] hover:text-white font-medium'
-              }`}
-            >
-              {isActive && (
-                <div className="absolute -top-2 w-8 h-1 bg-[#64CFF6] rounded-full shadow-[0_0_8px_#64CFF6]" />
-              )}
-              <div className={`p-1.5 rounded-xl transition-all ${
-                isActive ? 'text-[#64CFF6] bg-[#6359E9]/30 shadow-inner' : 'text-[#AEABD8]'
-              }`}>
-                <Icon size={19} strokeWidth={isActive ? 2.5 : 2} />
-              </div>
-              <span className={`text-[10px] mt-0.5 tracking-tight font-semibold ${
-                isActive ? 'text-[#64CFF6]' : 'text-[#AEABD8]'
-              }`}>
-                {item.name}
-              </span>
-            </button>
-          );
-        })}
-
-        {/* More Drawer Button */}
+    <nav className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 shadow-nav md:hidden" data-purpose="tab-bar-navigation">
+      <div className="flex items-center justify-between relative max-w-md mx-auto">
+        {/* Tab 1: Dashboard (Active) */}
         <button
-          onClick={onOpenDrawer}
-          className="flex flex-col items-center justify-center py-1 px-3 rounded-2xl text-[#AEABD8] hover:text-white active:scale-95 min-w-[56px]"
-          aria-label="Open full menu"
+          type="button"
+          onClick={() => setActiveTab('dashboard')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+            activeTab === 'dashboard' ? 'text-brand-600' : 'text-slate-400 hover:text-slate-600'
+          }`}
         >
-          <div className="p-1.5 rounded-xl text-[#AEABD8] hover:bg-[#27264E] transition-colors">
-            <Menu size={19} strokeWidth={2} />
+          <div className="w-6 h-6 flex items-center justify-center">
+            <LayoutDashboard size={20} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} className={activeTab === 'dashboard' ? 'fill-current' : ''} />
           </div>
-          <span className="text-[10px] mt-0.5 font-semibold text-[#AEABD8]">
-            More
+          <span className={`text-[10px] mt-1 tracking-tight ${activeTab === 'dashboard' ? 'font-bold' : 'font-medium'}`}>
+            Overview
+          </span>
+        </button>
+
+        {/* Tab 2: Chits */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('chits')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+            activeTab === 'chits' ? 'text-brand-600' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <div className="w-6 h-6 flex items-center justify-center">
+            <Briefcase size={20} strokeWidth={activeTab === 'chits' ? 2.5 : 2} />
+          </div>
+          <span className={`text-[10px] mt-1 tracking-tight ${activeTab === 'chits' ? 'font-bold' : 'font-medium'}`}>
+            Chits
+          </span>
+        </button>
+
+        {/* Center Floating Action Button (Quick New Transaction / Record) */}
+        {!isSubscriber && (
+          <div className="relative -top-5 flex justify-center flex-1">
+            <button
+              onClick={handleTriggerQuickRecord}
+              aria-label="Add transaction or entry"
+              className="w-12 h-12 rounded-full bg-brand-600 hover:bg-brand-700 active:scale-95 text-white shadow-float flex items-center justify-center transition-all cursor-pointer shadow-lg shadow-brand-500/35"
+              type="button"
+            >
+              <Plus size={22} className="stroke-[2.5]" />
+            </button>
+          </div>
+        )}
+
+        {/* Tab 3: Auctions */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('auctions')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+            activeTab === 'auctions' ? 'text-brand-600' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <div className="w-6 h-6 flex items-center justify-center">
+            <Gavel size={20} strokeWidth={activeTab === 'auctions' ? 2.5 : 2} />
+          </div>
+          <span className={`text-[10px] mt-1 tracking-tight ${activeTab === 'auctions' ? 'font-bold' : 'font-medium'}`}>
+            Auctions
+          </span>
+        </button>
+
+        {/* Tab 4: Members / Menu */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('members')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+            activeTab === 'members' ? 'text-brand-600' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <div className="w-6 h-6 flex items-center justify-center">
+            <Users size={20} strokeWidth={activeTab === 'members' ? 2.5 : 2} />
+          </div>
+          <span className={`text-[10px] mt-1 tracking-tight ${activeTab === 'members' ? 'font-bold' : 'font-medium'}`}>
+            Members
           </span>
         </button>
       </div>
