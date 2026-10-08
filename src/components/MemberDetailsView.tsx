@@ -980,9 +980,9 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-slate-50 text-slate-800 antialiased selection:bg-brand-500 selection:text-white rounded-2xl sm:rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs animate-in fade-in duration-200">
-      
-      {/* ── Top Header with Breadcrumbs & Action Bar ── */}
-      <header className="h-16 bg-white border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between flex-shrink-0 z-20">
+      {/* ── DESKTOP VIEW (hidden md:flex) ── */}
+      <div className="hidden md:flex flex-1 flex-col min-w-0">
+<header className="h-16 bg-white border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between flex-shrink-0 z-20">
         {/* Breadcrumb and Navigation back to members */}
         <div className="flex items-center gap-3">
           <button 
@@ -1743,6 +1743,458 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
         </div>
       </main>
+      </div>
+{/* ── MOBILE VIEW (md:hidden) ── */}
+      <div className="md:hidden flex-1 flex flex-col min-w-0 bg-[#F8FAFC] relative">
+        {/* App Header: Back Navigation & Profile Title */}
+        <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 safe-top">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <button 
+              type="button"
+              onClick={onBack} 
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-brand-600 transition-colors py-1.5 px-2 rounded-xl hover:bg-slate-100 active:scale-95 cursor-pointer"
+            >
+              <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
+              </svg>
+              <span>Members</span>
+            </button>
+            <div className="text-center">
+              <h1 className="text-sm font-extrabold text-slate-900 leading-tight">Member Profile</h1>
+              <span className="text-[10px] font-mono text-slate-500">Ticket #{firstTicket}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <a 
+                href={cleanPhone ? `https://wa.me/91${cleanPhone}` : '#'} 
+                target="_blank" 
+                rel="noreferrer"
+                className="p-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors" 
+                title="WhatsApp Member"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12.031 2C6.495 2 2 6.495 2 12.031c0 1.97.57 3.81 1.558 5.372L2.5 22l4.808-1.047a9.98 9.98 0 0 0 4.723 1.18c5.536 0 10.031-4.496 10.031-10.032S17.567 2 12.031 2zm5.727 14.198c-.24.673-1.393 1.285-1.922 1.343-.497.054-1.127.08-3.266-.807-2.734-1.135-4.498-3.906-4.636-4.088-.137-.182-1.1-1.464-1.1-2.793 0-1.328.694-1.982.942-2.247.248-.266.541-.332.723-.332.183 0 .365.002.525.01.17.009.398-.065.621.472.23.555.787 1.92.855 2.06.068.14.113.303.023.483-.09.18-.135.292-.27.45-.135.158-.284.354-.405.474-.136.136-.278.283-.12.553.158.271.7 1.155 1.503 1.868 1.033.918 1.905 1.203 2.176 1.339.27.135.43.113.589-.069.158-.18.677-.788.857-1.059.18-.27.36-.226.602-.136.241.09 1.536.724 1.799.855.263.131.439.196.502.304.064.108.064.629-.176 1.302z"></path>
+                </svg>
+              </a>
+              <a 
+                href={cleanPhone ? `tel:+91${cleanPhone}` : '#'} 
+                className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors" 
+                title="Call"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Scrollable Mobile Content */}
+        <main className="flex-1 px-4 py-4 space-y-4 pb-28">
+          {/* 1. Member Profile & Identity Mobile Card */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-card space-y-3.5">
+            <div className="flex items-center gap-3.5">
+              <div className="relative flex-shrink-0">
+                <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-800 font-extrabold text-lg flex items-center justify-center shadow-xs">
+                  {memberInitial}
+                </div>
+                <span className="absolute -bottom-1 -right-1 px-1.5 py-0.2 rounded-full bg-slate-900 text-white font-mono text-[9px] font-bold border border-white shadow">
+                  #{firstTicket}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-bold text-slate-900 truncate">{memberName}</h2>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    memberProfile?.is_active !== false 
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200/70' 
+                      : 'bg-rose-50 text-rose-700 border-rose-200/70'
+                  }`}>
+                    {memberProfile?.is_active !== false ? 'Active' : 'Suspended'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  {memberProfile?.phone_number ? `+91 ${memberProfile.phone_number}` : 'No phone recorded'}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md capitalize">
+                    {memberProfile?.role || 'Subscriber'}
+                  </span>
+                  <span className="text-[10px] text-slate-400">Member since {memberSince}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Outreach Callout Bar */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <a 
+                href={cleanPhone ? `https://wa.me/91${cleanPhone}` : '#'} 
+                target="_blank" 
+                rel="noreferrer"
+                className="py-2 px-3 bg-emerald-600 active:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all"
+              >
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12.031 2C6.495 2 2 6.495 2 12.031c0 1.97.57 3.81 1.558 5.372L2.5 22l4.808-1.047a9.98 9.98 0 0 0 4.723 1.18c5.536 0 10.031-4.496 10.031-10.032S17.567 2 12.031 2zm5.727 14.198c-.24.673-1.393 1.285-1.922 1.343-.497.054-1.127.08-3.266-.807-2.734-1.135-4.498-3.906-4.636-4.088-.137-.182-1.1-1.464-1.1-2.793 0-1.328.694-1.982.942-2.247.248-.266.541-.332.723-.332.183 0 .365.002.525.01.17.009.398-.065.621.472.23.555.787 1.92.855 2.06.068.14.113.303.023.483-.09.18-.135.292-.27.45-.135.158-.284.354-.405.474-.136.136-.278.283-.12.553.158.271.7 1.155 1.503 1.868 1.033.918 1.905 1.203 2.176 1.339.27.135.43.113.589-.069.158-.18.677-.788.857-1.059.18-.27.36-.226.602-.136.241.09 1.536.724 1.799.855.263.131.439.196.502.304.064.108.064.629-.176 1.302z"></path>
+                </svg>
+                <span>WhatsApp</span>
+              </a>
+              <a 
+                href={cleanPhone ? `tel:+91${cleanPhone}` : '#'} 
+                className="py-2 px-3 bg-slate-100 active:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
+              >
+                <svg className="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                </svg>
+                <span>Phone Call</span>
+              </a>
+            </div>
+          </div>
+
+          {/* 2. Financial KPI Metric Highlights (2x2 Grid) */}
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* Total Paid */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-card">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Total Paid</span>
+                <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center text-[10px] font-bold">₹</span>
+              </div>
+              <div className="mt-1.5">
+                <span className="text-xl font-black text-slate-900 leading-tight">{formatCurrency(totalPaidIn)}</span>
+                <span className="text-[10px] text-emerald-600 font-semibold block mt-0.5">
+                  {totalInstallmentsCount || memberTransactions.length} Installments
+                </span>
+              </div>
+            </div>
+
+            {/* Outstanding Dues */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-card">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Current Due</span>
+                <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${
+                  allSettled 
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200/60' 
+                    : 'bg-rose-50 text-rose-600 border-rose-200/60'
+                }`}>
+                  {allSettled ? 'Settled' : `M${groupDuesBreakdowns[0]?.effectiveCurrentMonth ?? 1}`}
+                </span>
+              </div>
+              <div className="mt-1.5">
+                <span className={`text-xl font-black leading-tight ${allSettled ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {formatCurrency(totalPendingCurrentDues)}
+                </span>
+                <span className="text-[10px] text-amber-600 font-semibold block mt-0.5">
+                  {allSettled ? 'Fully Clear' : 'Pending Due'}
+                </span>
+              </div>
+            </div>
+
+            {/* Chit Commitment */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-card">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Pool Value</span>
+                <span className="text-[9px] font-bold text-brand-600 bg-brand-50 px-1 rounded">
+                  {memberEnrollments.length} Pool{memberEnrollments.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="mt-1.5">
+                <span className="text-base font-extrabold text-slate-900 leading-tight">
+                  {formatCurrency(totalChitCommitment || 100000)}
+                </span>
+                <span className="text-[10px] text-slate-400 block mt-0.5 truncate">
+                  {groupDuesBreakdowns[0]?.groupName || 'Chit Pool'}
+                </span>
+              </div>
+            </div>
+
+            {/* Prize Pot Status */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-card">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Auction Status</span>
+                <span className="text-xs">🎯</span>
+              </div>
+              <div className="mt-1.5">
+                <span className="text-xs font-bold text-emerald-700 leading-tight block truncate">
+                  {prizesWon.length > 0 ? `Won Prize (M${prizesWon[0].month})` : 'Eligible Bidder'}
+                </span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  {prizesWon.length > 0 ? 'Disbursed' : `M${(groupDuesBreakdowns[0]?.effectiveCurrentMonth || 0) + 1} Auction`}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Physical Passbook QR & Token Management Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Physical Passbook &amp; QR</h3>
+              {memberProfile?.passbook_token ? (
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Synced
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Unlinked
+                </span>
+              )}
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 flex items-center gap-3">
+              <div className="w-12 h-12 bg-white rounded-lg border border-slate-200 p-1 flex items-center justify-center shadow-2xs flex-shrink-0">
+                <svg className="w-full h-full text-slate-800" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm-2 10h8v8H2v-8zm2 2v4h4v-4H4zm10-14h8v8h-8V2zm2 2v4h4V4h-4zm-1 9h2v2h-2v-2zm3 0h2v2h-2v-2zm-3 3h2v2h-2v-2zm5-3h2v4h-2v-4zm-2 5h2v2h-2v-2zm-3 0h2v2h-2v-2zm5-2h2v2h-2v-2zM5 5h2v2H5V5zm0 12h2v2H5v-2zm12-12h2v2h-2V5z"/>
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-mono text-xs font-black text-slate-900 truncate">
+                  {memberProfile?.passbook_token || 'TOKEN-UNBOUND'}
+                </div>
+                <div className="text-[11px] text-slate-600 font-semibold mt-0.5">
+                  Booklet #{String(firstTicket).padStart(2, '0')} <span className="text-slate-400 font-normal">· {memberProfile?.passbook_token ? 'Paired' : 'Pending'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 text-[11px] font-semibold">
+              <button 
+                type="button"
+                onClick={() => setIsPairingModalOpen(true)}
+                className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-center transition-colors cursor-pointer"
+              >
+                Re-bind
+              </button>
+              <button 
+                type="button"
+                onClick={handleRevokePassbook}
+                className="py-1.5 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-center transition-colors cursor-pointer"
+              >
+                Revoke
+              </button>
+              <button 
+                type="button"
+                onClick={handlePrintMemberStickers}
+                className="py-1.5 px-2 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg text-center font-bold transition-colors cursor-pointer"
+              >
+                Print Label
+              </button>
+            </div>
+          </div>
+
+          {/* 4. Administrative Security & MPIN Controls */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-4 space-y-3">
+            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Admin Controls &amp; Security</h3>
+            
+            {/* Access Cutoff Switch */}
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+              <div>
+                <span className="font-bold text-slate-900 block">Account Standing</span>
+                <span className="text-[10px] text-slate-400">Portal &amp; auction bidding access</span>
+              </div>
+              <div className="flex bg-slate-200 p-0.5 rounded-lg text-[10px] font-bold">
+                <button 
+                  type="button"
+                  onClick={() => handleToggleStatus(true)}
+                  className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                    memberProfile?.is_active !== false ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600'
+                  }`}
+                >
+                  Active
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => handleToggleStatus(false)}
+                  className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                    memberProfile?.is_active === false ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:text-rose-600'
+                  }`}
+                >
+                  Suspend
+                </button>
+              </div>
+            </div>
+
+            {/* Role Selector */}
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+              <div>
+                <span className="font-bold text-slate-900 block">Assigned Role</span>
+                <span className="text-[10px] text-slate-400">System privilege tier</span>
+              </div>
+              <select 
+                value={memberProfile?.role || 'subscriber'}
+                onChange={(e) => handleUpdateRole(e.target.value)}
+                className="text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-brand-500 cursor-pointer"
+              >
+                <option value="subscriber">Subscriber</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+
+            {/* Quick Login MPIN Management */}
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+              <div>
+                <span className="font-bold text-slate-900 block">Quick Login MPIN</span>
+                <span className="font-mono text-xs font-bold text-slate-700 tracking-widest">
+                  {showMemberPin ? (memberProfile?.mpin || '1234') : '••••'}{' '}
+                  <span className="text-[9px] text-slate-400 font-sans tracking-normal font-normal">
+                    {(!memberProfile?.mpin || memberProfile?.mpin === '1234') ? '(Default 1234)' : '(Encrypted)'}
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button 
+                  type="button"
+                  onClick={() => setShowMemberPin(!showMemberPin)}
+                  className="text-[11px] font-semibold text-slate-600 px-2 py-1 bg-white border border-slate-200 rounded-md cursor-pointer"
+                >
+                  {showMemberPin ? 'Hide' : 'Reveal'}
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleResetPinToDefault}
+                  className="text-[11px] font-bold text-brand-700 px-2 py-1 bg-brand-50 rounded-md cursor-pointer"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 5. Enrolled Chit Scheme Breakdown */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Enrolled Chit Scheme</h3>
+              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/60">Ticket #{firstTicket}</span>
+            </div>
+
+            {groupDuesBreakdowns.length === 0 ? (
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center text-xs text-slate-400">
+                No active chit groups enrolled.
+              </div>
+            ) : (
+              groupDuesBreakdowns.map((grpDues: any) => {
+                const firstUnpaid = grpDues.unpaidMonths?.[0];
+                return (
+                  <div key={grpDues.enrollmentId} className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">{grpDues.groupName} ({formatCurrency(grpDues.totalValue)} Pool)</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">{grpDues.durationMonths} Months Duration · Cycle {grpDues.effectiveCurrentMonth}/{grpDues.durationMonths}</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleOpenRecordPayment(grpDues.groupId, firstUnpaid?.month, firstUnpaid?.remainingDue)}
+                        className="text-[11px] font-bold text-brand-600 bg-white border border-slate-200 px-2 py-1 rounded-lg cursor-pointer hover:bg-slate-50"
+                      >
+                        Pay Ticket
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-medium">Monthly Installment</span>
+                        <span className="font-bold text-slate-800">{formatCurrency(grpDues.memberInstallment)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-medium">Cycle M{grpDues.effectiveCurrentMonth} Balance</span>
+                        <span className={`font-bold ${grpDues.outstandingBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {grpDues.outstandingBalance > 0 ? `${formatCurrency(grpDues.outstandingBalance)} Due` : 'Settled'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* 6. Historical Payment Ledger List (Itemized) */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Payment Ledger</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">{memberTransactions.length} Recorded Collections</p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => handleOpenRecordPayment()}
+                className="text-xs font-bold text-brand-600 hover:underline cursor-pointer"
+              >
+                + New Payment
+              </button>
+            </div>
+
+            {/* Transaction Items */}
+            <div className="space-y-2.5 divide-y divide-slate-100 text-xs">
+              {memberTransactions.length === 0 ? (
+                <div className="py-4 text-center text-slate-400 text-xs">
+                  No payment transactions recorded yet.
+                </div>
+              ) : (
+                memberTransactions.map((tx: any) => {
+                  const txDate = tx.created_at ? new Date(tx.created_at) : new Date();
+                  const dateStr = txDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                  const recCode = `#REC-${tx.id ? tx.id.slice(0, 4).toUpperCase() : '001'}`;
+                  const isCash = !tx.wallet_type || tx.wallet_type === 'cash_in_hand';
+                  const methodText = isCash ? 'Cash (Box #1)' : tx.wallet_type === 'kishor_bank' ? 'UPI / GPay' : 'Bank Transfer';
+
+                  return (
+                    <div key={tx.id} className="pt-2 first:pt-0 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-slate-900 text-xs">{recCode}</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60">
+                            {tx.cycle_month !== null && tx.cycle_month !== undefined ? `M${tx.cycle_month}` : 'General'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{dateStr} · {methodText}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-extrabold text-emerald-600 text-sm block">
+                          +{formatCurrency(Number(tx.amount || 0))}
+                        </span>
+                        <button 
+                          type="button"
+                          onClick={() => setViewingReceiptTx(tx)}
+                          className="text-[10px] text-brand-600 font-semibold hover:underline cursor-pointer"
+                        >
+                          Receipt
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Ledger Total Footer */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">Cumulative Total:</span>
+              <span className="font-black text-slate-900 text-sm">{formatCurrency(totalPaidIn)}</span>
+            </div>
+          </div>
+        </main>
+
+        {/* Floating Record Payment Action Button & Bottom Bar */}
+        <div className="sticky bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-3 safe-bottom z-20 flex items-center gap-3">
+          <button 
+            type="button"
+            onClick={() => handleOpenRecordPayment()}
+            className="flex-1 py-3 px-4 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-float flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
+            </svg>
+            <span>Record Installment Payment</span>
+          </button>
+          <button 
+            type="button"
+            onClick={() => window.print()}
+            className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors cursor-pointer" 
+            title="Export Ledger"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
 
       {/* ── RECORD / EDIT PAYMENT MODAL ── */}
       {isPaymentModalOpen && (
