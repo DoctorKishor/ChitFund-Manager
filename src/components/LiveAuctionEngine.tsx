@@ -171,7 +171,7 @@ export default function LiveAuctionEngine() {
 
   // Derived countdown conditions for UI states
   const isCountdownZero = countdown.days === 0 && countdown.hours === 0 && countdown.minutes === 0 && countdown.seconds === 0;
-  const isCountdownUnderOneHour = isCountdownZero || (countdown.days === 0 && countdown.hours === 0);
+  const isCountdownUnderTwoHours = isCountdownZero || (countdown.days === 0 && countdown.hours < 2);
 
   // Selected Historical Log for full detailed view
   const [selectedHistoricalLog, setSelectedHistoricalLog] = useState<HistoricalAuctionLog | null>(null);
@@ -1845,15 +1845,17 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={promptStartLiveAuction}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
-                  >
-                    <svg className="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                    <span>Begin Auction</span>
-                    <span className="text-base leading-none">➔</span>
-                  </button>
+                  {isCountdownUnderTwoHours && (
+                    <button
+                      type="button"
+                      onClick={promptStartLiveAuction}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                      <span>Begin Auction</span>
+                      <span className="text-base leading-none">➔</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </section>
@@ -2383,14 +2385,16 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
-                    <button
-                      type="button"
-                      onClick={promptStartLiveAuction}
-                      className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                      <span>Start Auction</span>
-                    </button>
+                    {isCountdownUnderTwoHours && (
+                      <button
+                        type="button"
+                        onClick={promptStartLiveAuction}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                        <span>Start Auction</span>
+                      </button>
+                    )}
                     <div className="grid grid-cols-2 gap-2">
                       <button 
                         type="button"
