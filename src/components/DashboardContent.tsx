@@ -4403,12 +4403,12 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* Top Badge & Kai Iruppu Floating Pill */}
                 <div className="relative z-10 flex justify-between items-start gap-2">
-                  <div>
-                    <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[11px] text-indigo-200 font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>{selectedDashboardMonth === 0 ? 'Launch Month' : `Month ${selectedDashboardMonth} of ${totalDuration}`}</span>
-                      <span className="text-indigo-400">•</span>
-                      <span className="text-white font-semibold">Cycle #{selectedDashboardMonth}</span>
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[11px] text-indigo-200 font-medium whitespace-nowrap shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                      <span className="whitespace-nowrap">{selectedDashboardMonth === 0 ? 'Launch Month' : `Month ${selectedDashboardMonth} of ${totalDuration}`}</span>
+                      <span className="text-indigo-400 select-none">•</span>
+                      <span className="text-white font-semibold whitespace-nowrap">Cycle #{selectedDashboardMonth}</span>
                     </div>
                     <div className="mt-3">
                       <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Total Collected</p>
@@ -4422,7 +4422,7 @@ Thank you for your prompt payment! 🙏`;
                   </div>
 
                   {/* Kai Iruppu Reserve Pill */}
-                  <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-3 text-right shadow-sm min-w-[120px]">
+                  <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-3 text-right shadow-sm shrink-0 min-w-[110px]">
                     <div className="flex items-center justify-end space-x-1 mb-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                       <span className="text-[9px] uppercase font-bold text-amber-300 tracking-wider">Kai Iruppu</span>
@@ -4449,15 +4449,15 @@ Thank you for your prompt payment! 🙏`;
                 </div>
 
                 {/* Action Grid CTA Inside Hero */}
-                <div className="relative z-10 mt-5 grid grid-cols-3 gap-2 text-xs">
+                <div className="relative z-10 mt-5 grid grid-cols-3 gap-1.5 text-[11px]">
                   <button
                     type="button"
                     onClick={handleMarkAllPaid}
                     disabled={isMarkingAllPaid || pendingList.length === 0}
-                    className="py-2.5 px-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl font-semibold flex items-center justify-center space-x-1.5 transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+                    className="py-2.5 px-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl font-semibold flex items-center justify-center space-x-1 transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
                   >
-                    <Check size={14} className="stroke-[2.5]" />
-                    <span>{isMarkingAllPaid ? 'Recording...' : 'Mark Paid'}</span>
+                    <Check size={13} className="stroke-[2.5] shrink-0" />
+                    <span className="truncate">{isMarkingAllPaid ? 'Recording...' : 'Mark Paid'}</span>
                   </button>
                   <button
                     type="button"
@@ -4466,21 +4466,21 @@ Thank you for your prompt payment! 🙏`;
                       setShowRemindModal(true);
                     }}
                     disabled={pendingList.length === 0}
-                    className="py-2.5 px-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl font-semibold flex items-center justify-center space-x-1.5 transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+                    className="py-2.5 px-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl font-semibold flex items-center justify-center space-x-1 transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
                   >
-                    <Send size={14} />
-                    <span>Remind ({pendingList.length})</span>
+                    <Send size={13} className="shrink-0" />
+                    <span className="truncate">Remind ({pendingList.length})</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleCloseMonth}
                     disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup?.currentMonth ?? 0)}
-                    className="py-2.5 px-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold flex items-center justify-center space-x-1 shadow-md transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+                    className="py-2.5 px-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold flex items-center justify-center space-x-1 shadow-md transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
                   >
                     <span className="truncate">
                       {selectedDashboardMonth === 0 ? 'Roll M1' : 'Close Month'}
                     </span>
-                    <ArrowRight size={14} className="shrink-0" />
+                    <ArrowRight size={13} className="shrink-0" />
                   </button>
                 </div>
               </section>
@@ -4490,9 +4490,8 @@ Thank you for your prompt payment! 🙏`;
               <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="auction-milestones-widget">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <span>Auction Timeline</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Auction Timeline
                     </h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">
                       {activeGroup ? getGroupAuctionDate(activeGroup.id, selectedDashboardMonth).display : 'No scheduled auction'}
