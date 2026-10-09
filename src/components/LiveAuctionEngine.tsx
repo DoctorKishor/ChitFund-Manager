@@ -2335,10 +2335,10 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             </header>
 
             {/* Scrollable Main Content */}
-            <main className="flex-1 px-4 py-4 space-y-4 pb-28">
+            <main className="flex-1 px-3 py-3 space-y-3 pb-28">
 
               {/* Hero Bidding Card: Live Discount & Net Pot Calculation */}
-              <section className="rounded-3xl p-5 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20">
+              <section className="rounded-2xl p-4 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20">
                 <div className="absolute -right-12 -top-12 w-48 h-48 bg-brand-500/25 rounded-full blur-2xl pointer-events-none"></div>
                 <div className="relative z-10">
                   <div className="flex items-center justify-between">
@@ -2350,27 +2350,27 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     </span>
                   </div>
 
-                  <div className="mt-3 text-center">
+                  <div className="mt-2.5 text-center">
                     <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Next Live Auction In</p>
-                    <div className="flex justify-center items-center gap-1.5 mt-2">
-                      <div className="bg-white/10 border border-white/15 rounded-xl px-2.5 py-1.5 min-w-[52px]">
-                        <span className="text-2xl font-black text-white block font-mono leading-tight">{String(countdown.days).padStart(2, '0')}</span>
-                        <span className="text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Days</span>
+                    <div className="flex justify-center items-center gap-1 mt-2">
+                      <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
+                        <span className="text-xl sm:text-2xl font-black text-white block font-mono leading-tight">{String(countdown.days).padStart(2, '0')}</span>
+                        <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Days</span>
                       </div>
-                      <span className="text-xl font-bold text-slate-500">:</span>
-                      <div className="bg-white/10 border border-white/15 rounded-xl px-2.5 py-1.5 min-w-[52px]">
-                        <span className="text-2xl font-black text-white block font-mono leading-tight">{String(countdown.hours).padStart(2, '0')}</span>
-                        <span className="text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Hours</span>
+                      <span className="text-base sm:text-lg font-bold text-slate-500">:</span>
+                      <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
+                        <span className="text-xl sm:text-2xl font-black text-white block font-mono leading-tight">{String(countdown.hours).padStart(2, '0')}</span>
+                        <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Hours</span>
                       </div>
-                      <span className="text-xl font-bold text-slate-500">:</span>
-                      <div className="bg-white/10 border border-white/15 rounded-xl px-2.5 py-1.5 min-w-[52px]">
-                        <span className="text-2xl font-black text-white block font-mono leading-tight">{String(countdown.minutes).padStart(2, '0')}</span>
-                        <span className="text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Mins</span>
+                      <span className="text-base sm:text-lg font-bold text-slate-500">:</span>
+                      <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
+                        <span className="text-xl sm:text-2xl font-black text-white block font-mono leading-tight">{String(countdown.minutes).padStart(2, '0')}</span>
+                        <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Mins</span>
                       </div>
-                      <span className="text-xl font-bold text-slate-500">:</span>
-                      <div className="bg-white/10 border border-white/15 rounded-xl px-2.5 py-1.5 min-w-[52px]">
-                        <span className="text-2xl font-black text-amber-300 block font-mono leading-tight">{String(countdown.seconds).padStart(2, '0')}</span>
-                        <span className="text-[9px] uppercase tracking-wider text-amber-300 block font-semibold">Secs</span>
+                      <span className="text-base sm:text-lg font-bold text-slate-500">:</span>
+                      <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
+                        <span className="text-xl sm:text-2xl font-black text-amber-300 block font-mono leading-tight">{String(countdown.seconds).padStart(2, '0')}</span>
+                        <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-amber-300 block font-semibold">Secs</span>
                       </div>
                     </div>
 
@@ -2561,18 +2561,18 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     )}
                   </button>
                 </div>
-              ) : (
+              ) : !isCountdownZero ? (
                 <div className="pt-2">
                   <button 
                     type="button"
-                    onClick={handleEnterStudio}
+                    onClick={promptStartLiveAuction}
                     className="w-full py-3.5 px-4 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-bold text-xs rounded-2xl shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
                     <span>Conduct Auction Early (Admin Override)</span>
                   </button>
                 </div>
-              )}
+              ) : null}
 
             </main>
           </div>
@@ -3262,35 +3262,38 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
         </header>
 
         {/* Scrollable Main Content */}
-        <main className="flex-1 px-4 py-4 space-y-4 pb-28">
+        <main className="flex-1 px-3 py-3 space-y-3 pb-28">
 
           {/* Current Highest Discount Banner Card */}
-          <section className="rounded-3xl p-5 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20">
+          <section className="rounded-2xl p-3.5 sm:p-4 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20">
             <div className="absolute -right-12 -top-12 w-48 h-48 bg-brand-500/25 rounded-full blur-2xl pointer-events-none" />
-            <div className="relative z-10 flex justify-between items-start">
-              <div>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-indigo-200 font-mono">
-                  Month {group.currentMonth} Cycle Bidding
-                </span>
-                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mt-2">Current Highest Discount</p>
-                <p className="text-3xl font-black tracking-tight text-white mt-0.5 font-mono">
-                  {bids.length > 0 ? formatCurrency(highestBid) : formatCurrency(startingBaselineBid)}
-                </p>
-                <p className="text-xs text-emerald-300 font-medium mt-1 truncate">
-                  Lead: <strong className="text-white">{bids.length > 0 ? `${winnerName} ${winnerTicket ? `(Ticket #${winnerTicket})` : ''}` : 'Floor Open'}</strong>
-                </p>
+            
+            {/* Top row: Cycle Badge on left, Net Winner Payout on right */}
+            <div className="relative z-10 flex items-center justify-between gap-2">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-indigo-200 font-mono shrink-0">
+                Month {group.currentMonth} Cycle
+              </span>
+              <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-xl px-2.5 py-1 text-right shrink-0">
+                <span className="text-[9px] uppercase font-bold text-amber-300 tracking-wider">Net Payout: </span>
+                <span className="text-xs font-black text-white font-mono">{formatCurrency(netPayout)}</span>
               </div>
-              
-              {/* Net Winner Payout Pill */}
-              <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-3 text-right min-w-[125px]">
-                <span className="text-[9px] uppercase font-bold text-amber-300 tracking-wider block">Net Winner Payout</span>
-                <span className="text-lg font-black text-white tracking-tight block mt-0.5 font-mono">
-                  {formatCurrency(netPayout)}
-                </span>
-                <span className="text-[9px] text-indigo-200 block truncate">
-                  {formatCurrency(group.totalValue)} Chit - {formatCurrency(highestBid)} Bid
-                </span>
-              </div>
+            </div>
+
+            {/* Middle: Discount Price & Lead Info */}
+            <div className="relative z-10 mt-2">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Current Highest Discount</p>
+              <p className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-0.5 font-mono">
+                {bids.length > 0 ? formatCurrency(highestBid) : formatCurrency(startingBaselineBid)}
+              </p>
+              <p className="text-[11px] text-emerald-300 font-medium mt-1 truncate">
+                Lead: <strong className="text-white">{bids.length > 0 ? `${winnerName} ${winnerTicket ? `(Ticket #${winnerTicket})` : ''}` : 'Floor Open'}</strong>
+              </p>
+            </div>
+
+            {/* Bottom summary strip */}
+            <div className="relative z-10 mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-indigo-200 font-mono">
+              <span className="truncate">Chit: {formatCurrency(group.totalValue)}</span>
+              <span className="shrink-0 text-slate-300">Net: {formatCurrency(netPayout)}</span>
             </div>
           </section>
 
@@ -3300,7 +3303,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               onClick={() => setShowTimelineDrawer(true)}
               className="flex items-center justify-between px-1 cursor-pointer"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Live Bids Stream</h3>
                 <span className="text-[10px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded-full font-mono">{bids.length}</span>
@@ -3311,9 +3314,9 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {bids.length === 0 ? (
-                <div className="p-4 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400">
+                <div className="p-3.5 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400">
                   No live bids shouted yet this cycle. Floor open!
                 </div>
               ) : (
@@ -3328,12 +3331,12 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   return (
                     <div 
                       key={bid.id || idx}
-                      className={`p-3 bg-white rounded-2xl border flex items-center justify-between transition-all ${
-                        isLeader ? 'border-emerald-300 shadow-sm' : 'border-slate-200 shadow-card'
+                      className={`p-2.5 sm:p-3 bg-white rounded-2xl border flex items-center justify-between transition-all ${
+                        isLeader ? 'border-emerald-300 shadow-xs' : 'border-slate-200 shadow-2xs'
                       }`}
                     >
-                      <div className="flex items-center space-x-2.5 min-w-0">
-                        <span className={`w-8 h-8 rounded-xl font-bold text-xs flex items-center justify-center font-mono shrink-0 ${
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <span className={`w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center font-mono shrink-0 ${
                           isLeader ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
                         }`}>
                           #{ticketNum}
@@ -3370,33 +3373,35 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
           </section>
 
           {/* Contenders Attendance Pill Row */}
-          <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-1.5">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Active Contenders Floor</h3>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand-50 text-brand-600 border border-brand-100">
+          <section className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/90 shadow-card">
+            <div className="flex items-center justify-between gap-1.5 mb-2.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wide truncate">
+                  Contenders
+                </h3>
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-brand-50 text-brand-700 border border-brand-200 shrink-0">
                   Tap to Bid
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-slate-500 font-medium">
-                  {visibleContenders.length} active
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10px] text-slate-500 font-medium font-mono">
+                  {visibleContenders.length} Active
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowOnlyAttending(v => !v)}
-                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border transition-colors cursor-pointer ${
+                  className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
                     showOnlyAttending 
                       ? 'bg-brand-500 border-brand-500 text-white' 
-                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  {showOnlyAttending ? `Roll Call (${attendingMemberIds.length})` : 'All'}
+                  {showOnlyAttending ? `Roll Call (${attendingMemberIds.length})` : 'Roll Call'}
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-2">
               {displayedMembers.map((m) => {
                 const isWon = m.hasWonRegular;
                 const isCurrentTopBidder = winnerId === m.id;
@@ -3406,24 +3411,24 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   return (
                     <div 
                       key={m.id}
-                      className="p-3 bg-slate-50/60 rounded-2xl border border-slate-200/60 opacity-50 relative overflow-hidden flex flex-col justify-between"
+                      className="p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 opacity-50 relative overflow-hidden flex flex-col justify-between"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="w-8 h-8 rounded-xl bg-slate-200 text-slate-600 font-bold text-xs flex items-center justify-center font-mono">
+                        <span className="w-7 h-7 rounded-lg bg-slate-200 text-slate-600 font-bold text-xs flex items-center justify-center font-mono">
                           #{m.ticketNumber}
                         </span>
                         <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded-full">
                           Won
                         </span>
                       </div>
-                      <h4 className="text-xs font-bold text-slate-500 mt-2 leading-tight truncate">{m.fullName}</h4>
+                      <h4 className="text-xs font-bold text-slate-500 mt-1.5 leading-tight truncate">{m.fullName}</h4>
                       <div className="flex items-center justify-between mt-1">
                         <span className="text-[10px] text-slate-400">Status</span>
-                        <span className="text-xs font-bold text-slate-400 font-mono">Spectator</span>
+                        <span className="text-[11px] font-bold text-slate-400 font-mono">Spectator</span>
                       </div>
                       <button 
                         disabled
-                        className="mt-2.5 w-full py-1.5 bg-slate-100 text-slate-400 text-xs font-bold rounded-xl flex items-center justify-center cursor-not-allowed"
+                        className="mt-2 w-full py-1.5 bg-slate-100 text-slate-400 text-[11px] font-bold rounded-lg flex items-center justify-center cursor-not-allowed"
                       >
                         <span>Already Won</span>
                       </button>
@@ -3435,17 +3440,17 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   return (
                     <div 
                       key={m.id}
-                      className="p-3 bg-amber-50/70 rounded-2xl border-2 border-amber-300 shadow-sm relative overflow-hidden flex flex-col justify-between"
+                      className="p-2.5 bg-amber-50/70 rounded-xl border-2 border-amber-300 shadow-xs relative overflow-hidden flex flex-col justify-between"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center font-mono">
+                        <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center font-mono">
                           #{m.ticketNumber}
                         </span>
-                        <span className="text-[9px] font-bold px-2 py-0.5 bg-amber-200/90 text-amber-900 rounded-full">
-                          👑 Floor Leader
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-200/90 text-amber-900 rounded-full">
+                          👑 Leader
                         </span>
                       </div>
-                      <h4 className="text-xs font-bold text-slate-900 mt-2 leading-tight truncate">{m.fullName}</h4>
+                      <h4 className="text-xs font-bold text-slate-900 mt-1.5 leading-tight truncate">{m.fullName}</h4>
                       <div className="flex items-center justify-between mt-1">
                         <span className="text-[10px] text-amber-900 font-semibold">Lead Bid</span>
                         <span className="text-xs font-black text-amber-900 font-mono">{formatCurrency(highestBid)}</span>
@@ -3453,7 +3458,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                       <button 
                         type="button"
                         onClick={() => handleOpenBidModal(m.id)}
-                        className="mt-2.5 w-full py-1.5 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all shadow-xs cursor-pointer"
+                        className="mt-2 w-full py-1.5 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 active:scale-95 transition-all shadow-2xs cursor-pointer"
                       >
                         <span>Raise Bid</span>
                       </button>
@@ -3465,17 +3470,17 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   return (
                     <div 
                       key={m.id}
-                      className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between"
+                      className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs relative overflow-hidden flex flex-col justify-between"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center font-mono">
+                        <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center font-mono">
                           #{m.ticketNumber}
                         </span>
                         <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full">
                           Outbid
                         </span>
                       </div>
-                      <h4 className="text-xs font-bold text-slate-900 mt-2 leading-tight truncate">{m.fullName}</h4>
+                      <h4 className="text-xs font-bold text-slate-900 mt-1.5 leading-tight truncate">{m.fullName}</h4>
                       <div className="flex items-center justify-between mt-1">
                         <span className="text-[10px] text-slate-500">Last Bid</span>
                         <span className="text-xs font-bold text-slate-700 font-mono">{formatCurrency(memberLastBid)}</span>
@@ -3483,7 +3488,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                       <button 
                         type="button"
                         onClick={() => handleOpenBidModal(m.id)}
-                        className="mt-2.5 w-full py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all cursor-pointer"
+                        className="mt-2 w-full py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition-all cursor-pointer"
                       >
                         <span>Tap to Bid</span>
                       </button>
@@ -3494,25 +3499,25 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 return (
                   <div 
                     key={m.id}
-                    className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col justify-between"
+                    className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center font-mono">
+                      <span className="w-7 h-7 rounded-lg bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center font-mono">
                         #{m.ticketNumber}
                       </span>
                       <span className="text-[9px] font-medium text-emerald-600 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Ready
                       </span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-900 mt-2 leading-tight truncate">{m.fullName}</h4>
+                    <h4 className="text-xs font-bold text-slate-900 mt-1.5 leading-tight truncate">{m.fullName}</h4>
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-[10px] text-slate-500">Floor Bidder</span>
-                      <span className="text-xs font-bold text-slate-600 font-mono">Active</span>
+                      <span className="text-[11px] font-bold text-slate-600 font-mono">Active</span>
                     </div>
                     <button 
                       type="button"
                       onClick={() => handleOpenBidModal(m.id)}
-                      className="mt-2.5 w-full py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all cursor-pointer"
+                      className="mt-2 w-full py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition-all cursor-pointer"
                     >
                       <span>Tap to Bid</span>
                     </button>
