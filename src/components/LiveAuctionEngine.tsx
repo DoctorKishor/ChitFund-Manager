@@ -122,6 +122,27 @@ function fmtDate(d: Date): string {
   return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+function formatBidTimestamp(timestamp?: string | number | null): string {
+  if (!timestamp) return '07:30 PM';
+  if (typeof timestamp === 'number') {
+    const d = new Date(timestamp);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+  }
+  const str = String(timestamp).trim();
+  if (!str) return '07:30 PM';
+  // Check if it is already a formatted time like "07:30 PM" or "04:50:12 PM" or "16:50:12"
+  if (str.includes('AM') || str.includes('PM') || /^\d{1,2}:\d{2}/.test(str)) {
+    return str;
+  }
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+  return str;
+}
+
 export default function LiveAuctionEngine() {
   const { profile } = useAuth();
   const { organizationName, organizationTagline, organizationInitials } = useOrganization();
@@ -2531,95 +2552,105 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                             <div className="flex flex-col gap-3">
                               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider font-display">Shouted Bidding Log</span>
                               <div className="space-y-4 pl-2 max-h-60 overflow-y-auto">
-                                {currentInspectedLog.bidStream && currentInspectedLog.bidStream.length > 0 ? (
-                                  currentInspectedLog.bidStream.map((b, idx) => {
-                                    const isLast = idx === (currentInspectedLog.bidStream?.length || 0) - 1;
-                                    return (
-                                      <div
-                                        key={b.id || idx}
-                                        className={`flex items-start gap-3 relative ${
-                                          isLast ? 'bg-indigo-50/60 -mx-3 p-3 rounded-xl border border-indigo-100' : ''
-                                        }`}
-                                      >
-                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
-                                          isLast ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'
-                                        }`}>
-                                          {String(idx + 1).padStart(2, '0')}
+                                {(() => {
+                                  const chronologicalShouts = [...(currentInspectedLog.bidStream || [])].sort(
+                                    (a, b) => (a.amount || 0) - (b.amount || 0)
+                                  );
+
+                                  if (chronologicalShouts.length > 0) {
+                                    return chronologicalShouts.map((b, idx) => {
+                                      const isLast = idx === chronologicalShouts.length - 1;
+                                      return (
+                                        <div
+                                          key={b.id || idx}
+                                          className={`flex items-start gap-3 relative ${
+                                            isLast ? 'bg-indigo-50/60 -mx-3 p-3 rounded-xl border border-indigo-100' : ''
+                                          }`}
+                                        >
+                                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
+                                            isLast ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'
+                                          }`}>
+                                            {String(idx + 1).padStart(2, '0')}
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between text-xs">
+                                              <span className={`font-semibold ${isLast ? 'text-indigo-950 font-bold' : 'text-slate-800'}`}>
+                                                {b.memberName} (#{b.ticketNumber})
+                                              </span>
+                                              <span className="text-slate-400 font-mono text-[10px]">
+                                                {formatBidTimestamp(b.timestamp)}
+                                              </span>
+                                            </div>
+                                            <p className="text-xs text-slate-600 mt-0.5">
+                                              Bid Discount: <span className="font-mono font-medium text-slate-900">{formatCurrency(b.amount)}</span>
+                                            </p>
+                                            {isLast && (
+                                              <div className="mt-1 flex items-center gap-1.5">
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider font-display">
+                                                  Sealed Winner
+                                                </span>
+                                                <span className="text-[11px] font-mono font-semibold text-emerald-700">
+                                                  Net Pot: {formatCurrency(currentInspectedLog.netPayout)}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    });
+                                  }
+
+                                  return (
+                                    <>
+                                      <div className="flex items-start gap-3 relative">
+                                        <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 shrink-0 mt-0.5">
+                                          01
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <div className="flex items-center justify-between text-xs">
-                                            <span className={`font-semibold ${isLast ? 'text-indigo-950 font-bold' : 'text-slate-800'}`}>
-                                              {b.memberName} (#{b.ticketNumber})
-                                            </span>
+                                            <span className="font-semibold text-slate-800">Bidding Floor Opened</span>
                                             <span className="text-slate-400 font-mono text-[10px]">
-                                              {b.timestamp ? new Date(b.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '07:40 PM'}
+                                              {formatBidTimestamp(currentInspectedLog.createdAt)}
                                             </span>
                                           </div>
                                           <p className="text-xs text-slate-600 mt-0.5">
-                                            Bid Discount: <span className="font-mono font-medium text-slate-900">{formatCurrency(b.amount)}</span>
+                                            Floor open at <span className="font-mono font-medium text-slate-900">₹500 min step</span>
                                           </p>
-                                          {isLast && (
-                                            <div className="mt-1 flex items-center gap-1.5">
-                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider font-display">
-                                                Sealed Winner
-                                              </span>
-                                              <span className="text-[11px] font-mono font-semibold text-emerald-700">
-                                                Net Pot: {formatCurrency(currentInspectedLog.netPayout)}
-                                              </span>
-                                            </div>
-                                          )}
+                                          <span className="text-[10px] text-slate-400 block font-mono">
+                                            Total Value: {formatCurrency(group.totalValue)}
+                                          </span>
                                         </div>
                                       </div>
-                                    );
-                                  })
-                                ) : (
-                                  <>
-                                    <div className="flex items-start gap-3 relative">
-                                      <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 shrink-0 mt-0.5">
-                                        01
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between text-xs">
-                                          <span className="font-semibold text-slate-800">Bidding Floor Opened</span>
-                                          <span className="text-slate-400 font-mono text-[10px]">07:30:00 PM</span>
-                                        </div>
-                                        <p className="text-xs text-slate-600 mt-0.5">
-                                          Floor open at <span className="font-mono font-medium text-slate-900">₹500 min step</span>
-                                        </p>
-                                        <span className="text-[10px] text-slate-400 block font-mono">
-                                          Total Value: {formatCurrency(group.totalValue)}
-                                        </span>
-                                      </div>
-                                    </div>
 
-                                    <div className="flex items-start gap-3 relative bg-indigo-50/60 -mx-3 p-3 rounded-xl border border-indigo-100">
-                                      <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5">
-                                        02
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between text-xs">
-                                          <span className="font-bold text-indigo-950">
-                                            {currentInspectedLog.winningBidderName} (#{currentInspectedLog.ticketNumber || '—'})
-                                          </span>
-                                          <span className="text-indigo-600 font-mono text-[10px] font-semibold">
-                                            {new Date(currentInspectedLog.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                          </span>
+                                      <div className="flex items-start gap-3 relative bg-indigo-50/60 -mx-3 p-3 rounded-xl border border-indigo-100">
+                                        <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5">
+                                          02
                                         </div>
-                                        <p className="text-xs text-slate-700 mt-0.5">
-                                          Winning Discount: <span className="font-mono font-bold text-indigo-900">{formatCurrency(currentInspectedLog.winningDiscount)}</span>
-                                        </p>
-                                        <div className="mt-1 flex items-center gap-1.5">
-                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider font-display">
-                                            Sealed Winner
-                                          </span>
-                                          <span className="text-[11px] font-mono font-semibold text-emerald-700">
-                                            Net Pot: {formatCurrency(currentInspectedLog.netPayout)}
-                                          </span>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center justify-between text-xs">
+                                            <span className="font-bold text-indigo-950">
+                                              {currentInspectedLog.winningBidderName} (#{currentInspectedLog.ticketNumber || '—'})
+                                            </span>
+                                            <span className="text-indigo-600 font-mono text-[10px] font-semibold">
+                                              {formatBidTimestamp(currentInspectedLog.createdAt)}
+                                            </span>
+                                          </div>
+                                          <p className="text-xs text-slate-700 mt-0.5">
+                                            Winning Discount: <span className="font-mono font-bold text-indigo-900">{formatCurrency(currentInspectedLog.winningDiscount)}</span>
+                                          </p>
+                                          <div className="mt-1 flex items-center gap-1.5">
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider font-display">
+                                              Sealed Winner
+                                            </span>
+                                            <span className="text-[11px] font-mono font-semibold text-emerald-700">
+                                              Net Pot: {formatCurrency(currentInspectedLog.netPayout)}
+                                            </span>
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  </>
-                                )}
+                                    </>
+                                  );
+                                })()}
                               </div>
                             </div>
 
@@ -3594,33 +3625,47 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                                     Live Shouts Log &amp; Timeline
                                   </div>
-                                  {log.bidStream && log.bidStream.length > 0 ? (
-                                    log.bidStream.map((b, bIdx) => {
-                                      const isLast = bIdx === (log.bidStream?.length || 0) - 1;
-                                      return (
-                                        <div
-                                          key={b.id || bIdx}
-                                          className={`flex justify-between items-center py-1 px-1.5 rounded-lg ${
-                                            isLast ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200' : 'text-slate-600'
-                                          }`}
-                                        >
-                                          <span>{isLast ? '🏆 ' : ''}#{bIdx + 1} {b.memberName} (#{b.ticketNumber})</span>
-                                          <span className="font-mono font-semibold">{formatCurrency(b.amount)} {isLast ? '[WINNER]' : ''}</span>
+                                  {(() => {
+                                    const chronologicalShouts = [...(log.bidStream || [])].sort(
+                                      (a, b) => (a.amount || 0) - (b.amount || 0)
+                                    );
+
+                                    if (chronologicalShouts.length > 0) {
+                                      return chronologicalShouts.map((b, bIdx) => {
+                                        const isLast = bIdx === chronologicalShouts.length - 1;
+                                        return (
+                                          <div
+                                            key={b.id || bIdx}
+                                            className={`flex justify-between items-center py-1.5 px-2 rounded-lg ${
+                                              isLast ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200' : 'text-slate-600'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="font-mono text-slate-400 text-[10px]">#{String(bIdx + 1).padStart(2, '0')}</span>
+                                              <span>{isLast ? '🏆 ' : ''}{b.memberName} (#{b.ticketNumber})</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-mono font-semibold">{formatCurrency(b.amount)} {isLast ? '[WINNER]' : ''}</span>
+                                              <span className="text-[10px] font-mono text-slate-400">{formatBidTimestamp(b.timestamp)}</span>
+                                            </div>
+                                          </div>
+                                        );
+                                      });
+                                    }
+
+                                    return (
+                                      <>
+                                        <div className="flex justify-between items-center text-slate-600 py-0.5">
+                                          <span>#01 Floor Opened</span>
+                                          <span className="font-semibold text-slate-800">₹500 min step</span>
                                         </div>
-                                      );
-                                    })
-                                  ) : (
-                                    <>
-                                      <div className="flex justify-between items-center text-slate-600 py-0.5">
-                                        <span>#1 Floor Opened</span>
-                                        <span className="font-semibold text-slate-800">₹500 min step</span>
-                                      </div>
-                                      <div className="flex justify-between items-center text-emerald-800 font-bold bg-emerald-50 p-1.5 rounded-lg border border-emerald-200">
-                                        <span className="flex items-center gap-1">🏆 #2 {log.winningBidderName} (#{log.ticketNumber || '—'})</span>
-                                        <span>{formatCurrency(log.winningDiscount)} [WINNER]</span>
-                                      </div>
-                                    </>
-                                  )}
+                                        <div className="flex justify-between items-center text-emerald-800 font-bold bg-emerald-50 p-1.5 rounded-lg border border-emerald-200">
+                                          <span className="flex items-center gap-1">🏆 #02 {log.winningBidderName} (#{log.ticketNumber || '—'})</span>
+                                          <span>{formatCurrency(log.winningDiscount)} [WINNER]</span>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </div>
