@@ -3526,115 +3526,198 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
         </main>
       </div>
 
-      {/* ── POP-UP MODAL: CANDIDATE TARGET PRICES BIDDING DIALOG ──────────────── */}
+      {/* ── POP-UP MODAL: CANDIDATE TARGET PRICES BIDDING DIALOG (EXACT STITCH FINTECH) ──────────────── */}
       {showBidModal && activeContender && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
-          <div className="bg-[#1D1D41] border border-[#27264E] text-white rounded-3xl w-full max-w-lg p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl relative max-h-[90dvh] overflow-y-auto animate-in zoom-in-95 duration-150 my-auto">
-            
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150" 
+          id="quick-bid-modal"
+        >
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden transition-all max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-[#27264E] pb-3">
-              <div className="flex items-center space-x-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-[#6359E9] text-white font-extrabold flex items-center justify-center text-sm shadow-sm shrink-0">
+            <div className="p-5 bg-gradient-to-r from-brand-50 to-indigo-50 border-b border-indigo-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-brand-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-brand-500/20 font-mono">
                   #{activeContender.ticketNumber}
                 </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider block truncate">
-                    Logging Live Bid For
-                  </span>
-                  <h3 className="text-sm sm:text-base font-extrabold text-white truncate">
-                    {activeContender.fullName}
-                  </h3>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-display font-bold text-base text-slate-900">{activeContender.fullName}</h3>
+                    <span className="text-[10px] font-bold bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full border border-brand-200">
+                      Ticket #{activeContender.ticketNumber}
+                    </span>
+                  </div>
                 </div>
               </div>
-
               <button 
                 type="button"
                 onClick={() => setShowBidModal(false)}
-                className="text-[#AEABD8] hover:text-white p-1.5 rounded-xl hover:bg-[#27264E] transition-colors cursor-pointer shrink-0"
+                className="w-8 h-8 rounded-lg bg-white/80 hover:bg-white text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors border border-slate-200/80 cursor-pointer"
               >
-                <X size={20} />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
               </button>
             </div>
 
-            {/* Current Highest Live Banner */}
-            <div className="bg-[#141332] border border-[#27264E] rounded-xl p-3 flex items-center justify-between text-xs">
-              <div>
-                <span className="text-[10px] text-[#AEABD8] uppercase font-bold block">Current Top Bid</span>
-                <span className="font-extrabold text-white text-sm">{formatCurrency(highestBid)}</span>
+            {/* Floor Lead To Beat & Dynamic Winner Payout Bar */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200/70 flex items-center justify-between gap-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Floor Lead To Beat</span>
+                  <span className="font-display font-black text-slate-900 text-sm">
+                    {highestBid > 0 
+                      ? `${winnerName} (${winnerTicket ? `#${winnerTicket}` : 'Leader'}) @ ${formatCurrency(highestBid)}`
+                      : 'Opening Round @ Floor Baseline'}
+                  </span>
+                </div>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-[#AEABD8] uppercase font-bold block">Live Leader</span>
-                <span className="font-bold text-[#64CFF6] truncate block max-w-[150px]">{winnerName}</span>
-              </div>
-            </div>
-
-            {/* 1-Tap Candidate Target Price Tiles (Auto-closes on tap) */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-[#AEABD8] uppercase tracking-wider">
-                  🎯 Next Candidate Target Prices (1-Tap Log)
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Dynamic Winner Payout</span>
+                <span className="font-display font-black text-emerald-600 text-sm">
+                  {formatCurrency(netPayout)} (Net Disbursal)
                 </span>
-                <span className="text-[10px] text-[#64CFF6] font-semibold">Auto-closes on tap</span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
-                {candidateTargetTiles.map((price) => {
-                  const diff = price - highestBid;
-                  return (
-                    <button
-                      key={price}
-                      type="button"
-                      onClick={() => recordBid(price, activeContender.id)}
-                      className="p-3 bg-[#141332] hover:bg-[#6359E9] text-white active:bg-[#6F64FF] border border-[#27264E] hover:border-[#6359E9] rounded-xl text-center transition-all shadow-xs group cursor-pointer"
-                    >
-                      <span className="text-xs sm:text-sm font-black text-white block">
-                        {formatCurrency(price)}
-                      </span>
-                      <span className="text-[10px] font-bold text-[#64CFF6] group-hover:text-white block mt-0.5">
-                        +{formatCurrency(diff)}
-                      </span>
-                    </button>
-                  );
-                })}
               </div>
             </div>
 
-            {/* Custom Shorthand Amount Form (e.g. "29" = ₹29,000) */}
-            <form onSubmit={handleCustomBidSubmit} className="pt-3 border-t border-[#27264E] space-y-2.5">
-              <label className="text-[11px] font-bold text-[#AEABD8] uppercase tracking-wider block">
-                ⚡ Arbitrary Shouted Amount (Type &apos;29&apos; = ₹29,000)
-              </label>
-              
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <span className="absolute left-3.5 top-2.5 text-xs text-[#AEABD8] font-bold">₹</span>
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    placeholder="e.g. 29 or 28.5 or 29000"
-                    value={customBidInput}
-                    onChange={(e) => setCustomBidInput(e.target.value)}
-                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none shadow-xs"
-                  />
+            {/* Modal Scrollable Body */}
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                    Instant 1-Tap Submit
+                  </span>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={parsedCustomBidAmount <= 0}
-                  className="bg-[#6359E9] hover:bg-[#6F64FF] active:scale-95 disabled:opacity-40 text-white font-bold text-xs px-5 py-2 rounded-xl transition-all shadow-sm shrink-0 cursor-pointer"
-                >
-                  Log {parsedCustomBidAmount > 0 ? formatCurrency(parsedCustomBidAmount) : 'Bid'}
-                </button>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { delta: 500, label: '+₹500', badge: 'LOG', tier: 'standard' },
+                    { delta: 1000, label: '+₹1,000', badge: 'LOG', tier: 'standard' },
+                    { delta: 1500, label: '+₹1,500', badge: 'LOG', tier: 'standard' },
+                    { delta: 2000, label: '+₹2,000', badge: 'POWER', tier: 'power' },
+                    { delta: 2500, label: '+₹2,500', badge: 'LOG', tier: 'standard' },
+                    { delta: 3000, label: '+₹3,000', badge: 'LOG', tier: 'standard' },
+                    { delta: 3500, label: '+₹3,500', badge: 'LOG', tier: 'standard' },
+                    { delta: 4000, label: '+₹4,000', badge: 'POWER', tier: 'power' },
+                    { delta: 4500, label: '+₹4,500', badge: 'LOG', tier: 'standard' },
+                    { delta: 5000, label: '+₹5,000', badge: 'LOG', tier: 'standard' },
+                    { delta: 6000, label: '+₹6,000', badge: 'POWER', tier: 'power' },
+                    { delta: 7500, label: '+₹7,500', badge: 'MAX', tier: 'max' },
+                  ].map((item) => {
+                    const basePrice = highestBid > 0 ? highestBid : startingBaselineBid;
+                    const price = basePrice + item.delta;
+
+                    if (item.tier === 'max') {
+                      return (
+                        <button
+                          key={item.delta}
+                          type="button"
+                          onClick={() => {
+                            triggerHapticFeedback('light');
+                            recordBid(price, activeContender.id);
+                          }}
+                          className="p-2.5 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 border border-amber-200 rounded-xl transition-all hover:scale-[1.02] active:scale-95 group text-left cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between text-[10px] font-bold text-amber-800">
+                            <span>{item.label}</span>
+                            <span className="text-[9px] bg-amber-200 text-amber-900 px-1 rounded font-bold">{item.badge}</span>
+                          </div>
+                          <div className="text-sm font-black font-display text-amber-900 mt-0.5">
+                            {formatCurrency(price)}
+                          </div>
+                        </button>
+                      );
+                    }
+
+                    if (item.tier === 'power') {
+                      return (
+                        <button
+                          key={item.delta}
+                          type="button"
+                          onClick={() => {
+                            triggerHapticFeedback('light');
+                            recordBid(price, activeContender.id);
+                          }}
+                          className="p-2.5 bg-indigo-50/70 hover:bg-brand-100 hover:border-brand-600 border border-brand-200 rounded-xl transition-all hover:scale-[1.02] active:scale-95 group text-left cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between text-[10px] font-bold text-brand-700">
+                            <span>{item.label}</span>
+                            <span className="text-[9px] bg-brand-200 text-brand-900 px-1 rounded font-bold">{item.badge}</span>
+                          </div>
+                          <div className="text-sm font-black font-display text-brand-700 mt-0.5">
+                            {formatCurrency(price)}
+                          </div>
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={item.delta}
+                        type="button"
+                        onClick={() => {
+                          triggerHapticFeedback('light');
+                          recordBid(price, activeContender.id);
+                        }}
+                        className="p-2.5 bg-slate-50 hover:bg-brand-50 hover:border-brand-500 border border-slate-200 rounded-xl transition-all hover:scale-[1.02] active:scale-95 group text-left cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500 group-hover:text-brand-600">
+                          <span>{item.label}</span>
+                          <span className="text-[9px] bg-slate-200/70 group-hover:bg-brand-200 text-slate-700 px-1 rounded font-bold">{item.badge}</span>
+                        </div>
+                        <div className="text-sm font-black font-display text-slate-900 group-hover:text-brand-700 mt-0.5">
+                          {formatCurrency(price)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {parsedCustomBidAmount > 0 && (
-                <div className="text-[11px] font-semibold text-[#64CFF6] bg-[#6359E9]/20 border border-[#6359E9]/30 px-3 py-1.5 rounded-lg flex items-center justify-between">
-                  <span>Interpreted Bid: <strong className="text-white">{formatCurrency(parsedCustomBidAmount)}</strong></span>
-                  <span>Net Payout: <strong className="text-white">{formatCurrency((group?.totalValue || 0) - parsedCustomBidAmount)}</strong></span>
+              {/* Custom Bid Entry Form */}
+              <form onSubmit={handleCustomBidSubmit} className="pt-3 border-t border-slate-100">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Custom Bid Entry
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 relative">
+                    <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">₹</span>
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      placeholder="Type '19k' or 19000 or 19.5..."
+                      value={customBidInput}
+                      onChange={(e) => setCustomBidInput(e.target.value)}
+                      className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl pl-7 pr-3 py-2 text-slate-800 focus:bg-white focus:ring-brand-500 focus:border-brand-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={parsedCustomBidAmount <= 0}
+                    className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 flex-shrink-0 cursor-pointer disabled:opacity-40 active:scale-95"
+                  >
+                    <span>Log Bid</span>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                  </button>
                 </div>
-              )}
-            </form>
+                {parsedCustomBidAmount > 0 && (
+                  <div className="mt-2 text-[11px] font-semibold text-brand-700 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-lg flex items-center justify-between">
+                    <span>Interpreted Bid: <strong>{formatCurrency(parsedCustomBidAmount)}</strong></span>
+                    <span>Net Disbursal: <strong>{formatCurrency((group?.totalValue || 0) - parsedCustomBidAmount)}</strong></span>
+                  </div>
+                )}
+              </form>
+            </div>
 
+            {/* Modal Footer */}
+            <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 shrink-0">
+              <span>⚡ 1 Tap immediately records bid and dismisses modal</span>
+              <button
+                type="button"
+                onClick={() => setShowBidModal(false)}
+                className="font-semibold text-slate-600 hover:text-slate-900 hover:underline cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
