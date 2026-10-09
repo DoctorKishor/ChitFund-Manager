@@ -9973,12 +9973,6 @@ Thank you for your prompt payment! 🙏`;
                                 Pending: <strong className="text-amber-700 font-extrabold font-mono">{formatCurrency(member.remaining)}</strong>
                               </p>
                             </div>
-
-                            {hasPhone && (
-                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
-                                <Phone size={10} /> Saved
-                              </span>
-                            )}
                           </div>
 
                           {/* Phone input & Send Button */}
