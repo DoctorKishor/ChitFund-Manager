@@ -2816,17 +2816,28 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Auction Floor Status</span>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold">
-                              <span className="text-xs">🔒</span> Standby Mode
-                            </span>
+                            {isCountdownUnderTwoHours ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Floor Ready to Open
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold">
+                                <span className="text-xs">🔒</span> Standby Mode
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-baseline gap-3 mt-2">
                             <span className="text-base sm:text-lg md:text-xl font-bold font-display text-slate-900 tracking-tight">
-                              🔒 Bidding Floor Locked Until Scheduled Time
+                              {isCountdownUnderTwoHours 
+                                ? '⚡ Live Auction Floor Ready to Open'
+                                : '🔒 Bidding Floor Locked Until Scheduled Time'}
                             </span>
                           </div>
                           <p className="text-xs text-slate-500 mt-1.5">
-                            Countdown active · Floor bidding terminal will unlock automatically at {countdown.formattedTargetTime || formattedTargetAuctionTime} or when Admin initiates the session.
+                            {isCountdownUnderTwoHours
+                              ? 'Scheduled time reached · Admin can begin live bidding floor anytime.'
+                              : `Countdown active · Floor bidding terminal will unlock automatically at ${countdown.formattedTargetTime || formattedTargetAuctionTime} or when Admin initiates the session.`}
                           </p>
                         </div>
                         <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-md min-w-[220px] text-right shrink-0">
@@ -3712,9 +3723,16 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-indigo-200 border border-white/10">
                           {group.currentMonth === 0 ? 'Month 0 Launch Cycle' : `Month ${group.currentMonth} Cycle Bidding`}
                         </span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-900">
-                          🔒 Floor Locked
-                        </span>
+                        {isCountdownUnderTwoHours ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-400 text-slate-950 shadow-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping" />
+                            Floor Ready
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-900">
+                            🔒 Floor Locked
+                          </span>
+                        )}
                       </div>
 
                       <div className="mt-2.5 text-center">
@@ -3820,17 +3838,32 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
                   {/* Contenders Attendance Pill Row */}
                   <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-1.5">
-                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Eligible Contenders Floor</h3>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Locked</span>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider truncate">
+                        Eligible Contenders Floor
+                      </h3>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          isCountdownUnderTwoHours
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-800 border border-amber-200'
+                        }`}>
+                          {isCountdownUnderTwoHours ? 'Ready' : 'Scheduled'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-medium font-mono">({eligibleCount} in standby)</span>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-medium">{eligibleCount} in standby</span>
                     </div>
-                    <div className="mb-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-1.5 text-xs text-slate-600 font-semibold">
-                      <svg className="w-3.5 h-3.5 text-slate-500" fill="currentColor" viewBox="0 0 20 20"><path clipRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" fillRule="evenodd"></path></svg>
-                      <span>Bidding Locked Until Scheduled Time</span>
-                    </div>
+                    {isCountdownUnderTwoHours ? (
+                      <div className="mb-3 p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-center gap-1.5 text-xs text-emerald-800 font-bold">
+                        <span>⚡</span>
+                        <span>Live Auction Floor Ready · Tap &quot;Start Auction&quot; above</span>
+                      </div>
+                    ) : (
+                      <div className="mb-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-1.5 text-xs text-slate-600 font-semibold">
+                        <Lock size={13} className="text-slate-400" />
+                        <span>Bidding Locked Until Scheduled Time</span>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-2.5">
                       {members.map((m) => {
                         const isEligible = !m.hasWonRegular;
