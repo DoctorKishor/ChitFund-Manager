@@ -3099,7 +3099,11 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
                     if (isLeader) {
                       return (
-                        <div key={m.id} className="p-3.5 rounded-xl border-2 border-amber-400 bg-amber-50/50 shadow-xs relative transition-all hover:scale-[1.01]">
+                        <div 
+                          key={m.id} 
+                          onClick={() => handleOpenBidModal(m.id)}
+                          className="p-3.5 rounded-xl border-2 border-amber-400 bg-amber-50/50 hover:bg-amber-100/60 shadow-xs relative transition-all active:scale-[0.99] cursor-pointer"
+                        >
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-2.5">
                               <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center font-mono">
@@ -3119,7 +3123,10 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                             <span className="text-slate-500 font-medium">Last shout: {lastBidTime || 'Active'}</span>
                             <button
                               type="button"
-                              onClick={() => handleOpenBidModal(m.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenBidModal(m.id);
+                              }}
                               className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-lg text-[10px] transition-colors border border-amber-300 cursor-pointer"
                             >
                               Raise Lead Bid
@@ -3131,7 +3138,11 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
                     if (memberLastBid) {
                       return (
-                        <div key={m.id} className="p-3.5 rounded-xl border-2 border-brand-500 bg-brand-50/40 shadow-xs relative transition-all ring-2 ring-brand-500/20">
+                        <div 
+                          key={m.id} 
+                          onClick={() => handleOpenBidModal(m.id)}
+                          className="p-3.5 rounded-xl border-2 border-brand-500 bg-brand-50/40 hover:bg-brand-50/70 shadow-xs relative transition-all ring-2 ring-brand-500/20 active:scale-[0.99] cursor-pointer"
+                        >
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-2.5">
                               <span className="w-7 h-7 rounded-lg bg-brand-600 text-white font-bold text-xs flex items-center justify-center font-mono">
@@ -3154,7 +3165,10 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                             </span>
                             <button
                               type="button"
-                              onClick={() => handleOpenBidModal(m.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenBidModal(m.id);
+                              }}
                               className="px-2.5 py-1 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg text-[10px] transition-colors shadow-xs flex items-center gap-1 cursor-pointer"
                             >
                               <Zap size={11} />
@@ -3166,7 +3180,11 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     }
 
                     return (
-                      <div key={m.id} className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-brand-200 transition-all cursor-pointer group shadow-2xs">
+                      <div 
+                        key={m.id} 
+                        onClick={() => handleOpenBidModal(m.id)}
+                        className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-brand-300 transition-all cursor-pointer group shadow-2xs active:scale-[0.99]"
+                      >
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-2.5">
                             <span className="w-7 h-7 rounded-lg bg-slate-200 group-hover:bg-brand-100 group-hover:text-brand-700 text-slate-700 font-bold text-xs flex items-center justify-center font-mono transition-colors">
@@ -3190,7 +3208,10 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                           <span className="text-slate-400 text-[10px]">Eligible Contender</span>
                           <button
                             type="button"
-                            onClick={() => handleOpenBidModal(m.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenBidModal(m.id);
+                            }}
                             className="px-2.5 py-1 bg-white hover:bg-brand-50 text-brand-600 border border-slate-200 hover:border-brand-200 font-bold rounded-lg text-[10px] transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
                           >
                             <Plus size={11} />
@@ -3463,7 +3484,174 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             </div>
           </section>
 
-          {/* Live Shouts Stream List */}
+          {/* Contenders Attendance Pill Row (Moved Up) */}
+          <section className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/90 shadow-card">
+            <div className="flex items-center justify-between gap-1.5 mb-2.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wide truncate">
+                  Contenders
+                </h3>
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-brand-50 text-brand-700 border border-brand-200 shrink-0">
+                  Tap to Bid
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10px] text-slate-500 font-medium font-mono">
+                  {visibleContenders.length} Active
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowOnlyAttending(v => !v)}
+                  className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
+                    showOnlyAttending 
+                      ? 'bg-brand-500 border-brand-500 text-white' 
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {showOnlyAttending ? `Roll Call (${attendingMemberIds.length})` : 'Roll Call'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {displayedMembers.map((m) => {
+                const isWon = m.hasWonRegular;
+                const isCurrentTopBidder = winnerId === m.id;
+                const memberLastBid = bids.find(b => b.memberId === m.id)?.amount;
+
+                if (isWon) {
+                  return (
+                    <div 
+                      key={m.id}
+                      className="p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 opacity-50 relative overflow-hidden flex flex-col justify-between"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="w-7 h-7 rounded-lg bg-slate-200 text-slate-600 font-bold text-xs flex items-center justify-center font-mono">
+                          #{m.ticketNumber}
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded-full">
+                          Won
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-500 mt-1.5 leading-tight truncate">{m.fullName}</h4>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[10px] text-slate-400">Status</span>
+                        <span className="text-[11px] font-bold text-slate-400 font-mono">Spectator</span>
+                      </div>
+                      <button 
+                        disabled
+                        className="mt-2 w-full py-1.5 bg-slate-100 text-slate-400 text-[11px] font-bold rounded-lg flex items-center justify-center cursor-not-allowed"
+                      >
+                        <span>Already Won</span>
+                      </button>
+                    </div>
+                  );
+                }
+
+                if (isCurrentTopBidder) {
+                  return (
+                    <div 
+                      key={m.id}
+                      onClick={() => handleOpenBidModal(m.id)}
+                      className="p-2.5 bg-amber-50/70 hover:bg-amber-100/70 border-2 border-amber-300 hover:border-amber-400 shadow-xs relative overflow-hidden flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center font-mono">
+                          #{m.ticketNumber}
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-200/90 text-amber-900 rounded-full">
+                          👑 Leader
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-900 mt-1.5 leading-tight truncate">{m.fullName}</h4>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[10px] text-amber-900 font-semibold">Lead Bid</span>
+                        <span className="text-xs font-black text-amber-900 font-mono">{formatCurrency(highestBid)}</span>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenBidModal(m.id);
+                        }}
+                        className="mt-2 w-full py-1.5 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                      >
+                        <span>Raise Bid</span>
+                      </button>
+                    </div>
+                  );
+                }
+
+                if (memberLastBid) {
+                  return (
+                    <div 
+                      key={m.id}
+                      onClick={() => handleOpenBidModal(m.id)}
+                      className="p-2.5 bg-white hover:bg-slate-50 rounded-xl border border-slate-200 hover:border-brand-300 shadow-2xs relative overflow-hidden flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center font-mono">
+                          #{m.ticketNumber}
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full">
+                          Outbid
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-900 mt-1.5 leading-tight truncate">{m.fullName}</h4>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[10px] text-slate-500">Last Bid</span>
+                        <span className="text-xs font-bold text-slate-700 font-mono">{formatCurrency(memberLastBid)}</span>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenBidModal(m.id);
+                        }}
+                        className="mt-2 w-full py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                      >
+                        <span>Tap to Bid</span>
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div 
+                    key={m.id}
+                    onClick={() => handleOpenBidModal(m.id)}
+                    className="p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 hover:border-brand-300 flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="w-7 h-7 rounded-lg bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center font-mono">
+                        #{m.ticketNumber}
+                      </span>
+                      <span className="text-[9px] font-medium text-emerald-600 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Ready
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-900 mt-1.5 leading-tight truncate">{m.fullName}</h4>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-[10px] text-slate-500">Floor Bidder</span>
+                      <span className="text-[11px] font-bold text-slate-600 font-mono">Active</span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenBidModal(m.id);
+                      }}
+                      className="mt-2 w-full py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                    >
+                      <span>Tap to Bid</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Live Shouts Stream List (Moved Down) */}
           <section className="space-y-2">
             <div 
               onClick={() => setShowTimelineDrawer(true)}
@@ -3535,161 +3723,6 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   );
                 })
               )}
-            </div>
-          </section>
-
-          {/* Contenders Attendance Pill Row */}
-          <section className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/90 shadow-card">
-            <div className="flex items-center justify-between gap-1.5 mb-2.5">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wide truncate">
-                  Contenders
-                </h3>
-                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-brand-50 text-brand-700 border border-brand-200 shrink-0">
-                  Tap to Bid
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="text-[10px] text-slate-500 font-medium font-mono">
-                  {visibleContenders.length} Active
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowOnlyAttending(v => !v)}
-                  className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
-                    showOnlyAttending 
-                      ? 'bg-brand-500 border-brand-500 text-white' 
-                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {showOnlyAttending ? `Roll Call (${attendingMemberIds.length})` : 'Roll Call'}
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {displayedMembers.map((m) => {
-                const isWon = m.hasWonRegular;
-                const isCurrentTopBidder = winnerId === m.id;
-                const memberLastBid = bids.find(b => b.memberId === m.id)?.amount;
-
-                if (isWon) {
-                  return (
-                    <div 
-                      key={m.id}
-                      className="p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 opacity-50 relative overflow-hidden flex flex-col justify-between"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="w-7 h-7 rounded-lg bg-slate-200 text-slate-600 font-bold text-xs flex items-center justify-center font-mono">
-                          #{m.ticketNumber}
-                        </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded-full">
-                          Won
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-500 mt-1.5 leading-tight truncate">{m.fullName}</h4>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-[10px] text-slate-400">Status</span>
-                        <span className="text-[11px] font-bold text-slate-400 font-mono">Spectator</span>
-                      </div>
-                      <button 
-                        disabled
-                        className="mt-2 w-full py-1.5 bg-slate-100 text-slate-400 text-[11px] font-bold rounded-lg flex items-center justify-center cursor-not-allowed"
-                      >
-                        <span>Already Won</span>
-                      </button>
-                    </div>
-                  );
-                }
-
-                if (isCurrentTopBidder) {
-                  return (
-                    <div 
-                      key={m.id}
-                      className="p-2.5 bg-amber-50/70 rounded-xl border-2 border-amber-300 shadow-xs relative overflow-hidden flex flex-col justify-between"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center font-mono">
-                          #{m.ticketNumber}
-                        </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-200/90 text-amber-900 rounded-full">
-                          👑 Leader
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-900 mt-1.5 leading-tight truncate">{m.fullName}</h4>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-[10px] text-amber-900 font-semibold">Lead Bid</span>
-                        <span className="text-xs font-black text-amber-900 font-mono">{formatCurrency(highestBid)}</span>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => handleOpenBidModal(m.id)}
-                        className="mt-2 w-full py-1.5 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 active:scale-95 transition-all shadow-2xs cursor-pointer"
-                      >
-                        <span>Raise Bid</span>
-                      </button>
-                    </div>
-                  );
-                }
-
-                if (memberLastBid) {
-                  return (
-                    <div 
-                      key={m.id}
-                      className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs relative overflow-hidden flex flex-col justify-between"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center font-mono">
-                          #{m.ticketNumber}
-                        </span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full">
-                          Outbid
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-900 mt-1.5 leading-tight truncate">{m.fullName}</h4>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-[10px] text-slate-500">Last Bid</span>
-                        <span className="text-xs font-bold text-slate-700 font-mono">{formatCurrency(memberLastBid)}</span>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => handleOpenBidModal(m.id)}
-                        className="mt-2 w-full py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition-all cursor-pointer"
-                      >
-                        <span>Tap to Bid</span>
-                      </button>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div 
-                    key={m.id}
-                    className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="w-7 h-7 rounded-lg bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center font-mono">
-                        #{m.ticketNumber}
-                      </span>
-                      <span className="text-[9px] font-medium text-emerald-600 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Ready
-                      </span>
-                    </div>
-                    <h4 className="text-xs font-bold text-slate-900 mt-1.5 leading-tight truncate">{m.fullName}</h4>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[10px] text-slate-500">Floor Bidder</span>
-                      <span className="text-[11px] font-bold text-slate-600 font-mono">Active</span>
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={() => handleOpenBidModal(m.id)}
-                      className="mt-2 w-full py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition-all cursor-pointer"
-                    >
-                      <span>Tap to Bid</span>
-                    </button>
-                  </div>
-                );
-              })}
             </div>
           </section>
 
@@ -3809,11 +3842,11 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                           }}
                           className="p-3 bg-slate-50 hover:bg-white hover:border-brand-500 border border-slate-200 rounded-xl transition-all hover:scale-[1.02] active:scale-95 group text-left cursor-pointer shadow-2xs hover:shadow-sm"
                         >
-                          <div className="text-[11px] font-semibold text-slate-500 group-hover:text-brand-600 transition-colors">
-                            {item.label}
-                          </div>
-                          <div className="text-base font-black font-display text-slate-900 group-hover:text-brand-700 font-mono mt-0.5">
+                          <div className="text-base font-black font-display text-slate-900 group-hover:text-brand-700 font-mono">
                             {formatCurrency(price)}
+                          </div>
+                          <div className="text-[11px] font-bold text-brand-600 mt-0.5">
+                            {item.label}
                           </div>
                         </button>
                       );
@@ -3910,7 +3943,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 </button>
               </div>
 
-              {/* Instant 9-Grid Quick Increments */}
+              {/* Instant 12-Grid Quick Increments (3x4) */}
               <div className="mt-3.5">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-semibold text-emerald-600">Instant Log on Tap</span>
@@ -3927,6 +3960,9 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     { delta: 2500, label: '+₹2,500' },
                     { delta: 3000, label: '+₹3,000' },
                     { delta: 3500, label: '+₹3,500' },
+                    { delta: 4000, label: '+₹4,000' },
+                    { delta: 4500, label: '+₹4,500' },
+                    { delta: 5000, label: '+₹5,000' },
                   ].map((item) => {
                     const basePrice = highestBid > 0 ? highestBid : startingBaselineBid;
                     const price = basePrice + item.delta;
@@ -3939,12 +3975,14 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                           triggerHapticFeedback('light');
                           recordBid(price, activeContender.id);
                         }}
-                        className="p-2.5 bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-xl text-left active:scale-95 transition-transform flex flex-col justify-between cursor-pointer"
+                        className="py-2.5 px-2 bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-xl text-center active:scale-95 transition-all flex flex-col items-center justify-center cursor-pointer shadow-2xs group"
                       >
-                        <div className="flex justify-between items-center w-full">
-                          <span className="text-xs font-black text-slate-900 font-mono">{formatCurrency(price)}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/70 font-bold text-slate-600">{item.label}</span>
-                        </div>
+                        <span className="text-xs sm:text-sm font-black text-slate-900 font-mono tracking-tight group-hover:text-brand-700 transition-colors">
+                          {formatCurrency(price)}
+                        </span>
+                        <span className="text-[10px] sm:text-[11px] font-bold text-brand-600 font-mono mt-0.5">
+                          {item.label}
+                        </span>
                       </button>
                     );
                   })}
