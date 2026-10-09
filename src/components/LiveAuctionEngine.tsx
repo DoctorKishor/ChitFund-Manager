@@ -3195,14 +3195,27 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               <div className="px-4 py-3 flex items-center justify-between">
                 <div>
                   <div className="flex items-center space-x-2">
-                    <h1 className="text-base font-extrabold text-slate-900 leading-tight">Live Bidding Arena</h1>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                      <svg className="w-3 h-3 mr-1 text-amber-700" fill="currentColor" viewBox="0 0 20 20"><path clipRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" fillRule="evenodd"></path></svg>
-                      Upcoming Session
-                    </span>
+                    <h1 className="text-base font-extrabold text-slate-900 leading-tight">
+                      {desktopViewTab === 'history' ? 'Auction Archive' : 'Live Bidding Arena'}
+                    </h1>
+                    {desktopViewTab === 'history' ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 mr-1" />
+                        Historical Log
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                        <svg className="w-3 h-3 mr-1 text-amber-700" fill="currentColor" viewBox="0 0 20 20"><path clipRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" fillRule="evenodd"></path></svg>
+                        Upcoming Session
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Floor Opens at {countdown.formattedTargetTime || formattedTargetAuctionTime} · {eligibleCount} Contenders Ready
+                    {desktopViewTab === 'history' ? (
+                      `All Past Rounds & Certified Ledgers (${historicalAuctionLogs.length} Cycles)`
+                    ) : (
+                      `Floor Opens at ${countdown.formattedTargetTime || formattedTargetAuctionTime} · ${eligibleCount} Contenders Ready`
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -3219,7 +3232,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     }`}
                     title="Toggle Historical Ledger"
                   >
-                    History
+                    {desktopViewTab === 'history' ? 'Live Arena' : 'History'}
                   </button>
                 </div>
               </div>
