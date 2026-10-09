@@ -1707,7 +1707,7 @@ export default function CashVaultLedger() {
                   </div>
                 </div>
                 <svg className="w-4 h-4 text-emerald-400/80 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
                 </svg>
               </div>
               <div className="text-right">
@@ -1764,7 +1764,7 @@ export default function CashVaultLedger() {
                   </div>
                 </div>
                 <svg className="w-4 h-4 text-indigo-300/80 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
                 </svg>
               </div>
               <div className="text-right">
@@ -1819,7 +1819,7 @@ export default function CashVaultLedger() {
                   </div>
                 </div>
                 <svg className="w-4 h-4 text-emerald-300/80 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
                 </svg>
               </div>
               <div className="text-right">
@@ -1873,7 +1873,7 @@ export default function CashVaultLedger() {
                   </div>
                 </div>
                 <svg className="w-4 h-4 text-amber-300/80 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
                 </svg>
               </div>
               <div className="text-right">

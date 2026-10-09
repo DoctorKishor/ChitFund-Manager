@@ -86,7 +86,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
   // Core data states
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRoleRecord[]>([]);
-  const [allChitGroups, setAllChitGroups] = useState<{ id: string; name: string; total_value?: number; duration?: number; current_month?: number }[]>([]);
+  const [allChitGroups, setAllChitGroups] = useState<{ id: string; name: string; total_value?: number; duration_months?: number; duration?: number; current_month?: number }[]>([]);
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [allAuctionLogs, setAllAuctionLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -208,7 +208,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
             id,
             name,
             total_value,
-            duration,
+            duration_months,
             current_month
           )
         `);
@@ -220,7 +220,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       // 3. Fetch chit groups list for filter
       const { data: groupsData } = await supabase
         .from('chit_groups')
-        .select('id, name, total_value, duration, current_month')
+        .select('id, name, total_value, duration_months, current_month')
         .order('name', { ascending: true });
 
       if (groupsData) {
@@ -254,7 +254,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
                 name: groupObj?.name || 'Chit Group',
                 ticket: gm.ticket_number,
                 totalValue: groupObj?.total_value,
-                duration: groupObj?.duration,
+                duration: groupObj?.duration_months || groupObj?.duration,
                 currentMonth: groupObj?.current_month,
               };
             });
