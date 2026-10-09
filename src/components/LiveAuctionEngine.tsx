@@ -160,6 +160,7 @@ export default function LiveAuctionEngine() {
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [
+    group?.id,
     group?.auction_day_of_month,
     group?.auction_time,
     group?.next_auction_date,
@@ -167,6 +168,10 @@ export default function LiveAuctionEngine() {
     group?.startDate,
     group?.currentMonth,
   ]);
+
+  // Derived countdown conditions for UI states
+  const isCountdownZero = countdown.days === 0 && countdown.hours === 0 && countdown.minutes === 0 && countdown.seconds === 0;
+  const isCountdownUnderOneHour = isCountdownZero || (countdown.days === 0 && countdown.hours === 0);
 
   // Selected Historical Log for full detailed view
   const [selectedHistoricalLog, setSelectedHistoricalLog] = useState<HistoricalAuctionLog | null>(null);
@@ -247,7 +252,7 @@ export default function LiveAuctionEngine() {
       const { data: groupsData } = await supabase
         .from('chit_groups')
         .select('*')
-        .eq('status', 'active')
+        .in('status', ['active', 'draft'])
         .order('created_at', { ascending: false });
 
       if (groupsData && groupsData.length > 0) {
@@ -270,8 +275,10 @@ export default function LiveAuctionEngine() {
         setAllGroups(parsedGroups);
         
         setSelectedGroupId(prev => {
-          if (prev && parsedGroups.some(g => g.id === prev)) return prev;
-          return parsedGroups[0].id;
+          const targetId = (prev && parsedGroups.some(g => g.id === prev)) ? prev : parsedGroups[0].id;
+          const targetGroup = parsedGroups.find(g => g.id === targetId);
+          if (targetGroup) setGroup(targetGroup);
+          return targetId;
         });
       } else {
         setAllGroups([]);
@@ -724,7 +731,7 @@ export default function LiveAuctionEngine() {
       alert("No live auction takes place in Month 0 (Launch Phase). Advance to Month 1 to begin live auctions.");
       return;
     }
-    if (!isAuctionDateToday && (group?.currentMonth || 0) > 0) {
+    if (stage !== 'studio' && !group?.is_live_auction_active && !isAuctionDateToday && (group?.currentMonth || 0) > 0) {
       alert(`Live Auction is LOCKED for today. It is scheduled for ${formattedTargetAuctionDate} at ${formattedTargetAuctionTime}.\n\nPlease click "Reschedule to Conduct Today" if you wish to conduct it today.`);
       setShowScheduleModal(true);
       return;
@@ -744,7 +751,7 @@ export default function LiveAuctionEngine() {
       return;
     }
 
-    if (!isAuctionDateToday && (group?.currentMonth || 0) > 0) {
+    if (stage !== 'studio' && !group?.is_live_auction_active && !isAuctionDateToday && (group?.currentMonth || 0) > 0) {
       alert(`Live Auction is LOCKED for today. It is scheduled for ${formattedTargetAuctionDate} at ${formattedTargetAuctionTime}.\n\nPlease reschedule the auction to today before logging bids.`);
       setShowScheduleModal(true);
       return;
@@ -1540,6 +1547,8 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                       onClick={() => {
                         triggerHapticFeedback('light');
                         setSelectedGroupId(g.id);
+                        const targetGroup = allGroups.find(item => item.id === g.id);
+                        if (targetGroup) setGroup(targetGroup);
                         fetchGroupDetails(g.id);
                       }}
                       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
@@ -1613,16 +1622,18 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-2 text-right">
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> {eligibleCount} Floor Participants
-                    </span>
-                    <span className="text-slate-300">•</span>
-                    <span>{members.length - eligibleCount} Prior Winner Spectator{members.length - eligibleCount !== 1 ? 's' : ''}</span>
-                    <span className="text-slate-300">•</span>
-                    <span className="font-bold text-brand-700">Quorum Met</span>
-                  </div>
+                <div className="flex items-center gap-3">
+                  {isCountdownUnderOneHour && (
+                    <button
+                      type="button"
+                      onClick={handleEnterStudio}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                      <span>Begin Auction</span>
+                      <span className="text-base leading-none">➔</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </section>
@@ -1934,26 +1945,28 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 </div>
 
                 {/* Initiate Early Live Auction Session (Admin Control) */}
-                <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
-                      Admin Control
-                    </span>
-                    <span className="text-xs text-amber-300 font-semibold">Standby Mode</span>
+                {!isCountdownZero && (
+                  <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
+                        Admin Control
+                      </span>
+                      <span className="text-xs text-amber-300 font-semibold">Standby Mode</span>
+                    </div>
+                    <h4 className="font-display font-bold text-sm mt-3">Initiate Early Live Auction Session</h4>
+                    <p className="text-xs text-slate-300 mt-1">
+                      Overrides the countdown timer and unlocks the 2-Tap bidding console immediately for all verified contenders on the floor.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleEnterStudio}
+                      className="mt-4 w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                      <span>Start Live Auction Now (Admin Override)</span>
+                    </button>
                   </div>
-                  <h4 className="font-display font-bold text-sm mt-3">Initiate Early Live Auction Session</h4>
-                  <p className="text-xs text-slate-300 mt-1">
-                    Overrides the countdown timer and unlocks the 2-Tap bidding console immediately for all verified contenders on the floor.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleEnterStudio}
-                    className="mt-4 w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                    <span>Start Live Auction Now (Admin Override)</span>
-                  </button>
-                </div>
+                )}
 
               </aside>
 
@@ -2080,6 +2093,8 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                         onClick={() => {
                           triggerHapticFeedback('light');
                           setSelectedGroupId(g.id);
+                          const targetGroup = allGroups.find(item => item.id === g.id);
+                          if (targetGroup) setGroup(targetGroup);
                           fetchGroupDetails(g.id);
                         }}
                         className={`flex-shrink-0 flex items-center space-x-1.5 px-3 py-1.5 font-medium rounded-full transition-all cursor-pointer ${
@@ -2147,27 +2162,40 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-white/10">
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        const msg = `📢 *Upcoming Live Chit Auction Notice*\nGroup: ${group.name}\nMonth Cycle: Month ${group.currentMonth}\nChit Value: ${formatCurrency(group.totalValue)}\nScheduled Date: ${countdown.formattedTargetDate || formattedTargetAuctionDate} at ${countdown.formattedTargetTime || formattedTargetAuctionTime}\n\nPlease be present on the floor or connected in-app.`;
-                        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-                      }}
-                      className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.007c.101.005.245-.038.375.275.145.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.178.18-.077.354.101.174.45 1.742 1.937 2.067.188.041.332-.014.419-.115.116-.13.491-.572.622-.767.13-.195.26-.163.433-.101.174.062 1.1.519 1.288.613.188.094.318.14.364.219.043.079.043.46-.101.865z"></path></svg>
-                      <span>Send Notice</span>
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setShowScheduleModal(true)}
-                      className="py-2 px-3 bg-white/10 hover:bg-white/20 border border-white/15 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
-                    >
-                      <svg className="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
-                      <span>Reschedule</span>
-                    </button>
-                  </div>
+                  {isCountdownUnderOneHour ? (
+                    <div className="mt-4 pt-3 border-t border-white/10">
+                      <button
+                        type="button"
+                        onClick={handleEnterStudio}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                        <span>Start Auction</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-white/10">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const msg = `📢 *Upcoming Live Chit Auction Notice*\nGroup: ${group.name}\nMonth Cycle: Month ${group.currentMonth}\nChit Value: ${formatCurrency(group.totalValue)}\nScheduled Date: ${countdown.formattedTargetDate || formattedTargetAuctionDate} at ${countdown.formattedTargetTime || formattedTargetAuctionTime}\n\nPlease be present on the floor or connected in-app.`;
+                          window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                        }}
+                        className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.007c.101.005.245-.038.375.275.145.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.178.18-.077.354.101.174.45 1.742 1.937 2.067.188.041.332-.014.419-.115.116-.13.491-.572.622-.767.13-.195.26-.163.433-.101.174.062 1.1.519 1.288.613.188.094.318.14.364.219.043.079.043.46-.101.865z"></path></svg>
+                        <span>Send Notice</span>
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setShowScheduleModal(true)}
+                        className="py-2 px-3 bg-white/10 hover:bg-white/20 border border-white/15 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <svg className="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                        <span>Reschedule</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -2403,6 +2431,8 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     onClick={() => {
                       triggerHapticFeedback('light');
                       setSelectedGroupId(g.id);
+                      const targetGroup = allGroups.find(item => item.id === g.id);
+                      if (targetGroup) setGroup(targetGroup);
                       fetchGroupDetails(g.id);
                     }}
                     className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
@@ -2631,19 +2661,37 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     <div className="flex items-center gap-2">
                       <h2 className="font-display font-bold text-base text-slate-900 tracking-tight">Active Contenders on Floor</h2>
                       <span className="text-xs font-bold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-full">
-                        {eligibleCount} Contenders · 1-Tap Ready
+                        {displayedMembers.length} Contenders · 1-Tap Ready
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">Tap any contender to prime the 2-Tap fast bidding register.</p>
                   </div>
-                  <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 font-semibold px-2.5 py-1 rounded-lg">
-                    {attendingMemberIds.length} / {eligibleCount} Floor Quorum Met
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowOnlyAttending(v => !v)}
+                      className={`text-xs px-2.5 py-1 rounded-lg border font-semibold transition-colors cursor-pointer ${
+                        showOnlyAttending
+                          ? 'bg-brand-50 text-brand-700 border-brand-300'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {showOnlyAttending ? `Roll Call (${attendingMemberIds.length})` : 'All Members'}
+                    </button>
+                    <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 font-semibold px-2.5 py-1 rounded-lg">
+                      {attendingMemberIds.length} / {eligibleCount} Floor Quorum Met
+                    </span>
+                  </div>
                 </div>
 
                 {/* Contender Grid Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                  {members.map((m) => {
+                  {displayedMembers.length === 0 ? (
+                    <div className="col-span-full py-8 text-center text-slate-500 text-xs bg-slate-50 border border-slate-200 rounded-xl">
+                      No attending contenders selected. Click &quot;Roll Call&quot; or toggle to view all members.
+                    </div>
+                  ) : (
+                    displayedMembers.map((m) => {
                     const isWon = m.hasWonRegular;
                     const isLeader = winnerId === m.id && bids.length > 0;
                     const memberLastBid = bids.find(b => b.memberId === m.id)?.amount;
@@ -2774,7 +2822,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                         </div>
                       </div>
                     );
-                  })}
+                  }))}
                 </div>
               </div>
 
@@ -3121,6 +3169,8 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     onClick={() => {
                       triggerHapticFeedback('light');
                       setSelectedGroupId(g.id);
+                      const targetGroup = allGroups.find(item => item.id === g.id);
+                      if (targetGroup) setGroup(targetGroup);
                       fetchGroupDetails(g.id);
                     }}
                     className={`flex-shrink-0 flex items-center space-x-1.5 px-3 py-1.5 font-medium rounded-full transition-all cursor-pointer ${
@@ -4021,7 +4071,10 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
             <button
               type="button"
-              onClick={() => setShowRollCallModal(false)}
+              onClick={() => {
+                setShowOnlyAttending(true);
+                setShowRollCallModal(false);
+              }}
               className="w-full bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs py-2.5 rounded-xl shadow-xs transition-all active:scale-[0.98] cursor-pointer"
             >
               Done &amp; Begin Live Bidding ({attendingMemberIds.length} Bidders)
