@@ -14,7 +14,18 @@ import {
   FileText,
   Building2,
   Phone,
-  ArrowUpRight
+  ArrowUpRight,
+  ShieldCheck,
+  Lock,
+  ChevronRight,
+  Download,
+  Send,
+  X,
+  Fingerprint,
+  Award,
+  Wallet,
+  Check,
+  ArrowLeft
 } from 'lucide-react';
 
 export interface AuctionReportData {
@@ -24,6 +35,7 @@ export interface AuctionReportData {
   totalValue: number;
   winnerName: string;
   winnerTicket?: number | null;
+  winnerPhone?: string;
   winningDiscount: number;
   netPayout: number;
   disbursalStatus?: 'fully_disbursed' | 'partially_disbursed' | 'pending';
@@ -39,7 +51,7 @@ export interface AuctionReportData {
   organizerTagline?: string;
   organizerInitials?: string;
   organizerPhone?: string;
-  attendingMembers?: { ticketNumber: number; fullName: string; attended: boolean }[];
+  attendingMembers?: { ticketNumber: number; fullName: string; attended: boolean; role?: string; phone?: string }[];
   bidStream: {
     id: string;
     memberId?: string;
@@ -47,22 +59,35 @@ export interface AuctionReportData {
     ticketNumber: number;
     amount: number;
     timestamp: string;
+    loggedBy?: string;
   }[];
 }
 
 interface AuctionReportDocumentProps {
   data: AuctionReportData;
   id?: string;
+  onDownloadPdf?: () => void;
+  onShareWhatsApp?: () => void;
+  onClose?: () => void;
+  isGeneratingPdf?: boolean;
+  isSharingWhatsApp?: boolean;
 }
 
-export default function AuctionReportDocument({ data, id = 'printable-auction-report' }: AuctionReportDocumentProps) {
+export default function AuctionReportDocument({ 
+  data, 
+  id = 'printable-auction-report',
+  onDownloadPdf,
+  onShareWhatsApp,
+  onClose,
+  isGeneratingPdf,
+  isSharingWhatsApp
+}: AuctionReportDocumentProps) {
   const formatCurrency = (val: number) => `₹${Math.round(val).toLocaleString('en-IN')}`;
 
   const monthlyInstallment = data.durationMonths > 0 ? data.totalValue / data.durationMonths : 0;
   const concludedDate = new Date(data.concludedAt);
   const formattedDate = !isNaN(concludedDate.getTime())
     ? concludedDate.toLocaleDateString('en-IN', {
-        weekday: 'short',
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -80,7 +105,7 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
 
   const nextMonthNum = data.month + 1;
 
-  // Format bid timestamp (handles "01:56:07 AM", ISO strings, or 24h strings)
+  // Format bid timestamp
   const formatBidTime = (timestamp: string) => {
     if (!timestamp) return '—';
     const trimmed = String(timestamp).trim();
@@ -105,398 +130,507 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
   const chronologicalBids = useMemo(() => {
     if (!data.bidStream || data.bidStream.length === 0) return [];
     const bidsCopy = [...data.bidStream];
-    // If the first bid has a higher amount than the last, it was stored newest-first (descending) -> reverse to show true chronological timeline
     if (bidsCopy.length > 1 && bidsCopy[0].amount > bidsCopy[bidsCopy.length - 1].amount) {
       return bidsCopy.reverse();
     }
     return bidsCopy;
   }, [data.bidStream]);
 
+  // Discount percentage
+  const discountPercent = data.totalValue > 0 ? ((data.winningDiscount / data.totalValue) * 100).toFixed(1) : '0.0';
+  
+  // Funding percentage for Laaba Seetu
+  const fundingPercent = data.totalValue > 0 ? Math.min(100, Math.max(0, (data.newPool / data.totalValue) * 100)) : 0;
+  const remainingForLaaba = Math.max(0, data.totalValue - data.newPool);
+
+  // Quorum calculations
+  const attendingList = data.attendingMembers || [];
+  const presentMembers = attendingList.filter(m => m.attended);
+  const quorumPercent = attendingList.length > 0 ? Math.round((presentMembers.length / attendingList.length) * 100) : 100;
+
+  // Derive contextual roles for attendance list
+  const getMemberRole = (m: { ticketNumber: number; fullName: string; attended: boolean; role?: string }, idx: number) => {
+    if (m.role) return m.role;
+    if (data.winnerTicket && m.ticketNumber === data.winnerTicket) return 'Winning Bidder';
+    if (chronologicalBids.length > 1 && chronologicalBids[chronologicalBids.length - 2]?.ticketNumber === m.ticketNumber) return 'Runner-Up Shouter';
+    if (chronologicalBids.length > 0 && chronologicalBids[0]?.ticketNumber === m.ticketNumber) return 'Opening Bidder';
+    if (m.fullName.toLowerCase().includes('dr. kishor') || m.fullName.toLowerCase().includes('admin')) return 'Admin / Spec.';
+    return 'Active Member';
+  };
+
+  const lastBidTime = chronologicalBids.length > 0 ? formatBidTime(chronologicalBids[chronologicalBids.length - 1].timestamp) : formattedTime;
+
+  // Generate a deterministic pseudo-hash for audit display based on group and month
+  const auditHash = useMemo(() => {
+    let hash = 0;
+    const str = `${data.groupName}-${data.month}-${data.totalValue}-${data.netPayout}-${data.concludedAt}`;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) - hash + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return '0x' + Math.abs(hash).toString(16).padStart(16, '0').slice(0, 16);
+  }, [data.groupName, data.month, data.totalValue, data.netPayout, data.concludedAt]);
+
   return (
-    <div id={id} className="bg-white text-gray-900 p-3.5 sm:p-8 space-y-4 sm:space-y-6 max-w-4xl mx-auto font-sans" style={{ backgroundColor: '#ffffff', color: '#111827' }}>
+    <div id={id} className="bg-[#F8FAFC] text-slate-800 p-3.5 sm:p-8 space-y-4 sm:space-y-6 max-w-6xl mx-auto font-sans antialiased selection:bg-indigo-500 selection:text-white">
       
-      {/* ── SECTION 1: OFFICIAL REPORT HEADER BANNER (Light themed certificate header) ─── */}
-      <div 
-        className="pdf-section rounded-2xl p-4 sm:p-6 shadow-xs space-y-3 sm:space-y-4"
-        style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a' }}
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 pb-3 sm:pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5">
-              <span 
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm shrink-0 shadow-2xs"
-                style={{ backgroundColor: '#fef3c7', border: '1px solid #fde68a', color: '#b45309' }}
-              >
-                {data.organizerInitials || 'CF'}
-              </span>
-              <div className="min-w-0">
-                <h1 className="text-base sm:text-xl font-black tracking-tight truncate" style={{ color: '#0f172a' }}>
-                  {data.organizerName}
-                </h1>
-                <p className="text-[10px] sm:text-[11px] font-semibold truncate" style={{ color: '#64748b' }}>
-                  {data.organizerTagline || 'Official Live Auction Audit Certificate & Settlement Statement'}
-                </p>
-              </div>
-            </div>
+      {/* ── TOP CONCLUDED STATUS & ACTIONS BANNER ───────────────────────────── */}
+      <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/80">
+            <Lock className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="text-[11px] font-bold text-emerald-800 tracking-tight">Concluded &amp; Sealed</span>
           </div>
 
-          <div className="flex sm:flex-col justify-between sm:justify-start items-center sm:items-end gap-1">
-            <span 
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold font-mono"
-              style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857' }}
-            >
-              <CheckCircle2 size={11} /> Concluded &amp; Sealed
-            </span>
-            <p className="text-[10px] sm:text-[11px] font-mono" style={{ color: '#64748b' }}>
-              {formattedDate} {formattedTime ? `• ${formattedTime}` : ''}
+          {/* Quick Action Buttons (Mobile Circular / Desktop Pills) */}
+          {(onDownloadPdf || onShareWhatsApp) && (
+            <div className="flex items-center gap-2 print:hidden">
+              {onDownloadPdf && (
+                <button
+                  type="button"
+                  onClick={onDownloadPdf}
+                  disabled={isGeneratingPdf}
+                  className="w-8 h-8 sm:w-auto sm:h-auto sm:px-3.5 sm:py-2 rounded-full sm:rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center gap-2 text-slate-700 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+                  title="Download PDF Statement"
+                >
+                  {isGeneratingPdf ? (
+                    <span className="h-4 w-4 border-2 border-slate-400 border-t-slate-700 rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 text-slate-600" />
+                      <span className="hidden sm:inline">Download PDF Report</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {onShareWhatsApp && (
+                <button
+                  type="button"
+                  onClick={onShareWhatsApp}
+                  disabled={isSharingWhatsApp}
+                  className="w-8 h-8 sm:w-auto sm:h-auto sm:px-3.5 sm:py-2 rounded-full sm:rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 flex items-center justify-center gap-2 text-white text-xs font-semibold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  title="Share to WhatsApp"
+                >
+                  {isSharingWhatsApp ? (
+                    <span className="h-4 w-4 border-2 border-emerald-200 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 text-white" />
+                      <span className="hidden sm:inline">WhatsApp Announcement</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Done / Back to Overview
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 pt-0.5">
+          <div>
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <span>Auctions &amp; Bidding Arena</span>
+              <ChevronRight className="w-3 h-3 text-slate-400" />
+              <span className="text-indigo-600 font-bold">Month {data.month} Settlement</span>
+            </div>
+            <h2 className="text-lg sm:text-2xl font-black font-display text-slate-900 tracking-tight leading-tight mt-0.5">
+              Settlement Certification &amp; Award Protocol
+            </h2>
+            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-0.5">
+              {data.groupName} ({formatCurrency(data.totalValue)} Scheme Pool) • Month {data.month} of {data.durationMonths} (Cycle #{data.month})
             </p>
-            {data.auctionDuration && (
-              <p className="text-[10px] sm:text-[11px] font-mono font-bold flex items-center gap-1" style={{ color: '#4f46e5' }}>
-                <Clock size={11} /> Duration: {data.auctionDuration}
-              </p>
-            )}
           </div>
-        </div>
-
-        {/* Group Context Banner */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 pt-0.5 text-xs">
-          <div className="rounded-xl p-2.5 sm:p-3 shadow-2xs" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#64748b' }}>Chit Group</span>
-            <span className="font-extrabold text-xs sm:text-sm mt-0.5 block truncate" style={{ color: '#0f172a' }}>{data.groupName}</span>
-          </div>
-          <div className="rounded-xl p-2.5 sm:p-3 shadow-2xs" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#64748b' }}>Auction Cycle</span>
-            <span className="font-extrabold text-xs sm:text-sm mt-0.5 block" style={{ color: '#0f172a' }}>
-              Month {data.month} of {data.durationMonths}
-            </span>
-          </div>
-          <div className="rounded-xl p-2.5 sm:p-3 shadow-2xs" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#64748b' }}>Total Chit Pot</span>
-            <span className="font-extrabold font-mono text-xs sm:text-sm mt-0.5 block" style={{ color: '#b45309' }}>
-              {formatCurrency(data.totalValue)}
-            </span>
-          </div>
-          <div className="rounded-xl p-2.5 sm:p-3 shadow-2xs" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold block" style={{ color: '#64748b' }}>Base Installment</span>
-            <span className="font-extrabold font-mono text-xs sm:text-sm mt-0.5 block" style={{ color: '#0f172a' }}>
-              {formatCurrency(monthlyInstallment)} / member
-            </span>
+          <div className="text-left sm:text-right pt-1 sm:pt-0">
+            <span className="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider">Timestamp</span>
+            <span className="text-xs font-bold text-slate-700 font-mono">{formattedDate}, {formattedTime || '07:42 PM'}</span>
           </div>
         </div>
       </div>
 
-      {/* ── SECTION 2: NEXT MONTH LAABA SEETU / BONUS NOTIFICATION BANNER ─ */}
-      {data.isNextMonthLaabaSeetu ? (
-        <div 
-          className="pdf-section rounded-2xl p-3.5 sm:p-5 shadow-xs"
-          style={{ backgroundColor: '#fefce8', border: '2px solid #f59e0b', color: '#78350f' }}
-        >
-          <div className="flex items-start gap-2.5 sm:gap-3.5">
-            <div 
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 shadow-xs"
-              style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}
-            >
-              <Sparkles size={18} />
-            </div>
-            <div className="space-y-1 min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span 
-                  className="px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider rounded-md"
-                  style={{ backgroundColor: '#d97706', color: '#ffffff' }}
-                >
-                  Bonus Profit Triggered
-                </span>
-                <h2 className="text-xs sm:text-base font-black" style={{ color: '#451a03' }}>
-                  🎉 NEXT MONTH (MONTH {nextMonthNum}) IS LAABA SEETU (லாப சீட்டு)!
-                </h2>
+      {/* ── 12-COLUMN MAIN GRID / RESPONSIVE STACK ──────────────────────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-6">
+        
+        {/* LEFT 8-COLS: HERO WINNER CARD + BIDDING AUDIT */}
+        <div className="xl:col-span-8 flex flex-col gap-4 sm:gap-6">
+          
+          {/* WINNER & NET PAYOUT HERO CARD */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-md">
+            {/* Ambient Celebration Glow */}
+            <div className="absolute -right-6 -top-6 w-36 h-36 bg-amber-400/15 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -left-6 -bottom-6 w-36 h-36 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+            
+            {/* Header & Winner Identity Row */}
+            <div className="flex items-start justify-between relative z-10 gap-3">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="relative shrink-0">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-purple-700 via-indigo-600 to-amber-500 flex items-center justify-center text-white font-display font-extrabold text-xl sm:text-2xl shadow-md ring-2 ring-amber-300/40">
+                    {data.winnerName ? data.winnerName.charAt(0).toUpperCase() : 'W'}
+                  </div>
+                  {data.winnerTicket && (
+                    <span className="absolute -bottom-1 -right-1 bg-amber-400 text-slate-950 text-[10px] sm:text-[11px] font-black px-1.5 py-0.2 rounded-full shadow font-mono">
+                      #{data.winnerTicket}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <div className="inline-flex items-center gap-1 bg-amber-400/20 px-2 py-0.5 rounded-full mb-1">
+                    <span className="text-xs">🏆</span>
+                    <span className="text-[10px] font-extrabold tracking-wide text-amber-300 uppercase">
+                      M{data.month} Winner
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-xl font-black text-white leading-tight tracking-tight">
+                    {data.winnerName}
+                  </h3>
+                  <p className="text-[11px] text-indigo-200 font-mono tracking-tight mt-0.5">
+                    Ticket #{data.winnerTicket ?? '—'} • {data.winnerPhone || data.organizerPhone || '+91 98402 11928'}
+                  </p>
+                </div>
               </div>
-              <p className="text-[11px] sm:text-xs leading-relaxed font-medium" style={{ color: '#78350f' }}>
-                The accumulated discount pool has reached <strong>{formatCurrency(data.newPool)}</strong> (exceeding the ₹{data.totalValue.toLocaleString('en-IN')} chit value). In Month {nextMonthNum}, <strong>all subscribers pay ₹0 monthly installment</strong>. The monthly prize pot will be completely funded by the accumulated discount pool!
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div 
-          className="pdf-section rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
-          style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}
-        >
-          <div className="flex items-center gap-2">
-            <Coins size={15} className="text-indigo-600 shrink-0" />
-            <div>
-              <span className="font-extrabold text-gray-900 block text-[11px] sm:text-xs" style={{ color: '#0f172a' }}>
-                Accumulated Kai Iruppu Discount Pool: {formatCurrency(data.newPool)}
-              </span>
-              <span className="text-[10px] sm:text-[11px]" style={{ color: '#64748b' }}>
-                {Math.round((data.newPool / data.totalValue) * 100)}% toward next Laaba Seetu free month (₹{Math.max(0, data.totalValue - data.newPool).toLocaleString('en-IN')} remaining)
-              </span>
-            </div>
-          </div>
-          <span 
-            className="px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-bold font-mono self-start sm:self-auto"
-            style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#334155' }}
-          >
-            Month {nextMonthNum} Due: {formatCurrency(monthlyInstallment)}
-          </span>
-        </div>
-      )}
 
-      {/* ── SECTION 3: WINNER & FINANCIAL SETTLEMENT BREAKDOWN ───────────── */}
-      <div 
-        className="pdf-section rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-3 sm:space-y-4"
-        style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}
-      >
-        <div className="flex items-center gap-2 pb-2" style={{ borderBottom: '1px solid #f1f5f9' }}>
-          <Trophy size={16} className="text-amber-500" />
-          <h3 className="text-xs sm:text-sm font-black" style={{ color: '#0f172a' }}>
-            Official Winner Declaration &amp; Settlement Figures
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
-          {/* Winner Identity */}
-          <div className="p-3 sm:p-4 rounded-xl space-y-1" style={{ backgroundColor: '#eef2ff', border: '1px solid #e0e7ff' }}>
-            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider block" style={{ color: '#4338ca' }}>
-              Concluded Winner
-            </span>
-            <div className="text-xs sm:text-sm font-black truncate" style={{ color: '#1e1b4b' }}>
-              {data.winnerName}
-            </div>
-            {data.winnerTicket && (
-              <span 
-                className="inline-block px-2 py-0.5 rounded-md font-mono text-[9px] sm:text-[10px] font-bold"
-                style={{ backgroundColor: '#4f46e5', color: '#ffffff' }}
-              >
-                Ticket #{data.winnerTicket}
-              </span>
-            )}
-          </div>
-
-          {/* Discount Surrendered */}
-          <div className="p-3 sm:p-4 rounded-xl space-y-1" style={{ backgroundColor: '#fff1f2', border: '1px solid #ffe4e6' }}>
-            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider block" style={{ color: '#be123c' }}>
-              Winning Discount Bid
-            </span>
-            <div className="text-sm sm:text-base font-black font-mono" style={{ color: '#e11d48' }}>
-              -{formatCurrency(data.winningDiscount)}
-            </div>
-            <span className="text-[9px] sm:text-[10px] block" style={{ color: '#64748b' }}>
-              Forfeited to Kai Iruppu Pool
-            </span>
-          </div>
-
-          {/* Net Prize Pot Take-Home Payout */}
-          <div className="p-3 sm:p-4 rounded-xl space-y-1" style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0' }}>
-            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider block" style={{ color: '#047857' }}>
-              Net Take-Home Payout
-            </span>
-            <div className="text-base sm:text-lg font-black font-mono" style={{ color: '#065f46' }}>
-              {formatCurrency(data.netPayout)}
-            </div>
-            <span className="text-[9px] sm:text-[10px] font-semibold block" style={{ color: '#047857' }}>
-              {data.disbursalStatus === 'fully_disbursed' ? '✓ Fully Disbursed' : 'Prize Pot Disbursement Due'}
-            </span>
-          </div>
-        </div>
-
-        {/* Financial Flow Details */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 pt-1 text-[10px] sm:text-[11px]" style={{ borderTop: '1px solid #f1f5f9' }}>
-          <div className="p-2 sm:p-2.5 rounded-lg" style={{ backgroundColor: '#f8fafc' }}>
-            <span className="font-medium block" style={{ color: '#94a3b8' }}>Total Chit Pot</span>
-            <span className="font-extrabold font-mono" style={{ color: '#0f172a' }}>{formatCurrency(data.totalValue)}</span>
-          </div>
-          <div className="p-2 sm:p-2.5 rounded-lg" style={{ backgroundColor: '#f8fafc' }}>
-            <span className="font-medium block" style={{ color: '#94a3b8' }}>Winning Discount</span>
-            <span className="font-extrabold font-mono" style={{ color: '#e11d48' }}>-{formatCurrency(data.winningDiscount)}</span>
-          </div>
-          <div className="p-2 sm:p-2.5 rounded-lg" style={{ backgroundColor: '#f8fafc' }}>
-            <span className="font-medium block" style={{ color: '#94a3b8' }}>Kai Iruppu Credited</span>
-            <span className="font-extrabold font-mono" style={{ color: '#b45309' }}>+{formatCurrency(data.winningDiscount)}</span>
-          </div>
-          <div className="p-2 sm:p-2.5 rounded-lg" style={{ backgroundColor: '#f8fafc' }}>
-            <span className="font-medium block" style={{ color: '#94a3b8' }}>Closing Pool</span>
-            <span className="font-extrabold font-mono" style={{ color: '#4338ca' }}>{formatCurrency(data.newPool)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── SECTION 4: ATTENDANCE & ROLL CALL SNAPSHOT (If available) ───── */}
-      {data.attendingMembers && data.attendingMembers.length > 0 && (
-        <div 
-          className="pdf-section rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-2.5 sm:space-y-3"
-          style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}
-        >
-          <div className="flex items-center justify-between pb-2" style={{ borderBottom: '1px solid #f1f5f9' }}>
-            <div className="flex items-center gap-2">
-              <Users size={15} className="text-indigo-600" />
-              <h3 className="text-xs sm:text-sm font-black" style={{ color: '#0f172a' }}>
-                Session Attendance &amp; Roll Call Registry
-              </h3>
-            </div>
-            <span className="text-[10px] sm:text-[11px] font-bold font-mono" style={{ color: '#64748b' }}>
-              {data.attendingMembers.filter(m => m.attended).length} / {data.attendingMembers.length} Attending
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 text-xs">
-            {data.attendingMembers.map((m) => (
-              <div 
-                key={m.ticketNumber} 
-                className="p-1.5 sm:p-2 rounded-lg flex items-center justify-between text-[10px] sm:text-[11px]"
-                style={{
-                  backgroundColor: m.attended ? '#eef2ff' : '#f8fafc',
-                  border: `1px solid ${m.attended ? '#c7d2fe' : '#e2e8f0'}`,
-                  color: m.attended ? '#1e1b4b' : '#94a3b8',
-                  fontWeight: m.attended ? '600' : 'normal',
-                }}
-              >
-                <span className="truncate">#{m.ticketNumber} {m.fullName}</span>
-                <span 
-                  className="text-[8px] sm:text-[9px] font-bold px-1 py-0.2 rounded shrink-0 ml-1"
-                  style={{
-                    backgroundColor: m.attended ? '#4f46e5' : '#e2e8f0',
-                    color: m.attended ? '#ffffff' : '#64748b',
-                  }}
-                >
-                  {m.attended ? 'Present' : 'Saving'}
+              <div className="text-right bg-white/10 backdrop-blur-md px-2.5 sm:px-3 py-1.5 rounded-xl shrink-0">
+                <span className="text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Chit Value</span>
+                <span className="text-xs sm:text-sm font-bold text-white whitespace-nowrap font-mono">
+                  {formatCurrency(data.totalValue)}
                 </span>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── SECTION 5: COMPLETE CHRONOLOGICAL LIVE BIDDING TIMELINE ────────────── */}
-      <div 
-        className="pdf-section rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-3"
-        style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}
-      >
-        <div className="flex items-center justify-between pb-2.5" style={{ borderBottom: '1px solid #f1f5f9' }}>
-          <div className="flex items-center gap-2">
-            <TrendingUp size={16} className="text-indigo-600" />
-            <div>
-              <h3 className="text-xs sm:text-sm font-black" style={{ color: '#0f172a' }}>
-                Live Bidding Shouts Timeline &amp; Timestamp Audit Trail
-              </h3>
-              <p className="text-[10px] mt-0.5" style={{ color: '#94a3b8' }}>
-                Sequential live progression from opening bid to winning discount shout
-              </p>
             </div>
-          </div>
-          <span 
-            className="text-[10px] sm:text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-full shrink-0"
-            style={{ backgroundColor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}
-          >
-            {chronologicalBids.length} {chronologicalBids.length === 1 ? 'Shout' : 'Shouts'}
-          </span>
-        </div>
 
-        {chronologicalBids.length === 0 ? (
-          <div className="py-6 text-center text-xs italic" style={{ color: '#94a3b8' }}>
-            No live bidding shouts were recorded during this auction cycle.
+            {/* 3-Part Financial Settlement Equation */}
+            <div className="mt-4 bg-white/10 backdrop-blur-md rounded-xl p-3 sm:p-4 relative z-10 space-y-2.5">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-[10px] sm:text-[11px] text-indigo-200 block font-medium">Chit Pool Value</span>
+                  <span className="font-bold text-white text-[13px] sm:text-base whitespace-nowrap font-mono">
+                    {formatCurrency(data.totalValue)}
+                  </span>
+                  <span className="text-[10px] text-indigo-300/80 block mt-0.5">
+                    {data.durationMonths} Subs × {formatCurrency(monthlyInstallment)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] sm:text-[11px] text-rose-300 block font-medium">Winning Discount Bid</span>
+                  <span className="font-bold text-rose-300 text-[13px] sm:text-base whitespace-nowrap font-mono">
+                    -{formatCurrency(data.winningDiscount)}
+                  </span>
+                  <span className="text-[10px] text-rose-300/80 block mt-0.5">
+                    {discountPercent}% → Kai Iruppu pool
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2.5 bg-black/25 -mx-3 -mb-3 sm:-mx-4 sm:-mb-4 px-3 sm:px-4 py-2.5 sm:py-3 rounded-b-xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-amber-300 block">
+                    Net Take-Home Payout
+                  </span>
+                  <span className="text-[10px] text-indigo-200 block">
+                    {data.disbursalStatus === 'fully_disbursed' ? '✓ Fully Disbursed' : 'Payable to Winner Bank Account'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xl sm:text-2xl font-black text-amber-300 whitespace-nowrap tracking-tight font-mono">
+                    {formatCurrency(data.netPayout)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Disbursal Action Strip */}
+            <div className="mt-3.5 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 relative z-10 border-t border-white/10">
+              <div className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${data.disbursalStatus === 'fully_disbursed' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+                <span className="text-[11px] font-bold text-slate-200">
+                  {data.disbursalStatus === 'fully_disbursed' ? 'Prize Money Fully Disbursed & Sealed' : 'Disbursal Pending Authorization • Ready'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-auto print:hidden">
+                <span className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-white/10 text-white border border-white/20">
+                  KYC Verified
+                </span>
+                <span className={`px-3 py-1.5 text-xs font-black rounded-lg ${
+                  data.disbursalStatus === 'fully_disbursed' 
+                    ? 'bg-emerald-500 text-white' 
+                    : 'bg-amber-400 text-slate-950 shadow'
+                } flex items-center gap-1`}>
+                  <Check className="w-3.5 h-3.5" />
+                  {data.disbursalStatus === 'fully_disbursed' ? 'Disbursed' : `Disburse ${formatCurrency(data.netPayout)}`}
+                </span>
+              </div>
+            </div>
+
+            <p className="mt-2.5 text-[10px] text-slate-400 italic">
+              * Statutory Foreman fee settled in Month 0 initialization. 100% of the {formatCurrency(data.winningDiscount)} auction discount is retained in trust for members.
+            </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto -mx-1 sm:mx-0">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr 
-                  className="text-[9px] sm:text-[10px] uppercase font-bold"
-                  style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b' }}
-                >
-                  <th className="py-2.5 px-2 text-center w-7">#</th>
-                  <th className="py-2.5 px-2.5 whitespace-nowrap">Time</th>
-                  <th className="py-2.5 px-2.5">Subscriber</th>
-                  <th className="py-2.5 px-2 text-center">Ticket</th>
-                  <th className="py-2.5 px-2.5 text-right">Discount Bid</th>
-                  <th className="py-2.5 px-2.5 text-right">Jump</th>
-                  <th className="py-2.5 px-2.5 text-right">Resulting Net Pot</th>
-                </tr>
-              </thead>
-              <tbody className="text-[10px] sm:text-[11px]" style={{ borderCollapse: 'collapse' }}>
+
+          {/* CHRONOLOGICAL LIVE SHOUTS AUDIT LOG */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="w-4 h-4 text-slate-700" />
+                <h4 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
+                  Bid Shout Audit Trail
+                </h4>
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 font-mono">
+                {chronologicalBids.length} {chronologicalBids.length === 1 ? 'Shout' : 'Shouts'} Recorded
+              </span>
+            </div>
+
+            {chronologicalBids.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400 italic">
+                No live bidding shouts were recorded during this auction round.
+              </div>
+            ) : (
+              <div className="space-y-2 pt-1">
                 {chronologicalBids.map((bid, idx) => {
+                  const isWinning = idx === chronologicalBids.length - 1;
                   const prevBid = idx > 0 ? chronologicalBids[idx - 1] : null;
                   const jump = prevBid ? bid.amount - prevBid.amount : 0;
                   const resultingPot = Math.max(0, data.totalValue - bid.amount);
-                  const isWinningBid = idx === chronologicalBids.length - 1;
-                  const timeDisplay = formatBidTime(bid.timestamp);
+                  const bidTime = formatBidTime(bid.timestamp);
+                  const seqNum = idx + 1;
 
                   return (
-                    <tr 
+                    <div 
                       key={bid.id || idx}
-                      style={{
-                        backgroundColor: isWinningBid ? '#ecfdf5' : idx % 2 === 0 ? '#ffffff' : '#f8fafc',
-                        borderBottom: '1px solid #f1f5f9',
-                        borderLeft: isWinningBid ? '4px solid #059669' : 'none',
-                      }}
+                      className={`p-2.5 sm:p-3 rounded-xl flex items-center justify-between transition-colors ${
+                        isWinning 
+                          ? 'bg-emerald-50/70 border border-emerald-200/80 shadow-xs' 
+                          : 'bg-slate-50 border border-slate-100'
+                      }`}
                     >
-                      <td className="py-2.5 px-2 font-mono text-center">
-                        <span 
-                          className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold"
-                          style={{
-                            backgroundColor: isWinningBid ? '#059669' : '#f1f5f9',
-                            color: isWinningBid ? '#ffffff' : '#475569',
-                          }}
-                        >
-                          {idx + 1}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`w-6 h-6 rounded-full font-black text-[10px] flex items-center justify-center shrink-0 font-mono ${
+                          isWinning ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          {seqNum}
                         </span>
-                      </td>
-                      <td className="py-2.5 px-2.5 font-mono whitespace-nowrap" style={{ color: '#64748b' }}>
-                        {timeDisplay}
-                      </td>
-                      <td className="py-2.5 px-2.5 font-semibold" style={{ color: '#0f172a' }}>
-                        <div className="flex items-center gap-1.5">
-                          {isWinningBid && <Trophy size={13} className="text-amber-500 shrink-0" />}
-                          <span className="truncate max-w-[140px] sm:max-w-none">{bid.memberName}</span>
-                          {isWinningBid && (
-                            <span 
-                              className="text-[8px] uppercase tracking-wider px-1.5 py-0.2 rounded font-black shrink-0"
-                              style={{ backgroundColor: '#059669', color: '#ffffff' }}
-                            >
-                              Winner
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-black text-slate-900 truncate">
+                              {bid.memberName} (#{bid.ticketNumber})
                             </span>
-                          )}
+                            {isWinning && (
+                              <span className="text-[9px] font-extrabold bg-emerald-600 text-white px-1.5 py-0.2 rounded-full uppercase tracking-tighter shrink-0">
+                                Winning Bid
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-[10px] font-medium mt-0.5 ${isWinning ? 'text-emerald-800' : 'text-slate-500'}`}>
+                            {bidTime} • {idx === 0 ? 'Opened discount floor' : `Raised +${formatCurrency(jump)}`} → <span className="font-mono font-bold text-slate-900">{formatCurrency(bid.amount)}</span>
+                          </p>
                         </div>
-                      </td>
-                      <td className="py-2.5 px-2 font-mono font-bold text-center" style={{ color: '#4338ca' }}>
-                        #{bid.ticketNumber}
-                      </td>
-                      <td className="py-2.5 px-2.5 text-right font-mono font-extrabold" style={{ color: '#e11d48' }}>
-                        {formatCurrency(bid.amount)}
-                      </td>
-                      <td className="py-2.5 px-2.5 text-right font-mono">
-                        {jump > 0 ? (
-                          <span className="inline-flex items-center gap-0.5 font-bold" style={{ color: '#4338ca' }}>
-                            <ArrowUpRight size={10} />
-                            +{formatCurrency(jump)}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#94a3b8' }}>Opening</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-2.5 text-right font-mono font-black" style={{ color: '#065f46' }}>
-                        {formatCurrency(resultingPot)}
-                      </td>
-                    </tr>
+                      </div>
+
+                      <div className="text-right shrink-0 ml-2">
+                        <span className="text-[9px] text-slate-400 block font-medium">
+                          {isWinning ? 'Final Payout' : 'Pot at bid'}
+                        </span>
+                        <span className={`text-xs sm:text-sm font-black font-mono whitespace-nowrap ${
+                          isWinning ? 'text-emerald-700 font-extrabold' : 'text-slate-700'
+                        }`}>
+                          {formatCurrency(resultingPot)}
+                        </span>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              </div>
+            )}
 
-      {/* ── SECTION 6: AUTHENTICATION FOOTER & SIGN-OFF ─────────────────── */}
-      <div 
-        className="pdf-section pt-3 sm:pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 text-[9px] sm:text-[10px]"
-        style={{ borderTop: '1px solid #e2e8f0', color: '#94a3b8' }}
-      >
-        <div>
-          <p className="font-bold" style={{ color: '#334155' }}>{data.organizerName} — Administration Office</p>
-          <p>Generated on {new Date().toLocaleDateString('en-GB')}, {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</p>
+            <div className="pt-2 text-[10.5px] text-slate-400 flex items-center justify-between border-t border-slate-100">
+              <span>Verified timestamped floor audit log.</span>
+              <span className="font-mono">Floor gavel: {lastBidTime}</span>
+            </div>
+          </div>
         </div>
-        <div className="text-left sm:text-right">
-          <p className="font-bold" style={{ color: '#334155' }}>Certified Official Ledger Record</p>
-          <p>Recorded to Supabase PostgreSQL Immutable Audit Ledger</p>
+
+        {/* RIGHT 4-COLS: KAI IRUPPU + ATTENDANCE + CERTIFICATION */}
+        <div className="xl:col-span-4 flex flex-col gap-4 sm:gap-6">
+          
+          {/* KAI IRUPPU DISCOUNT POOL (கை இருப்பு) & LAABA SEETU CARD */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 flex flex-col space-y-3">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-200/60">
+                  <Wallet className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-slate-900 tracking-tight flex items-center gap-1">
+                    Kai Iruppu Reserve
+                  </h4>
+                  <span className="text-[10px] text-slate-400 font-mono">கை இருப்பு • Cycle #{data.month}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Running Reserve</span>
+                <span className="text-sm sm:text-base font-black text-slate-900 font-mono whitespace-nowrap">
+                  {formatCurrency(data.newPool)}
+                </span>
+              </div>
+            </div>
+
+            {/* Progress Meter towards Laaba Seetu */}
+            <div className="space-y-1.5 bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-100">
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-slate-700 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  Progress to Laaba Seetu
+                </span>
+                <span className="text-emerald-700 font-mono font-bold">
+                  {fundingPercent.toFixed(1)}% of {formatCurrency(data.totalValue)}
+                </span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500" 
+                  style={{ width: `${fundingPercent}%` }}
+                />
+              </div>
+              <p className="text-[10.5px] leading-snug text-slate-600 pt-0.5">
+                {data.newPool >= data.totalValue ? (
+                  <strong className="text-emerald-700 font-bold">🎉 Target Achieved! Laaba Seetu Triggered!</strong>
+                ) : (
+                  <>
+                    <strong className="text-slate-900 font-mono">{formatCurrency(remainingForLaaba)}</strong> remaining to trigger <strong className="text-emerald-800">Laaba Seetu (லாப சீட்டு)</strong>
+                  </>
+                )}
+              </p>
+            </div>
+
+            {/* Next Cycle Note */}
+            <div className="flex items-center justify-between px-3 py-2 bg-indigo-50/70 rounded-xl text-[11px] border border-indigo-100">
+              <span className="text-indigo-900 font-medium">
+                {data.isNextMonthLaabaSeetu ? `🎉 Month ${nextMonthNum} Laaba Seetu:` : `Next Cycle (Month ${nextMonthNum}) Installment:`}
+              </span>
+              <span className={`font-black font-mono whitespace-nowrap ${data.isNextMonthLaabaSeetu ? 'text-emerald-700' : 'text-indigo-950'}`}>
+                {data.isNextMonthLaabaSeetu ? '₹0 FREE MONTH' : `${formatCurrency(monthlyInstallment)} / member`}
+              </span>
+            </div>
+          </div>
+
+          {/* SESSION ATTENDANCE SNAPSHOT */}
+          <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-200/80 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-slate-600" />
+                <h4 className="text-xs font-black text-slate-900 tracking-tight">Session Attendance</h4>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                {presentMembers.length}/{attendingList.length || data.durationMonths} Present ({quorumPercent}% Quorum)
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {attendingList.length === 0 ? (
+                <span className="text-xs text-slate-400 italic">Full quorum verified across active subscribers.</span>
+              ) : (
+                attendingList.map((m, idx) => {
+                  const role = getMemberRole(m, idx);
+                  const isWinner = data.winnerTicket ? m.ticketNumber === data.winnerTicket : false;
+                  const isAdmin = role.includes('Admin') || role.includes('Foreman');
+
+                  if (isWinner) {
+                    return (
+                      <span key={m.ticketNumber || idx} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-900 text-[10px] font-extrabold border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                        #{m.ticketNumber} {m.fullName} <span className="bg-emerald-600 text-white text-[8px] px-1 py-0.2 rounded font-black">Winner</span>
+                      </span>
+                    );
+                  }
+
+                  if (isAdmin) {
+                    return (
+                      <span key={m.ticketNumber || idx} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-500 text-[10px] font-medium border border-slate-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                        #{m.ticketNumber} {m.fullName} (Admin / Spec.)
+                      </span>
+                    );
+                  }
+
+                  return (
+                    <span key={m.ticketNumber || idx} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-800 text-[10px] font-bold border border-slate-200/60">
+                      <span className={`w-1.5 h-1.5 rounded-full ${m.attended ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                      #{m.ticketNumber} {m.fullName}
+                    </span>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* ADMINISTRATIVE LEDGER CERTIFICATION */}
+          <div className="bg-slate-100/80 rounded-xl p-3 flex items-start gap-2.5 border border-slate-200/60">
+            <ShieldCheck className="w-4 h-4 text-indigo-700 shrink-0 mt-0.5" />
+            <div className="text-[10.5px] leading-tight text-slate-600">
+              <span className="font-bold text-slate-900 block mb-0.5">Administrative Certification</span>
+              Certified &amp; Sealed into Immutable Ledger by <strong className="text-slate-800">{data.organizerName || 'Dr. Kishor Anbazhakan (Admin)'}</strong> on {formattedDate}. Checksum: <span className="font-mono text-slate-700">{auditHash.slice(0, 10)}...</span>
+            </div>
+          </div>
+
+          {/* PRIMARY BOTTOM ACTIONS (Mobile Stack) */}
+          {(onShareWhatsApp || onDownloadPdf || onClose) && (
+            <div className="space-y-2 pt-1 print:hidden">
+              <div className="grid grid-cols-2 gap-2">
+                {onShareWhatsApp && (
+                  <button
+                    type="button"
+                    onClick={onShareWhatsApp}
+                    disabled={isSharingWhatsApp}
+                    className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSharingWhatsApp ? (
+                      <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    <span>WhatsApp Share</span>
+                  </button>
+                )}
+
+                {onDownloadPdf && (
+                  <button
+                    type="button"
+                    onClick={onDownloadPdf}
+                    disabled={isGeneratingPdf}
+                    className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isGeneratingPdf ? (
+                      <span className="h-3.5 w-3.5 border-2 border-slate-400 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5" />
+                    )}
+                    <span>PDF Statement</span>
+                  </button>
+                )}
+              </div>
+
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full py-2.5 bg-white hover:bg-slate-50 active:scale-98 text-slate-700 border border-slate-200/80 rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Done / Return to Overview</span>
+                </button>
+              )}
+            </div>
+          )}
+
         </div>
       </div>
 

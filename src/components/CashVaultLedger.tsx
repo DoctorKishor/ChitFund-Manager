@@ -33,7 +33,9 @@ import {
   Users,
   CheckCircle2,
   ExternalLink,
-  Send
+  Send,
+  FileText,
+  ChevronRight
 } from 'lucide-react';
 
 export type CashHandlingSubtab = 
@@ -100,6 +102,8 @@ export default function CashVaultLedger() {
 
   // Active filter for account cards & statement
   const [selectedWalletFilter, setSelectedWalletFilter] = useState<'all' | WalletType>('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState<'month' | '30days' | 'all'>('month');
+  const [activeExpandedCard, setActiveExpandedCard] = useState<WalletType | null>(null);
 
   // Supabase Data State
   const [loading, setLoading] = useState<boolean>(true);
@@ -144,7 +148,7 @@ export default function CashVaultLedger() {
   const [settleAmount, setSettleAmount] = useState<string>('');
   const [isProcessingSettle, setIsProcessingSettle] = useState<boolean>(false);
 
-  // Floating Capital Recovery State (Choose payout vault freely)
+  // Floating Capital Recovery State
   const [recoveringFloat, setRecoveringFloat] = useState<FloatingDeposit | null>(null);
   const [recoverSourceWallet, setRecoverSourceWallet] = useState<WalletType>('cash_in_hand');
   const [recoverAmount, setRecoverAmount] = useState<string>('');
@@ -152,14 +156,13 @@ export default function CashVaultLedger() {
 
   // Denomination Counter State
   const [denominations, setDenominations] = useState<{ [key: number]: number }>({
-    500: 0,
-    200: 0,
-    100: 0,
-    50: 0,
-    20: 0,
-    10: 0,
+    500: 100,
+    200: 40,
+    100: 50,
+    50: 20,
+    20: 20,
+    10: 10,
   });
-  const [lastReconciliationNote, setLastReconciliationNote] = useState<string | null>(null);
 
   // Ledger Filter & Search
   const [ledgerSearch, setLedgerSearch] = useState<string>('');
@@ -187,7 +190,6 @@ export default function CashVaultLedger() {
   useEffect(() => {
     fetchData();
 
-    // Subscribe to realtime transaction ledger updates
     const channel = supabase
       .channel('realtime_treasury_ledger_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
@@ -209,70 +211,65 @@ export default function CashVaultLedger() {
     }).format(val || 0);
   };
 
+  const formatShortCurrency = (val: number) => {
+    if (val >= 100000) {
+      return `₹${(val / 100000).toFixed(2).replace(/\.00$/, '')}L`;
+    }
+    if (val >= 1000) {
+      return `₹${(val / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+    }
+    return `₹${val}`;
+  };
+
   const WALLET_META: Record<WalletType, {
     name: string;
+    shortName: string;
     owner: string;
     accountNumber: string;
     typeLabel: string;
-    bgGradient: string;
-    borderClass: string;
-    textAccent: string;
-    dotColor: string;
-    badgeBg: string;
-    iconBg: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
+    bankName: string;
+    lastFour: string;
+    iconSymbol: string;
   }> = {
     cash_in_hand: {
       name: 'Physical Cash Box',
-      owner: 'On-Premises Locker',
-      accountNumber: 'Vault #01',
-      typeLabel: 'Cash Vault · Physical Box',
-      bgGradient: 'bg-[#1D1D41]',
-      borderClass: 'border-[#27264E]',
-      textAccent: 'text-[#02B15A]',
-      dotColor: 'bg-[#02B15A]',
-      badgeBg: 'bg-[#02B15A]/15 text-[#02B15A] border-[#02B15A]/30',
-      iconBg: 'bg-[#02B15A]/20 text-[#02B15A]',
-      icon: Banknote,
+      shortName: 'Cash Box',
+      owner: 'On-Premises Safe',
+      accountNumber: 'VAULT-01 •••• SAFE',
+      typeLabel: 'Physical Liquid Safe',
+      bankName: 'Safe #01',
+      lastFour: 'SAFE',
+      iconSymbol: '🗄️',
     },
     kishor_bank: {
-      name: 'Kishor Bank (UPI)',
-      owner: 'Kishor',
-      accountNumber: '•••• 8492 · Primary Digital',
-      typeLabel: 'Digital Vault · Primary Inflow',
-      bgGradient: 'bg-gradient-to-br from-[#9C2CF3] to-[#3A6FF9]',
-      borderClass: 'border-transparent shadow-[0_8px_30px_rgba(156,44,243,0.35)]',
-      textAccent: 'text-white',
-      dotColor: 'bg-[#64CFF6]',
-      badgeBg: 'bg-white/20 text-white border-white/30',
-      iconBg: 'bg-white/20 text-white',
-      icon: Landmark,
+      name: 'Dr. Kishor Account',
+      shortName: 'Kishor Bank',
+      owner: 'Dr. Kishor Anbazhakan',
+      accountNumber: '•••• •••• •••• 4192',
+      typeLabel: 'Primary UPI / Collections',
+      bankName: 'HDFC Bank',
+      lastFour: '4192',
+      iconSymbol: '🏦',
     },
     dad_bank: {
-      name: "Anbazhakan's Bank",
+      name: 'Anbazhakan (Dad) Account',
+      shortName: 'Dad Bank',
       owner: 'Anbazhakan',
-      accountNumber: '•••• 3108 · Primary Banking',
-      typeLabel: 'Disbursement Vault · Primary Banking',
-      bgGradient: 'bg-[#1D1D41]',
-      borderClass: 'border-[#27264E]',
-      textAccent: 'text-[#64CFF6]',
-      dotColor: 'bg-[#64CFF6]',
-      badgeBg: 'bg-[#64CFF6]/15 text-[#64CFF6] border-[#64CFF6]/30',
-      iconBg: 'bg-[#64CFF6]/20 text-[#64CFF6]',
-      icon: CreditCard,
+      accountNumber: '•••• •••• •••• 8821',
+      typeLabel: 'Prize Disbursal',
+      bankName: 'CSB Bank',
+      lastFour: '8821',
+      iconSymbol: '💳',
     },
     mom_bank: {
-      name: "Parimalam's Bank",
+      name: 'Parimalam (Mom) Account',
+      shortName: 'Mom Bank',
       owner: 'Parimalam',
-      accountNumber: '•••• 5521 · Reserve Account',
-      typeLabel: 'Reserve Vault · Secondary Channel',
-      bgGradient: 'bg-[#1D1D41]',
-      borderClass: 'border-[#27264E]',
-      textAccent: 'text-[#FFBB38]',
-      dotColor: 'bg-[#FFBB38]',
-      badgeBg: 'bg-[#FFBB38]/15 text-[#FFBB38] border-[#FFBB38]/30',
-      iconBg: 'bg-[#FFBB38]/20 text-[#FFBB38]',
-      icon: Wallet,
+      accountNumber: '•••• •••• •••• 3094',
+      typeLabel: 'Emergency Reserve',
+      bankName: 'SBI Bank',
+      lastFour: '3094',
+      iconSymbol: '🪙',
     },
   };
 
@@ -281,78 +278,55 @@ export default function CashVaultLedger() {
     return (balances.cash_in_hand || 0) + (balances.kishor_bank || 0) + (balances.dad_bank || 0) + (balances.mom_bank || 0);
   }, [balances]);
 
+  const bankCapital = useMemo(() => {
+    return (balances.kishor_bank || 0) + (balances.dad_bank || 0) + (balances.mom_bank || 0);
+  }, [balances]);
+
   // Helper to accurately classify if a treasury movement is an Inflow/Credit (+) or Outflow/Debit (-)
   const getTxDirection = (tx: TreasuryTx, perspectiveWallet?: WalletType | 'all'): { isCredit: boolean; badgeLabel: string; badgeColor: string } => {
     const type = tx.type;
     const notes = (tx.notes || tx.description || '').toLowerCase();
     const targetWallet = perspectiveWallet && perspectiveWallet !== 'all' ? perspectiveWallet : tx.wallet_type;
 
-    // 1. Collections are ALWAYS Inflow/Credit
     if (type === 'collection') {
-      return { isCredit: true, badgeLabel: 'COLLECTION (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      return { isCredit: true, badgeLabel: '💰 Collection (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200/60' };
     }
 
-    // 2. Payouts
     if (type === 'payout') {
-      return { isCredit: false, badgeLabel: 'PRIZE PAYOUT (-)', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200' };
+      return { isCredit: false, badgeLabel: '🏆 Prize Disbursal (-)', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200/60' };
     }
 
-    // 3. Personal Draws
     if (type === 'personal_draw') {
-      return { isCredit: false, badgeLabel: 'PERSONAL DRAW (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' };
+      if (notes.includes('float recovery')) {
+        return { isCredit: false, badgeLabel: '🌊 Float Return (-)', badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200/60' };
+      }
+      return { isCredit: false, badgeLabel: '💼 Personal Draw (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200/60' };
     }
 
-    // 4. External Deposits / Floating Capital Injections
-    if (notes.includes('[floating deposit') || notes.includes('deposit into') || notes.includes('reserve cash deposit') || notes.includes('external cash deposit') || notes.includes('deposited by')) {
-      return { isCredit: true, badgeLabel: 'FLOAT DEPOSIT (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    if (notes.includes('[floating deposit') || notes.includes('deposit into') || notes.includes('reserve cash deposit') || notes.includes('deposited by')) {
+      return { isCredit: true, badgeLabel: '🌊 Float Inflow (+)', badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
     }
 
-    // 5. Float Recoveries
-    if (notes.includes('float recovery') || notes.includes('recovered (withdrawn')) {
-      return { isCredit: false, badgeLabel: 'FLOAT RECOVERY (-)', badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
-    }
-
-    // 6. Personal Draw Repayments / Put Cash Back
     if (notes.includes('repaid by') || notes.includes('put cash back') || notes.includes('put back')) {
-      return { isCredit: true, badgeLabel: 'DRAW REPAYMENT (+)', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200' };
+      return { isCredit: true, badgeLabel: '💰 Draw Repayment (+)', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200/60' };
     }
 
-    // 7. ATM Relocations (Bank debit vs Cash Box credit)
     if (type === 'atm_withdrawal') {
       if (targetWallet === 'cash_in_hand') {
-        return { isCredit: true, badgeLabel: 'ATM CASH INFLOW (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        return { isCredit: true, badgeLabel: '🏧 ATM Relocation (+)', badgeColor: 'bg-amber-100 text-amber-800 border-amber-200' };
       }
-      return { isCredit: false, badgeLabel: 'ATM WITHDRAWAL (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' };
+      return { isCredit: false, badgeLabel: '🏧 ATM Relocation', badgeColor: 'bg-amber-100 text-amber-800 border-amber-200' };
     }
 
-    // 8. Explicit Transfer Leg Types
     if (type === 'transfer_in') {
-      return { isCredit: true, badgeLabel: 'TRANSFER IN (+)', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' };
+      return { isCredit: true, badgeLabel: '🔄 Vault Transfer (+)', badgeColor: 'bg-indigo-50 text-brand-700 border-brand-200/60' };
     }
 
-    if (type === 'organizer_profit') {
-      return { isCredit: false, badgeLabel: 'ORGANIZER PROFIT (-)', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200' };
-    }
-
-    // 9. Inter-Vault Transfers
     if (type === 'transfer') {
-      const walletName = (WALLET_META[targetWallet]?.name || targetWallet).toLowerCase();
-      
-      // Check destination
-      if (notes.includes(`-> ${walletName}`) || notes.includes(`to ${walletName}`) || notes.includes(`into ${walletName}`) || notes.includes(`into ${targetWallet}`) || notes.includes(`to ${targetWallet}`)) {
-        return { isCredit: true, badgeLabel: 'TRANSFER IN (+)', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' };
-      }
-      // Check source
-      if (notes.includes(`${walletName} ->`) || notes.includes(`from ${walletName}`) || notes.includes(`from ${targetWallet}`)) {
-        return { isCredit: false, badgeLabel: 'TRANSFER OUT (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' };
-      }
-
-      if (notes.includes('into') || notes.includes('deposit') || notes.includes('credit')) {
-        return { isCredit: true, badgeLabel: 'INFLOW (+)', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-      }
+      return { isCredit: true, badgeLabel: '🔄 Vault Transfer', badgeColor: 'bg-indigo-50 text-brand-700 border-brand-200/60' };
     }
 
-    return { isCredit: false, badgeLabel: 'OUTFLOW (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' };
+    return { isCredit: false, badgeLabel: '💸 Outflow (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200/60' };
   };
 
   // ATM Relocations awaiting Physical Cash Box Verification
@@ -379,7 +353,7 @@ export default function CashVaultLedger() {
       });
   }, [recentTransactions]);
 
-  // Computed Personal Draws from Supabase transactions ledger
+  // Computed Personal Draws
   const computedPersonalDraws = useMemo<PersonalDraw[]>(() => {
     return recentTransactions
       .filter((t) => t.type === 'personal_draw')
@@ -427,13 +401,6 @@ export default function CashVaultLedger() {
       });
   }, [recentTransactions]);
 
-  // Khatabook Navigation & Filter State
-  const [khatabookTab, setKhatabookTab] = useState<'floats' | 'draws'>('floats');
-  const [khatabookPersonFilter, setKhatabookPersonFilter] = useState<string>('all');
-  const [showSettledDraws, setShowSettledDraws] = useState<boolean>(false);
-  const [showRecoveredFloats, setShowRecoveredFloats] = useState<boolean>(false);
-
-  // Outstanding Personal Draws
   const outstandingPersonalDraws = useMemo(() => {
     return computedPersonalDraws.filter(d => d.status === 'outstanding');
   }, [computedPersonalDraws]);
@@ -487,100 +454,17 @@ export default function CashVaultLedger() {
     return computedFloatingDeposits.filter(f => f.status === 'active');
   }, [computedFloatingDeposits]);
 
-  // Float Stats Per Person
   const floatStats = useMemo(() => {
     const active = computedFloatingDeposits.filter(f => f.status === 'active');
     const total = active.reduce((sum, f) => sum + f.amount, 0);
-
-    const anbazhakan = active
-      .filter(f => f.depositedBy.toLowerCase().includes('anbazhakan') || f.depositedBy.toLowerCase().includes('dad'))
-      .reduce((sum, f) => sum + f.amount, 0);
-
-    const parimalam = active
-      .filter(f => f.depositedBy.toLowerCase().includes('parimalam') || f.depositedBy.toLowerCase().includes('mom'))
-      .reduce((sum, f) => sum + f.amount, 0);
-
-    const kishor = active
-      .filter(f => f.depositedBy.toLowerCase().includes('kishor'))
-      .reduce((sum, f) => sum + f.amount, 0);
-
-    const other = active
-      .filter(f => !f.depositedBy.toLowerCase().includes('dad') && !f.depositedBy.toLowerCase().includes('anbazhakan') && !f.depositedBy.toLowerCase().includes('mom') && !f.depositedBy.toLowerCase().includes('parimalam') && !f.depositedBy.toLowerCase().includes('kishor'))
-      .reduce((sum, f) => sum + f.amount, 0);
-
-    return { total, anbazhakan, parimalam, kishor, other, activeCount: active.length };
+    return { total, activeCount: active.length };
   }, [computedFloatingDeposits]);
-
-  // Personal Draws Stats Per Person
-  const personalDrawStats = useMemo(() => {
-    const active = computedPersonalDraws.filter(d => d.status === 'outstanding');
-    const total = active.reduce((sum, d) => sum + d.amount, 0);
-
-    const anbazhakan = active
-      .filter(d => d.takenBy.toLowerCase().includes('anbazhakan') || d.takenBy.toLowerCase().includes('dad'))
-      .reduce((sum, d) => sum + d.amount, 0);
-
-    const parimalam = active
-      .filter(d => d.takenBy.toLowerCase().includes('parimalam') || d.takenBy.toLowerCase().includes('mom'))
-      .reduce((sum, d) => sum + d.amount, 0);
-
-    const kishor = active
-      .filter(d => d.takenBy.toLowerCase().includes('kishor'))
-      .reduce((sum, d) => sum + d.amount, 0);
-
-    const other = active
-      .filter(d => !d.takenBy.toLowerCase().includes('dad') && !d.takenBy.toLowerCase().includes('anbazhakan') && !d.takenBy.toLowerCase().includes('mom') && !d.takenBy.toLowerCase().includes('parimalam') && !d.takenBy.toLowerCase().includes('kishor'))
-      .reduce((sum, d) => sum + d.amount, 0);
-
-    return { total, anbazhakan, parimalam, kishor, other, activeCount: active.length };
-  }, [computedPersonalDraws]);
-
-  // WhatsApp Reminder Link Generator for Personal Draws
-  const generateDrawWhatsAppReminder = (personFilter: string) => {
-    const draws = personFilter === 'all'
-      ? outstandingPersonalDraws
-      : outstandingPersonalDraws.filter(d => d.takenBy.toLowerCase().includes(personFilter.toLowerCase()));
-    const total = draws.reduce((sum, d) => sum + d.amount, 0);
-    const itemsList = draws.map(d => `• ₹${d.amount.toLocaleString('en-IN')} — ${d.tag} (${d.description || 'Cash Draw'}) taken on ${new Date(d.created_at).toLocaleDateString('en-IN')}`).join('\n');
-    
-    const personLabel = personFilter === 'anbazhakan' || personFilter === 'dad' ? 'Anbazhakan' : personFilter === 'parimalam' || personFilter === 'mom' ? 'Parimalam' : personFilter === 'kishor' ? 'Kishor' : 'Family Member';
-
-    const msg = `*CHIT FUND — PERSONAL CASH DRAW REMINDER*\n\n` +
-      `Hello ${personLabel},\n` +
-      `Here is the record of pending personal cash draws from the Chit Fund Box:\n\n` +
-      `${itemsList}\n\n` +
-      `*Total to Settle / Put Back: ₹${total.toLocaleString('en-IN')}*\n\n` +
-      `Please deposit into the Cash Box or Bank when convenient. Thank you!`;
-
-    return `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-  };
-
-  // WhatsApp Summary Link Generator for Floating Capital
-  const generateFloatWhatsAppSummary = (personFilter: string) => {
-    const floats = personFilter === 'all'
-      ? activeFloatingDeposits
-      : activeFloatingDeposits.filter(f => f.depositedBy.toLowerCase().includes(personFilter.toLowerCase()));
-    const total = floats.reduce((sum, f) => sum + f.amount, 0);
-    const itemsList = floats.map(f => `• ₹${f.amount.toLocaleString('en-IN')} — ${f.tag} (${f.notes || 'Float Inflow'}) deposited on ${new Date(f.created_at).toLocaleDateString('en-IN')}`).join('\n');
-    
-    const personLabel = personFilter === 'anbazhakan' || personFilter === 'dad' ? 'Anbazhakan' : personFilter === 'parimalam' || personFilter === 'mom' ? 'Parimalam' : personFilter === 'kishor' ? 'Kishor' : 'Family Member';
-
-    const msg = `*CHIT FUND — FLOATING CAPITAL RESERVE RECORD*\n\n` +
-      `Hello ${personLabel},\n` +
-      `Here is your floating capital deposit record for Chit Fund payouts:\n\n` +
-      `${itemsList}\n\n` +
-      `*Total Float Available to Take Back / Recover: ₹${total.toLocaleString('en-IN')}*\n\n` +
-      `You can recover this amount back into your bank account or cash box anytime.`;
-
-    return `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-  };
 
   // Master Transaction Feed filtered by active wallet and type
   const filteredTransactions = useMemo(() => {
     return recentTransactions.filter((tx) => {
       const notes = (tx.notes || tx.description || '').toLowerCase();
       
-      // Wallet account match
       let matchesWallet = true;
       if (selectedWalletFilter !== 'all') {
         matchesWallet = tx.wallet_type === selectedWalletFilter ||
@@ -597,13 +481,16 @@ export default function CashVaultLedger() {
           ));
       }
 
-      // Type match
       let matchesType = true;
       if (ledgerTypeFilter !== 'all') {
-        matchesType = tx.type === ledgerTypeFilter;
+        if (ledgerTypeFilter === 'collection') matchesType = tx.type === 'collection';
+        else if (ledgerTypeFilter === 'payout') matchesType = tx.type === 'payout';
+        else if (ledgerTypeFilter === 'transfer') matchesType = tx.type === 'transfer' || tx.type === 'transfer_in';
+        else if (ledgerTypeFilter === 'atm') matchesType = tx.type === 'atm_withdrawal';
+        else if (ledgerTypeFilter === 'draw') matchesType = tx.type === 'personal_draw' && !notes.includes('float recovery');
+        else if (ledgerTypeFilter === 'float') matchesType = notes.includes('[floating deposit') || notes.includes('float recovery');
       }
 
-      // Search match
       const q = ledgerSearch.toLowerCase().trim();
       const matchesSearch = !q || 
         (tx.notes && tx.notes.toLowerCase().includes(q)) ||
@@ -647,7 +534,6 @@ export default function CashVaultLedger() {
     try {
       setIsProcessingTransfer(true);
       
-      // Step 1: Debit the SOURCE bank via atomic RPC
       const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
         p_wallet: relocateSource,
         p_delta: -amount,
@@ -661,7 +547,6 @@ export default function CashVaultLedger() {
 
       const sourceName = WALLET_META[relocateSource].name;
 
-      // Step 2: Record a PENDING transaction on the SOURCE wallet (not cash_in_hand)
       const { error } = await supabase.from('transactions').insert([
         {
           wallet_type: relocateSource,
@@ -706,7 +591,6 @@ export default function CashVaultLedger() {
       setIsVerifyingAtmId(txId);
       triggerHapticFeedback('light');
 
-      // Atomic credit to cash_in_hand
       const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
         p_wallet: 'cash_in_hand',
         p_delta: amount,
@@ -820,10 +704,8 @@ export default function CashVaultLedger() {
 
     try {
       setIsProcessingSettle(true);
-      // 1. Credit destination account
       await updateBalance(settleDestWallet, amount);
 
-      // 2. Insert repayment transaction
       await supabase.from('transactions').insert([
         {
           wallet_type: settleDestWallet,
@@ -835,7 +717,6 @@ export default function CashVaultLedger() {
         }
       ]);
 
-      // 3. Update original spend note
       const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
       const isFull = amount >= settlingDraw.amount;
       const updatedNotes = isFull
@@ -902,7 +783,7 @@ export default function CashVaultLedger() {
     }
   };
 
-  // 6. Inter-Vault Transfer (Full Double-Entry Accounting)
+  // 6. Inter-Vault Transfer
   const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(transferAmount);
@@ -922,7 +803,6 @@ export default function CashVaultLedger() {
     try {
       setIsProcessingTransfer(true);
 
-      // Step 1: Atomic debit from source
       const { data: debitData, error: debitErr } = await supabase.rpc('mutate_wallet_balance', {
         p_wallet: transferSource,
         p_delta: -amount,
@@ -934,7 +814,6 @@ export default function CashVaultLedger() {
         return;
       }
 
-      // Step 2: Atomic credit to destination
       const { data: creditData, error: creditErr } = await supabase.rpc('mutate_wallet_balance', {
         p_wallet: transferDest,
         p_delta: amount,
@@ -942,7 +821,6 @@ export default function CashVaultLedger() {
       });
 
       if (creditErr || !creditData?.success) {
-        // Rollback source debit
         await supabase.rpc('mutate_wallet_balance', {
           p_wallet: transferSource,
           p_delta: amount,
@@ -985,7 +863,7 @@ export default function CashVaultLedger() {
       if (txErr) console.warn('Transfer transaction recording note:', txErr);
 
       await supabase.from('security_audit_logs').insert({
-        action_description: `INTER-VAULT TRANSFER: ₹${amount.toLocaleString('en-IN')} moved from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name} (Double-entry logged).`,
+        action_description: `INTER-VAULT TRANSFER: ₹${amount.toLocaleString('en-IN')} moved from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name}.`,
         target_table: 'transactions',
       });
 
@@ -1069,807 +947,1331 @@ export default function CashVaultLedger() {
     }
   };
 
+  const handleCardStackTap = (wKey: WalletType) => {
+    triggerHapticFeedback('light');
+    if (activeExpandedCard === wKey) {
+      setActiveExpandedCard(null);
+    } else {
+      setActiveExpandedCard(wKey);
+      setSelectedWalletFilter(wKey);
+    }
+  };
+
   return (
-    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
+    <div className="w-full space-y-4 sm:space-y-6 animate-in fade-in duration-200">
       
-      {/* ── 1. UNIFIED TREASURY HERO HEADER ─────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
-        {/* Subtle background glow circle */}
-        <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-indigo-500/15 blur-2xl pointer-events-none" />
+      {/* ══════════════════════════════════════════════════════════════════════════
+          MOBILE VIEW (max-w-[420px] / block lg:hidden)
+          Includes Apple Wallet Sticky Card Stack Animation & Quick Operations
+          ══════════════════════════════════════════════════════════════════════════ */}
+      <div className="block lg:hidden space-y-3 pb-8">
         
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-indigo-300">
-                Treasury &amp; Multi-Vault Liquidity
-              </span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+        {/* Mobile Filter Chips */}
+        <div className="overflow-x-auto no-scrollbar flex items-center space-x-1.5 text-xs py-1">
+          <button 
+            onClick={() => { setSelectedWalletFilter('all'); setActiveExpandedCard(null); triggerHapticFeedback('light'); }}
+            className={`flex-shrink-0 px-3 py-1 font-bold rounded-full shadow-xs transition-all cursor-pointer ${
+              selectedWalletFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            All ({formatShortCurrency(totalTreasuryBalance)})
+          </button>
+          <button 
+            onClick={() => { setSelectedWalletFilter('cash_in_hand'); setActiveExpandedCard('cash_in_hand'); triggerHapticFeedback('light'); }}
+            className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
+              selectedWalletFilter === 'cash_in_hand' ? 'bg-emerald-900 text-white border-emerald-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <span>🗄️</span> Physical Cash ({formatShortCurrency(balances.cash_in_hand || 0)})
+          </button>
+          <button 
+            onClick={() => { setSelectedWalletFilter('kishor_bank'); setActiveExpandedCard('kishor_bank'); triggerHapticFeedback('light'); }}
+            className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
+              selectedWalletFilter === 'kishor_bank' ? 'bg-indigo-900 text-white border-indigo-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <span>🏦</span> Dr. Kishor ({formatShortCurrency(balances.kishor_bank || 0)})
+          </button>
+          <button 
+            onClick={() => { setSelectedWalletFilter('dad_bank'); setActiveExpandedCard('dad_bank'); triggerHapticFeedback('light'); }}
+            className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
+              selectedWalletFilter === 'dad_bank' ? 'bg-cyan-900 text-white border-cyan-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <span>💳</span> Dad Bank ({formatShortCurrency(balances.dad_bank || 0)})
+          </button>
+          <button 
+            onClick={() => { setSelectedWalletFilter('mom_bank'); setActiveExpandedCard('mom_bank'); triggerHapticFeedback('light'); }}
+            className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
+              selectedWalletFilter === 'mom_bank' ? 'bg-rose-900 text-white border-rose-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <span>🪙</span> Mom Bank ({formatShortCurrency(balances.mom_bank || 0)})
+          </button>
+        </div>
+
+        {/* 1. Mobile Hero Card */}
+        <section className="rounded-2xl p-4 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20">
+          <div className="absolute -right-10 -top-10 w-36 h-36 bg-brand-500/25 rounded-full blur-2xl pointer-events-none"></div>
+          <div className="flex items-center justify-between text-[11px] text-indigo-200">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="font-semibold text-white">Consolidated Total</span>
             </div>
-            <h2 className="text-2xl sm:text-4xl font-black font-mono tracking-tight text-white mt-1">
+            <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-400/30">
+              Active Sync
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <div className="text-3xl font-extrabold tracking-tight text-white tabular-nums">
               {formatCurrency(totalTreasuryBalance)}
-            </h2>
-            <p className="text-xs text-indigo-200/80 mt-0.5">
-              Physical cash box + 3 digital banking accounts synchronized
-            </p>
+            </div>
+            <div className="flex items-center gap-2 mt-1.5 text-xs text-indigo-200/90">
+              <span>Physical: <strong className="text-white font-mono">{formatShortCurrency(balances.cash_in_hand || 0)}</strong></span>
+              <span>•</span>
+              <span>Banks: <strong className="text-white font-mono">{formatShortCurrency(bankCapital)}</strong></span>
+            </div>
           </div>
+        </section>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-            <button
-              onClick={() => setActiveModal('denominations')}
-              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all border border-white/15 active:scale-95 cursor-pointer shadow-sm"
-            >
-              <Calculator size={14} className="text-indigo-300" />
-              <span>Count Cash (Tally)</span>
-            </button>
-
-            <button
-              onClick={() => fetchData()}
-              disabled={loading}
-              className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all border border-white/15 active:scale-95 cursor-pointer disabled:opacity-50"
-              title="Refresh Ledger"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 2. FOUR CORE VAULT CARDS (Interactive GPay / Account Feed Selector) ── */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-black uppercase tracking-wider text-[#AEABD8]">
-            Accounts &amp; Vault Balances
-          </span>
-          {selectedWalletFilter !== 'all' && (
-            <button
-              onClick={() => setSelectedWalletFilter('all')}
-              className="text-xs font-extrabold text-[#64CFF6] hover:underline transition-colors cursor-pointer"
-            >
-              Show All Accounts
-            </button>
-          )}
+        {/* Mobile Quick Action Buttons Grid */}
+        <div className="grid grid-cols-3 gap-2">
+          <button 
+            onClick={() => setActiveModal('transfer')}
+            className="h-12 px-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-0.5 text-slate-800 hover:bg-slate-50 active:scale-95 transition-all text-center group cursor-pointer"
+          >
+            <ArrowRightLeft className="w-4 h-4 text-brand-600" />
+            <span className="text-[10px] font-bold text-slate-800 tracking-tight leading-none">Inter-Vault</span>
+          </button>
+          <button 
+            onClick={() => setActiveModal('spend')}
+            className="h-12 px-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-0.5 text-slate-800 hover:bg-slate-50 active:scale-95 transition-all text-center group cursor-pointer"
+          >
+            <Coins className="w-4 h-4 text-amber-600" />
+            <span className="text-[10px] font-bold text-slate-800 tracking-tight leading-none">Personal Draw</span>
+          </button>
+          <button 
+            onClick={() => setActiveModal('atm')}
+            className="h-12 px-2 bg-brand-500 rounded-2xl shadow-xs flex flex-col items-center justify-center gap-0.5 text-white hover:bg-brand-600 active:scale-95 transition-all text-center group cursor-pointer"
+          >
+            <Plus className="w-4 h-4 text-white" />
+            <span className="text-[10px] font-bold text-white tracking-tight leading-none">ATM Relocate</span>
+          </button>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
-          {(['cash_in_hand', 'kishor_bank', 'dad_bank', 'mom_bank'] as WalletType[]).map((wKey) => {
-            const meta = WALLET_META[wKey];
-            const Icon = meta.icon;
-            const bal = balances[wKey] || 0;
-            const isSelected = selectedWalletFilter === wKey;
-            const isKishor = wKey === 'kishor_bank';
-
-            return (
-              <div
-                key={wKey}
-                onClick={() => setSelectedWalletFilter(prev => prev === wKey ? 'all' : wKey)}
-                className={`${meta.bgGradient} border-2 rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 cursor-pointer transition-all shadow-xs hover:shadow-lg active:scale-98 ${
-                  isSelected 
-                    ? 'border-[#6359E9] ring-4 ring-[#6359E9]/30 shadow-md scale-[1.02]' 
-                    : meta.borderClass
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className={`w-8 h-8 rounded-xl ${meta.iconBg} flex items-center justify-center font-bold shadow-2xs`}>
-                    <Icon size={16} />
-                  </div>
-                  <span className={`w-2.5 h-2.5 rounded-full ${meta.dotColor}`} />
+        {/* 2. Mobile Pending ATM Relocation Card (if any) */}
+        {pendingRelocations.length > 0 && (
+          <section className="p-3 bg-amber-50 rounded-2xl border border-amber-200/90 shadow-card flex flex-col gap-2.5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-base shadow-xs">
+                  🏧
                 </div>
-
-                <div className="min-w-0">
-                  <div className={`text-xs sm:text-sm font-black truncate ${isKishor ? 'text-white' : 'text-white'}`}>
-                    {meta.name}
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-900">ATM Relocation</span>
                   </div>
-                  <div className={`text-[10px] font-medium truncate ${isKishor ? 'text-white/80' : 'text-[#AEABD8]'}`}>
-                    {meta.owner}
-                  </div>
-                  <div className={`text-base sm:text-2xl font-black font-mono tracking-tight mt-1 truncate ${isKishor ? 'text-white' : meta.textAccent}`}>
-                    {formatCurrency(bal)}
-                  </div>
-                </div>
-
-                <div className={`mt-2 pt-2 border-t flex items-center justify-between text-[9px] sm:text-[10px] font-bold uppercase ${
-                  isKishor ? 'border-white/20 text-white/70' : 'border-[#27264E] text-[#AEABD8]'
-                }`}>
-                  <span>{isSelected ? 'Viewing Feed' : 'Tap for Feed'}</span>
-                  <ArrowRight size={10} className={isSelected ? 'text-[#64CFF6] font-bold' : ''} />
+                  <p className="text-[11px] text-amber-800 font-mono font-bold mt-0.5">
+                    {formatCurrency(pendingRelocations[0].amount)} Withdrawn
+                  </p>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── 3. PARENT-FRIENDLY QUICK ACTION BUTTONS ─────────────────────────── */}
-      <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-sm space-y-3">
-        <span className="text-xs font-black uppercase tracking-wider text-[#AEABD8] block px-0.5">
-          Quick Cash Actions
-        </span>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-          {/* Action 1: ATM to Cash Box */}
-          <button
-            onClick={() => setActiveModal('atm')}
-            className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
-          >
-            <div className="w-8 h-8 rounded-xl bg-[#6359E9] text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
-              <Landmark size={16} />
-            </div>
-            <div className="min-w-0">
-              <strong className="text-xs sm:text-sm font-black block text-white leading-tight">
-                🏧 ATM to Cash Box
-              </strong>
-              <span className="text-[10px] text-[#AEABD8] font-medium block mt-0.5">
-                Bank → Cash Box
+              <span className="text-[10px] text-amber-700 font-semibold bg-amber-100/70 px-2 py-0.5 rounded-full">
+                In-Transit
               </span>
             </div>
-          </button>
-
-          {/* Action 2: Personal Spend / Draw */}
-          <button
-            onClick={() => setActiveModal('spend')}
-            className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
-          >
-            <div className="w-8 h-8 rounded-xl bg-[#E41414] text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
-              <Coins size={16} />
-            </div>
-            <div className="min-w-0">
-              <strong className="text-xs sm:text-sm font-black block text-white leading-tight">
-                💸 Log Spend / Draw
-              </strong>
-              <span className="text-[10px] text-[#AEABD8] font-medium block mt-0.5">
-                Petrol, Groceries, Dad
-              </span>
-            </div>
-          </button>
-
-          {/* Action 3: Deposit Float / Inflow */}
-          <button
-            onClick={() => setActiveModal('deposit')}
-            className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
-          >
-            <div className="w-8 h-8 rounded-xl bg-[#02B15A] text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
-              <Plus size={16} />
-            </div>
-            <div className="min-w-0">
-              <strong className="text-xs sm:text-sm font-black block text-white leading-tight">
-                📥 Deposit Money
-              </strong>
-              <span className="text-[10px] text-[#AEABD8] font-medium block mt-0.5">
-                Add Float / Inflow
-              </span>
-            </div>
-          </button>
-
-          {/* Action 4: Transfer between Accounts */}
-          <button
-            onClick={() => setActiveModal('transfer')}
-            className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white p-3 sm:p-3.5 rounded-2xl flex flex-col items-start gap-1.5 text-left transition-all active:scale-95 cursor-pointer group shadow-2xs"
-          >
-            <div className="w-8 h-8 rounded-xl bg-[#64CFF6] text-[#141332] flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
-              <ArrowRightLeft size={16} />
-            </div>
-            <div className="min-w-0">
-              <strong className="text-xs sm:text-sm font-black block text-white leading-tight">
-                ⇄ Inter-Bank Transfer
-              </strong>
-              <span className="text-[10px] text-[#AEABD8] font-medium block mt-0.5">
-                Move between Vaults
-              </span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* ── 4. ATTENTION REQUIRED & FAMILY KHATABOOK ───────────────────────── */}
-      <div className="space-y-4">
-        {/* Pending ATM Relocation Banner */}
-        {pendingRelocations.length > 0 && (
-          <div className="bg-[#1D1D41] border border-[#FFBB38]/40 rounded-2xl p-3 sm:p-4 space-y-2.5 shadow-sm animate-in fade-in duration-150">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs sm:text-sm font-black text-[#FFBB38] uppercase tracking-wider flex items-center gap-1.5">
-                <AlertCircle size={15} className="text-[#FFBB38] animate-pulse" />
-                Pending Physical Cash Box Verification ({pendingRelocations.length})
-              </h4>
-              <span className="text-[10px] font-bold text-[#FFBB38] bg-[#FFBB38]/15 border border-[#FFBB38]/30 px-2 py-0.5 rounded-full">
-                Step 2 Pending
-              </span>
-            </div>
-            <p className="text-[11px] text-[#AEABD8] font-medium">
-              Currency was debited from bank. Click below once notes are physically placed inside the Cash Box:
+            <p className="text-[11px] text-slate-600 leading-snug">
+              Withdrawn from {WALLET_META[pendingRelocations[0].source]?.name}. Needs physical counting before adding to Cash Box balance.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {pendingRelocations.map((reloc) => {
-                const isVerifying = isVerifyingAtmId === reloc.id;
-                return (
-                  <div key={reloc.id} className="bg-[#141332] border border-[#27264E] p-3 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
-                    <div className="min-w-0">
-                      <span className="text-[10px] font-bold text-[#AEABD8] uppercase block truncate">From: {WALLET_META[reloc.source]?.name}</span>
-                      <span className="text-sm sm:text-base font-black text-white font-mono mt-0.5 block">{formatCurrency(reloc.amount)}</span>
-                      <span className="text-[9px] text-[#AEABD8]/70 font-mono">{reloc.createdAt}</span>
-                    </div>
-                    <button
-                      onClick={() => handleVerifyATM(reloc.id, reloc.amount, reloc.source, reloc.notes)}
-                      disabled={isVerifying}
-                      className="bg-[#02B15A] hover:bg-[#02B15A]/85 active:scale-95 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all shadow-xs cursor-pointer disabled:opacity-50"
-                    >
-                      {isVerifying ? <RefreshCw size={12} className="animate-spin" /> : <Check size={13} />}
-                      <span>Confirm Inflow</span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+            <button 
+              onClick={() => handleVerifyATM(pendingRelocations[0].id, pendingRelocations[0].amount, pendingRelocations[0].source, pendingRelocations[0].notes)}
+              disabled={isVerifyingAtmId === pendingRelocations[0].id}
+              className="w-full py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Verify &amp; Confirm Notes in Safe</span>
+            </button>
+          </section>
         )}
 
-        {/* ── FAMILY KHATABOOK (FLOATS & PERSONAL DRAWS) ── */}
-        <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4">
-          {/* Khatabook Header & Tab Selector */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#27264E] pb-3.5">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-[#6359E9]/20 text-[#64CFF6] flex items-center justify-center font-bold">
-                  <BookOpen size={16} />
-                </div>
-                <h3 className="text-base sm:text-lg font-black text-white">
-                  Family Khatabook · Capital &amp; Spends
-                </h3>
-                <span className="text-[10px] font-bold text-[#64CFF6] bg-[#6359E9]/20 border border-[#6359E9]/30 px-2 py-0.5 rounded-full hidden sm:inline-block">
-                  குடும்ப கணக்கு
-                </span>
-              </div>
-              <p className="text-xs text-[#AEABD8] mt-0.5">
-                Track float capital provided by Dad, Mom, or Kishor to recover, &amp; personal cash draws to be repaid
-              </p>
-            </div>
-
-            {/* Tab Switcher: Floating Capital vs Personal Draws */}
-            <div className="flex items-center bg-[#141332] border border-[#27264E] p-1 rounded-2xl gap-1 shrink-0 self-start md:self-auto">
-              <button
-                type="button"
-                onClick={() => { setKhatabookTab('floats'); triggerHapticFeedback('light'); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  khatabookTab === 'floats'
-                    ? 'bg-[#02B15A] text-white shadow-xs'
-                    : 'text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
-                }`}
+        {/* 3. APPLE WALLET STYLE STACKED CARDS CONTAINER WITH BUTTERY SMOOTH SCROLL & TAP EXPANSION */}
+        <section className="space-y-2 pt-1">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Vaults</span>
+              <span className="text-[10px] lowercase font-normal text-slate-400">(Tap or scroll stack)</span>
+            </h3>
+            {activeExpandedCard && (
+              <button 
+                onClick={() => setActiveExpandedCard(null)}
+                className="text-[11px] font-bold text-brand-600 hover:text-brand-700"
               >
-                <Plus size={13} />
-                <span>Floating Capital</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  khatabookTab === 'floats' ? 'bg-[#02B15A]/80 text-white' : 'bg-[#27264E] text-[#AEABD8]'
-                }`}>
-                  {floatStats.activeCount}
-                </span>
+                Reset Stack
               </button>
-
-              <button
-                type="button"
-                onClick={() => { setKhatabookTab('draws'); triggerHapticFeedback('light'); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  khatabookTab === 'draws'
-                    ? 'bg-[#E41414] text-white shadow-xs'
-                    : 'text-[#AEABD8] hover:text-white hover:bg-[#27264E]'
-                }`}
-              >
-                <Coins size={13} />
-                <span>Personal Draws</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  khatabookTab === 'draws' ? 'bg-[#E41414]/80 text-white' : 'bg-[#27264E] text-[#AEABD8]'
-                }`}>
-                  {personalDrawStats.activeCount}
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Per-Person Stat Cards (Anbazhakan, Parimalam, Kishor, Total) */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-            {/* Anbazhakan */}
-            <div 
-              onClick={() => setKhatabookPersonFilter(prev => prev === 'anbazhakan' ? 'all' : 'anbazhakan')}
-              className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                khatabookPersonFilter === 'anbazhakan' ? 'ring-2 ring-[#6359E9] bg-[#141332] border-[#6359E9]' : 'bg-[#141332] border-[#27264E] hover:border-[#6359E9]/40'
-              }`}
-            >
-              <span className="text-[10px] font-bold text-[#AEABD8] uppercase block">Anbazhakan</span>
-              <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
-                khatabookTab === 'floats' ? 'text-[#02B15A]' : 'text-[#E41414]'
-              }`}>
-                {formatCurrency(khatabookTab === 'floats' ? floatStats.anbazhakan : personalDrawStats.anbazhakan)}
-              </span>
-              <span className="text-[9px] text-[#AEABD8]/70 font-medium block mt-0.5">
-                {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
-              </span>
-            </div>
-
-            {/* Parimalam */}
-            <div 
-              onClick={() => setKhatabookPersonFilter(prev => prev === 'parimalam' ? 'all' : 'parimalam')}
-              className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                khatabookPersonFilter === 'parimalam' ? 'ring-2 ring-[#6359E9] bg-[#141332] border-[#6359E9]' : 'bg-[#141332] border-[#27264E] hover:border-[#6359E9]/40'
-              }`}
-            >
-              <span className="text-[10px] font-bold text-[#AEABD8] uppercase block">Parimalam</span>
-              <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
-                khatabookTab === 'floats' ? 'text-[#02B15A]' : 'text-[#E41414]'
-              }`}>
-                {formatCurrency(khatabookTab === 'floats' ? floatStats.parimalam : personalDrawStats.parimalam)}
-              </span>
-              <span className="text-[9px] text-[#AEABD8]/70 font-medium block mt-0.5">
-                {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
-              </span>
-            </div>
-
-            {/* Kishor */}
-            <div 
-              onClick={() => setKhatabookPersonFilter(prev => prev === 'kishor' ? 'all' : 'kishor')}
-              className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                khatabookPersonFilter === 'kishor' ? 'ring-2 ring-[#6359E9] bg-[#141332] border-[#6359E9]' : 'bg-[#141332] border-[#27264E] hover:border-[#6359E9]/40'
-              }`}
-            >
-              <span className="text-[10px] font-bold text-[#AEABD8] uppercase block">Kishor</span>
-              <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
-                khatabookTab === 'floats' ? 'text-[#02B15A]' : 'text-[#E41414]'
-              }`}>
-                {formatCurrency(khatabookTab === 'floats' ? floatStats.kishor : personalDrawStats.kishor)}
-              </span>
-              <span className="text-[9px] text-[#AEABD8]/70 font-medium block mt-0.5">
-                {khatabookTab === 'floats' ? 'Float to take back' : 'Cash drawn to settle'}
-              </span>
-            </div>
-
-            {/* Total Pool */}
-            <div 
-              onClick={() => setKhatabookPersonFilter('all')}
-              className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                khatabookTab === 'floats' ? 'bg-[#02B15A]/10 border-[#02B15A]/30' : 'bg-[#E41414]/10 border-[#E41414]/30'
-              } ${khatabookPersonFilter === 'all' ? 'ring-2 ring-white/30' : ''}`}
-            >
-              <span className={`text-[10px] font-black uppercase block ${
-                khatabookTab === 'floats' ? 'text-[#02B15A]' : 'text-[#E41414]'
-              }`}>
-                {khatabookTab === 'floats' ? 'Total Active Float' : 'Total Debt to Settle'}
-              </span>
-              <span className="text-base sm:text-lg font-black font-mono mt-0.5 block text-white">
-                {formatCurrency(khatabookTab === 'floats' ? floatStats.total : personalDrawStats.total)}
-              </span>
-              <span className="text-[9px] text-[#AEABD8] font-medium block mt-0.5">
-                {khatabookTab === 'floats' ? `${floatStats.activeCount} active items` : `${personalDrawStats.activeCount} active items`}
-              </span>
-            </div>
-          </div>
-
-          {/* Filter Row & WhatsApp Action Button */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-nowrap">
-              {[
-                { id: 'all', label: 'All Members' },
-                { id: 'anbazhakan', label: 'Anbazhakan' },
-                { id: 'parimalam', label: 'Parimalam' },
-                { id: 'kishor', label: 'Kishor' },
-              ].map((p) => {
-                const isSelected = khatabookPersonFilter === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setKhatabookPersonFilter(p.id)}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
-                      isSelected
-                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
-                        : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Direct WhatsApp Share / Reminder Button */}
-            {khatabookTab === 'floats' ? (
-              <a
-                href={generateFloatWhatsAppSummary(khatabookPersonFilter)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black px-3.5 py-2 rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
-              >
-                <Share2 size={13} />
-                <span>Share Float Record (WhatsApp)</span>
-              </a>
-            ) : (
-              <a
-                href={generateDrawWhatsAppReminder(khatabookPersonFilter)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-black px-3.5 py-2 rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
-              >
-                <Send size={13} />
-                <span>Send WhatsApp Reminder</span>
-              </a>
             )}
           </div>
 
-          {/* Tab 1: Floating Capital Items */}
-          {khatabookTab === 'floats' && (
-            <div className="space-y-3 pt-1">
-              {(() => {
-                const filteredFloats = computedFloatingDeposits
-                  .filter(f => showRecoveredFloats ? true : f.status === 'active')
-                  .filter(f => khatabookPersonFilter === 'all' ? true : f.depositedBy.toLowerCase().includes(khatabookPersonFilter.toLowerCase()));
-
-                const recoveredCount = computedFloatingDeposits.filter(f => f.status === 'recovered').length;
-
-                if (filteredFloats.length === 0) {
-                  return (
-                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center space-y-2">
-                      <p className="text-xs font-bold text-gray-500">
-                        No {khatabookPersonFilter !== 'all' ? `${khatabookPersonFilter} ` : ''}active floating capital deposits found.
-                      </p>
-                      <button
-                        onClick={() => setActiveModal('deposit')}
-                        className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-xs"
-                      >
-                        <Plus size={14} />
-                        <span>Deposit New Float</span>
-                      </button>
+          <div className="relative flex flex-col space-y-[-78px] pt-1 pb-16">
+            
+            {/* CARD 1: Physical Cash Box */}
+            <div 
+              onClick={() => handleCardStackTap('cash_in_hand')}
+              className={`sticky top-20 rounded-2xl p-3.5 text-white shadow-xl transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) relative overflow-hidden border border-emerald-400/30 cursor-pointer ${
+                activeExpandedCard === 'cash_in_hand' 
+                  ? 'scale-[1.02] z-30 shadow-2xl translate-y-[-8px]' 
+                  : 'hover:translate-y-[-4px]'
+              }`}
+              style={{
+                background: 'linear-gradient(135deg, #062b1e 0%, #0d3d2c 50%, #041f15 100%)',
+                boxShadow: '0 10px 25px -5px rgba(6, 43, 30, 0.45), inset 0 1px 1px rgba(255,255,255,0.3)'
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none"></div>
+              <div className="absolute -right-8 -top-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none"></div>
+              
+              <div className="relative z-10 flex flex-col justify-between h-[154px]">
+                {/* Top strip */}
+                <div className="flex items-start justify-between pb-1">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-black tracking-wider text-emerald-200 font-mono">Physical Cash Box</span>
+                      <span className="text-[8px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-semibold">Safe #01</span>
                     </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-2.5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      {filteredFloats.map((f) => {
-                        const isRecovered = f.status === 'recovered';
-                        const singleWhatsAppUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
-                          `*CHIT FUND — FLOATING CAPITAL RECORD*\n\n` +
-                          `• Depositor: ${f.depositedBy}\n` +
-                          `• Amount: ₹${f.amount.toLocaleString('en-IN')}\n` +
-                          `• Purpose: ${f.tag} (${f.notes})\n` +
-                          `• Vault: ${WALLET_META[f.walletType]?.name || f.walletType}\n` +
-                          `• Date: ${new Date(f.created_at).toLocaleDateString('en-IN')}\n` +
-                          `• Status: ${isRecovered ? 'Recovered' : 'Available to Take Back'}\n\n` +
-                          `Recorded in Chit Fund Manager.`
-                        )}`;
-
-                        return (
-                          <div 
-                            key={f.id} 
-                            className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
-                              isRecovered 
-                                ? 'bg-gray-50/60 border-gray-200 opacity-60' 
-                                : 'bg-emerald-50/40 border-emerald-200 hover:border-emerald-300 shadow-2xs'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-[10px] font-black uppercase text-emerald-900 bg-emerald-100/90 px-2 py-0.5 rounded-md">
-                                    {f.depositedBy}
-                                  </span>
-                                  <span className="text-[9px] font-mono text-gray-400">
-                                    {new Date(f.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                  </span>
-                                  {isRecovered && (
-                                    <span className="text-[9px] font-black text-gray-500 bg-gray-200 px-1.5 py-0.2 rounded">
-                                      Recovered
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-base sm:text-lg font-black text-emerald-900 font-mono mt-1">
-                                  {formatCurrency(f.amount)}
-                                </div>
-                                <p className="text-xs font-semibold text-gray-700 leading-snug mt-0.5">
-                                  {f.notes || f.tag}
-                                </p>
-                                <span className="text-[10px] text-gray-400 font-medium block mt-1">
-                                  Deposited into: {WALLET_META[f.walletType]?.name || f.walletType}
-                                </span>
-                              </div>
-
-                              <div className="flex flex-col items-end gap-1.5 shrink-0">
-                                {!isRecovered ? (
-                                  <button
-                                    onClick={() => {
-                                      setRecoveringFloat(f);
-                                      setRecoverAmount(String(f.amount));
-                                      setRecoverSourceWallet(f.walletType);
-                                      setActiveModal('recover');
-                                    }}
-                                    className="bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-black text-xs px-3 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer"
-                                  >
-                                    Take Back Float
-                                  </button>
-                                ) : (
-                                  <span className="text-[10px] font-bold text-gray-500 bg-gray-200/80 px-2 py-1 rounded-lg">
-                                    ✓ Settled
-                                  </span>
-                                )}
-
-                                <a
-                                  href={singleWhatsAppUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Share2 size={11} />
-                                  <span>WhatsApp</span>
-                                </a>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {recoveredCount > 0 && (
-                      <div className="text-center pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowRecoveredFloats(!showRecoveredFloats)}
-                          className="text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
-                        >
-                          {showRecoveredFloats ? 'Hide Recovered Floats' : `Show ${recoveredCount} Recovered Floats`}
-                        </button>
-                      </div>
-                    )}
+                    <p className="text-[9px] text-emerald-200/70 font-medium mt-0.5">cash_in_hand</p>
                   </div>
-                );
-              })()}
-            </div>
-          )}
-
-          {/* Tab 2: Personal Draws Items */}
-          {khatabookTab === 'draws' && (
-            <div className="space-y-3 pt-1">
-              {(() => {
-                const filteredDraws = computedPersonalDraws
-                  .filter(d => showSettledDraws ? true : d.status === 'outstanding')
-                  .filter(d => khatabookPersonFilter === 'all' ? true : d.takenBy.toLowerCase().includes(khatabookPersonFilter.toLowerCase()));
-
-                const settledCount = computedPersonalDraws.filter(d => d.status === 'settled').length;
-
-                if (filteredDraws.length === 0) {
-                  return (
-                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center space-y-2">
-                      <p className="text-xs font-bold text-gray-500">
-                        No {khatabookPersonFilter !== 'all' ? `${khatabookPersonFilter} ` : ''}outstanding personal draws recorded.
-                      </p>
-                      <button
-                        onClick={() => setActiveModal('spend')}
-                        className="inline-flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-xs"
-                      >
-                        <Plus size={14} />
-                        <span>Log Personal Spend</span>
-                      </button>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-extrabold font-mono text-white tabular-nums">
+                      {formatCurrency(balances.cash_in_hand || 0)}
+                    </span>
+                    <div className="w-6 h-6 rounded-lg border border-amber-300/60 flex items-center justify-center text-[10px] shadow-xs" style={{ background: 'linear-gradient(135deg, #fef08a 0%, #d97706 70%, #b45309 100%)', color: '#451a03' }}>
+                      🔒
                     </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-2.5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      {filteredDraws.map((d) => {
-                        const isSettled = d.status === 'settled';
-                        const singleWhatsAppUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
-                          `*CHIT FUND — PERSONAL DRAW REMINDER*\n\n` +
-                          `• Taken By: ${d.takenBy}\n` +
-                          `• Amount: ₹${d.amount.toLocaleString('en-IN')}\n` +
-                          `• Category: ${d.tag}\n` +
-                          `• Description: ${d.description}\n` +
-                          `• Taken From: ${WALLET_META[d.walletType]?.name || d.walletType}\n` +
-                          `• Date: ${new Date(d.created_at).toLocaleDateString('en-IN')}\n` +
-                          `• Status: ${isSettled ? 'Settled' : 'To Settle / Put Back'}\n\n` +
-                          `Please put back the cash into the Chit Fund Box or Bank when convenient.`
-                        )}`;
-
-                        return (
-                          <div 
-                            key={d.id} 
-                            className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
-                              isSettled 
-                                ? 'bg-gray-50/60 border-gray-200 opacity-60' 
-                                : 'bg-rose-50/40 border-rose-200 hover:border-rose-300 shadow-2xs'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-[10px] font-black uppercase text-rose-900 bg-rose-100/90 px-2 py-0.5 rounded-md">
-                                    {d.takenBy}
-                                  </span>
-                                  <span className="text-[9px] font-bold text-gray-500 bg-gray-200/80 px-1.5 py-0.2 rounded">
-                                    {d.tag}
-                                  </span>
-                                  <span className="text-[9px] font-mono text-gray-400">
-                                    {new Date(d.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                  </span>
-                                  {isSettled && (
-                                    <span className="text-[9px] font-black text-gray-500 bg-gray-200 px-1.5 py-0.2 rounded">
-                                      Settled
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-base sm:text-lg font-black text-rose-900 font-mono mt-1">
-                                  {formatCurrency(d.amount)}
-                                </div>
-                                <p className="text-xs font-semibold text-gray-700 leading-snug mt-0.5">
-                                  {d.description || d.tag}
-                                </p>
-                                <span className="text-[10px] text-gray-400 font-medium block mt-1">
-                                  Taken from: {WALLET_META[d.walletType]?.name || d.walletType}
-                                </span>
-                              </div>
-
-                              <div className="flex flex-col items-end gap-1.5 shrink-0">
-                                {!isSettled ? (
-                                  <button
-                                    onClick={() => {
-                                      setSettlingDraw(d);
-                                      setSettleAmount(String(d.amount));
-                                      setSettleDestWallet(d.walletType);
-                                      setActiveModal('settle');
-                                    }}
-                                    className="bg-rose-700 hover:bg-rose-800 active:scale-95 text-white font-black text-xs px-3 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer"
-                                  >
-                                    Put Back Cash
-                                  </button>
-                                ) : (
-                                  <span className="text-[10px] font-bold text-gray-500 bg-gray-200/80 px-2 py-1 rounded-lg">
-                                    ✓ Settled
-                                  </span>
-                                )}
-
-                                <a
-                                  href={singleWhatsAppUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[10px] font-bold text-rose-700 hover:text-rose-900 flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Send size={11} />
-                                  <span>WhatsApp</span>
-                                </a>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {settledCount > 0 && (
-                      <div className="text-center pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowSettledDraws(!showSettledDraws)}
-                          className="text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
-                        >
-                          {showSettledDraws ? 'Hide Settled Draws' : `Show ${settledCount} Settled Draws`}
-                        </button>
-                      </div>
-                    )}
                   </div>
-                );
-              })()}
-            </div>
-          )}
-        </div>
-      </div>
+                </div>
 
-      {/* ── 5. UNIFIED STATEMENT & ACTIVITY TIMELINE ────────────────────────── */}
-      <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 shadow-sm">
-        {/* Header & Filter Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#27264E] pb-3">
-          <div>
-            <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-              <History size={18} className="text-[#64CFF6]" />
-              <span>
-                {selectedWalletFilter === 'all' 
-                  ? 'Unified Treasury Statement' 
-                  : `${WALLET_META[selectedWalletFilter].name} Statement`}
-              </span>
-            </h3>
-            <p className="text-xs text-[#AEABD8] mt-0.5">
-              Chronological feed of collections, ATM withdrawals, spends and transfers
-            </p>
+                {/* Middle row */}
+                <div className="flex items-center justify-between my-auto">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-6 rounded-md border border-amber-200/60 relative overflow-hidden flex items-center justify-center shadow-xs" style={{ background: 'linear-gradient(135deg, #fef9c3 0%, #fde047 40%, #ca8a04 100%)' }}>
+                      <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[2px] p-[2px] opacity-40">
+                        <div className="border-b border-r border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-b border-l border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-t border-r border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-t border-l border-amber-950/40 rounded-2xs"></div>
+                      </div>
+                      <div className="w-2.5 h-2 rounded-xs border border-amber-950/30 bg-amber-200/50"></div>
+                    </div>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-400/20 border border-emerald-300/30 text-emerald-200 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      {cashDisparity === 0 ? 'Tally Matched' : `${formatCurrency(cashDisparity)}`}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[8px] uppercase tracking-wider text-emerald-200/70 font-semibold">Vault Balance</p>
+                    <span className="text-lg font-extrabold font-mono tracking-tight text-white tabular-nums">
+                      {formatCurrency(balances.cash_in_hand || 0)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bottom row */}
+                <div className="flex items-end justify-between pt-1 border-t border-emerald-500/20 text-[10px]">
+                  <div>
+                    <p className="text-[8px] uppercase tracking-wider text-emerald-300/80 font-bold">Custodian</p>
+                    <p className="font-bold font-mono tracking-wider text-white text-[10px]">PHYSICAL CASH DRAWER</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono tracking-widest text-emerald-200 font-semibold text-[10px]">SAFE •••• 01</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CARD 2: Dr. Kishor Account */}
+            <div 
+              onClick={() => handleCardStackTap('kishor_bank')}
+              className={`sticky top-24 rounded-2xl p-3.5 text-white shadow-xl transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) relative overflow-hidden border border-blue-400/30 cursor-pointer ${
+                activeExpandedCard === 'kishor_bank' 
+                  ? 'scale-[1.02] z-30 shadow-2xl translate-y-[-8px]' 
+                  : 'hover:translate-y-[-4px]'
+              }`}
+              style={{
+                background: 'linear-gradient(135deg, #031b4e 0%, #002b80 50%, #011b54 100%)',
+                boxShadow: '0 10px 25px -5px rgba(0, 43, 128, 0.45), inset 0 1px 1px rgba(255,255,255,0.3)'
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-blue-400/10 to-white/10 pointer-events-none"></div>
+              <div className="absolute -right-8 -top-8 w-32 h-32 bg-blue-500/15 rounded-full blur-2xl pointer-events-none"></div>
+              
+              <div className="relative z-10 flex flex-col justify-between h-[154px]">
+                <div className="flex items-start justify-between pb-1">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-black tracking-wider text-blue-200 font-mono">Dr. Kishor Account</span>
+                      <span className="text-[8px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-200 border border-blue-400/30 font-semibold">Collections</span>
+                    </div>
+                    <p className="text-[9px] text-blue-200/70 font-medium mt-0.5">Primary UPI / kishor_bank</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-extrabold font-mono text-white tabular-nums">
+                      {formatCurrency(balances.kishor_bank || 0)}
+                    </span>
+                    <div className="w-6 h-6 rounded-lg bg-white flex items-center justify-center p-0.5 shadow-xs">
+                      <div className="w-full h-full bg-[#004c8f] rounded flex items-center justify-center text-[8px] font-black text-white">H</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between my-auto">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-6 rounded-md border border-amber-200/60 relative overflow-hidden flex items-center justify-center shadow-xs" style={{ background: 'linear-gradient(135deg, #fef9c3 0%, #fde047 40%, #ca8a04 100%)' }}>
+                      <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[2px] p-[2px] opacity-40">
+                        <div className="border-b border-r border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-b border-l border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-t border-r border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-t border-l border-amber-950/40 rounded-2xs"></div>
+                      </div>
+                      <div className="w-2.5 h-2 rounded-xs border border-amber-950/30 bg-amber-200/50"></div>
+                    </div>
+                    <svg className="w-4 h-4 text-blue-200/80 transform rotate-90" fill="currentColor" viewBox="0 0 24 24"><path d="M8 12c0-2.21 1.79-4 4-4s4 1.79 4 4"></path><path d="M6 12c0-3.31 2.69-6 6-6s6 2.69 6 6"></path></svg>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[8px] uppercase tracking-wider text-blue-200/70 font-semibold">Available Balance</p>
+                    <span className="text-lg font-extrabold font-mono tracking-tight text-white tabular-nums">
+                      {formatCurrency(balances.kishor_bank || 0)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-between pt-1 border-t border-blue-400/20 text-[10px]">
+                  <div>
+                    <p className="text-[8px] uppercase tracking-wider text-blue-300/80 font-bold">Cardholder</p>
+                    <p className="font-bold font-mono tracking-wider text-white text-[10px]">DR. KISHOR ANBAZHAKAN</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono tracking-widest text-blue-200 font-semibold text-[10px]">•••• 4192</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CARD 3: Anbazhakan (Dad) Account */}
+            <div 
+              onClick={() => handleCardStackTap('dad_bank')}
+              className={`sticky top-28 rounded-2xl p-3.5 text-white shadow-xl transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) relative overflow-hidden border border-teal-400/30 cursor-pointer ${
+                activeExpandedCard === 'dad_bank' 
+                  ? 'scale-[1.02] z-30 shadow-2xl translate-y-[-8px]' 
+                  : 'hover:translate-y-[-4px]'
+              }`}
+              style={{
+                background: 'linear-gradient(135deg, #072a31 0%, #0d4653 50%, #051f24 100%)',
+                boxShadow: '0 10px 25px -5px rgba(7, 42, 49, 0.45), inset 0 1px 1px rgba(255,255,255,0.25)'
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-cyan-300/10 to-white/10 pointer-events-none"></div>
+              <div className="absolute -right-8 -top-8 w-32 h-32 bg-cyan-400/15 rounded-full blur-2xl pointer-events-none"></div>
+              
+              <div className="relative z-10 flex flex-col justify-between h-[154px]">
+                <div className="flex items-start justify-between pb-1">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-black tracking-wider text-teal-200 font-mono">Anbazhakan (Dad) Account</span>
+                      <span className="text-[8px] px-1.5 py-0.2 rounded bg-cyan-400/15 text-teal-200 border border-teal-400/30 font-semibold">Disbursal</span>
+                    </div>
+                    <p className="text-[9px] text-teal-200/70 font-medium mt-0.5">Prize Disbursal Pool / dad_bank</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-extrabold font-mono text-white tabular-nums">
+                      {formatCurrency(balances.dad_bank || 0)}
+                    </span>
+                    <div className="w-6 h-6 rounded-lg bg-[#00b5e2] flex items-center justify-center shadow-xs">
+                      <div className="w-3 h-3 rounded-full bg-[#072a31] relative flex items-center justify-center">
+                        <div className="w-1 h-1.5 bg-[#00b5e2] rounded-xs -mt-0.5"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between my-auto">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-6 rounded-md border border-amber-200/60 relative overflow-hidden flex items-center justify-center shadow-xs" style={{ background: 'linear-gradient(135deg, #fef9c3 0%, #fde047 40%, #ca8a04 100%)' }}>
+                      <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[2px] p-[2px] opacity-40">
+                        <div className="border-b border-r border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-b border-l border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-t border-r border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-t border-l border-amber-950/40 rounded-2xs"></div>
+                      </div>
+                      <div className="w-2.5 h-2 rounded-xs border border-amber-950/30 bg-amber-200/50"></div>
+                    </div>
+                    <svg className="w-4 h-4 text-teal-200/80 transform rotate-90" fill="currentColor" viewBox="0 0 24 24"><path d="M8 12c0-2.21 1.79-4 4-4s4 1.79 4 4"></path><path d="M6 12c0-3.31 2.69-6 6-6s6 2.69 6 6"></path></svg>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[8px] uppercase tracking-wider text-teal-200/70 font-semibold">Available Balance</p>
+                    <span className="text-lg font-extrabold font-mono tracking-tight text-white tabular-nums">
+                      {formatCurrency(balances.dad_bank || 0)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-between pt-1 border-t border-teal-400/20 text-[10px]">
+                  <div>
+                    <p className="text-[8px] uppercase tracking-wider text-teal-300/80 font-bold">Cardholder</p>
+                    <p className="font-bold font-mono tracking-wider text-white text-[10px]">ANBAZHAKAN (DAD)</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono tracking-widest text-teal-200 font-semibold text-[10px]">•••• 8821</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CARD 4: Parimalam (Mom) Account */}
+            <div 
+              onClick={() => handleCardStackTap('mom_bank')}
+              className={`sticky top-32 rounded-2xl p-3.5 text-white shadow-xl transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) relative overflow-hidden border border-rose-400/30 cursor-pointer ${
+                activeExpandedCard === 'mom_bank' 
+                  ? 'scale-[1.02] z-30 shadow-2xl translate-y-[-8px]' 
+                  : 'hover:translate-y-[-4px]'
+              }`}
+              style={{
+                background: 'linear-gradient(135deg, #420a15 0%, #721424 50%, #30060e 100%)',
+                boxShadow: '0 10px 25px -5px rgba(66, 10, 21, 0.45), inset 0 1px 1px rgba(255,255,255,0.25)'
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-amber-200/10 to-white/10 pointer-events-none"></div>
+              <div className="absolute -right-8 -top-8 w-32 h-32 bg-rose-500/15 rounded-full blur-2xl pointer-events-none"></div>
+              
+              <div className="relative z-10 flex flex-col justify-between h-[154px]">
+                <div className="flex items-start justify-between pb-1">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-black tracking-wider text-rose-200 font-mono">Parimalam (Mom) Account</span>
+                      <span className="text-[8px] px-1.5 py-0.2 rounded bg-rose-500/15 text-rose-200 border border-rose-400/30 font-semibold">Reserve</span>
+                    </div>
+                    <p className="text-[9px] text-rose-200/70 font-medium mt-0.5">Emergency Reserve / mom_bank</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-extrabold font-mono text-white tabular-nums">
+                      {formatCurrency(balances.mom_bank || 0)}
+                    </span>
+                    <div className="w-6 h-6 rounded-lg bg-[#b02a30] border border-amber-400/40 flex items-center justify-center shadow-xs">
+                      <span className="text-[9px] font-black text-amber-200 font-mono">i</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between my-auto">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-6 rounded-md border border-amber-200/60 relative overflow-hidden flex items-center justify-center shadow-xs" style={{ background: 'linear-gradient(135deg, #fef9c3 0%, #fde047 40%, #ca8a04 100%)' }}>
+                      <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[2px] p-[2px] opacity-40">
+                        <div className="border-b border-r border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-b border-l border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-t border-r border-amber-950/40 rounded-2xs"></div>
+                        <div className="border-t border-l border-amber-950/40 rounded-2xs"></div>
+                      </div>
+                      <div className="w-2.5 h-2 rounded-xs border border-amber-950/30 bg-amber-200/50"></div>
+                    </div>
+                    <svg className="w-4 h-4 text-rose-200/80 transform rotate-90" fill="currentColor" viewBox="0 0 24 24"><path d="M8 12c0-2.21 1.79-4 4-4s4 1.79 4 4"></path><path d="M6 12c0-3.31 2.69-6 6-6s6 2.69 6 6"></path></svg>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[8px] uppercase tracking-wider text-rose-200/70 font-semibold">Available Balance</p>
+                    <span className="text-lg font-extrabold font-mono tracking-tight text-white tabular-nums">
+                      {formatCurrency(balances.mom_bank || 0)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-between pt-1 border-t border-rose-400/20 text-[10px]">
+                  <div>
+                    <p className="text-[8px] uppercase tracking-wider text-rose-300/80 font-bold">Cardholder</p>
+                    <p className="font-bold font-mono tracking-wider text-white text-[10px]">PARIMALAM (MOM)</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono tracking-widest text-rose-200 font-semibold text-[10px]">•••• 3094</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        {/* 4. Mobile Physical Note Denomination Counter Card */}
+        <section className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-card space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">🧮</span>
+              <div>
+                <h3 className="text-xs font-bold text-slate-900">Physical Cash Counter</h3>
+                <p className="text-[10px] text-slate-500">Live note counter vs Cash Box</p>
+              </div>
+            </div>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+              cashDisparity === 0 
+                ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                : 'text-rose-700 bg-rose-50 border-rose-200'
+            }`}>
+              {cashDisparity === 0 ? '₹0 Variance' : `${formatCurrency(cashDisparity)}`}
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 sm:w-60">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEABD8]" />
-              <input
-                type="text"
-                placeholder="Search statements..."
-                value={ledgerSearch}
-                onChange={(e) => setLedgerSearch(e.target.value)}
-                className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-8 pr-3 py-1.5 text-xs font-medium text-white placeholder-[#AEABD8]/60 focus:outline-none"
-              />
-            </div>
-
-            <button
-              onClick={() => window.print()}
-              className="p-2 bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-[#AEABD8] hover:text-white rounded-xl transition-colors cursor-pointer"
-              title="Print Statement"
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span>Total Count: <strong className="font-mono text-slate-900">{formatCurrency(calculatedPhysicalCash)}</strong></span>
+            <button 
+              onClick={() => setActiveModal('denominations')}
+              className="text-xs font-bold text-brand-600 hover:text-brand-700 cursor-pointer"
             >
-              <Printer size={15} />
+              Open Full Tally Keypad →
+            </button>
+          </div>
+        </section>
+
+        {/* 5. Mobile Personal Expenses & Float Tracker */}
+        <section className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Personal Expenses &amp; Float</h3>
+            <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
+              {formatCurrency(totalOutstandingDebt)} Outstanding
+            </span>
+          </div>
+
+          {outstandingPersonalDraws.length > 0 ? (
+            outstandingPersonalDraws.slice(0, 2).map((draw) => (
+              <div key={draw.id} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-card space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-800">{draw.tag}</span>
+                    <span className="text-xs font-bold text-slate-900">{draw.takenBy}</span>
+                  </div>
+                  <span className="text-xs font-extrabold text-slate-900 font-mono">{formatCurrency(draw.amount)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                  <span>{WALLET_META[draw.walletType]?.shortName}</span>
+                  <button 
+                    onClick={() => {
+                      setSettlingDraw(draw);
+                      setSettleAmount(String(draw.amount));
+                      setSettleDestWallet(draw.walletType);
+                      setActiveModal('settle');
+                    }}
+                    className="px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-700 font-bold text-[11px] rounded-lg transition-colors cursor-pointer"
+                  >
+                    Settle
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-3 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400">
+              No outstanding personal draws
+            </div>
+          )}
+
+          {activeFloatingDeposits.length > 0 && (
+            <div className="p-3 bg-white rounded-2xl border border-emerald-200 shadow-card flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">Float Injected</span>
+                  <span className="text-xs font-bold text-slate-900">{activeFloatingDeposits[0].depositedBy}</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-0.5">{activeFloatingDeposits[0].tag}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-extrabold text-emerald-700 font-mono">
+                  {formatCurrency(activeFloatingDeposits[0].amount)}
+                </div>
+                <button 
+                  onClick={() => {
+                    const f = activeFloatingDeposits[0];
+                    setRecoveringFloat(f);
+                    setRecoverAmount(String(f.amount));
+                    setRecoverSourceWallet(f.walletType);
+                    setActiveModal('recover');
+                  }}
+                  className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
+                >
+                  Recover Float →
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* 6. Mobile Audit Statement & Recent Transactions Stream */}
+        <section className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-card space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="w-7 h-7 rounded-lg bg-indigo-50 text-brand-600 flex items-center justify-center font-bold text-xs">📝</span>
+              <div>
+                <h3 className="text-xs font-bold text-slate-900">Recent Treasury Ledger</h3>
+                <p className="text-[10px] text-slate-500">Live credit &amp; debit movements</p>
+              </div>
+            </div>
+            <span className="text-[11px] font-semibold text-slate-500">{filteredTransactions.length} txs</span>
+          </div>
+
+          <div className="space-y-2">
+            {filteredTransactions.slice(0, 5).map((tx) => {
+              const { isCredit, badgeLabel } = getTxDirection(tx, selectedWalletFilter);
+              return (
+                <div key={tx.id} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                    <span className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 flex items-center justify-center text-xs flex-shrink-0">
+                      {tx.type === 'atm_withdrawal' ? '🏧' : tx.type === 'collection' ? '💰' : tx.type === 'personal_draw' ? '💼' : '🔄'}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-slate-900 truncate">
+                        {tx.notes || tx.description || 'Treasury Movement'}
+                      </div>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        {WALLET_META[tx.wallet_type]?.shortName}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right font-mono flex-shrink-0">
+                    <span className={`text-xs font-bold ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
+                    </span>
+                    <div className="text-[9px] text-slate-400">
+                      {new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          DESKTOP WORKSPACE VIEW (hidden lg:block / 1440px Viewport)
+          ══════════════════════════════════════════════════════════════════════════ */}
+      <div className="hidden lg:block space-y-6">
+        
+        {/* Top Desktop Action Header */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl px-6 py-4 flex items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-bold font-display text-slate-900 tracking-tight whitespace-nowrap">
+                Treasury &amp; Cash Vaults
+              </h1>
+            </div>
+            <div className="h-5 w-px bg-slate-200"></div>
+            
+            {/* Standardized Vault Filter Dropdown */}
+            <div className="relative inline-flex items-center">
+              <Wallet className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 pointer-events-none" />
+              <select 
+                value={selectedWalletFilter}
+                onChange={(e) => setSelectedWalletFilter(e.target.value as any)}
+                className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-semibold pl-8 pr-7 py-1.5 rounded-xl border border-slate-200/70 transition-all focus:bg-white focus:border-brand-500 cursor-pointer"
+              >
+                <option value="all">All 4 Vaults ({formatCurrency(totalTreasuryBalance)})</option>
+                <option value="cash_in_hand">Physical Cash Box — Safe #01 ({formatCurrency(balances.cash_in_hand || 0)})</option>
+                <option value="kishor_bank">Dr. Kishor Account — HDFC ({formatCurrency(balances.kishor_bank || 0)})</option>
+                <option value="dad_bank">Anbazhakan (Dad) Account — CSB ({formatCurrency(balances.dad_bank || 0)})</option>
+                <option value="mom_bank">Parimalam (Mom) Account — SBI ({formatCurrency(balances.mom_bank || 0)})</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setActiveModal('transfer')}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200/80 transition-all shadow-2xs whitespace-nowrap cursor-pointer active:scale-95"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" />
+              <span>Inter-vault Transfer</span>
+            </button>
+            <button 
+              onClick={() => setActiveModal('spend')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold border border-amber-200 transition-all cursor-pointer active:scale-95"
+            >
+              <Coins className="w-3.5 h-3.5 text-amber-600" />
+              <span>Log Personal Draw</span>
+            </button>
+            <button 
+              onClick={() => setActiveModal('atm')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all cursor-pointer active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>ATM Cash Relocation</span>
             </button>
           </div>
         </div>
 
-        {/* Quick Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-nowrap">
-          {[
-            { id: 'all', label: 'All Transactions' },
-            { id: 'collection', label: '📥 Collections' },
-            { id: 'atm_withdrawal', label: '🏧 ATM Cash' },
-            { id: 'personal_draw', label: '💸 Spends / Draws' },
-            { id: 'transfer', label: '⇄ Transfers & Floats' },
-            { id: 'payout', label: '🏆 Auction Payouts' },
-          ].map((pill) => {
-            const isSelected = ledgerTypeFilter === pill.id;
-            return (
-              <button
-                key={pill.id}
-                onClick={() => setLedgerTypeFilter(pill.id)}
-                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
-                  isSelected 
-                    ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-sm' 
-                    : 'bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border-[#27264E]'
-                }`}
-              >
-                {pill.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Statement Timeline Feed List */}
-        <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-          {filteredTransactions.length === 0 ? (
-            <div className="py-16 text-center text-xs text-[#AEABD8]">
-              No transactions match your search filter.
+        {/* 1. Desktop Consolidated Treasury Summary Strip */}
+        <section className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-indigo-500/20 relative overflow-hidden">
+          <div className="absolute -right-16 -top-16 w-56 h-56 bg-brand-500/20 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs text-indigo-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span className="font-semibold text-white">Consolidated Liquid Treasury</span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-4 flex-wrap">
+                <h2 className="text-4xl font-black font-display tracking-tight text-white tabular-nums">
+                  {formatCurrency(totalTreasuryBalance)}
+                </h2>
+                <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/15 border border-emerald-500/25 px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" />
+                  Live Multi-Account Balance
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1.5 flex items-center gap-3 flex-wrap">
+                <span>Physical Cash: <strong className="text-white font-mono">{formatCurrency(balances.cash_in_hand || 0)}</strong></span>
+                <span className="text-slate-500">•</span>
+                <span>Bank Capital: <strong className="text-white font-mono">{formatCurrency(bankCapital)}</strong></span>
+                <span className="text-slate-500">•</span>
+                <span>Active Floating Capital Injected: <strong className="text-amber-300 font-mono">{formatCurrency(floatStats.total)}</strong></span>
+              </p>
             </div>
-          ) : (
-            filteredTransactions.map((tx) => {
-              const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx, selectedWalletFilter);
-              const dateLabel = tx.created_at 
-                ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                : 'Recent';
 
-              return (
-                <div 
-                  key={tx.id} 
-                  className="p-3 sm:p-4 bg-[#141332] border border-[#27264E] rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3 hover:border-[#6359E9]/40 transition-colors"
-                >
-                  <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                      <span className={`text-[9px] sm:text-[10px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded-md border ${badgeColor}`}>
-                        {badgeLabel}
-                      </span>
-                      <span className="text-[10px] text-[#AEABD8] font-mono">{dateLabel}</span>
-                      <span className="text-[10px] text-[#AEABD8] font-bold bg-[#27264E] px-1.5 py-0.2 rounded">
-                        {WALLET_META[tx.wallet_type]?.name || tx.wallet_type}
-                      </span>
+            {/* In-Transit ATM Cash Banner & Quick Actions */}
+            <div className="flex items-center gap-3">
+              {pendingRelocations.length > 0 ? (
+                <div className="p-3.5 bg-amber-500/20 border border-amber-400/40 rounded-2xl backdrop-blur-md flex items-center gap-3.5 shadow-lg shadow-amber-950/20">
+                  <div className="w-10 h-10 rounded-xl bg-amber-400/25 border border-amber-400/50 text-amber-300 flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-inner">
+                    🏧
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded bg-amber-400 text-slate-950">IN-TRANSIT</span>
+                      <span className="text-xs font-bold text-white tabular-nums">{formatCurrency(pendingRelocations[0].amount)} ATM Relocation</span>
                     </div>
-                    <p className="text-xs font-semibold text-white leading-snug truncate mt-0.5">
-                      {tx.notes || tx.description || 'Treasury Ledger Movement'}
+                    <p className="text-[11px] text-amber-200 mt-0.5 font-medium">
+                      Withdrawn from <strong className="text-white font-semibold">{WALLET_META[pendingRelocations[0].source]?.name}</strong> ➔ Pending count in <strong className="text-white font-semibold">Physical Cash Box</strong>
                     </p>
                   </div>
-
-                  <div className="text-right shrink-0">
-                    <span className={`text-sm sm:text-base font-black font-mono block ${isCredit ? 'text-[#02B15A]' : 'text-[#E41414]'}`}>
-                      {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
-                    </span>
+                  <button 
+                    onClick={() => handleVerifyATM(pendingRelocations[0].id, pendingRelocations[0].amount, pendingRelocations[0].source, pendingRelocations[0].notes)}
+                    disabled={isVerifyingAtmId === pendingRelocations[0].id}
+                    className="ml-2 px-3.5 py-2 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition-all whitespace-nowrap active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Check className="w-3.5 h-3.5 text-slate-950" />
+                    <span>Confirm Cash Count &amp; Deposit into Cash Box</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                    🛡️
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded bg-emerald-500/30 text-emerald-200">SEALED</span>
+                      <span className="text-xs font-bold text-white">All 4 Vaults Synchronized</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 mt-0.5 font-medium">Zero pending ATM movements in flight</p>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <button 
+                  onClick={() => setActiveModal('deposit')}
+                  className="flex-1 px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/15 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5 text-indigo-300" />
+                  <span>Inject Float</span>
+                </button>
+                <button 
+                  onClick={() => setActiveModal('denominations')}
+                  className="flex-1 px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                >
+                  <Calculator className="w-3.5 h-3.5" />
+                  <span>Denomination Match</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 2. Desktop Four Financial Vault Cards */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* VAULT 1 */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-900 via-slate-800 to-emerald-950 p-5 text-white shadow-xl border border-emerald-500/25 flex flex-col justify-between transition-all group min-h-[224px]">
+            <div className="absolute -right-12 -top-12 w-36 h-36 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute -left-10 -bottom-10 w-28 h-28 bg-brand-500/10 rounded-full blur-xl pointer-events-none"></div>
+            
+            <div className="relative z-10 flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-7 rounded-md bg-gradient-to-br from-amber-200 via-amber-400 to-amber-600 p-0.5 shadow-sm border border-amber-300/60 flex flex-col justify-between overflow-hidden flex-shrink-0">
+                  <div className="flex justify-between items-center h-full">
+                    <div className="w-2.5 h-full border-r border-amber-700/40"></div>
+                    <div className="flex-1 h-2 border-y border-amber-700/40 mx-0.5"></div>
+                    <div className="w-2.5 h-full border-l border-amber-700/40"></div>
+                  </div>
+                </div>
+                <svg className="w-4 h-4 text-emerald-400/80 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                </svg>
+              </div>
+              <div className="text-right">
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-bold tracking-wide backdrop-blur-md">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Safe #01 · cash_in_hand
+                </span>
+                <span className="text-[9px] text-emerald-200/80 font-medium block mt-0.5">Physical Liquid Safe</span>
+              </div>
+            </div>
+
+            <div className="relative z-10 my-3">
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Available Balance</p>
+                  <p className="text-2xl font-black font-display tracking-tight text-white tabular-nums mt-0.5">
+                    {formatCurrency(balances.cash_in_hand || 0)}
+                  </p>
+                </div>
+                {pendingRelocations.length > 0 && (
+                  <span className="px-2 py-0.5 rounded bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[10px] font-bold tabular-nums">
+                    +{formatCurrency(pendingRelocations.reduce((s, r) => s + r.amount, 0))} in-transit
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="relative z-10 pt-2.5 border-t border-white/10 flex items-end justify-between">
+              <div>
+                <p className="font-mono text-xs tracking-wider text-slate-300 font-semibold">VAULT-01 •••• SAFE</p>
+                <p className="text-[11px] font-black uppercase tracking-wider text-emerald-300 mt-0.5">PHYSICAL CASH BOX</p>
+              </div>
+              <button 
+                onClick={() => setActiveModal('denominations')}
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs border border-white/15 backdrop-blur-md transition-all shadow-sm cursor-pointer"
+              >
+                Count Notes
+              </button>
+            </div>
+          </div>
+
+          {/* VAULT 2 */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-brand-900 p-5 text-white shadow-xl border border-indigo-500/30 flex flex-col justify-between transition-all group min-h-[224px]">
+            <div className="absolute -right-12 -top-12 w-36 h-36 bg-brand-500/20 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute -left-10 -bottom-10 w-28 h-28 bg-indigo-500/15 rounded-full blur-xl pointer-events-none"></div>
+            
+            <div className="relative z-10 flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-7 rounded-md bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 p-0.5 shadow-sm border border-slate-200/80 flex flex-col justify-between overflow-hidden flex-shrink-0">
+                  <div className="flex justify-between items-center h-full">
+                    <div className="w-2.5 h-full border-r border-slate-500/40"></div>
+                    <div className="flex-1 h-2 border-y border-slate-500/40 mx-0.5"></div>
+                    <div className="w-2.5 h-full border-l border-slate-500/40"></div>
+                  </div>
+                </div>
+                <svg className="w-4 h-4 text-indigo-300/80 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                </svg>
+              </div>
+              <div className="text-right">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-brand-500/30 border border-brand-400/40 text-brand-200 text-[9px] font-bold">
+                  Primary UPI / Collections
+                </span>
+                <span className="text-[9px] text-indigo-200/80 font-mono block mt-0.5">kishor_bank</span>
+              </div>
+            </div>
+
+            <div className="relative z-10 my-3">
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-indigo-200/70">Available Balance</p>
+                  <p className="text-2xl font-black font-display tracking-tight text-white tabular-nums mt-0.5">
+                    {formatCurrency(balances.kishor_bank || 0)}
+                  </p>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  Auto-recon Active
+                </span>
+              </div>
+            </div>
+
+            <div className="relative z-10 pt-2.5 border-t border-white/10 flex items-end justify-between">
+              <div>
+                <p className="font-mono text-xs tracking-wider text-slate-200 font-semibold">•••• •••• •••• 4192</p>
+                <p className="text-[11px] font-black uppercase tracking-wider text-indigo-200 mt-0.5">DR. KISHOR ACCOUNT</p>
+              </div>
+              <button 
+                onClick={() => setSelectedWalletFilter(selectedWalletFilter === 'kishor_bank' ? 'all' : 'kishor_bank')}
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs border border-white/15 backdrop-blur-md transition-all shadow-sm cursor-pointer"
+              >
+                Statement
+              </button>
+            </div>
+          </div>
+
+          {/* VAULT 3 */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-900 via-slate-800 to-indigo-950 p-5 text-white shadow-xl border border-indigo-400/25 flex flex-col justify-between transition-all group min-h-[224px]">
+            <div className="absolute -right-12 -top-12 w-36 h-36 bg-emerald-400/15 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute -left-10 -bottom-10 w-28 h-28 bg-brand-600/15 rounded-full blur-xl pointer-events-none"></div>
+            
+            <div className="relative z-10 flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-7 rounded-md bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 p-0.5 shadow-sm border border-slate-200/80 flex flex-col justify-between overflow-hidden flex-shrink-0">
+                  <div className="flex justify-between items-center h-full">
+                    <div className="w-2.5 h-full border-r border-slate-500/40"></div>
+                    <div className="flex-1 h-2 border-y border-slate-500/40 mx-0.5"></div>
+                    <div className="w-2.5 h-full border-l border-slate-500/40"></div>
+                  </div>
+                </div>
+                <svg className="w-4 h-4 text-emerald-300/80 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                </svg>
+              </div>
+              <div className="text-right">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-[9px] font-bold">
+                  Prize Disbursal
+                </span>
+                <span className="text-[9px] text-slate-300 font-mono block mt-0.5">dad_bank</span>
+              </div>
+            </div>
+
+            <div className="relative z-10 my-3">
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Available Balance</p>
+                  <p className="text-2xl font-black font-display tracking-tight text-white tabular-nums mt-0.5">
+                    {formatCurrency(balances.dad_bank || 0)}
+                  </p>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-slate-300 text-[10px] font-medium">
+                  Prize Disbursal Vault
+                </span>
+              </div>
+            </div>
+
+            <div className="relative z-10 pt-2.5 border-t border-white/10 flex items-end justify-between">
+              <div>
+                <p className="font-mono text-xs tracking-wider text-slate-200 font-semibold">•••• •••• •••• 8821</p>
+                <p className="text-[11px] font-black uppercase tracking-wider text-emerald-300 mt-0.5">ANBAZHAKAN (DAD) ACCOUNT</p>
+              </div>
+              <button 
+                onClick={() => setSelectedWalletFilter(selectedWalletFilter === 'dad_bank' ? 'all' : 'dad_bank')}
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs border border-white/15 backdrop-blur-md transition-all shadow-sm cursor-pointer"
+              >
+                Statement
+              </button>
+            </div>
+          </div>
+
+          {/* VAULT 4 */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-900 via-rose-950 to-slate-900 p-5 text-white shadow-xl border border-rose-500/30 flex flex-col justify-between transition-all group min-h-[224px]">
+            <div className="absolute -right-12 -top-12 w-36 h-36 bg-amber-400/15 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute -left-10 -bottom-10 w-28 h-28 bg-rose-500/15 rounded-full blur-xl pointer-events-none"></div>
+            
+            <div className="relative z-10 flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-7 rounded-md bg-gradient-to-br from-amber-200 via-amber-400 to-amber-600 p-0.5 shadow-sm border border-amber-300/60 flex flex-col justify-between overflow-hidden flex-shrink-0">
+                  <div className="flex justify-between items-center h-full">
+                    <div className="w-2.5 h-full border-r border-amber-700/40"></div>
+                    <div className="flex-1 h-2 border-y border-amber-700/40 mx-0.5"></div>
+                    <div className="w-2.5 h-full border-l border-amber-700/40"></div>
+                  </div>
+                </div>
+                <svg className="w-4 h-4 text-amber-300/80 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                </svg>
+              </div>
+              <div className="text-right">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/40 text-amber-200 text-[9px] font-bold">
+                  Emergency Reserve
+                </span>
+                <span className="text-[9px] text-amber-200/90 font-mono block mt-0.5">mom_bank</span>
+              </div>
+            </div>
+
+            <div className="relative z-10 my-3">
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Available Balance</p>
+                  <p className="text-2xl font-black font-display tracking-tight text-white tabular-nums mt-0.5">
+                    {formatCurrency(balances.mom_bank || 0)}
+                  </p>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-200 text-[10px] font-semibold">
+                  Kai Iruppu Reserve
+                </span>
+              </div>
+            </div>
+
+            <div className="relative z-10 pt-2.5 border-t border-white/10 flex items-end justify-between">
+              <div>
+                <p className="font-mono text-xs tracking-wider text-slate-200 font-semibold">•••• •••• •••• 3094</p>
+                <p className="text-[11px] font-black uppercase tracking-wider text-amber-300 mt-0.5">PARIMALAM (MOM) ACCOUNT</p>
+              </div>
+              <button 
+                onClick={() => setSelectedWalletFilter(selectedWalletFilter === 'mom_bank' ? 'all' : 'mom_bank')}
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs border border-white/15 backdrop-blur-md transition-all shadow-sm cursor-pointer"
+              >
+                Statement
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. Desktop Split Section: Denominations & Personal Draws */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left: Denominations (7 cols) */}
+          <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-sm">
+                  🧮
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-sm text-slate-900">Physical Cash Denomination Reconciler</h3>
+                  <p className="text-[11px] text-slate-500">Live note tallying against Physical Cash Box registered balance ({formatCurrency(balances.cash_in_hand || 0)})</p>
+                </div>
+              </div>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
+                cashDisparity === 0 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : cashDisparity > 0 
+                  ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                  : 'bg-rose-50 text-rose-700 border-rose-200'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${cashDisparity === 0 ? 'bg-emerald-500' : cashDisparity > 0 ? 'bg-blue-500' : 'bg-rose-500'}`}></span>
+                {cashDisparity === 0 ? 'Perfect Match (₹0 Variance)' : `${cashDisparity > 0 ? '+' : ''}${formatCurrency(cashDisparity)} Variance`}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
+              {[500, 200, 100, 50, 20, 10].map((note) => (
+                <div key={note} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-800">₹{note} Note</span>
+                    <span className="text-[10px] font-mono text-slate-500">x {denominations[note] || 0}</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <input 
+                      type="number"
+                      min={0}
+                      value={denominations[note] || ''}
+                      onChange={(e) => setDenominations(prev => ({ ...prev, [note]: parseInt(e.target.value) || 0 }))}
+                      className="w-full text-xs bg-white border border-slate-300 rounded-lg py-1 px-2 font-mono font-bold text-slate-800 focus:ring-brand-500 focus:border-brand-500"
+                    />
+                  </div>
+                  <div className="mt-1.5 text-right font-mono text-xs font-bold text-slate-900">
+                    {formatCurrency((denominations[note] || 0) * note)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-100/80 border border-slate-200 flex items-center justify-between text-xs flex-wrap gap-2">
+              <div className="flex items-center gap-4">
+                <span>Total Counted Notes: <strong className="text-slate-900 font-mono">{formatCurrency(calculatedPhysicalCash)}</strong></span>
+                <span className="text-slate-300">|</span>
+                <span>Physical Cash Box: <strong className="text-slate-900 font-mono">{formatCurrency(balances.cash_in_hand || 0)}</strong></span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setDenominations({ 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0 })}
+                  className="px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-lg border border-slate-200 text-xs shadow-2xs cursor-pointer"
+                >
+                  Reset
+                </button>
+                <button 
+                  onClick={() => {
+                    triggerHapticFeedback('success');
+                    alert(`✓ Physical cash tally of ${formatCurrency(calculatedPhysicalCash)} stamped successfully! Variance: ${formatCurrency(cashDisparity)}`);
+                  }}
+                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-xs cursor-pointer"
+                >
+                  Save Physical Tally Stamp
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Personal Draws & Float (5 cols) */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-md bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center">💼</span>
+                  <h4 className="font-display font-bold text-xs text-slate-900 uppercase tracking-wider">Outstanding Personal Draws</h4>
+                </div>
+                <span className="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                  {formatCurrency(totalOutstandingDebt)} Due
+                </span>
+              </div>
+
+              {outstandingPersonalDraws.length === 0 ? (
+                <div className="p-4 bg-slate-50 rounded-xl text-center text-xs text-slate-500 font-medium">
+                  No outstanding personal cash draws recorded.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[190px] overflow-y-auto pr-1">
+                  {outstandingPersonalDraws.slice(0, 3).map((draw) => (
+                    <div key={draw.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100/60 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-800">{draw.tag}</span>
+                          <span className="text-xs font-bold text-slate-900">{draw.takenBy}</span>
+                        </div>
+                        <span className="text-xs font-extrabold text-slate-900 font-mono">{formatCurrency(draw.amount)}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+                        <span>From {WALLET_META[draw.walletType]?.name || draw.walletType}</span>
+                        <button 
+                          onClick={() => {
+                            setSettlingDraw(draw);
+                            setSettleAmount(String(draw.amount));
+                            setSettleDestWallet(draw.walletType);
+                            setActiveModal('settle');
+                          }}
+                          className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                        >
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span>Settle to {draw.walletType === 'cash_in_hand' ? 'Cash Box' : 'Bank'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center">🌊</span>
+                  <h4 className="font-display font-bold text-xs text-slate-900 uppercase tracking-wider">Active Floating Capital Float</h4>
+                </div>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  {formatCurrency(floatStats.total)} Injected
+                </span>
+              </div>
+
+              {activeFloatingDeposits.length === 0 ? (
+                <div className="p-4 bg-slate-50 rounded-xl text-center text-xs text-slate-500 font-medium">
+                  No active floating capital injections.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[190px] overflow-y-auto pr-1">
+                  {activeFloatingDeposits.slice(0, 3).map((f) => (
+                    <div key={f.id} className="p-3 rounded-xl bg-emerald-50/40 border border-emerald-200/70 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900">{f.depositedBy}</span>
+                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">{f.tag}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{f.notes || `Credited into ${WALLET_META[f.walletType]?.name}`}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono text-sm font-extrabold text-slate-900">{formatCurrency(f.amount)}</div>
+                        <button 
+                          onClick={() => {
+                            setRecoveringFloat(f);
+                            setRecoverAmount(String(f.amount));
+                            setRecoverSourceWallet(f.walletType);
+                            setActiveModal('recover');
+                          }}
+                          className="mt-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-white border border-rose-200 hover:bg-rose-50 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Recover / Return
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* 4. Desktop Audit Statement & Ledger Table */}
+        <section className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <h3 className="font-display font-bold text-base text-slate-900">Treasury Audit Statement &amp; Ledger</h3>
+              <span className="text-xs font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
+                {filteredTransactions.length} Movements Recorded
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="relative w-60">
+                <input 
+                  type="text"
+                  placeholder="Search reference, memo, ID..."
+                  value={ledgerSearch}
+                  onChange={(e) => setLedgerSearch(e.target.value)}
+                  className="w-full text-xs bg-slate-50 border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-brand-500 focus:border-brand-500 transition-all"
+                />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+              </div>
+
+              <div className="relative">
+                <select 
+                  value={dateRangeFilter}
+                  onChange={(e) => setDateRangeFilter(e.target.value as any)}
+                  className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:ring-brand-500 focus:border-brand-500 pr-7 appearance-none cursor-pointer"
+                >
+                  <option value="month">Date: This Month / M2 Cycle</option>
+                  <option value="30days">Date: Last 30 Days</option>
+                  <option value="all">Date: All Time</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2 pointer-events-none" />
+              </div>
+
+              <div className="relative">
+                <select 
+                  value={selectedWalletFilter}
+                  onChange={(e) => setSelectedWalletFilter(e.target.value as any)}
+                  className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:ring-brand-500 focus:border-brand-500 pr-7 appearance-none cursor-pointer"
+                >
+                  <option value="all">All 4 Vaults</option>
+                  <option value="cash_in_hand">Physical Cash Box</option>
+                  <option value="kishor_bank">Dr. Kishor Account</option>
+                  <option value="dad_bank">Anbazhakan (Dad) Account</option>
+                  <option value="mom_bank">Parimalam (Mom) Account</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2 pointer-events-none" />
+              </div>
+
+              <div className="relative">
+                <select 
+                  value={ledgerTypeFilter}
+                  onChange={(e) => setLedgerTypeFilter(e.target.value)}
+                  className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:ring-brand-500 focus:border-brand-500 pr-7 appearance-none cursor-pointer"
+                >
+                  <option value="all">All Categories</option>
+                  <option value="collection">Collection (+)</option>
+                  <option value="payout">Prize Disbursal (-)</option>
+                  <option value="transfer">Vault Transfer</option>
+                  <option value="atm">ATM Relocation</option>
+                  <option value="draw">Personal Draw (-)</option>
+                  <option value="float">Float Inflow (+)</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2 pointer-events-none" />
+              </div>
+
+              <button 
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200/80 transition-colors cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-500" />
+                <span>Export PDF</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-12 px-6 py-2.5 bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="col-span-2">Date &amp; Time</div>
+            <div className="col-span-3">Transaction Description &amp; Memo</div>
+            <div className="col-span-2">Source / Destination Vault</div>
+            <div className="col-span-2">Category Tag</div>
+            <div className="col-span-2 text-right">Amount (₹)</div>
+            <div className="col-span-1 text-center">Status</div>
+          </div>
+
+          <div className="divide-y divide-slate-100 text-xs">
+            {filteredTransactions.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400">
+                No transactions match your current search and filter criteria.
+              </div>
+            ) : (
+              filteredTransactions.map((tx) => {
+                const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx, selectedWalletFilter);
+                const dateObj = new Date(tx.created_at);
+                const dateStr = dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+                const timeStr = dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                const txIdShort = `TXN #${tx.id.slice(0, 6).toUpperCase()}`;
+
+                return (
+                  <div 
+                    key={tx.id} 
+                    className={`grid grid-cols-12 px-6 py-2.5 items-center hover:bg-slate-50/80 transition-colors ${
+                      tx.type === 'atm_withdrawal' && tx.status === 'pending_verification' ? 'bg-amber-50/20' : ''
+                    }`}
+                  >
+                    <div className="col-span-2 font-mono text-slate-600">
+                      <div className="font-bold text-slate-900 leading-tight">{dateStr}, {timeStr}</div>
+                      <span className="text-[10px] text-slate-400">{txIdShort}</span>
+                    </div>
+
+                    <div className="col-span-3 pr-2">
+                      <div className="font-bold text-slate-900 leading-tight">
+                        {tx.type === 'collection' ? 'Member Installment Collection' : 
+                         tx.type === 'payout' ? 'Month Winner Prize Pot Payout' :
+                         tx.type === 'atm_withdrawal' ? 'ATM Withdrawal for Safe Cash' :
+                         tx.type === 'personal_draw' ? 'Personal Draw Expense' :
+                         'Inter-Vault Liquidity Balancing'}
+                      </div>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        {tx.notes || tx.description || 'Treasury Movement'}
+                      </p>
+                    </div>
+
+                    <div className="col-span-2 pr-2">
+                      <div className="flex items-center gap-1 font-semibold text-slate-700 text-[11px]">
+                        <span className="truncate">{WALLET_META[tx.wallet_type]?.name || tx.wallet_type}</span>
+                        {tx.to_wallet && tx.to_wallet !== tx.wallet_type && (
+                          <>
+                            <span className="text-brand-600 font-bold">➔</span>
+                            <span className="truncate">{WALLET_META[tx.to_wallet as WalletType]?.name || tx.to_wallet}</span>
+                          </>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400 block font-mono">
+                        {WALLET_META[tx.wallet_type]?.bankName || 'Verified Vault'}
+                      </span>
+                    </div>
+
+                    <div className="col-span-2 pr-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${badgeColor}`}>
+                        {badgeLabel}
+                      </span>
+                    </div>
+
+                    <div className="col-span-2 text-right font-mono pr-2">
+                      <div className={`font-extrabold ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
+                      </div>
+                      <span className="text-[10px] text-slate-400">
+                        {tx.status === 'pending_verification' ? 'Awaiting Count' : 'Direct Vault Delta'}
+                      </span>
+                    </div>
+
+                    <div className="col-span-1 text-center">
+                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border whitespace-nowrap ${
+                        tx.status === 'pending_verification'
+                          ? 'bg-amber-100 text-amber-800 border-amber-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}>
+                        {tx.status === 'pending_verification' ? 'In-Transit' : 'Verified'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="px-6 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span className="font-medium">Showing {filteredTransactions.length} treasury movements</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-slate-400">Cryptographically sealed into PostgreSQL Local-First Node</span>
+              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-2xs">
+                <button className="px-2.5 py-1 text-slate-400 font-semibold cursor-default">1</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div>
 
-      {/* ── MODAL 1: ATM WITHDRAWAL MODAL ───────────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════════════════════════
+          SHARED INTERACTIVE MODALS (ATM, Spend, Deposit, Transfer, etc.)
+          ══════════════════════════════════════════════════════════════════════════ */}
+
+      {/* MODAL 1: ATM WITHDRAWAL */}
       {activeModal === 'atm' && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
           <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
@@ -1915,7 +2317,7 @@ export default function CashVaultLedger() {
                         relocateSource === bKey ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs' : 'bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200'
                       }`}
                     >
-                      <div className="text-[10px] font-bold truncate">{WALLET_META[bKey].name}</div>
+                      <div className="text-[10px] font-bold truncate">{WALLET_META[bKey].shortName}</div>
                       <div className="text-xs font-mono font-black mt-0.5">{formatCurrency(balances[bKey] || 0)}</div>
                     </button>
                   ))}
@@ -1934,7 +2336,7 @@ export default function CashVaultLedger() {
         </div>
       )}
 
-      {/* ── MODAL 2: PERSONAL SPEND / DRAW MODAL ─────────────────────────────── */}
+      {/* MODAL 2: PERSONAL SPEND / DRAW */}
       {activeModal === 'spend' && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
           <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
@@ -2020,10 +2422,10 @@ export default function CashVaultLedger() {
                     onChange={(e) => setSpendWallet(e.target.value as any)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
                   >
-                    <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                    <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank)})</option>
-                    <option value="dad_bank">Anbazhakan's Bank ({formatCurrency(balances.dad_bank)})</option>
-                    <option value="mom_bank">Parimalam's Bank ({formatCurrency(balances.mom_bank)})</option>
+                    <option value="cash_in_hand">Cash Box ({formatCurrency(balances.cash_in_hand || 0)})</option>
+                    <option value="kishor_bank">Kishor Bank ({formatCurrency(balances.kishor_bank || 0)})</option>
+                    <option value="dad_bank">Anbazhakan's Bank ({formatCurrency(balances.dad_bank || 0)})</option>
+                    <option value="mom_bank">Parimalam's Bank ({formatCurrency(balances.mom_bank || 0)})</option>
                   </select>
                 </div>
               </div>
@@ -2051,7 +2453,7 @@ export default function CashVaultLedger() {
         </div>
       )}
 
-      {/* ── MODAL 3: DEPOSIT FLOAT / INFLOW MODAL ────────────────────────────── */}
+      {/* MODAL 3: DEPOSIT FLOAT / INFLOW */}
       {activeModal === 'deposit' && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
           <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
@@ -2138,7 +2540,7 @@ export default function CashVaultLedger() {
         </div>
       )}
 
-      {/* ── MODAL 4: INTER-BANK TRANSFER MODAL ──────────────────────────────── */}
+      {/* MODAL 4: INTER-BANK TRANSFER */}
       {activeModal === 'transfer' && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
           <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
@@ -2225,7 +2627,7 @@ export default function CashVaultLedger() {
         </div>
       )}
 
-      {/* ── MODAL 5: SETTLE PERSONAL DEBT (PUT BACK) ────────────────────────── */}
+      {/* MODAL 5: SETTLE PERSONAL DEBT */}
       {activeModal === 'settle' && settlingDraw && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
           <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
@@ -2285,7 +2687,7 @@ export default function CashVaultLedger() {
         </div>
       )}
 
-      {/* ── MODAL 6: DENOMINATIONS / NOTE COUNTER MODAL ─────────────────────── */}
+      {/* MODAL 6: DENOMINATIONS / NOTE COUNTER */}
       {activeModal === 'denominations' && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
           <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-lg p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
@@ -2305,7 +2707,6 @@ export default function CashVaultLedger() {
             </div>
 
             <div className="overflow-y-auto flex-1 space-y-3 pr-1">
-              {/* Note Row Inputs */}
               {[500, 200, 100, 50, 20, 10].map((note) => (
                 <div key={note} className="flex items-center justify-between bg-gray-50 border border-gray-200 p-2.5 rounded-xl gap-2">
                   <span className="w-16 font-black font-mono text-sm text-gray-800">₹{note}</span>
@@ -2325,7 +2726,6 @@ export default function CashVaultLedger() {
                 </div>
               ))}
 
-              {/* Tally Summary Card */}
               <div className="bg-slate-900 text-white p-3.5 rounded-2xl space-y-2 mt-3">
                 <div className="flex justify-between text-xs font-bold">
                   <span className="text-gray-400">Physical Notes Counted:</span>
@@ -2333,7 +2733,7 @@ export default function CashVaultLedger() {
                 </div>
                 <div className="flex justify-between text-xs font-bold">
                   <span className="text-gray-400">System Cash in Hand:</span>
-                  <span className="font-mono text-white">{formatCurrency(balances.cash_in_hand)}</span>
+                  <span className="font-mono text-white">{formatCurrency(balances.cash_in_hand || 0)}</span>
                 </div>
                 <div className="pt-2 border-t border-white/10 flex justify-between items-center">
                   <span className="text-xs font-black uppercase">Disparity (Difference):</span>
@@ -2365,7 +2765,7 @@ export default function CashVaultLedger() {
         </div>
       )}
 
-      {/* ── MODAL 7: RECOVER FLOATING CAPITAL MODAL ────────────────────────── */}
+      {/* MODAL 7: RECOVER FLOATING CAPITAL */}
       {activeModal === 'recover' && recoveringFloat && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
           <div className="bg-white border border-gray-200 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150">
@@ -2412,10 +2812,10 @@ export default function CashVaultLedger() {
                   onChange={(e) => setRecoverSourceWallet(e.target.value as any)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-900 focus:outline-none"
                 >
-                  <option value="cash_in_hand">Physical Cash Box ({formatCurrency(balances.cash_in_hand)})</option>
-                  <option value="kishor_bank">Kishor Bank (UPI) ({formatCurrency(balances.kishor_bank)})</option>
-                  <option value="dad_bank">Dad's Bank ({formatCurrency(balances.dad_bank)})</option>
-                  <option value="mom_bank">Mom's Bank ({formatCurrency(balances.mom_bank)})</option>
+                  <option value="cash_in_hand">Physical Cash Box ({formatCurrency(balances.cash_in_hand || 0)})</option>
+                  <option value="kishor_bank">Kishor Bank (UPI) ({formatCurrency(balances.kishor_bank || 0)})</option>
+                  <option value="dad_bank">Dad's Bank ({formatCurrency(balances.dad_bank || 0)})</option>
+                  <option value="mom_bank">Mom's Bank ({formatCurrency(balances.mom_bank || 0)})</option>
                 </select>
               </div>
 
