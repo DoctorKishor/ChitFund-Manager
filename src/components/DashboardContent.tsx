@@ -4465,25 +4465,10 @@ Thank you for your prompt payment! 🙏`;
               </section>
               {/* END: HeroFinancialCard */}
 
-              {/* BEGIN: CycleMilestonesAndCountdown */}
-              <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="auction-milestones-widget">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Auction Timeline
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {activeGroup ? getGroupAuctionDate(activeGroup.id, selectedDashboardMonth).display : 'No scheduled auction'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 font-mono">
-                    <Clock size={12} className="text-brand-600" />
-                    <span>{selectedDashboardMonth === 0 ? 'Month 0' : `Cycle M${selectedDashboardMonth}`}</span>
-                  </div>
-                </div>
-
+              {/* BEGIN: CycleMilestonesAndCountdown (Compact Month Selector) */}
+              <section className="bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200/90 shadow-card" data-purpose="auction-milestones-widget">
                 {/* Step Indicators for Months */}
-                <div className="flex items-center gap-1.5 pt-1 overflow-x-auto scrollbar-none">
+                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
                   {monthsRange.map((m) => {
                     const isGroupActiveMonth = m === (activeGroup?.currentMonth ?? 0);
                     const isCompleted = m < (activeGroup?.currentMonth ?? 0);
