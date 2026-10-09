@@ -4558,32 +4558,27 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
           </div>
 
           {/* App Title & Sub-header */}
-          <div className="px-5 py-2.5 flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex items-center space-x-1.5">
-                <button
-                  type="button"
-                  onClick={handleExitStudio}
-                  className="p-1 -ml-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0"
-                  title="Back to Overview"
-                >
-                  <ArrowLeft size={16} />
-                </button>
-                <h1 className="text-base font-extrabold text-slate-900 leading-tight truncate">Live Bidding Arena</h1>
-                {group.is_live_auction_active ? (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />
-                    Live
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0 font-mono">
-                    Standby
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                Month {group.currentMonth === 0 ? '0 Launch' : group.currentMonth} · {eligibleCount} Contenders Active
-              </p>
+          <div className="px-4 py-2.5 flex items-center justify-between gap-2">
+            <div className="flex items-center space-x-1.5 min-w-0">
+              <button
+                type="button"
+                onClick={handleExitStudio}
+                className="p-1 -ml-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0"
+                title="Back to Overview"
+              >
+                <ArrowLeft size={16} />
+              </button>
+              <h1 className="text-base font-extrabold text-slate-900 leading-tight truncate">Live Bidding Arena</h1>
+              {group.is_live_auction_active ? (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />
+                  Live
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0 font-mono">
+                  Standby
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-1.5 shrink-0">
               <div 
@@ -4596,54 +4591,57 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             </div>
           </div>
 
-          {/* Action & Attendance Sub-bar */}
-          <div className="px-5 py-2 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar border-t border-slate-100 bg-slate-50/70 text-[11px]">
-            <div className="flex items-center space-x-2 flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowViewersModal(true)}
-                className="inline-flex items-center gap-1 font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
-              >
-                <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                <span>{liveViewerCount} in-app</span>
-              </button>
-              <span className="text-slate-300">•</span>
+          {/* Action & Attendance Sub-bar (Decluttered) */}
+          <div className="px-4 py-1.5 flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/70 text-xs">
+            <div className="flex items-center space-x-2">
               <button
                 type="button"
                 onClick={() => setShowRollCallModal(true)}
-                className="inline-flex items-center gap-1 font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+                className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded-md border border-slate-200 font-bold text-[11px] text-emerald-700 hover:bg-slate-50 shadow-2xs cursor-pointer active:scale-95 transition-all"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span>{attendingMemberIds.length}/{eligibleCount} Roll Call</span>
+                <span>{attendingMemberIds.length}/{eligibleCount} Quorum</span>
               </button>
+              {liveViewerCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowViewersModal(true)}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-800 cursor-pointer"
+                >
+                  <Eye className="w-3 h-3 text-slate-400" />
+                  <span>{liveViewerCount}</span>
+                </button>
+              )}
             </div>
-            <div className="flex items-center space-x-1.5 flex-shrink-0">
-              <button 
-                type="button"
-                onClick={handleUndo}
-                disabled={bids.length === 0}
-                className="inline-flex items-center space-x-1 px-2 py-0.5 bg-amber-50 border border-amber-200 rounded-md text-[10px] font-bold text-amber-800 hover:bg-amber-100 active:scale-95 transition-all disabled:opacity-40 cursor-pointer"
-              >
-                <svg className="w-2.5 h-2.5 text-amber-700" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2m0 0l-3-3m3 3l3-3M3 10l3-3m-3 3l3 3" /></svg>
-                <span>Undo Last Bid</span>
-              </button>
+            <div className="flex items-center space-x-1.5">
+              {bids.length > 0 && (
+                <button 
+                  type="button"
+                  onClick={handleUndo}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-200 rounded-md text-[10px] font-bold text-amber-800 hover:bg-amber-100 active:scale-95 transition-all cursor-pointer"
+                  title="Undo Last Bid"
+                >
+                  <Undo2 className="w-2.5 h-2.5 text-amber-700" />
+                  <span>Undo</span>
+                </button>
+              )}
               {group.currentMonth > 0 && !group.is_live_auction_active ? (
                 <button
                   type="button"
                   onClick={promptStartLiveBroadcast}
                   disabled={isStartingLiveSession}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-100 text-[9px] font-black text-emerald-700 tracking-tight cursor-pointer hover:bg-emerald-200 disabled:opacity-50"
+                  className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                 >
-                  {isStartingLiveSession ? 'STARTING...' : 'BEGIN LIVE'}
+                  {isStartingLiveSession ? 'Starting...' : 'Begin Live'}
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handleEndLiveAuctionSession}
                   disabled={isStartingLiveSession}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded bg-red-100 text-[9px] font-black text-red-700 tracking-tight cursor-pointer hover:bg-red-200 disabled:opacity-50"
+                  className="inline-flex items-center px-2 py-0.5 rounded-md bg-rose-50 border border-rose-200 text-[10px] font-bold text-rose-700 hover:bg-rose-100 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                 >
-                  END LIVE STREAM
+                  End Stream
                 </button>
               )}
             </div>
@@ -4881,7 +4879,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   const member = members.find(m => m.id === bid.memberId);
                   const ticketNum = member?.ticketNumber || bid.ticketNumber || '?';
                   const bidderName = member?.fullName || bid.memberName || 'Bidder';
-                  const formattedTime = new Date(bid.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                  const formattedTime = formatBidTimestamp(bid.timestamp);
                   const netPot = (group.totalValue || 0) - bid.amount;
 
                   return (
