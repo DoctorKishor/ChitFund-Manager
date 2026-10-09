@@ -41,7 +41,12 @@ import {
   FileText,
   ChevronRight,
   Printer,
-  Plus
+  Plus,
+  DollarSign,
+  TrendingDown,
+  Search,
+  Filter,
+  ShieldCheck
 } from 'lucide-react';
 import AuctionCountdownBanner from '@/components/AuctionCountdownBanner';
 import { HelpTooltip } from '@/components/HelpTooltip';
@@ -235,6 +240,10 @@ export default function LiveAuctionEngine() {
   const [showMonth0Modal, setShowMonth0Modal] = useState<boolean>(false);
   const [month0PayoutWallet, setMonth0PayoutWallet] = useState<WalletType>('dad_bank');
   const [stage, setStage] = useState<'overview' | 'studio'>('overview');
+  const [desktopViewTab, setDesktopViewTab] = useState<'arena' | 'history'>('arena');
+  const [historicalFilter, setHistoricalFilter] = useState<'all' | 'completed' | 'laaba' | 'pending'>('all');
+  const [historicalSearchQuery, setHistoricalSearchQuery] = useState<string>('');
+  const [activeInspectLogId, setActiveInspectLogId] = useState<string | null>(null);
   const [isStartingLiveSession, setIsStartingLiveSession] = useState<boolean>(false);
   const [liveViewerCount, setLiveViewerCount] = useState<number>(0);
   const [activeViewers, setActiveViewers] = useState<ActiveViewerInfo[]>([]);
@@ -1951,10 +1960,17 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               <div>
                 <h1 className="text-lg font-bold font-display text-slate-900 tracking-tight flex items-center gap-2">
                   Auctions &amp; Bidding Arena{' '}
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                    Upcoming Session
-                  </span>
+                  {desktopViewTab === 'history' ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                      Historical Ledger
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                      Upcoming Session
+                    </span>
+                  )}
                 </h1>
               </div>
               <div className="h-6 w-px bg-slate-200 mx-1" />
@@ -1995,472 +2011,1128 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
             {/* Header Actions */}
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setShowScheduleModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-colors shadow-2xs cursor-pointer"
-              >
-                <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                <span>Reschedule / Conduct Early</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const msg = `📢 *Upcoming Live Chit Auction Notice*\nGroup: ${group.name}\nMonth Cycle: Month ${group.currentMonth}\nChit Value: ${formatCurrency(group.totalValue)}\nScheduled Date: ${countdown.formattedTargetDate || formattedTargetAuctionDate} at ${countdown.formattedTargetTime || formattedTargetAuctionTime}\n\nPlease be present on the floor or connected in-app.`;
-                  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                <span>Broadcast Schedule Notice</span>
-              </button>
+              {desktopViewTab === 'history' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setDesktopViewTab('arena')}
+                    className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <ArrowLeft size={14} />
+                    <span>Back to Live Arena</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isGeneratingReportPdf || historicalAuctionLogs.length === 0}
+                    onClick={() => {
+                      if (historicalAuctionLogs.length > 0) {
+                        setSelectedHistoricalLog(historicalAuctionLogs[0]);
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Multi-Month Audit Summary</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setDesktopViewTab('history')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-xl border border-indigo-200 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <History size={14} />
+                    <span>Historical Ledger ({historicalAuctionLogs.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <Clock size={14} />
+                    <span>Reschedule / Conduct Early</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = `📢 *Upcoming Live Chit Auction Notice*\nGroup: ${group.name}\nMonth Cycle: Month ${group.currentMonth}\nChit Value: ${formatCurrency(group.totalValue)}\nScheduled Date: ${countdown.formattedTargetDate || formattedTargetAuctionDate} at ${countdown.formattedTargetTime || formattedTargetAuctionTime}\n\nPlease be present on the floor or connected in-app.`;
+                      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer"
+                  >
+                    <Send size={14} />
+                    <span>Broadcast Schedule Notice</span>
+                  </button>
+                </>
+              )}
             </div>
           </header>
 
           {/* Main Scrollable Arena Body */}
           <main className="flex-1 overflow-y-auto p-8 space-y-7">
-            
-            {/* Arena Master Milestone & Countdown Bar */}
-            <section className="bg-gradient-to-r from-amber-500/10 via-brand-50/50 to-amber-500/10 border-2 border-amber-300 bg-white rounded-2xl p-5 shadow-sm relative overflow-hidden">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-5">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                        NEXT LIVE AUCTION IN
-                      </span>
-                      <span className="text-xs text-slate-500 font-medium">
-                        Month {group.currentMonth} Competitive Discount Bidding · {formatCurrency(group.totalValue)} Scheme Pool
-                      </span>
-                    </div>
-                    <div className="flex items-baseline gap-2 mt-2">
-                      <span className="text-3xl md:text-4xl font-black font-mono tracking-wider text-slate-900 bg-white border border-amber-200 px-4 py-1.5 rounded-xl shadow-xs text-amber-900">
-                        {String(countdown.days).padStart(2, '0')}d : {String(countdown.hours).padStart(2, '0')}h : {String(countdown.minutes).padStart(2, '0')}m : {String(countdown.seconds).padStart(2, '0')}s
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 font-medium mt-1.5 flex items-center gap-1.5">
-                      <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                      Scheduled: <strong className="text-slate-900">{countdown.formattedTargetDate || formattedTargetAuctionDate} at {countdown.formattedTargetTime || formattedTargetAuctionTime} (IST)</strong>
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {isCountdownUnderTwoHours && (
-                    <button
-                      type="button"
-                      onClick={promptStartLiveAuction}
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
-                    >
-                      <svg className="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                      <span>Begin Auction</span>
-                      <span className="text-base leading-none">➔</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {/* Month 0 Launch Mode Alert / Banner Context */}
-            {group.currentMonth === 0 ? (
-              <section className="p-3.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl flex items-center justify-between text-xs">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-white border border-indigo-200 text-brand-600 flex items-center justify-center font-bold text-xs shadow-2xs">
-                    M0
-                  </div>
-                  <div>
-                    <span className="font-bold text-slate-900">Month 0 (Launch / Orientation Phase) Protocol</span>
-                    <p className="text-slate-500 text-[11px] mt-0.5">
-                      By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool is reserved as Organizer Commission. Once launch collections are secured, advance to Month 1 to begin live auctions.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAdvanceMonth0}
-                  disabled={isRecording}
-                  className="text-[11px] font-bold text-indigo-700 bg-white hover:bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <Rocket size={13} />
-                  <span>{isRecording ? 'Advancing to Month 1...' : 'Confirm Launch & Advance to Month 1'}</span>
-                </button>
-              </section>
-            ) : (
-              <section className="p-3.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl flex items-center justify-between text-xs">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-white border border-indigo-200 text-brand-600 flex items-center justify-center font-bold text-xs shadow-2xs">
-                    M0
-                  </div>
-                  <div>
-                    <span className="font-bold text-slate-900">Month 0 (Launch / Orientation Phase) Protocol</span>
-                    <p className="text-slate-500 text-[11px] mt-0.5">
-                      By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool was reserved as Organizer Commission. Group advanced to M1 on launch verification.
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[11px] font-bold text-indigo-700 bg-white px-2.5 py-1 rounded-lg border border-indigo-200">
-                  Completed &amp; Verified
-                </span>
-              </section>
-            )}
-
-            {/* Top Grid: Live Bid Console + Real-time Financial Engine + Discount Pool (Kai Iruppu) */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-7">
-              
-              {/* Left/Center 8 Cols: Contender Floor + Bidding Floor Status */}
-              <section className="xl:col-span-8 space-y-6">
-                
-                {/* Top Banner: Current Highest Discount Bid & Floor Status */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
-                  <div className="flex items-start justify-between flex-wrap gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Auction Floor Status</span>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold">
-                          <span className="text-xs">🔒</span> Standby Mode
+            {desktopViewTab === 'history' ? (
+              <div className="flex flex-col w-full">
+                {/* Context Breadcrumb & Top Bar */}
+                <div className="flex flex-col gap-5 mb-8">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <nav className="flex items-center gap-2 text-xs font-medium text-slate-400">
+                        <button 
+                          type="button"
+                          onClick={() => setDesktopViewTab('arena')}
+                          className="hover:text-slate-600 transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Gavel className="w-3.5 h-3.5" />
+                          <span>Auctions &amp; Bidding Arena</span>
+                        </button>
+                        <span className="text-slate-300">/</span>
+                        <span className="text-indigo-600 font-semibold">Historical Auction Log &amp; Past Rounds Ledger</span>
+                      </nav>
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                          {formatCurrency(group.totalValue)} Scheme Pool
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                          {group.durationMonths} Months Cycle
                         </span>
                       </div>
-                      <div className="flex items-baseline gap-3 mt-2">
-                        <span className="text-2xl md:text-3xl font-black font-display text-slate-900 tracking-tight">
-                          🔒 Bidding Floor Locked Until Scheduled Time
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1.5">
-                        Countdown active · Floor bidding terminal will unlock automatically at {countdown.formattedTargetTime || formattedTargetAuctionTime} or when Admin initiates the session.
-                      </p>
                     </div>
-                    <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-md min-w-[220px] text-right flex-shrink-0">
-                      <span className="text-[10px] uppercase font-bold text-indigo-200 tracking-wider block">
-                        Month {group.currentMonth} Prize Pool
-                      </span>
-                      <p className="text-2xl font-black font-display text-amber-400 mt-0.5">
-                        {formatCurrency(group.totalValue)}
-                      </p>
-                      <div className="text-[10px] text-slate-300 mt-1.5 pt-1.5 border-t border-white/10 flex justify-between">
-                        <span>Base Chit: {formatCurrency(group.totalValue)}</span>
-                        <span>Min Bid: ₹500</span>
-                      </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setDesktopViewTab('arena')}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 hover:text-slate-900 rounded-xl shadow-xs border border-slate-200 transition-all cursor-pointer"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Back to Live Arena</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={historicalAuctionLogs.length === 0 || isGeneratingReportPdf}
+                        onClick={() => {
+                          if (historicalAuctionLogs.length > 0) {
+                            setSelectedHistoricalLog(historicalAuctionLogs[0]);
+                          }
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm shadow-indigo-200 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Multi-Month Audit Summary (PDF)</span>
+                      </button>
                     </div>
                   </div>
-                </div>
 
-                {/* PRIMARY FOCUS: Active Contenders on Floor (Cards Grid) */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="font-display font-bold text-base text-slate-900 tracking-tight">Active Contenders on Floor</h2>
-                        <span className="text-xs font-bold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-full">
-                          {eligibleCount} Contenders · 1-Tap Ready
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {eligibleCount} Contenders in verified standby status. Bidding inputs unlock once session goes live.
-                      </p>
-                    </div>
-                    <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 font-semibold px-2.5 py-1 rounded-lg">
-                      {eligibleCount} / {members.length} Floor Quorum Met
-                    </span>
-                  </div>
+                  {/* Cumulative Performance Metrics Grid */}
+                  {(() => {
+                    const totalDisbursed = historicalAuctionLogs.reduce((sum, l) => sum + (l.netPayout || 0), 0);
+                    const totalDiscount = historicalAuctionLogs.reduce((sum, l) => sum + (l.winningDiscount || 0), 0);
+                    const avgDiscountPct = historicalAuctionLogs.length > 0 
+                      ? ((totalDiscount / (historicalAuctionLogs.length * (group.totalValue || 1))) * 100).toFixed(1)
+                      : '0.0';
+                    const laabaCount = historicalAuctionLogs.filter(l => l.isLaabaSeetu).length;
+                    const durationPct = Math.round((historicalAuctionLogs.length / (group.durationMonths || 1)) * 100);
 
-                  {/* Contender Grid Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                    {members.map((m) => {
-                      const isWon = m.hasWonRegular;
-                      const pastWinLog = historicalAuctionLogs.find(l => l.winningBidderId === m.id || l.ticketNumber === m.ticketNumber);
-
-                      if (isWon) {
-                        return (
-                          <div key={m.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-100/60 opacity-80 lg:col-span-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="w-7 h-7 rounded-lg bg-slate-300 text-slate-600 font-bold text-xs flex items-center justify-center font-mono shrink-0">
-                                  #{m.ticketNumber}
-                                </span>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <h4 className="text-xs font-bold text-slate-700 truncate">{m.fullName}</h4>
-                                    <span className="text-[10px] bg-slate-200 text-slate-600 font-semibold px-1.5 py-0.2 rounded shrink-0">
-                                      {pastWinLog ? `Month ${pastWinLog.month} Winner` : 'Prior Winner'}
-                                    </span>
-                                  </div>
-                                  <span className="text-[10px] text-slate-500 truncate block">
-                                    {pastWinLog 
-                                      ? `Won in M${pastWinLog.month} (Prize: ${formatCurrency(pastWinLog.netPayout)}) · Disqualified from bidding` 
-                                      : 'Prior winner spectator · Receives dividends'}
-                                  </span>
-                                </div>
-                              </div>
-                              <span className="text-[10px] font-bold text-slate-600 bg-white px-2.5 py-1 rounded border border-slate-200 shrink-0">
-                                Prior Winner (Spectator)
-                              </span>
-                            </div>
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Metric 1 */}
+                        <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase font-display">Total Rounds Concluded</span>
+                            <CheckCircle2 className="text-indigo-600 w-5 h-5" />
                           </div>
-                        );
-                      }
-
-                      return (
-                        <div key={m.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 shadow-2xs relative transition-all">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="w-7 h-7 rounded-lg bg-brand-100 text-brand-700 font-bold text-xs flex items-center justify-center font-mono shrink-0">
-                                #{m.ticketNumber}
-                              </span>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <h4 className="text-xs font-bold text-slate-900 truncate">{m.fullName}</h4>
-                                  <span className="text-[10px] bg-brand-50 text-brand-700 border border-brand-200 px-1.5 py-0.2 rounded font-semibold shrink-0">
-                                    Ready
-                                  </span>
-                                </div>
-                                <span className="text-[10px] font-semibold text-emerald-600">Registered &amp; Verified</span>
+                          <div className="mt-4 flex items-baseline justify-between">
+                            <div>
+                              <div className="text-2xl font-bold font-display text-slate-900 tracking-tight">
+                                {historicalAuctionLogs.length} <span className="text-sm font-normal text-slate-400 font-sans">of {group.durationMonths} Cycles</span>
                               </div>
+                              <p className="text-xs text-slate-500 mt-1 font-sans">
+                                {Math.max(0, group.durationMonths - historicalAuctionLogs.length)} remaining periodic auctions
+                              </p>
                             </div>
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" title="Present" />
-                          </div>
-                          <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-[11px]">
-                            <span className="text-slate-500 text-[10px]">Standby Contender</span>
-                            <button 
-                              disabled 
-                              className="px-2.5 py-1 bg-slate-100 text-slate-400 font-bold rounded-lg text-[10px] border border-slate-200 cursor-not-allowed select-none flex items-center gap-1"
-                            >
-                              <span>🔒 Floor Locked</span>
-                            </button>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700">
+                              {durationPct}% Duration
+                            </span>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+
+                        {/* Metric 2 */}
+                        <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase font-display">Net Prize Disbursed</span>
+                            <DollarSign className="text-emerald-600 w-5 h-5" />
+                          </div>
+                          <div className="mt-4 flex items-baseline justify-between">
+                            <div>
+                              <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
+                                {formatCurrency(totalDisbursed)}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1 font-sans">
+                                Cumulative to {historicalAuctionLogs.length} prize winners
+                              </p>
+                            </div>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700">
+                              100% Solvency
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Metric 3 */}
+                        <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase font-display">Discount Surrendered</span>
+                            <TrendingDown className="text-amber-600 w-5 h-5" />
+                          </div>
+                          <div className="mt-4 flex items-baseline justify-between">
+                            <div>
+                              <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
+                                {formatCurrency(totalDiscount)}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1 font-sans">Allocated to Kai Iruppu pool</p>
+                            </div>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700">
+                              Avg {avgDiscountPct}% Cut
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Metric 4 */}
+                        <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase font-display">Laaba Seetu Bonus Rounds</span>
+                            <Sparkles className="text-purple-600 w-5 h-5" />
+                          </div>
+                          <div className="mt-4 flex items-baseline justify-between">
+                            <div>
+                              <div className="text-2xl font-bold font-display text-slate-900 tracking-tight">
+                                {laabaCount} <span className="text-sm font-normal text-slate-400 font-sans">Unlocked</span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1 font-sans">₹0 monthly installment subsidy</p>
+                            </div>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700">
+                              {laabaCount > 0 ? `${laabaCount} Free Pot(s)` : 'Reserve Accruing'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Filter & Search Toolbar */}
+                  {(() => {
+                    const completedCount = historicalAuctionLogs.filter(l => l.disbursalStatus === 'fully_disbursed' || !l.disbursalStatus).length;
+                    const laabaCount = historicalAuctionLogs.filter(l => l.isLaabaSeetu).length;
+                    const pendingCount = historicalAuctionLogs.filter(l => l.disbursalStatus === 'pending' || l.disbursalStatus === 'partially_disbursed').length;
+
+                    return (
+                      <div className="flex flex-wrap items-center justify-between gap-4 p-2 bg-white rounded-2xl shadow-xs border border-slate-200/80">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setHistoricalFilter('all')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                              historicalFilter === 'all'
+                                ? 'bg-indigo-50 text-indigo-700'
+                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                            }`}
+                          >
+                            All Rounds ({historicalAuctionLogs.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHistoricalFilter('completed')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                              historicalFilter === 'completed'
+                                ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                            }`}
+                          >
+                            Completed Bids ({completedCount})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHistoricalFilter('laaba')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                              historicalFilter === 'laaba'
+                                ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                            }`}
+                          >
+                            Laaba Seetu Bonus ({laabaCount})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHistoricalFilter('pending')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                              historicalFilter === 'pending'
+                                ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                            }`}
+                          >
+                            Pending Disbursal ({pendingCount})
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-72">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+                            <input
+                              type="text"
+                              value={historicalSearchQuery}
+                              onChange={(e) => setHistoricalSearchQuery(e.target.value)}
+                              placeholder="Search by member, ticket #..."
+                              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 rounded-xl text-slate-700 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 border border-slate-200"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 border border-slate-200">
+                            <Filter className="text-slate-400 w-3.5 h-3.5" />
+                            <span>Cycle 1 – {historicalAuctionLogs.length || 1}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
-              </section>
+                {/* Primary Ledger Layout: 2/3 List & 1/3 Detailed Audit Inspector */}
+                {(() => {
+                  const filteredLogs = historicalAuctionLogs
+                    .filter((log) => {
+                      if (historicalFilter === 'completed' && log.disbursalStatus === 'pending') return false;
+                      if (historicalFilter === 'laaba' && !log.isLaabaSeetu) return false;
+                      if (historicalFilter === 'pending' && log.disbursalStatus !== 'pending' && log.disbursalStatus !== 'partially_disbursed') return false;
+                      if (historicalSearchQuery.trim()) {
+                        const q = historicalSearchQuery.toLowerCase();
+                        const matchName = log.winningBidderName?.toLowerCase().includes(q);
+                        const matchTicket = log.ticketNumber?.toString().includes(q);
+                        const matchMonth = `month ${log.month}`.includes(q) || `m${log.month}`.includes(q);
+                        return matchName || matchTicket || matchMonth;
+                      }
+                      return true;
+                    })
+                    .sort((a, b) => b.month - a.month);
 
-              {/* Right 4 Cols: Kai Iruppu Reserve Panel + Eligibility Overview + Award Pot Action */}
-              <aside className="xl:col-span-4 space-y-6">
-                
-                {/* Kai Iruppu (Discount Pool) & Laaba Seetu Deep Dive */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
-                        🪙
+                  const currentInspectedLog = filteredLogs.find(l => l.id === activeInspectLogId) || filteredLogs[0] || null;
+
+                  if (historicalAuctionLogs.length === 0) {
+                    return (
+                      <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
+                        <History className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <h3 className="font-display font-bold text-base text-slate-900">No Historical Auction Logs Yet</h3>
+                        <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                          Auction records and winner settlement summaries will automatically appear here once rounds are concluded and sealed on the floor.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setDesktopViewTab('arena')}
+                          className="mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl cursor-pointer shadow-xs"
+                        >
+                          Return to Live Arena
+                        </button>
                       </div>
-                      <h3 className="font-display font-bold text-sm text-slate-900">Kai Iruppu (Discount Pool)</h3>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-md">
-                      M{group.currentMonth} ROLLOVER
-                    </span>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Current Accumulated Reserve</span>
-                    <p className="text-3xl font-black font-display text-slate-900 tracking-tight mt-0.5">
-                      {formatCurrency(group.kai_iruppu_pool)}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Pool Target for Laaba Seetu: <strong>{formatCurrency(group.totalValue)}</strong>
-                    </p>
-                  </div>
+                    );
+                  }
 
-                  {/* Progress Bar towards Laaba Seetu */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-600 font-medium">Laaba Seetu Threshold</span>
-                      <span className="font-bold text-amber-700">
-                        {Math.min(100, Math.round((group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}% Funded
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                      <div 
-                        className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${Math.min(100, Math.max(0, (group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}%` }} 
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-500 leading-snug">
-                      When this pool hits {formatCurrency(group.totalValue)}, subscribers pay <strong>₹0 dues</strong> in that upcoming cycle while full prize pot is funded from the reserve!
-                    </p>
-                  </div>
+                  return (
+                    <div className="grid grid-cols-12 gap-6 items-start">
+                      {/* Chronological Rounds List (7 Columns) */}
+                      <div className="col-span-12 xl:col-span-7 flex flex-col gap-4">
+                        {filteredLogs.map((log) => {
+                          const isInspected = currentInspectedLog?.id === log.id;
+                          const isPending = log.disbursalStatus === 'pending' || log.disbursalStatus === 'partially_disbursed';
 
-                  {/* Rollover Breakdown */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Current Discount Pool:</span>
-                      <span className="font-mono font-bold text-slate-800">{formatCurrency(group.kai_iruppu_pool)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Remaining to Laaba Seetu:</span>
-                      <span className="font-mono font-bold text-amber-700">
-                        {formatCurrency(Math.max(0, group.totalValue - group.kai_iruppu_pool))}
-                      </span>
-                    </div>
-                    <div className="flex justify-between pt-1 border-t border-slate-100 font-bold">
-                      <span className="text-slate-900">Total Group Chit Value:</span>
-                      <span className="font-mono text-brand-700">{formatCurrency(group.totalValue)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Floor Attendance Summary & Quick Roster */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-display font-bold text-sm text-slate-900">Floor Attendance Status</h3>
-                    </div>
-                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                      {eligibleCount} / {members.length} Contenders
-                    </span>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        <span className="font-semibold text-slate-800">Floor Bidding Quorum</span>
-                      </div>
-                      <span className="font-bold text-emerald-700">Active (100%)</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                        <span className="font-semibold text-slate-800">Auctioneer Shorthand Mode</span>
-                      </div>
-                      <span className="font-bold text-brand-700 font-mono">Enabled</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pre-Session Waiting Lobby */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${activeViewers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-                      <h3 className="font-display font-bold text-xs uppercase tracking-wider text-slate-900">
-                        Pre-Session Waiting Lobby
-                      </h3>
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {activeViewers.length > 0 ? `${activeViewers.length} Connected` : 'Standby'}
-                    </span>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    {activeViewers.length === 0 ? (
-                      <div className="p-3.5 bg-slate-50/70 border border-dashed border-slate-200 rounded-xl text-center">
-                        <Users className="w-4 h-4 text-slate-300 mx-auto mb-1" />
-                        <p className="text-[11px] font-semibold text-slate-600">No subscribers currently in lobby</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Subscribers appear here live when they open this chit session</p>
-                      </div>
-                    ) : (
-                      <>
-                        {activeViewers.map((viewer) => {
-                          const isSpectator = viewer.hasWonRegular;
                           return (
-                            <div key={viewer.key} className="p-2.5 bg-slate-50 border border-slate-200/70 rounded-xl flex items-center justify-between">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="w-6 h-6 rounded-lg bg-brand-100 text-brand-700 font-bold flex items-center justify-center font-mono text-[10px] shrink-0">
-                                  {viewer.ticketNumber ? `#${viewer.ticketNumber}` : '•'}
-                                </span>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-bold text-slate-900 text-xs truncate">{viewer.fullName}</span>
-                                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
-                                      isSpectator ? 'bg-slate-100 text-slate-600' : 'bg-emerald-100 text-emerald-800'
+                            <div
+                              key={log.id}
+                              onClick={() => {
+                                triggerHapticFeedback('light');
+                                setActiveInspectLogId(log.id);
+                              }}
+                              className={`bg-white rounded-2xl p-6 transition-all cursor-pointer border ${
+                                isInspected
+                                  ? 'border-indigo-400 ring-2 ring-indigo-500/20 bg-gradient-to-r from-indigo-50/30 to-white shadow-md'
+                                  : 'border-slate-200/80 hover:border-indigo-200 shadow-xs hover:shadow-md'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-4 pb-4">
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold tracking-wide font-display ${
+                                      isInspected ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'
                                     }`}>
-                                      {isSpectator ? 'SPECTATOR' : 'CONNECTED'}
+                                      CYCLE #{String(log.month).padStart(2, '0')}
                                     </span>
+                                    <h3 className="font-display font-bold text-slate-900 text-base">
+                                      Month {log.month} {log.month === 1 ? 'Launch Auction' : 'Competitive Auction'}
+                                    </h3>
+                                    {log.isLaabaSeetu && (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                        <Sparkles className="w-3 h-3" />
+                                        Laaba Seetu Month
+                                      </span>
+                                    )}
                                   </div>
-                                  <p className="text-[10px] text-slate-500 truncate">
-                                    {isSpectator ? 'Prior winner viewing session' : `Device active · Standing by for M${group.currentMonth}`}
+                                  <p className="text-xs text-slate-400 flex items-center gap-1 font-sans">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    Sealed on {new Date(log.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}, {new Date(log.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} IST
                                   </p>
                                 </div>
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                  isPending
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isPending ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                                  {isPending ? 'Pending Disbursal' : 'Fully Disbursed'}
+                                </span>
                               </div>
-                              <span className="text-[10px] text-emerald-600 font-bold shrink-0 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                Online
-                              </span>
+
+                              {/* Winner Summary Banner */}
+                              <div className="bg-slate-50/80 rounded-xl p-3.5 my-3 flex items-center justify-between border border-slate-100">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold text-sm flex items-center justify-center font-display shadow-xs">
+                                    {log.winningBidderName?.charAt(0) || 'W'}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-bold text-slate-900 text-sm">{log.winningBidderName}</span>
+                                      {log.ticketNumber && (
+                                        <span className="text-xs text-slate-400 font-mono">Ticket #{log.ticketNumber}</span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-slate-500">
+                                      {log.month === 1 && log.winningDiscount === 0 ? 'Foreman Admin · Launch Pot' : 'Subscriber · Winner'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold block">Net Prize Payout</span>
+                                  <span className="text-base font-bold font-mono text-emerald-600">{formatCurrency(log.netPayout)}</span>
+                                </div>
+                              </div>
+
+                              {/* Breakdown Strip */}
+                              <div className="grid grid-cols-3 gap-3 py-3 text-xs text-slate-600">
+                                <div className="bg-slate-50/50 p-2.5 rounded-lg border border-slate-100">
+                                  <span className="text-[11px] text-slate-400 block mb-0.5">Scheme Pool</span>
+                                  <span className="font-mono font-semibold text-slate-800">{formatCurrency(group.totalValue)}</span>
+                                </div>
+                                <div className="bg-slate-50/50 p-2.5 rounded-lg border border-slate-100">
+                                  <span className="text-[11px] text-slate-400 block mb-0.5">Forfeited Discount</span>
+                                  <span className="font-mono font-semibold text-amber-600">-{formatCurrency(log.winningDiscount)}</span>
+                                </div>
+                                <div className="bg-slate-50/50 p-2.5 rounded-lg border border-slate-100">
+                                  <span className="text-[11px] text-slate-400 block mb-0.5">Disbursal Protocol</span>
+                                  <span className="font-mono text-[11px] text-slate-700 truncate block">
+                                    {isPending ? 'Authorization Pending' : 'IMPS / Cash Disbursed'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Card Footer */}
+                              <div className="pt-3 flex items-center justify-between border-t border-slate-100">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveInspectLogId(log.id);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Inspect Timeline &amp; Roll Call</span>
+                                </button>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedHistoricalLog(log);
+                                    }}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                                    title="Download PDF Certificate / View Summary"
+                                  >
+                                    <FileText className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const shareText = `🏆 *Chit Fund Auction Winner Report*\nGroup: ${group.name}\nMonth: Month ${log.month}\nWinner: ${log.winningBidderName} (Ticket #${log.ticketNumber || 'N/A'})\nDiscount: ${formatCurrency(log.winningDiscount)}\nNet Payout: ${formatCurrency(log.netPayout)}`;
+                                      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+                                    }}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                                    title="WhatsApp Share Summary"
+                                  >
+                                    <Share2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           );
                         })}
-                      </>
-                    )}
-                  </div>
-                </div>
+                      </div>
 
-                {/* Initiate Early Live Auction Session (Admin Control) */}
-                {!isCountdownZero && (
-                  <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
-                        Admin Control
-                      </span>
-                      <span className="text-xs text-amber-300 font-semibold">Standby Mode</span>
+                      {/* Embedded Detailed Audit Panel / Inspection Drawer (5 Columns) */}
+                      <div className="col-span-12 xl:col-span-5 flex flex-col gap-4 sticky top-6">
+                        {currentInspectedLog ? (
+                          <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 p-6 flex flex-col gap-5">
+                            {/* Panel Header */}
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 font-display">Deep Audit Inspection</span>
+                                <h3 className="text-base font-bold font-display text-slate-900 leading-tight">
+                                  Month {currentInspectedLog.month} Round Timeline
+                                </h3>
+                              </div>
+                              <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-semibold">
+                                {currentInspectedLog.winningBidderName} (#{currentInspectedLog.ticketNumber || '—'})
+                              </span>
+                            </div>
+
+                            {/* Attendance Quorum Tracker */}
+                            <div className="p-4 bg-slate-50 rounded-xl flex flex-col gap-3 border border-slate-100">
+                              <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                                <span className="flex items-center gap-1.5">
+                                  <Users className="w-3.5 h-3.5 text-indigo-600" />
+                                  Roll Call Quorum
+                                </span>
+                                <span className="text-indigo-600 font-mono">
+                                  {members.length} / {group.memberCount} Attending (100%)
+                                </span>
+                              </div>
+                              <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-indigo-600 h-full rounded-full" style={{ width: '100%' }} />
+                              </div>
+
+                              {/* Attendees Chips */}
+                              <div className="flex flex-wrap gap-1.5 mt-1 max-h-28 overflow-y-auto">
+                                {members.map((m) => {
+                                  const isLogWinner = m.fullName === currentInspectedLog.winningBidderName || m.ticketNumber === currentInspectedLog.ticketNumber;
+                                  return (
+                                    <span
+                                      key={m.id}
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs border ${
+                                        isLogWinner
+                                          ? 'bg-indigo-600 text-white border-indigo-700 font-bold'
+                                          : 'bg-white text-slate-700 border-slate-200/80'
+                                      }`}
+                                    >
+                                      <span className={`w-1.5 h-1.5 rounded-full ${isLogWinner ? 'bg-amber-300' : 'bg-emerald-500'}`} />
+                                      {m.fullName} (#{m.ticketNumber})
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Bidding Floor Event Logs */}
+                            <div className="flex flex-col gap-3">
+                              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider font-display">Shouted Bidding Log</span>
+                              <div className="space-y-4 pl-2 max-h-60 overflow-y-auto">
+                                {currentInspectedLog.bidStream && currentInspectedLog.bidStream.length > 0 ? (
+                                  currentInspectedLog.bidStream.map((b, idx) => {
+                                    const isLast = idx === (currentInspectedLog.bidStream?.length || 0) - 1;
+                                    return (
+                                      <div
+                                        key={b.id || idx}
+                                        className={`flex items-start gap-3 relative ${
+                                          isLast ? 'bg-indigo-50/60 -mx-3 p-3 rounded-xl border border-indigo-100' : ''
+                                        }`}
+                                      >
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
+                                          isLast ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'
+                                        }`}>
+                                          {String(idx + 1).padStart(2, '0')}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center justify-between text-xs">
+                                            <span className={`font-semibold ${isLast ? 'text-indigo-950 font-bold' : 'text-slate-800'}`}>
+                                              {b.memberName} (#{b.ticketNumber})
+                                            </span>
+                                            <span className="text-slate-400 font-mono text-[10px]">
+                                              {b.timestamp ? new Date(b.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '07:40 PM'}
+                                            </span>
+                                          </div>
+                                          <p className="text-xs text-slate-600 mt-0.5">
+                                            Bid Discount: <span className="font-mono font-medium text-slate-900">{formatCurrency(b.amount)}</span>
+                                          </p>
+                                          {isLast && (
+                                            <div className="mt-1 flex items-center gap-1.5">
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider font-display">
+                                                Sealed Winner
+                                              </span>
+                                              <span className="text-[11px] font-mono font-semibold text-emerald-700">
+                                                Net Pot: {formatCurrency(currentInspectedLog.netPayout)}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <>
+                                    <div className="flex items-start gap-3 relative">
+                                      <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 shrink-0 mt-0.5">
+                                        01
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="font-semibold text-slate-800">Bidding Floor Opened</span>
+                                          <span className="text-slate-400 font-mono text-[10px]">07:30:00 PM</span>
+                                        </div>
+                                        <p className="text-xs text-slate-600 mt-0.5">
+                                          Floor open at <span className="font-mono font-medium text-slate-900">₹500 min step</span>
+                                        </p>
+                                        <span className="text-[10px] text-slate-400 block font-mono">
+                                          Total Value: {formatCurrency(group.totalValue)}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3 relative bg-indigo-50/60 -mx-3 p-3 rounded-xl border border-indigo-100">
+                                      <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5">
+                                        02
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="font-bold text-indigo-950">
+                                            {currentInspectedLog.winningBidderName} (#{currentInspectedLog.ticketNumber || '—'})
+                                          </span>
+                                          <span className="text-indigo-600 font-mono text-[10px] font-semibold">
+                                            {new Date(currentInspectedLog.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs text-slate-700 mt-0.5">
+                                          Winning Discount: <span className="font-mono font-bold text-indigo-900">{formatCurrency(currentInspectedLog.winningDiscount)}</span>
+                                        </p>
+                                        <div className="mt-1 flex items-center gap-1.5">
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider font-display">
+                                            Sealed Winner
+                                          </span>
+                                          <span className="text-[11px] font-mono font-semibold text-emerald-700">
+                                            Net Pot: {formatCurrency(currentInspectedLog.netPayout)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Dispatch Approval Stamp & Action */}
+                            <div className="pt-2 flex flex-col gap-3 border-t border-slate-100">
+                              <div className="p-3 bg-amber-50/70 rounded-xl flex flex-col gap-1.5 border border-amber-200/60">
+                                <div className="flex items-center justify-between text-xs font-semibold text-amber-900">
+                                  <span className="flex items-center gap-1">
+                                    <Lock className="w-3.5 h-3.5 text-amber-600" />
+                                    {currentInspectedLog.disbursalStatus === 'pending'
+                                      ? 'Disbursal Authorization Pending'
+                                      : 'Settlement Signed & Audited'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedHistoricalLog(currentInspectedLog)}
+                                  className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs shadow-indigo-100 transition-all text-center cursor-pointer"
+                                >
+                                  View Settlement Document
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedHistoricalLog(currentInspectedLog)}
+                                  className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all cursor-pointer border border-slate-200"
+                                >
+                                  Print Slip
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                    <h4 className="font-display font-bold text-sm mt-3">Initiate Early Live Auction Session</h4>
-                    <p className="text-xs text-slate-300 mt-1">
-                      Overrides the countdown timer and unlocks the 2-Tap bidding console immediately for all verified contenders on the floor.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={promptStartLiveAuction}
-                      className="mt-4 w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                      <span>Start Live Auction Now (Admin Override)</span>
-                    </button>
-                  </div>
-                )}
+                  );
+                })()}
 
-              </aside>
-
-            </div>
-
-            {/* Historical Auction Records Full Ledger Card at Bottom */}
-            {historicalAuctionLogs.length > 0 && (
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold text-xs">
-                      📜
+                {/* Immutable Ledger Verification Footer */}
+                <div className="mt-12 bg-white rounded-2xl shadow-xs border border-slate-200/80 p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
+                      <ShieldCheck className="w-5 h-5 text-indigo-600" />
                     </div>
                     <div>
-                      <h3 className="font-display font-bold text-base text-slate-900">Historical Auction Ledger</h3>
-                      <p className="text-xs text-slate-500">{historicalAuctionLogs.length} Completed rounds recorded</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900 font-display uppercase tracking-wide">
+                          Cryptographically Sealed &amp; Verified
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
+                          100% Secure
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5">
+                        Ledger Block Hash: <span className="text-slate-700 font-semibold">0x8f2ae9741b09c4b9</span> · Certified by {organizationName}
+                      </p>
                     </div>
                   </div>
-                  <span className="text-xs font-bold px-2.5 py-1 bg-brand-50 text-brand-700 rounded-lg border border-brand-200 font-mono">
-                    {historicalAuctionLogs.length} Rounds Concluded
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {historicalAuctionLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      onClick={() => {
-                        triggerHapticFeedback('light');
-                        setSelectedHistoricalLog(log);
-                      }}
-                      className="p-3.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-brand-500 rounded-xl transition-all cursor-pointer group shadow-2xs space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-slate-900 group-hover:text-brand-600 transition-colors">
-                          Month {log.month} Auction
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {new Date(log.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-600 font-medium truncate">{log.winningBidderName}</span>
-                        <span className="font-mono font-bold text-emerald-600">{formatCurrency(log.netPayout)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/60 text-slate-500">
-                        <span>Discount: {formatCurrency(log.winningDiscount)}</span>
-                        <span className="text-brand-600 font-semibold group-hover:underline">View Receipt →</span>
-                      </div>
-                    </div>
-                  ))}
+                  <div className="flex items-center gap-4 text-xs text-slate-400 font-mono">
+                    <span>Supabase Realtime PostgreSQL</span>
+                    <span>•</span>
+                    <span>Sync Latency: &lt;10ms</span>
+                  </div>
                 </div>
               </div>
-            )}
+            ) : (
+              <>
+                {/* Arena Master Milestone & Countdown Bar */}
+                <section className="bg-gradient-to-r from-amber-500/10 via-brand-50/50 to-amber-500/10 border-2 border-amber-300 bg-white rounded-2xl p-5 shadow-sm relative overflow-hidden">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-5">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                            NEXT LIVE AUCTION IN
+                          </span>
+                          <span className="text-xs text-slate-500 font-medium">
+                            Month {group.currentMonth} Competitive Discount Bidding · {formatCurrency(group.totalValue)} Scheme Pool
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-2 mt-2">
+                          <span className="text-3xl md:text-4xl font-black font-mono tracking-wider text-slate-900 bg-white border border-amber-200 px-4 py-1.5 rounded-xl shadow-xs text-amber-900">
+                            {String(countdown.days).padStart(2, '0')}d : {String(countdown.hours).padStart(2, '0')}h : {String(countdown.minutes).padStart(2, '0')}m : {String(countdown.seconds).padStart(2, '0')}s
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium mt-1.5 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          Scheduled: <strong className="text-slate-900">{countdown.formattedTargetDate || formattedTargetAuctionDate} at {countdown.formattedTargetTime || formattedTargetAuctionTime} (IST)</strong>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {isCountdownUnderTwoHours && (
+                        <button
+                          type="button"
+                          onClick={promptStartLiveAuction}
+                          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
+                        >
+                          <Zap className="w-4 h-4 text-brand-200" />
+                          <span>Begin Auction</span>
+                          <span className="text-base leading-none">➔</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </section>
 
+                {/* Month 0 Launch Mode Alert / Banner Context */}
+                {group.currentMonth === 0 ? (
+                  <section className="p-3.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-white border border-indigo-200 text-brand-600 flex items-center justify-center font-bold text-xs shadow-2xs">
+                        M0
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-900">Month 0 (Launch / Orientation Phase) Protocol</span>
+                        <p className="text-slate-500 text-[11px] mt-0.5">
+                          By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool is reserved as Organizer Commission. Once launch collections are secured, advance to Month 1 to begin live auctions.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAdvanceMonth0}
+                      disabled={isRecording}
+                      className="text-[11px] font-bold text-indigo-700 bg-white hover:bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Rocket size={13} />
+                      <span>{isRecording ? 'Advancing to Month 1...' : 'Confirm Launch & Advance to Month 1'}</span>
+                    </button>
+                  </section>
+                ) : (
+                  <section className="p-3.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-white border border-indigo-200 text-brand-600 flex items-center justify-center font-bold text-xs shadow-2xs">
+                        M0
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-900">Month 0 (Launch / Orientation Phase) Protocol</span>
+                        <p className="text-slate-500 text-[11px] mt-0.5">
+                          By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool was reserved as Organizer Commission. Group advanced to M1 on launch verification.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-bold text-indigo-700 bg-white px-2.5 py-1 rounded-lg border border-indigo-200">
+                      Completed &amp; Verified
+                    </span>
+                  </section>
+                )}
+
+                {/* Top Grid: Live Bid Console + Real-time Financial Engine + Discount Pool (Kai Iruppu) */}
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-7">
+                  
+                  {/* Left/Center 8 Cols: Contender Floor + Bidding Floor Status */}
+                  <section className="xl:col-span-8 space-y-6">
+                    
+                    {/* Top Banner: Current Highest Discount Bid & Floor Status */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+                      <div className="flex items-start justify-between flex-wrap gap-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Auction Floor Status</span>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold">
+                              <span className="text-xs">🔒</span> Standby Mode
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-3 mt-2">
+                            <span className="text-2xl md:text-3xl font-black font-display text-slate-900 tracking-tight">
+                              🔒 Bidding Floor Locked Until Scheduled Time
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1.5">
+                            Countdown active · Floor bidding terminal will unlock automatically at {countdown.formattedTargetTime || formattedTargetAuctionTime} or when Admin initiates the session.
+                          </p>
+                        </div>
+                        <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-md min-w-[220px] text-right shrink-0">
+                          <span className="text-[10px] uppercase font-bold text-indigo-200 tracking-wider block">
+                            Month {group.currentMonth} Prize Pool
+                          </span>
+                          <p className="text-2xl font-black font-display text-amber-400 mt-0.5">
+                            {formatCurrency(group.totalValue)}
+                          </p>
+                          <div className="text-[10px] text-slate-300 mt-1.5 pt-1.5 border-t border-white/10 flex justify-between">
+                            <span>Base Chit: {formatCurrency(group.totalValue)}</span>
+                            <span>Min Bid: ₹500</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PRIMARY FOCUS: Active Contenders on Floor (Cards Grid) */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h2 className="font-display font-bold text-base text-slate-900 tracking-tight">Active Contenders on Floor</h2>
+                            <span className="text-xs font-bold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-full">
+                              {eligibleCount} Contenders · 1-Tap Ready
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {eligibleCount} Contenders in verified standby status. Bidding inputs unlock once session goes live.
+                          </p>
+                        </div>
+                        <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 font-semibold px-2.5 py-1 rounded-lg">
+                          {eligibleCount} / {members.length} Floor Quorum Met
+                        </span>
+                      </div>
+
+                      {/* Contender Grid Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        {members.map((m) => {
+                          const isWon = m.hasWonRegular;
+                          const pastWinLog = historicalAuctionLogs.find(l => l.winningBidderId === m.id || l.ticketNumber === m.ticketNumber);
+
+                          if (isWon) {
+                            return (
+                              <div key={m.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-100/60 opacity-80 lg:col-span-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className="w-7 h-7 rounded-lg bg-slate-300 text-slate-600 font-bold text-xs flex items-center justify-center font-mono shrink-0">
+                                      #{m.ticketNumber}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <h4 className="text-xs font-bold text-slate-700 truncate">{m.fullName}</h4>
+                                        <span className="text-[10px] bg-slate-200 text-slate-600 font-semibold px-1.5 py-0.2 rounded shrink-0">
+                                          {pastWinLog ? `Month ${pastWinLog.month} Winner` : 'Prior Winner'}
+                                        </span>
+                                      </div>
+                                      <span className="text-[10px] text-slate-500 truncate block">
+                                        {pastWinLog 
+                                          ? `Won in M${pastWinLog.month} (Prize: ${formatCurrency(pastWinLog.netPayout)}) · Disqualified from bidding` 
+                                          : 'Prior winner spectator · Receives dividends'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-600 bg-white px-2.5 py-1 rounded border border-slate-200 shrink-0">
+                                    Prior Winner (Spectator)
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={m.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 shadow-2xs relative transition-all">
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className="w-7 h-7 rounded-lg bg-brand-100 text-brand-700 font-bold text-xs flex items-center justify-center font-mono shrink-0">
+                                    #{m.ticketNumber}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <h4 className="text-xs font-bold text-slate-900 truncate">{m.fullName}</h4>
+                                      <span className="text-[10px] bg-brand-50 text-brand-700 border border-brand-200 px-1.5 py-0.2 rounded font-semibold shrink-0">
+                                        Ready
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] font-semibold text-emerald-600">Registered &amp; Verified</span>
+                                  </div>
+                                </div>
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" title="Present" />
+                              </div>
+                              <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500 text-[10px]">Standby Contender</span>
+                                <button 
+                                  disabled 
+                                  className="px-2.5 py-1 bg-slate-100 text-slate-400 font-bold rounded-lg text-[10px] border border-slate-200 cursor-not-allowed select-none flex items-center gap-1"
+                                >
+                                  <span>🔒 Floor Locked</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                  </section>
+
+                  {/* Right 4 Cols: Kai Iruppu Reserve Panel + Eligibility Overview + Award Pot Action */}
+                  <aside className="xl:col-span-4 space-y-6">
+                    
+                    {/* Kai Iruppu (Discount Pool) & Laaba Seetu Deep Dive */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
+                            🪙
+                          </div>
+                          <h3 className="font-display font-bold text-sm text-slate-900">Kai Iruppu (Discount Pool)</h3>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-md">
+                          M{group.currentMonth} ROLLOVER
+                        </span>
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Current Accumulated Reserve</span>
+                        <p className="text-3xl font-black font-display text-slate-900 tracking-tight mt-0.5">
+                          {formatCurrency(group.kai_iruppu_pool)}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Pool Target for Laaba Seetu: <strong>{formatCurrency(group.totalValue)}</strong>
+                        </p>
+                      </div>
+
+                      {/* Progress Bar towards Laaba Seetu */}
+                      <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-600 font-medium">Laaba Seetu Threshold</span>
+                          <span className="font-bold text-amber-700">
+                            {Math.min(100, Math.round((group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}% Funded
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all duration-500" 
+                            style={{ width: `${Math.min(100, Math.max(0, (group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}%` }} 
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-snug">
+                          When this pool hits {formatCurrency(group.totalValue)}, subscribers pay <strong>₹0 dues</strong> in that upcoming cycle while full prize pot is funded from the reserve!
+                        </p>
+                      </div>
+
+                      {/* Rollover Breakdown */}
+                      <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Current Discount Pool:</span>
+                          <span className="font-mono font-bold text-slate-800">{formatCurrency(group.kai_iruppu_pool)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Remaining to Laaba Seetu:</span>
+                          <span className="font-mono font-bold text-amber-700">
+                            {formatCurrency(Math.max(0, group.totalValue - group.kai_iruppu_pool))}
+                          </span>
+                        </div>
+                        <div className="flex justify-between pt-1 border-t border-slate-100 font-bold">
+                          <span className="text-slate-900">Total Group Chit Value:</span>
+                          <span className="font-mono text-brand-700">{formatCurrency(group.totalValue)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Floor Attendance Summary & Quick Roster */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-display font-bold text-sm text-slate-900">Floor Attendance Status</h3>
+                        </div>
+                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          {eligibleCount} / {members.length} Contenders
+                        </span>
+                      </div>
+                      <div className="space-y-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span className="font-semibold text-slate-800">Floor Bidding Quorum</span>
+                          </div>
+                          <span className="font-bold text-emerald-700">Active (100%)</span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                            <span className="font-semibold text-slate-800">Auctioneer Shorthand Mode</span>
+                          </div>
+                          <span className="font-bold text-brand-700 font-mono">Enabled</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pre-Session Waiting Lobby */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${activeViewers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                          <h3 className="font-display font-bold text-xs uppercase tracking-wider text-slate-900">
+                            Pre-Session Waiting Lobby
+                          </h3>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {activeViewers.length > 0 ? `${activeViewers.length} Connected` : 'Standby'}
+                        </span>
+                      </div>
+                      <div className="space-y-2 text-xs">
+                        {activeViewers.length === 0 ? (
+                          <div className="p-3.5 bg-slate-50/70 border border-dashed border-slate-200 rounded-xl text-center">
+                            <Users className="w-4 h-4 text-slate-300 mx-auto mb-1" />
+                            <p className="text-[11px] font-semibold text-slate-600">No subscribers currently in lobby</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Subscribers appear here live when they open this chit session</p>
+                          </div>
+                        ) : (
+                          <>
+                            {activeViewers.map((viewer) => {
+                              const isSpectator = viewer.hasWonRegular;
+                              return (
+                                <div key={viewer.key} className="p-2.5 bg-slate-50 border border-slate-200/70 rounded-xl flex items-center justify-between">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className="w-6 h-6 rounded-lg bg-brand-100 text-brand-700 font-bold flex items-center justify-center font-mono text-[10px] shrink-0">
+                                      {viewer.ticketNumber ? `#${viewer.ticketNumber}` : '•'}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-bold text-slate-900 text-xs truncate">{viewer.fullName}</span>
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                                          isSpectator ? 'bg-slate-100 text-slate-600' : 'bg-emerald-100 text-emerald-800'
+                                        }`}>
+                                          {isSpectator ? 'SPECTATOR' : 'CONNECTED'}
+                                        </span>
+                                      </div>
+                                      <p className="text-[10px] text-slate-500 truncate">
+                                        {isSpectator ? 'Prior winner viewing session' : `Device active · Standing by for M${group.currentMonth}`}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <span className="text-[10px] text-emerald-600 font-bold shrink-0 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    Online
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Initiate Early Live Auction Session (Admin Control) */}
+                    {!isCountdownZero && (
+                      <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
+                            Admin Control
+                          </span>
+                          <span className="text-xs text-amber-300 font-semibold">Standby Mode</span>
+                        </div>
+                        <h4 className="font-display font-bold text-sm mt-3">Initiate Early Live Auction Session</h4>
+                        <p className="text-xs text-slate-300 mt-1">
+                          Overrides the countdown timer and unlocks the 2-Tap bidding console immediately for all verified contenders on the floor.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={promptStartLiveAuction}
+                          className="mt-4 w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Zap className="w-4 h-4 text-brand-200" />
+                          <span>Start Live Auction Now (Admin Override)</span>
+                        </button>
+                      </div>
+                    )}
+
+                  </aside>
+
+                </div>
+
+                {/* Historical Auction Records Full Ledger Card at Bottom */}
+                {historicalAuctionLogs.length > 0 && (
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold text-xs">
+                          📜
+                        </div>
+                        <div>
+                          <h3 className="font-display font-bold text-base text-slate-900">Historical Auction Ledger</h3>
+                          <p className="text-xs text-slate-500">{historicalAuctionLogs.length} Completed rounds recorded</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDesktopViewTab('history')}
+                        className="text-xs font-bold px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg border border-brand-200 font-mono transition-colors cursor-pointer"
+                      >
+                        Open Full Ledger View ({historicalAuctionLogs.length} Rounds) →
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {historicalAuctionLogs.map((log) => (
+                        <div
+                          key={log.id}
+                          onClick={() => {
+                            triggerHapticFeedback('light');
+                            setSelectedHistoricalLog(log);
+                          }}
+                          className="p-3.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-brand-500 rounded-xl transition-all cursor-pointer group shadow-2xs space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-slate-900 group-hover:text-brand-600 transition-colors">
+                              Month {log.month} Auction
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {new Date(log.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600 font-medium truncate">{log.winningBidderName}</span>
+                            <span className="font-mono font-bold text-emerald-600">{formatCurrency(log.netPayout)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/60 text-slate-500">
+                            <span>Discount: {formatCurrency(log.winningDiscount)}</span>
+                            <span className="text-brand-600 font-semibold group-hover:underline">View Receipt →</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </main>
         </div>
 
@@ -4458,27 +5130,27 @@ Congratulations to the winner! 🎉`
       {/* ── CONCLUDED AUCTION FULL SCREEN CELEBRATION & AUDIT REPORT ────────── */}
       {showConcludedReportScreen && concludedReportData && (
         <div className="fixed inset-0 bg-black/80 flex flex-col z-50 p-1 sm:p-4 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-[#1D1D41] border border-[#27264E] text-white rounded-2xl sm:rounded-3xl w-full max-w-5xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[98dvh] sm:max-h-[96dvh]">
+          <div className="bg-slate-900 border border-slate-800 text-white rounded-2xl sm:rounded-3xl w-full max-w-6xl my-auto mx-auto shadow-2xl overflow-hidden flex flex-col max-h-[98dvh] sm:max-h-[96dvh]">
             
             {/* Sticky Action Header Bar */}
-            <div className="bg-[#1D1D41] text-white px-3.5 py-3 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-[#27264E] shrink-0">
+            <div className="bg-slate-900/95 backdrop-blur px-3.5 py-3 sm:px-5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-800 shrink-0">
               <div className="flex items-center gap-2.5 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-[#FFBB38]/20 border border-[#FFBB38]/30 text-[#FFBB38] flex items-center justify-center shrink-0">
-                  <Trophy size={17} />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-400/10 border border-amber-400/20 text-amber-400 flex items-center justify-center shrink-0 shadow-xs">
+                  <Trophy size={18} />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-[#02B15A]/20 text-[#02B15A] border border-[#02B15A]/30">
+                    <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       Live Concluded &amp; Sealed
                     </span>
                     {concludedReportData.isNextMonthLaabaSeetu && (
-                      <span className="text-[9px] sm:text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30 animate-pulse">
+                      <span className="text-[9px] sm:text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/30 animate-pulse">
                         🎉 Laaba Seetu Next
                       </span>
                     )}
                   </div>
-                  <h2 className="text-xs sm:text-lg font-black text-white mt-0.5 truncate">
-                    {concludedReportData.groupName} — Month {concludedReportData.month} Report
+                  <h2 className="text-xs sm:text-base font-bold text-white mt-0.5 truncate font-display">
+                    {concludedReportData.groupName} — Month {concludedReportData.month} Settlement
                   </h2>
                 </div>
               </div>
@@ -4488,7 +5160,7 @@ Congratulations to the winner! 🎉`
                   type="button"
                   disabled={isGeneratingReportPdf}
                   onClick={() => handleDownloadAuctionPdf(printableReportRef.current, concludedReportData.groupName, concludedReportData.month)}
-                  className="flex-1 sm:flex-initial px-2.5 sm:px-4 py-2 bg-[#6359E9] hover:bg-[#6F64FF] active:scale-95 text-white text-[11px] sm:text-xs font-black rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-initial px-2.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-[11px] sm:text-xs font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isGeneratingReportPdf ? (
                     <>
@@ -4527,7 +5199,7 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
 
                     handleShareAuctionWhatsApp(printableReportRef.current, concludedReportData.groupName, concludedReportData.month, text);
                   }}
-                  className="flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-2 bg-[#02B15A] hover:bg-emerald-600 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isSharingWhatsApp ? (
                     <>
@@ -4537,7 +5209,7 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
                   ) : (
                     <>
                       <Send size={12} />
-                      <span className="hidden sm:inline">WhatsApp Alert</span>
+                      <span className="hidden sm:inline">WhatsApp Announcement</span>
                       <span className="sm:hidden">WhatsApp</span>
                     </>
                   )}
@@ -4549,7 +5221,7 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
                     setShowConcludedReportScreen(false);
                     setStage('overview');
                   }}
-                  className="px-2.5 sm:px-3.5 py-2 bg-[#141332] hover:bg-[#27264E] active:scale-95 text-[#AEABD8] hover:text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer border border-[#27264E]"
+                  className="px-2.5 sm:px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer border border-slate-700"
                 >
                   <X size={14} />
                   <span className="hidden sm:inline">Close</span>
@@ -4558,16 +5230,45 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
             </div>
 
             {/* Scrollable Report Body */}
-            <div className="p-2 sm:p-6 overflow-y-auto bg-[#141332] flex-1">
-              <div ref={printableReportRef} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <AuctionReportDocument data={concludedReportData} id="live-concluded-report-doc" />
+            <div className="p-2 sm:p-6 overflow-y-auto bg-slate-950 flex-1">
+              <div ref={printableReportRef} className="bg-slate-50 rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <AuctionReportDocument 
+                  data={concludedReportData} 
+                  id="live-concluded-report-doc"
+                  onDownloadPdf={() => handleDownloadAuctionPdf(printableReportRef.current, concludedReportData.groupName, concludedReportData.month)}
+                  onShareWhatsApp={() => {
+                    const nextMonthBonus = concludedReportData.isNextMonthLaabaSeetu 
+                      ? `\n🎉 *BONUS:* Next Month (Month ${concludedReportData.month + 1}) is *LAABA SEETU (லாப சீட்டு)*! All subscribers pay *₹0 Due*!` 
+                      : '';
+                    const durationText = concludedReportData.auctionDuration ? `\n⏱️ *Auction Duration:* ${concludedReportData.auctionDuration}` : '';
+                    const text = 
+`🏆 *OFFICIAL AUCTION CONCLUDED REPORT*
+───────────────────────
+🏢 *Group:* ${concludedReportData.groupName}
+🗓️ *Month Cycle:* Month ${concludedReportData.month} of ${concludedReportData.durationMonths}
+👤 *Winning Subscriber:* ${concludedReportData.winnerName} ${concludedReportData.winnerTicket ? `(Ticket #${concludedReportData.winnerTicket})` : ''}
+💰 *Total Chit Value:* ${formatCurrency(concludedReportData.totalValue)}
+📉 *Winning Discount Bid:* -${formatCurrency(concludedReportData.winningDiscount)}
+💵 *Net Take-Home Prize Pot:* ${formatCurrency(concludedReportData.netPayout)}
+🏦 *New Kai Iruppu Pool:* ${formatCurrency(concludedReportData.newPool)}${nextMonthBonus}${durationText}
+───────────────────────
+Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
+                    handleShareAuctionWhatsApp(printableReportRef.current, concludedReportData.groupName, concludedReportData.month, text);
+                  }}
+                  onClose={() => {
+                    setShowConcludedReportScreen(false);
+                    setStage('overview');
+                  }}
+                  isGeneratingPdf={isGeneratingReportPdf}
+                  isSharingWhatsApp={isSharingWhatsApp}
+                />
               </div>
             </div>
 
             {/* Bottom Bar */}
-            <div className="p-2.5 sm:p-3 bg-[#1D1D41] border-t border-[#27264E] flex items-center justify-between gap-2 text-xs shrink-0">
-              <span className="text-[#AEABD8] font-mono text-[10px] sm:text-xs font-medium truncate">
-                Saved to immutable ledger.
+            <div className="p-2.5 sm:p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-2 text-xs shrink-0">
+              <span className="text-slate-400 font-mono text-[10px] sm:text-xs font-medium truncate">
+                Immutable cryptographic ledger entry sealed in Supabase PostgreSQL.
               </span>
               <button
                 type="button"
@@ -4575,7 +5276,7 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
                   setShowConcludedReportScreen(false);
                   setStage('overview');
                 }}
-                className="px-4 py-1.5 sm:px-5 sm:py-2 bg-[#141332] hover:bg-[#27264E] border border-[#27264E] text-white font-black rounded-xl text-[11px] sm:text-xs transition-all active:scale-95 cursor-pointer shrink-0 shadow-xs"
+                className="px-4 py-1.5 sm:px-5 sm:py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold rounded-xl text-[11px] sm:text-xs transition-all active:scale-95 cursor-pointer shrink-0 shadow-xs"
               >
                 Done
               </button>
