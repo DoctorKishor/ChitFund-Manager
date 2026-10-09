@@ -1450,6 +1450,166 @@ export default function LiveAuctionEngine() {
 
   const eligibleCount = members.filter(m => !m.hasWonRegular).length;
 
+  // ── RENDER START CONFIRMATION MODAL ──────────────────────────────────────
+  const renderStartConfirmModal = () => {
+    if (!showStartConfirmModal || !group) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+        <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
+          {/* Header */}
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-indigo-50/30">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shadow-xs">
+                <Radio className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">Start Live Auction Floor?</h3>
+                <p className="text-xs text-slate-500">Initiate live broadcast & contender bidding</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowStartConfirmModal(false)}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              title="Cancel"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Content Details */}
+          <div className="p-5 space-y-4">
+            <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80 space-y-2 text-xs">
+              <div className="flex justify-between items-center text-slate-600">
+                <span className="font-medium">Chit Group:</span>
+                <span className="font-bold text-slate-900">{group.name}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span className="font-medium">Auction Cycle:</span>
+                <span className="font-bold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded font-mono">
+                  Month {group.currentMonth}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span className="font-medium">Prize Pot Value:</span>
+                <span className="font-black text-slate-900 font-mono">{formatCurrency(group.totalValue)}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span className="font-medium">Eligible Floor Contenders:</span>
+                <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-mono">
+                  {members.filter(m => !m.hasWonRegular).length} of {group.memberCount} Members
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-amber-900 text-xs leading-relaxed flex items-start gap-2.5">
+              <span className="text-base leading-none">⏱️</span>
+              <p>
+                Confirming will initiate a <strong>5-second broadcast countdown</strong> on all connected screens before unlocking live shout registers.
+              </p>
+            </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={() => setShowStartConfirmModal(false)}
+              className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmStartLive}
+              className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              <span>Confirm & Go Live</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── RENDER 5-4-3-2-1 LIVE COUNTDOWN OVERLAY ──────────────────────────────
+  const renderGoingLiveCountdownOverlay = () => {
+    if (!isGoingLiveCountdown || !group) return null;
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-950 text-white overflow-hidden p-6 select-none animate-in fade-in duration-200">
+        {/* Subtle Ambient Glowing Background */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18)_0%,rgba(15,23,42,0.95)_60%,rgba(2,6,23,1)_100%)] pointer-events-none" />
+
+        {/* Pulse Ripple Rings */}
+        <div className="absolute w-[500px] h-[500px] rounded-full border border-indigo-500/10 animate-ping pointer-events-none" />
+        <div className="absolute w-[340px] h-[340px] rounded-full border border-indigo-400/20 animate-pulse pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col items-center text-center max-w-lg w-full space-y-6">
+          {/* Header Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-black tracking-widest uppercase shadow-lg shadow-red-950/50">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping mr-1" />
+            LIVE STREAM INITIATION
+          </div>
+
+          {/* Chit Details */}
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+              {group.name}
+            </h2>
+            <p className="text-xs sm:text-sm text-indigo-300 font-mono">
+              Cycle Month {group.currentMonth} · Pot {formatCurrency(group.totalValue)}
+            </p>
+          </div>
+
+          {/* Giant Dynamic Countdown Counter */}
+          <div className="py-6 flex items-center justify-center min-h-[160px]">
+            {liveCountdownSecs > 0 ? (
+              <div
+                key={liveCountdownSecs}
+                className="text-8xl sm:text-9xl font-black font-mono tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-indigo-100 to-indigo-400 animate-in zoom-in-50 duration-300 drop-shadow-[0_0_45px_rgba(99,102,241,0.6)]"
+              >
+                {liveCountdownSecs}
+              </div>
+            ) : (
+              <div className="text-4xl sm:text-6xl font-black tracking-tight text-emerald-400 animate-in zoom-in-75 duration-300 drop-shadow-[0_0_40px_rgba(16,185,129,0.7)] flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-emerald-400 animate-ping" />
+                <span>ON AIR!</span>
+              </div>
+            )}
+          </div>
+
+          {/* Step-by-Step Text Changing Animation */}
+          <div className="min-h-[28px] flex items-center justify-center">
+            <p
+              key={`status-${liveCountdownSecs}`}
+              className="text-xs sm:text-sm font-bold font-mono tracking-widest text-indigo-200 uppercase animate-in slide-in-from-bottom-2 duration-300"
+            >
+              {getCountdownStatusText(liveCountdownSecs)}
+            </p>
+          </div>
+
+          {/* Progress Pip Indicators (5 to 1) */}
+          <div className="flex items-center gap-2 pt-2">
+            {[5, 4, 3, 2, 1].map((step) => {
+              const isPassed = liveCountdownSecs <= step;
+              return (
+                <div
+                  key={step}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    isPassed
+                      ? 'w-8 bg-gradient-to-r from-indigo-400 to-emerald-400 shadow-[0_0_8px_rgba(99,102,241,0.6)]'
+                      : 'w-4 bg-slate-800'
+                  }`}
+                />
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── RENDER HISTORICAL AUCTION RECORD DETAILS MODAL ─────────────────────────
   const renderHistoricalModal = () => {
     if (!selectedHistoricalLog || !historicalReportData || !group) return null;
@@ -1685,17 +1845,15 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  {isCountdownUnderOneHour && (
-                    <button
-                      type="button"
-                      onClick={promptStartLiveAuction}
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
-                    >
-                      <svg className="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                      <span>Begin Auction</span>
-                      <span className="text-base leading-none">➔</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={promptStartLiveAuction}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
+                  >
+                    <svg className="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                    <span>Begin Auction</span>
+                    <span className="text-base leading-none">➔</span>
+                  </button>
                 </div>
               </div>
             </section>
@@ -2224,19 +2382,16 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     </div>
                   </div>
 
-                  {isCountdownUnderOneHour ? (
-                    <div className="mt-4 pt-3 border-t border-white/10">
-                      <button
-                        type="button"
-                        onClick={promptStartLiveAuction}
-                        className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                        <span>Start Auction</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-white/10">
+                  <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
+                    <button
+                      type="button"
+                      onClick={promptStartLiveAuction}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                      <span>Start Auction</span>
+                    </button>
+                    <div className="grid grid-cols-2 gap-2">
                       <button 
                         type="button"
                         onClick={() => {
@@ -2257,7 +2412,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                         <span>Reschedule</span>
                       </button>
                     </div>
-                  )}
+                  </div>
                 </div>
               </section>
 
@@ -2441,6 +2596,12 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
         {/* Historical Auction Record Details Modal */}
         {renderHistoricalModal()}
+
+        {/* Start Auction Confirmation Modal */}
+        {renderStartConfirmModal()}
+
+        {/* 5-4-3-2-1 Live Stream Countdown Overlay */}
+        {renderGoingLiveCountdownOverlay()}
       </div>
     );
   }
@@ -4258,158 +4419,10 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
       />
 
       {/* ── START LIVE AUCTION CONFIRMATION MODAL ───────────────────────── */}
-      {showStartConfirmModal && group && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-indigo-50/30">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shadow-xs">
-                  <Radio className="w-5 h-5 animate-pulse" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-slate-900">Start Live Auction Floor?</h3>
-                  <p className="text-xs text-slate-500">Initiate live broadcast & contender bidding</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowStartConfirmModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold active:scale-95 transition-all cursor-pointer"
-                title="Cancel"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Content Details */}
-            <div className="p-5 space-y-4">
-              <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80 space-y-2 text-xs">
-                <div className="flex justify-between items-center text-slate-600">
-                  <span className="font-medium">Chit Group:</span>
-                  <span className="font-bold text-slate-900">{group.name}</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span className="font-medium">Auction Cycle:</span>
-                  <span className="font-bold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded font-mono">
-                    Month {group.currentMonth}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span className="font-medium">Prize Pot Value:</span>
-                  <span className="font-black text-slate-900 font-mono">{formatCurrency(group.totalValue)}</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span className="font-medium">Eligible Floor Contenders:</span>
-                  <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-mono">
-                    {members.filter(m => !m.hasWonRegular).length} of {group.memberCount} Members
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-amber-900 text-xs leading-relaxed flex items-start gap-2.5">
-                <span className="text-base leading-none">⏱️</span>
-                <p>
-                  Confirming will initiate a <strong>5-second broadcast countdown</strong> on all connected screens before unlocking live shout registers.
-                </p>
-              </div>
-            </div>
-
-            {/* Footer Actions */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setShowStartConfirmModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmStartLive}
-                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Radio className="w-3.5 h-3.5 animate-pulse" />
-                <span>Confirm & Go Live</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderStartConfirmModal()}
 
       {/* ── FULL-SCREEN 5-4-3-2-1 LIVE STREAM COUNTDOWN OVERLAY ─────────── */}
-      {isGoingLiveCountdown && group && (
-        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-950 text-white overflow-hidden p-6 select-none animate-in fade-in duration-200">
-          {/* Subtle Ambient Glowing Background */}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18)_0%,rgba(15,23,42,0.95)_60%,rgba(2,6,23,1)_100%)] pointer-events-none" />
-
-          {/* Pulse Ripple Rings */}
-          <div className="absolute w-[500px] h-[500px] rounded-full border border-indigo-500/10 animate-ping pointer-events-none" />
-          <div className="absolute w-[340px] h-[340px] rounded-full border border-indigo-400/20 animate-pulse pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col items-center text-center max-w-lg w-full space-y-6">
-            {/* Header Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-black tracking-widest uppercase shadow-lg shadow-red-950/50">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping mr-1" />
-              LIVE STREAM INITIATION
-            </div>
-
-            {/* Chit Details */}
-            <div className="space-y-1">
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-                {group.name}
-              </h2>
-              <p className="text-xs sm:text-sm text-indigo-300 font-mono">
-                Cycle Month {group.currentMonth} · Pot {formatCurrency(group.totalValue)}
-              </p>
-            </div>
-
-            {/* Giant Dynamic Countdown Counter */}
-            <div className="py-6 flex items-center justify-center min-h-[160px]">
-              {liveCountdownSecs > 0 ? (
-                <div
-                  key={liveCountdownSecs}
-                  className="text-8xl sm:text-9xl font-black font-mono tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-indigo-100 to-indigo-400 animate-in zoom-in-50 duration-300 drop-shadow-[0_0_45px_rgba(99,102,241,0.6)]"
-                >
-                  {liveCountdownSecs}
-                </div>
-              ) : (
-                <div className="text-4xl sm:text-6xl font-black tracking-tight text-emerald-400 animate-in zoom-in-75 duration-300 drop-shadow-[0_0_40px_rgba(16,185,129,0.7)] flex items-center gap-3">
-                  <span className="w-6 h-6 rounded-full bg-emerald-400 animate-ping" />
-                  <span>ON AIR!</span>
-                </div>
-              )}
-            </div>
-
-            {/* Step-by-Step Text Changing Animation */}
-            <div className="min-h-[28px] flex items-center justify-center">
-              <p
-                key={`status-${liveCountdownSecs}`}
-                className="text-xs sm:text-sm font-bold font-mono tracking-widest text-indigo-200 uppercase animate-in slide-in-from-bottom-2 duration-300"
-              >
-                {getCountdownStatusText(liveCountdownSecs)}
-              </p>
-            </div>
-
-            {/* Progress Pip Indicators (5 to 1) */}
-            <div className="flex items-center gap-2 pt-2">
-              {[5, 4, 3, 2, 1].map((step) => {
-                const isPassed = liveCountdownSecs <= step;
-                return (
-                  <div
-                    key={step}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                      isPassed
-                        ? 'w-8 bg-gradient-to-r from-indigo-400 to-emerald-400 shadow-[0_0_8px_rgba(99,102,241,0.6)]'
-                        : 'w-4 bg-slate-800'
-                    }`}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {renderGoingLiveCountdownOverlay()}
 
     </div>
   );
