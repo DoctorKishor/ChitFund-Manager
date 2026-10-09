@@ -244,6 +244,7 @@ export default function LiveAuctionEngine() {
   const [historicalFilter, setHistoricalFilter] = useState<'all' | 'completed' | 'laaba' | 'pending'>('all');
   const [historicalSearchQuery, setHistoricalSearchQuery] = useState<string>('');
   const [activeInspectLogId, setActiveInspectLogId] = useState<string | null>(null);
+  const [expandedTrailLogId, setExpandedTrailLogId] = useState<string | null>(null);
   const [isStartingLiveSession, setIsStartingLiveSession] = useState<boolean>(false);
   const [liveViewerCount, setLiveViewerCount] = useState<number>(0);
   const [activeViewers, setActiveViewers] = useState<ActiveViewerInfo[]>([]);
@@ -3177,15 +3178,15 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   <button 
                     type="button"
                     onClick={() => {
-                      if (historicalAuctionLogs.length > 0) {
-                        triggerHapticFeedback('light');
-                        setSelectedHistoricalLog(historicalAuctionLogs[0]);
-                      } else {
-                        alert('No historical auction records completed yet.');
-                      }
+                      triggerHapticFeedback('light');
+                      setDesktopViewTab(desktopViewTab === 'history' ? 'arena' : 'history');
                     }}
-                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer active:scale-95 transition-all" 
-                    title="Rules & History"
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer active:scale-95 transition-all ${
+                      desktopViewTab === 'history'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                    title="Toggle Historical Ledger"
                   >
                     History
                   </button>
@@ -3224,244 +3225,690 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             </header>
 
             {/* Scrollable Main Content */}
-            <main className="flex-1 px-3 py-3 space-y-3 pb-28">
-
-              {/* Hero Bidding Card: Live Discount & Net Pot Calculation */}
-              <section className="rounded-2xl p-4 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20">
-                <div className="absolute -right-12 -top-12 w-48 h-48 bg-brand-500/25 rounded-full blur-2xl pointer-events-none"></div>
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-indigo-200 border border-white/10">
-                      {group.currentMonth === 0 ? 'Month 0 Launch Cycle' : `Month ${group.currentMonth} Cycle Bidding`}
-                    </span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-900">
-                      🔒 Floor Locked
-                    </span>
-                  </div>
-
-                  <div className="mt-2.5 text-center">
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Next Live Auction In</p>
-                    <div className="flex justify-center items-center gap-1 mt-2">
-                      <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
-                        <span className="text-xl sm:text-2xl font-black text-white block font-mono leading-tight">{String(countdown.days).padStart(2, '0')}</span>
-                        <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Days</span>
-                      </div>
-                      <span className="text-base sm:text-lg font-bold text-slate-500">:</span>
-                      <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
-                        <span className="text-xl sm:text-2xl font-black text-white block font-mono leading-tight">{String(countdown.hours).padStart(2, '0')}</span>
-                        <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Hours</span>
-                      </div>
-                      <span className="text-base sm:text-lg font-bold text-slate-500">:</span>
-                      <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
-                        <span className="text-xl sm:text-2xl font-black text-white block font-mono leading-tight">{String(countdown.minutes).padStart(2, '0')}</span>
-                        <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Mins</span>
-                      </div>
-                      <span className="text-base sm:text-lg font-bold text-slate-500">:</span>
-                      <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
-                        <span className="text-xl sm:text-2xl font-black text-amber-300 block font-mono leading-tight">{String(countdown.seconds).padStart(2, '0')}</span>
-                        <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-amber-300 block font-semibold">Secs</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-3.5 px-3 py-2 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between text-left">
-                      <div className="flex items-center space-x-2">
-                        <svg className="w-4 h-4 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
-                        <div>
-                          <p className="text-[11px] font-bold text-white">{countdown.formattedTargetDate || formattedTargetAuctionDate} at {countdown.formattedTargetTime || formattedTargetAuctionTime}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
-                    {isCountdownUnderTwoHours && (
-                      <button
-                        type="button"
-                        onClick={promptStartLiveAuction}
-                        className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
-                        <span>Start Auction</span>
-                      </button>
-                    )}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          const msg = `📢 *Upcoming Live Chit Auction Notice*\nGroup: ${group.name}\nMonth Cycle: Month ${group.currentMonth}\nChit Value: ${formatCurrency(group.totalValue)}\nScheduled Date: ${countdown.formattedTargetDate || formattedTargetAuctionDate} at ${countdown.formattedTargetTime || formattedTargetAuctionTime}\n\nPlease be present on the floor or connected in-app.`;
-                          window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-                        }}
-                        className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.007c.101.005.245-.038.375.275.145.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.178.18-.077.354.101.174.45 1.742 1.937 2.067.188.041.332-.014.419-.115.116-.13.491-.572.622-.767.13-.195.26-.163.433-.101.174.062 1.1.519 1.288.613.188.094.318.14.364.219.043.079.043.46-.101.865z"></path></svg>
-                        <span>Send Notice</span>
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setShowScheduleModal(true)}
-                        className="py-2 px-3 bg-white/10 hover:bg-white/20 border border-white/15 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
-                      >
-                        <svg className="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
-                        <span>Reschedule</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              {/* Kai Iruppu & Laaba Seetu Incentive Card */}
-              <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">🪙</span>
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Kai Iruppu Discount Pool</h3>
-                    </div>
-                  </div>
-                  <span className="text-sm font-black text-slate-900 font-mono">{formatCurrency(group.kai_iruppu_pool)}</span>
-                </div>
-                {/* Progress bar to Laaba Seetu */}
-                <div className="mt-3 pt-2 border-t border-slate-100">
-                  <div className="flex justify-between items-center text-[11px] mb-1.5">
-                    <span className="font-medium text-slate-600 flex items-center gap-1">
-                      <span>🎁</span>
-                      <span>Laaba Seetu Threshold</span>
-                    </span>
-                    <span className="font-bold text-amber-700">
-                      {Math.min(100, Math.round((group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}% (Target: {formatCurrency(group.totalValue)})
+            <main className="flex-1 px-4 py-4 space-y-4 pb-28">
+              {desktopViewTab === 'history' ? (
+                <div className="flex flex-col w-full">
+                  {/* Back Nav & Context Bar */}
+                  <div className="flex items-center justify-between mb-3">
+                    <button
+                      type="button"
+                      aria-label="Return to Live Arena"
+                      onClick={() => setDesktopViewTab('arena')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-200/70 hover:bg-slate-300 text-slate-800 text-xs font-semibold active:scale-95 transition-transform cursor-pointer"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>Auctions Arena</span>
+                    </button>
+                    <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-200">
+                      {group.name}
                     </span>
                   </div>
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all" 
-                      style={{ width: `${Math.min(100, Math.round((group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}%` }}
-                    />
-                  </div>
-                </div>
-              </section>
 
-              {/* Contenders Attendance Pill Row */}
-              <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-1.5">
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Eligible Contenders Floor</h3>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Locked</span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-medium">{eligibleCount} in standby</span>
-                </div>
-                <div className="mb-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-1.5 text-xs text-slate-600 font-semibold">
-                  <svg className="w-3.5 h-3.5 text-slate-500" fill="currentColor" viewBox="0 0 20 20"><path clipRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" fillRule="evenodd"></path></svg>
-                  <span>Bidding Locked Until Scheduled Time</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {members.map((m) => {
-                    const isEligible = !m.hasWonRegular;
-                    const pastWinLog = historicalAuctionLogs.find(
-                      l => l.winningBidderId === m.id || l.ticketNumber === m.ticketNumber
-                    );
-                    return (
-                      <div key={m.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200/90">
-                        <div className="flex items-center justify-between">
-                          <span className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center font-mono">
-                            #{m.ticketNumber || '?'}
-                          </span>
-                          <span className={`text-[9px] font-medium ${isEligible ? 'text-emerald-600' : 'text-slate-400'}`}>
-                            {isEligible ? '● Ready' : pastWinLog ? `Won M${pastWinLog.month}` : 'Prior Winner'}
-                          </span>
-                        </div>
-                        <h4 className="text-xs font-bold text-slate-900 mt-2 leading-tight truncate">{m.fullName}</h4>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-[10px] text-slate-500">Status</span>
-                          <span className={`text-[11px] font-bold ${isEligible ? 'text-slate-700' : 'text-slate-400'}`}>
-                            {isEligible ? 'Eligible' : 'Spectator'}
-                          </span>
-                        </div>
-                        <button 
-                          type="button"
-                          className="mt-2.5 w-full py-1.5 bg-slate-100 text-slate-400 border border-slate-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-not-allowed" 
-                          disabled
-                        >
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path clipRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" fillRule="evenodd"></path></svg>
-                          <span>{isEligible ? 'Locked' : 'Already Won'}</span>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-
-              {/* Historical Records Quick Strip (if available) */}
-              {historicalAuctionLogs.length > 0 && (
-                <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="w-7 h-7 rounded-lg bg-indigo-50 text-brand-600 flex items-center justify-center font-bold text-xs">📜</span>
-                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Concluded Auction Rounds</h3>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-slate-500">{historicalAuctionLogs.length} Records</span>
-                  </div>
-                  <div className="space-y-2">
-                    {historicalAuctionLogs.slice(0, 3).map((log) => (
-                      <div
-                        key={log.id}
-                        onClick={() => {
-                          triggerHapticFeedback('light');
-                          setSelectedHistoricalLog(log);
-                        }}
-                        className="p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-brand-500 cursor-pointer transition-colors flex items-center justify-between"
-                      >
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-slate-900">Month {log.month}</span>
-                            <span className="text-[10px] text-slate-500">• {log.winningBidderName}</span>
-                          </div>
-                          <span className="text-[11px] font-mono text-emerald-600 font-bold">
-                            Payout: {formatCurrency(log.netPayout)}
-                          </span>
-                        </div>
-                        <span className="text-xs text-brand-600 font-semibold flex items-center gap-0.5">
-                          View <ChevronRight size={14} />
+                  {/* Title & Scheme Identity Block */}
+                  <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 shadow-lg shadow-indigo-950/20 relative overflow-hidden mb-4 border border-indigo-500/20">
+                    <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] tracking-widest uppercase font-extrabold text-indigo-300">Scheme Archive</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Active Pool
                         </span>
                       </div>
-                    ))}
-                  </div>
-                </section>
-              )}
+                      <h2 className="text-lg font-black text-white tracking-tight mt-1">Historical Auction Log</h2>
+                      <p className="text-xs text-slate-300 mt-0.5">
+                        {formatCurrency(group.totalValue)} Scheme Pool · {group.durationMonths} Months Cycle
+                      </p>
 
-              {/* Conclude Month & Disburse CTA Floating Button */}
-              {group.currentMonth === 0 ? (
-                <div className="pt-2">
-                  <button 
-                    type="button"
-                    onClick={handleAdvanceMonth0}
-                    disabled={isRecording}
-                    className="w-full py-3.5 px-4 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold text-xs rounded-2xl shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {isRecording ? (
-                      <>
-                        <span className="h-4 w-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
-                        <span>Advancing to Month 1...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Rocket size={16} />
-                        <span>Confirm Launch &amp; Advance to Month 1</span>
-                      </>
-                    )}
-                  </button>
+                      {/* Quick Metrics Ribbon Inside Hero */}
+                      {(() => {
+                        const laabaCount = historicalAuctionLogs.filter(l => l.isLaabaSeetu).length;
+                        return (
+                          <div className="grid grid-cols-2 gap-2 mt-3 pt-3 bg-white/5 rounded-xl p-2.5 border border-white/10">
+                            <div>
+                              <span className="text-[10px] text-indigo-200 uppercase tracking-wider font-semibold block">Cycle Progress</span>
+                              <span className="text-sm font-extrabold text-white">
+                                {historicalAuctionLogs.length} of {group.durationMonths} Rounds
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-indigo-200 uppercase tracking-wider font-semibold block">Bonus Status</span>
+                              <span className="text-sm font-extrabold text-amber-300 flex items-center gap-1">
+                                <span>{laabaCount > 0 ? `${laabaCount} Free Month(s)` : 'Accruing'}</span>
+                                <Sparkles className="w-3.5 h-3.5" />
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Search & Filter Controls */}
+                  {(() => {
+                    const completedCount = historicalAuctionLogs.filter(l => l.disbursalStatus === 'fully_disbursed' || !l.disbursalStatus).length;
+                    const laabaCount = historicalAuctionLogs.filter(l => l.isLaabaSeetu).length;
+                    const pendingCount = historicalAuctionLogs.filter(l => l.disbursalStatus === 'pending' || l.disbursalStatus === 'partially_disbursed').length;
+
+                    return (
+                      <div className="space-y-2.5 mb-4">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                          <input
+                            type="text"
+                            value={historicalSearchQuery}
+                            onChange={(e) => setHistoricalSearchQuery(e.target.value)}
+                            placeholder="Search round, winner or ticket #..."
+                            className="w-full bg-white text-slate-800 text-xs rounded-xl pl-9 pr-8 py-2.5 shadow-xs placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 border border-slate-200"
+                          />
+                          {historicalSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setHistoricalSearchQuery('')}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Filter Chips Scrollable */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setHistoricalFilter('all')}
+                            className={`filter-chip px-3 py-1.5 rounded-full text-[11px] shadow-xs flex-shrink-0 whitespace-nowrap active:scale-95 transition-all cursor-pointer ${
+                              historicalFilter === 'all'
+                                ? 'bg-indigo-600 text-white font-bold'
+                                : 'bg-white text-slate-600 hover:bg-slate-100 font-semibold border border-slate-200/80'
+                            }`}
+                          >
+                            All Rounds ({historicalAuctionLogs.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHistoricalFilter('completed')}
+                            className={`filter-chip px-3 py-1.5 rounded-full text-[11px] shadow-xs flex-shrink-0 whitespace-nowrap active:scale-95 transition-all cursor-pointer ${
+                              historicalFilter === 'completed'
+                                ? 'bg-indigo-600 text-white font-bold'
+                                : 'bg-white text-slate-600 hover:bg-slate-100 font-semibold border border-slate-200/80'
+                            }`}
+                          >
+                            Completed ({completedCount})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHistoricalFilter('laaba')}
+                            className={`filter-chip px-3 py-1.5 rounded-full text-[11px] shadow-xs flex-shrink-0 whitespace-nowrap active:scale-95 transition-all flex items-center gap-1 cursor-pointer ${
+                              historicalFilter === 'laaba'
+                                ? 'bg-indigo-600 text-white font-bold'
+                                : 'bg-white text-slate-600 hover:bg-slate-100 font-semibold border border-slate-200/80'
+                            }`}
+                          >
+                            <span>Laaba Seetu ({laabaCount})</span>
+                            <span className="text-[10px]">🎉</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHistoricalFilter('pending')}
+                            className={`filter-chip px-3 py-1.5 rounded-full text-[11px] shadow-xs flex-shrink-0 whitespace-nowrap active:scale-95 transition-all cursor-pointer ${
+                              historicalFilter === 'pending'
+                                ? 'bg-indigo-600 text-white font-bold'
+                                : 'bg-white text-slate-600 hover:bg-slate-100 font-semibold border border-slate-200/80'
+                            }`}
+                          >
+                            Pending ({pendingCount})
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Cumulative Performance Summary Grid (2x2 KPI Bento) */}
+                  {(() => {
+                    const totalDisbursed = historicalAuctionLogs.reduce((sum, l) => sum + (l.netPayout || 0), 0);
+                    const totalDiscount = historicalAuctionLogs.reduce((sum, l) => sum + (l.winningDiscount || 0), 0);
+                    const laabaCount = historicalAuctionLogs.filter(l => l.isLaabaSeetu).length;
+                    const durationPct = Math.round((historicalAuctionLogs.length / (group.durationMonths || 1)) * 100);
+
+                    return (
+                      <div className="grid grid-cols-2 gap-2.5 mb-5">
+                        <div className="bg-white p-3 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Disbursed</span>
+                            <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                              <DollarSign className="w-3.5 h-3.5" />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-base font-black text-slate-900 leading-tight">
+                              {formatCurrency(totalDisbursed)}
+                            </div>
+                            <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-0.5 mt-0.5">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                              100% Solvency
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pool Discount</span>
+                            <div className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                              <TrendingDown className="w-3.5 h-3.5" />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-base font-black text-slate-900 leading-tight">
+                              {formatCurrency(totalDiscount)}
+                            </div>
+                            <span className="text-[10px] font-semibold text-indigo-600 mt-0.5 block">Total Saved &amp; Distributed</span>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Completed</span>
+                            <div className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-base font-black text-slate-900 leading-tight">
+                              {historicalAuctionLogs.length} / {group.durationMonths} Rounds
+                            </div>
+                            <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                              <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${Math.min(100, durationPct)}%` }} />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-amber-50 to-amber-100/70 p-3 rounded-2xl shadow-xs border border-amber-200/60 flex flex-col justify-between">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-black text-amber-900 uppercase tracking-wider">Laaba Seetu</span>
+                            <span className="text-sm">🎉</span>
+                          </div>
+                          <div>
+                            <div className="text-xs font-black text-amber-900 leading-snug">
+                              {laabaCount > 0 ? `${laabaCount} Month(s) Unlocked` : 'Accruing Reserve'}
+                            </div>
+                            <span className="text-[10px] font-semibold text-amber-800 mt-0.5 block">
+                              {laabaCount > 0 ? 'Zero installment month' : `Target: ${formatCurrency(group.totalValue)}`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Section Header */}
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    <div className="flex items-center gap-1.5">
+                      <FileText className="text-slate-700 w-4 h-4" />
+                      <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Chronological Ledger</h3>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-500">Sorted Newest First</span>
+                  </div>
+
+                  {/* Cards List */}
+                  {(() => {
+                    const filteredLogs = historicalAuctionLogs
+                      .filter((log) => {
+                        if (historicalFilter === 'completed' && log.disbursalStatus === 'pending') return false;
+                        if (historicalFilter === 'laaba' && !log.isLaabaSeetu) return false;
+                        if (historicalFilter === 'pending' && log.disbursalStatus !== 'pending' && log.disbursalStatus !== 'partially_disbursed') return false;
+                        if (historicalSearchQuery.trim()) {
+                          const q = historicalSearchQuery.toLowerCase();
+                          const matchName = log.winningBidderName?.toLowerCase().includes(q);
+                          const matchTicket = log.ticketNumber?.toString().includes(q);
+                          const matchMonth = `month ${log.month}`.includes(q) || `m${log.month}`.includes(q);
+                          return matchName || matchTicket || matchMonth;
+                        }
+                        return true;
+                      })
+                      .sort((a, b) => b.month - a.month);
+
+                    if (filteredLogs.length === 0) {
+                      return (
+                        <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-8 text-center mb-6">
+                          <History className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                          <p className="text-xs font-bold text-slate-700">No historical records match your filter</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Try clearing filters or search query</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-3.5 mb-6">
+                        {filteredLogs.map((log) => {
+                          const isExpanded = expandedTrailLogId === log.id;
+                          const isPending = log.disbursalStatus === 'pending' || log.disbursalStatus === 'partially_disbursed';
+
+                          return (
+                            <div
+                              key={log.id}
+                              className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/80 hover:shadow-md transition-shadow relative overflow-hidden"
+                            >
+                              {/* Special Bonus Top Ribbon */}
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-black tracking-tight">
+                                    Month {log.month}
+                                  </span>
+                                  {log.isLaabaSeetu && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-extrabold border border-amber-200">
+                                      <span>🎉 Laaba Seetu Bonus Month</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[11px] font-medium text-slate-400">
+                                  {new Date(log.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </span>
+                              </div>
+
+                              {/* Winner Identity */}
+                              <div className="flex items-center justify-between mb-3 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold text-sm flex items-center justify-center font-display shadow-xs shrink-0">
+                                    {log.winningBidderName?.charAt(0) || 'W'}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs font-black text-slate-900 truncate">{log.winningBidderName}</span>
+                                      {log.ticketNumber && (
+                                        <span className="px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold">
+                                          #{log.ticketNumber}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 truncate">
+                                      {log.month === 1 && log.winningDiscount === 0 ? 'Foreman Admin · Mandatory First Pot' : 'Subscriber · Verified Winner'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <span className={`px-2 py-1 rounded-full text-[10px] font-black tracking-tight flex items-center gap-1 border shrink-0 ${
+                                  isPending
+                                    ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                    : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isPending ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                                  {isPending ? 'Pending Disbursal' : 'Fully Disbursed'}
+                                </span>
+                              </div>
+
+                              {/* Financial Breakdown Pill Grid */}
+                              <div className="grid grid-cols-3 gap-1.5 bg-slate-50 p-2.5 rounded-xl mb-3 text-center border border-slate-100">
+                                <div>
+                                  <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Pool Pot</span>
+                                  <span className="text-xs font-black text-slate-800">{formatCurrency(group.totalValue)}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Discount</span>
+                                  <span className="text-xs font-black text-rose-600">-{formatCurrency(log.winningDiscount)}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Net Payout</span>
+                                  <span className="text-xs font-black text-emerald-700">{formatCurrency(log.netPayout)}</span>
+                                </div>
+                              </div>
+
+                              {/* Action Footer */}
+                              <div className="flex items-center justify-between pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    triggerHapticFeedback('light');
+                                    setExpandedTrailLogId(isExpanded ? null : log.id);
+                                  }}
+                                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
+                                >
+                                  <History className="w-3.5 h-3.5" />
+                                  <span>{isExpanded ? 'Hide Bids Trail' : `View Bids Trail (${log.bidStream?.length || 2} shouts)`}</span>
+                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedHistoricalLog(log)}
+                                    className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer"
+                                    title="Download PDF"
+                                  >
+                                    <FileText className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const shareText = `🏆 *Chit Fund Auction Winner Report*\nGroup: ${group.name}\nMonth: Month ${log.month}\nWinner: ${log.winningBidderName} (Ticket #${log.ticketNumber || 'N/A'})\nDiscount: ${formatCurrency(log.winningDiscount)}\nNet Payout: ${formatCurrency(log.netPayout)}`;
+                                      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+                                    }}
+                                    className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer"
+                                    title="Share Ledger Entry"
+                                  >
+                                    <Share2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Expandable Mini Trail */}
+                              {isExpanded && (
+                                <div className="mt-3 pt-3 bg-slate-50/80 rounded-xl p-2.5 space-y-2 text-xs border border-slate-200/80 animate-in fade-in duration-200">
+                                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                    Live Shouts Log &amp; Timeline
+                                  </div>
+                                  {log.bidStream && log.bidStream.length > 0 ? (
+                                    log.bidStream.map((b, bIdx) => {
+                                      const isLast = bIdx === (log.bidStream?.length || 0) - 1;
+                                      return (
+                                        <div
+                                          key={b.id || bIdx}
+                                          className={`flex justify-between items-center py-1 px-1.5 rounded-lg ${
+                                            isLast ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200' : 'text-slate-600'
+                                          }`}
+                                        >
+                                          <span>{isLast ? '🏆 ' : ''}#{bIdx + 1} {b.memberName} (#{b.ticketNumber})</span>
+                                          <span className="font-mono font-semibold">{formatCurrency(b.amount)} {isLast ? '[WINNER]' : ''}</span>
+                                        </div>
+                                      );
+                                    })
+                                  ) : (
+                                    <>
+                                      <div className="flex justify-between items-center text-slate-600 py-0.5">
+                                        <span>#1 Floor Opened</span>
+                                        <span className="font-semibold text-slate-800">₹500 min step</span>
+                                      </div>
+                                      <div className="flex justify-between items-center text-emerald-800 font-bold bg-emerald-50 p-1.5 rounded-lg border border-emerald-200">
+                                        <span className="flex items-center gap-1">🏆 #2 {log.winningBidderName} (#{log.ticketNumber || '—'})</span>
+                                        <span>{formatCurrency(log.winningDiscount)} [WINNER]</span>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Global Export Floating CTA */}
+                  <div className="mb-5">
+                    <button
+                      type="button"
+                      disabled={historicalAuctionLogs.length === 0}
+                      onClick={() => {
+                        if (historicalAuctionLogs.length > 0) {
+                          setSelectedHistoricalLog(historicalAuctionLogs[0]);
+                        }
+                      }}
+                      className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-98 transition-all text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Download Multi-Month Ledger Summary (PDF)</span>
+                    </button>
+                  </div>
+
+                  {/* Ledger Authenticity Stamp Footer */}
+                  <div className="bg-slate-200/60 rounded-2xl p-3.5 mb-2 flex items-start gap-3 border border-slate-300/60">
+                    <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-[11px] font-black text-slate-800 tracking-tight flex items-center gap-1">
+                        <span>PostgreSQL Immutable Ledger Certified</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-normal mt-0.5">
+                        Cryptographically sealed against tampering · Certified by {organizationName} · 100% secure
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              ) : !isCountdownZero ? (
-                <div className="pt-2">
-                  <button 
-                    type="button"
-                    onClick={promptStartLiveAuction}
-                    className="w-full py-3.5 px-4 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-bold text-xs rounded-2xl shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
-                    <span>Conduct Auction Early (Admin Override)</span>
-                  </button>
-                </div>
-              ) : null}
+              ) : (
+                <>
+                  {/* Hero Bidding Card: Live Discount & Net Pot Calculation */}
+                  <section className="rounded-2xl p-4 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20">
+                    <div className="absolute -right-12 -top-12 w-48 h-48 bg-brand-500/25 rounded-full blur-2xl pointer-events-none"></div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-indigo-200 border border-white/10">
+                          {group.currentMonth === 0 ? 'Month 0 Launch Cycle' : `Month ${group.currentMonth} Cycle Bidding`}
+                        </span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-900">
+                          🔒 Floor Locked
+                        </span>
+                      </div>
+
+                      <div className="mt-2.5 text-center">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Next Live Auction In</p>
+                        <div className="flex justify-center items-center gap-1 mt-2">
+                          <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
+                            <span className="text-xl sm:text-2xl font-black text-white block font-mono leading-tight">{String(countdown.days).padStart(2, '0')}</span>
+                            <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Days</span>
+                          </div>
+                          <span className="text-base sm:text-lg font-bold text-slate-500">:</span>
+                          <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
+                            <span className="text-xl sm:text-2xl font-black text-white block font-mono leading-tight">{String(countdown.hours).padStart(2, '0')}</span>
+                            <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Hours</span>
+                          </div>
+                          <span className="text-base sm:text-lg font-bold text-slate-500">:</span>
+                          <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
+                            <span className="text-xl sm:text-2xl font-black text-white block font-mono leading-tight">{String(countdown.minutes).padStart(2, '0')}</span>
+                            <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-indigo-200 block font-semibold">Mins</span>
+                          </div>
+                          <span className="text-base sm:text-lg font-bold text-slate-500">:</span>
+                          <div className="bg-white/10 border border-white/15 rounded-xl px-2 py-1 min-w-[46px]">
+                            <span className="text-xl sm:text-2xl font-black text-amber-300 block font-mono leading-tight">{String(countdown.seconds).padStart(2, '0')}</span>
+                            <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-amber-300 block font-semibold">Secs</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-3.5 px-3 py-2 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between text-left">
+                          <div className="flex items-center space-x-2">
+                            <svg className="w-4 h-4 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                            <div>
+                              <p className="text-[11px] font-bold text-white">{countdown.formattedTargetDate || formattedTargetAuctionDate} at {countdown.formattedTargetTime || formattedTargetAuctionTime}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
+                        {isCountdownUnderTwoHours && (
+                          <button
+                            type="button"
+                            onClick={promptStartLiveAuction}
+                            className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                            <span>Start Auction</span>
+                          </button>
+                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const msg = `📢 *Upcoming Live Chit Auction Notice*\nGroup: ${group.name}\nMonth Cycle: Month ${group.currentMonth}\nChit Value: ${formatCurrency(group.totalValue)}\nScheduled Date: ${countdown.formattedTargetDate || formattedTargetAuctionDate} at ${countdown.formattedTargetTime || formattedTargetAuctionTime}\n\nPlease be present on the floor or connected in-app.`;
+                              window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                            }}
+                            className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.007c.101.005.245-.038.375.275.145.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.178.18-.077.354.101.174.45 1.742 1.937 2.067.188.041.332-.014.419-.115.116-.13.491-.572.622-.767.13-.195.26-.163.433-.101.174.062 1.1.519 1.288.613.188.094.318.14.364.219.043.079.043.46-.101.865z"></path></svg>
+                            <span>Send Notice</span>
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setShowScheduleModal(true)}
+                            className="py-2 px-3 bg-white/10 hover:bg-white/20 border border-white/15 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+                          >
+                            <svg className="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                            <span>Reschedule</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Kai Iruppu & Laaba Seetu Incentive Card */}
+                  <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">🪙</span>
+                        <div>
+                          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Kai Iruppu Discount Pool</h3>
+                        </div>
+                      </div>
+                      <span className="text-sm font-black text-slate-900 font-mono">{formatCurrency(group.kai_iruppu_pool)}</span>
+                    </div>
+                    {/* Progress bar to Laaba Seetu */}
+                    <div className="mt-3 pt-2 border-t border-slate-100">
+                      <div className="flex justify-between items-center text-[11px] mb-1.5">
+                        <span className="font-medium text-slate-600 flex items-center gap-1">
+                          <span>🎁</span>
+                          <span>Laaba Seetu Threshold</span>
+                        </span>
+                        <span className="font-bold text-amber-700">
+                          {Math.min(100, Math.round((group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}% (Target: {formatCurrency(group.totalValue)})
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all" 
+                          style={{ width: `${Math.min(100, Math.round((group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}%` }}
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Contenders Attendance Pill Row */}
+                  <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-1.5">
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Eligible Contenders Floor</h3>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Locked</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-medium">{eligibleCount} in standby</span>
+                    </div>
+                    <div className="mb-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-1.5 text-xs text-slate-600 font-semibold">
+                      <svg className="w-3.5 h-3.5 text-slate-500" fill="currentColor" viewBox="0 0 20 20"><path clipRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" fillRule="evenodd"></path></svg>
+                      <span>Bidding Locked Until Scheduled Time</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {members.map((m) => {
+                        const isEligible = !m.hasWonRegular;
+                        const pastWinLog = historicalAuctionLogs.find(
+                          l => l.winningBidderId === m.id || l.ticketNumber === m.ticketNumber
+                        );
+                        return (
+                          <div key={m.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200/90">
+                            <div className="flex items-center justify-between">
+                              <span className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center font-mono">
+                                #{m.ticketNumber || '?'}
+                              </span>
+                              <span className={`text-[9px] font-medium ${isEligible ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                {isEligible ? '● Ready' : pastWinLog ? `Won M${pastWinLog.month}` : 'Prior Winner'}
+                              </span>
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-900 mt-2 leading-tight truncate">{m.fullName}</h4>
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-[10px] text-slate-500">Status</span>
+                              <span className={`text-[11px] font-bold ${isEligible ? 'text-slate-700' : 'text-slate-400'}`}>
+                                {isEligible ? 'Eligible' : 'Spectator'}
+                              </span>
+                            </div>
+                            <button 
+                              type="button"
+                              className="mt-2.5 w-full py-1.5 bg-slate-100 text-slate-400 border border-slate-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-not-allowed" 
+                              disabled
+                            >
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path clipRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" fillRule="evenodd"></path></svg>
+                              <span>{isEligible ? 'Locked' : 'Already Won'}</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  {/* Historical Records Quick Strip (if available) */}
+                  {historicalAuctionLogs.length > 0 && (
+                    <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="w-7 h-7 rounded-lg bg-indigo-50 text-brand-600 flex items-center justify-center font-bold text-xs">📜</span>
+                          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Concluded Auction Rounds</h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setDesktopViewTab('history')}
+                          className="text-xs font-mono font-bold text-indigo-600 hover:underline cursor-pointer"
+                        >
+                          View All ({historicalAuctionLogs.length}) →
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {historicalAuctionLogs.slice(0, 3).map((log) => (
+                          <div
+                            key={log.id}
+                            onClick={() => {
+                              triggerHapticFeedback('light');
+                              setSelectedHistoricalLog(log);
+                            }}
+                            className="p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-brand-500 cursor-pointer transition-colors flex items-center justify-between"
+                          >
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-slate-900">Month {log.month}</span>
+                                <span className="text-[10px] text-slate-500">• {log.winningBidderName}</span>
+                              </div>
+                              <span className="text-[11px] font-mono text-emerald-600 font-bold">
+                                Payout: {formatCurrency(log.netPayout)}
+                              </span>
+                            </div>
+                            <span className="text-xs text-brand-600 font-semibold flex items-center gap-0.5">
+                              View <ChevronRight size={14} />
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Conclude Month & Disburse CTA Floating Button */}
+                  {group.currentMonth === 0 ? (
+                    <div className="pt-2">
+                      <button 
+                        type="button"
+                        onClick={handleAdvanceMonth0}
+                        disabled={isRecording}
+                        className="w-full py-3.5 px-4 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold text-xs rounded-2xl shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {isRecording ? (
+                          <>
+                            <span className="h-4 w-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
+                            <span>Advancing to Month 1...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Rocket size={16} />
+                            <span>Confirm Launch &amp; Advance to Month 1</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : !isCountdownZero ? (
+                    <div className="pt-2">
+                      <button 
+                        type="button"
+                        onClick={promptStartLiveAuction}
+                        className="w-full py-3.5 px-4 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-bold text-xs rounded-2xl shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                        <span>Conduct Auction Early (Admin Override)</span>
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
 
             </main>
           </div>
