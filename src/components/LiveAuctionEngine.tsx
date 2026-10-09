@@ -220,6 +220,7 @@ export default function LiveAuctionEngine() {
   const [selectedContenderId, setSelectedContenderId] = useState<string | null>(null);
   const [showBidModal, setShowBidModal] = useState<boolean>(false);
   const [showTimelineDrawer, setShowTimelineDrawer] = useState<boolean>(false);
+  const [isLiveBidsStreamCollapsed, setIsLiveBidsStreamCollapsed] = useState<boolean>(false);
 
   // Group-specific bids map with localStorage persistence
   const [groupBidsMap, setGroupBidsMap] = useState<Record<string, Bid[]>>(() => {
@@ -4851,79 +4852,86 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             </div>
           </section>
 
-          {/* Live Shouts Stream List (Moved Down) */}
+          {/* Live Shouts Stream List (Collapsible) */}
           <section className="space-y-2">
             <div 
-              onClick={() => setShowTimelineDrawer(true)}
-              className="flex items-center justify-between px-1 cursor-pointer"
+              onClick={() => {
+                triggerHapticFeedback('light');
+                setIsLiveBidsStreamCollapsed(prev => !prev);
+              }}
+              className="flex items-center justify-between px-1 py-1 cursor-pointer select-none group"
             >
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Live Bids Stream</h3>
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider group-hover:text-brand-600 transition-colors">Live Bids Stream</h3>
                 <span className="text-[10px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded-full font-mono">{bids.length}</span>
               </div>
-              <div className="flex items-center gap-1 text-[10px] font-medium text-slate-500 hover:text-slate-700">
-                <span className="text-[9px] text-slate-400">Auto-updating</span>
-                <svg className="w-3.5 h-3.5 text-slate-600 transform transition-transform" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>
+              <div className="flex items-center gap-1 text-[10px] font-medium text-slate-500 group-hover:text-slate-700">
+                <span className="text-[9px] text-slate-400">
+                  {isLiveBidsStreamCollapsed ? 'Show Bids' : 'Auto-updating'}
+                </span>
+                <svg className={`w-3.5 h-3.5 text-slate-600 transform transition-transform duration-200 ${isLiveBidsStreamCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              {bids.length === 0 ? (
-                <div className="p-3.5 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400">
-                  No live bids shouted yet this cycle. Floor open!
-                </div>
-              ) : (
-                bids.slice(0, 5).map((bid, idx) => {
-                  const isLeader = idx === 0;
-                  const member = members.find(m => m.id === bid.memberId);
-                  const ticketNum = member?.ticketNumber || bid.ticketNumber || '?';
-                  const bidderName = member?.fullName || bid.memberName || 'Bidder';
-                  const formattedTime = formatBidTimestamp(bid.timestamp);
-                  const netPot = (group.totalValue || 0) - bid.amount;
+            {!isLiveBidsStreamCollapsed && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                {bids.length === 0 ? (
+                  <div className="p-3.5 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-400">
+                    No live bids shouted yet this cycle. Floor open!
+                  </div>
+                ) : (
+                  bids.slice(0, 5).map((bid, idx) => {
+                    const isLeader = idx === 0;
+                    const member = members.find(m => m.id === bid.memberId);
+                    const ticketNum = member?.ticketNumber || bid.ticketNumber || '?';
+                    const bidderName = member?.fullName || bid.memberName || 'Bidder';
+                    const formattedTime = formatBidTimestamp(bid.timestamp);
+                    const netPot = (group.totalValue || 0) - bid.amount;
 
-                  return (
-                    <div 
-                      key={bid.id || idx}
-                      className={`p-2.5 sm:p-3 bg-white rounded-2xl border flex items-center justify-between transition-all ${
-                        isLeader ? 'border-emerald-300 shadow-xs' : 'border-slate-200 shadow-2xs'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2 min-w-0">
-                        <span className={`w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center font-mono shrink-0 ${
-                          isLeader ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          #{ticketNum}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="flex items-center space-x-1.5">
-                            <h4 className="text-xs font-bold text-slate-900 truncate">{bidderName}</h4>
-                            <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
-                              isLeader ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              {isLeader ? 'Lead' : 'Outbid'}
-                            </span>
+                    return (
+                      <div 
+                        key={bid.id || idx}
+                        className={`p-2.5 sm:p-3 bg-white rounded-2xl border flex items-center justify-between transition-all ${
+                          isLeader ? 'border-emerald-300 shadow-xs' : 'border-slate-200 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <span className={`w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center font-mono shrink-0 ${
+                            isLeader ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            #{ticketNum}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-1.5">
+                              <h4 className="text-xs font-bold text-slate-900 truncate">{bidderName}</h4>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                                isLeader ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {isLeader ? 'Lead' : 'Outbid'}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                              {formattedTime}
+                            </p>
                           </div>
-                          <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                            {formattedTime}
-                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className={`text-xs font-mono block ${isLeader ? 'font-black text-slate-900' : 'font-bold text-slate-700'}`}>
+                            {formatCurrency(bid.amount)}
+                          </span>
+                          {isLeader && (
+                            <span className="text-[9px] text-emerald-600 font-semibold block font-mono">
+                              Payout: {formatCurrency(netPot)}
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <span className={`text-xs font-mono block ${isLeader ? 'font-black text-slate-900' : 'font-bold text-slate-700'}`}>
-                          {formatCurrency(bid.amount)}
-                        </span>
-                        {isLeader && (
-                          <span className="text-[9px] text-emerald-600 font-semibold block font-mono">
-                            Payout: {formatCurrency(netPot)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </section>
 
           {/* Conclude Month & Disburse CTA Floating Button */}
