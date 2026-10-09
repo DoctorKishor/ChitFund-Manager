@@ -2735,7 +2735,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                           </span>
                         </div>
                         <div className="flex items-baseline gap-2 mt-2">
-                          <span className="text-3xl md:text-4xl font-black font-mono tracking-wider text-slate-900 bg-white border border-amber-200 px-4 py-1.5 rounded-xl shadow-xs text-amber-900">
+                          <span className="text-xl md:text-2xl font-bold font-mono tracking-wide bg-white border border-amber-200 px-3.5 py-1 rounded-xl shadow-xs text-amber-900">
                             {String(countdown.days).padStart(2, '0')}d : {String(countdown.hours).padStart(2, '0')}h : {String(countdown.minutes).padStart(2, '0')}m : {String(countdown.seconds).padStart(2, '0')}s
                           </span>
                         </div>
@@ -2821,7 +2821,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                             </span>
                           </div>
                           <div className="flex items-baseline gap-3 mt-2">
-                            <span className="text-2xl md:text-3xl font-black font-display text-slate-900 tracking-tight">
+                            <span className="text-base sm:text-lg md:text-xl font-bold font-display text-slate-900 tracking-tight">
                               🔒 Bidding Floor Locked Until Scheduled Time
                             </span>
                           </div>
