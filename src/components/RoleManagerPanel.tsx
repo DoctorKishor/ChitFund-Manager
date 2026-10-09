@@ -163,6 +163,7 @@ export default function RoleManagerPanel({
   const [selectedRoleId, setSelectedRoleId] = useState<string>('collections_agent');
 
   // Editing state for active role
+  const [editName, setEditName] = useState<string>('');
   const [editColor, setEditColor] = useState<string>('#F59E0B');
   const [allowedTabs, setAllowedTabs] = useState<string[]>([]);
   const [allowedActions, setAllowedActions] = useState<string[]>([]);
@@ -239,6 +240,7 @@ export default function RoleManagerPanel({
   }, [roles, selectedRoleId]);
 
   const syncRoleState = (role: CustomRoleRecord) => {
+    setEditName(role.name);
     setEditColor(role.color || '#4F46E5');
     setAllowedTabs(role.allowed_tabs || []);
     setAllowedActions(role.allowed_actions || []);
@@ -317,6 +319,7 @@ export default function RoleManagerPanel({
   // Reset to active role defaults
   const handleResetDefaults = () => {
     if (!activeRole) return;
+    setEditName(activeRole.name);
     setAllowedTabs(activeRole.allowed_tabs || []);
     setAllowedActions(activeRole.allowed_actions || []);
     setEditColor(activeRole.color || '#4F46E5');
@@ -330,6 +333,7 @@ export default function RoleManagerPanel({
       const { error } = await supabase
         .from('custom_roles')
         .update({
+          name: editName ? editName.trim() : activeRole.name,
           color: editColor,
           allowed_tabs: activeRole.id === 'admin' ? activeRole.allowed_tabs : allowedTabs,
           allowed_actions: activeRole.id === 'admin' ? activeRole.allowed_actions : allowedActions,
@@ -510,7 +514,7 @@ export default function RoleManagerPanel({
     <div className="flex-1 flex flex-col min-w-0 bg-slate-50">
       
       {/* ── DESKTOP ROLES & PERMISSIONS WORKSPACE (p-7 matching Stitch) ── */}
-      <main className="flex-1 overflow-y-auto p-4 sm:p-7">
+      <main className="hidden md:block flex-1 overflow-y-auto p-4 sm:p-7">
         <div className="w-full max-w-[1550px] mx-auto space-y-6">
 
           {/* Top Overview Metrics Strip */}
@@ -1108,6 +1112,417 @@ export default function RoleManagerPanel({
 
         </div>
       </main>
+
+      {/* ── MOBILE ROLES & PERMISSIONS WORKSPACE (block md:hidden matching Stitch Mobile) ── */}
+      <div className="block md:hidden w-full flex-1 flex flex-col relative">
+
+        {/* Horizontal Role Pills Selector */}
+        <div className="px-5 py-2.5 bg-slate-50/70 border-b border-slate-100 sticky top-0 z-20 backdrop-blur-xs">
+          <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar text-xs">
+            {/* Built-in Roles */}
+            {builtInRoles.map((role) => {
+              const isSelected = role.id === selectedRoleId;
+              const count = roleCounts[role.id] || 0;
+              const emoji = ROLE_EMOJIS[role.id] || '🛡️';
+
+              if (isSelected) {
+                return (
+                  <button
+                    key={role.id}
+                    type="button"
+                    onClick={() => selectRole(role)}
+                    className="flex-shrink-0 px-3 py-1.5 bg-brand-600 text-white font-bold rounded-full shadow-xs flex items-center gap-1.5 ring-2 ring-brand-200 cursor-pointer"
+                  >
+                    <span>{emoji} {role.name}</span>
+                    {count > 0 && (
+                      <span className="text-[10px] bg-brand-700 text-brand-100 px-1.5 py-0.2 rounded-full font-mono">
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              }
+
+              return (
+                <button
+                  key={role.id}
+                  type="button"
+                  onClick={() => selectRole(role)}
+                  className="flex-shrink-0 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-full shadow-2xs hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>{emoji} {role.name}</span>
+                  {count > 0 && (
+                    <span className="text-[10px] bg-slate-100 px-1.5 py-0.2 rounded-full font-mono">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Custom Roles */}
+            {customRoles.map((role) => {
+              const isSelected = role.id === selectedRoleId;
+              const count = roleCounts[role.id] || 0;
+              const emoji = ROLE_EMOJIS[role.id] || '🛡️';
+
+              if (isSelected) {
+                return (
+                  <button
+                    key={role.id}
+                    type="button"
+                    onClick={() => selectRole(role)}
+                    className="flex-shrink-0 px-3 py-1.5 bg-brand-600 text-white font-bold rounded-full shadow-xs flex items-center gap-1.5 ring-2 ring-brand-200 cursor-pointer"
+                  >
+                    <span>{emoji} {role.name}</span>
+                    {count > 0 && (
+                      <span className="text-[10px] bg-brand-700 text-brand-100 px-1.5 py-0.2 rounded-full font-mono">
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              }
+
+              return (
+                <button
+                  key={role.id}
+                  type="button"
+                  onClick={() => selectRole(role)}
+                  className="flex-shrink-0 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-full shadow-2xs hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>{emoji} {role.name}</span>
+                  {count > 0 && (
+                    <span className="text-[10px] bg-slate-100 px-1.5 py-0.2 rounded-full font-mono">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Main Scrollable Content */}
+        <div className="flex-1 px-4 py-4 space-y-4 pb-28">
+
+          {/* Active Role Header Banner */}
+          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-card">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div
+                  className="w-12 h-12 rounded-2xl font-bold flex items-center justify-center text-xl shadow-xs shrink-0"
+                  style={{ backgroundColor: `${editColor}20`, color: editColor }}
+                >
+                  {ROLE_EMOJIS[activeRole?.id || ''] || '💳'}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-sm font-bold text-slate-900 leading-tight truncate">{activeRole?.name}</h2>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 whitespace-nowrap">
+                      {activeRole?.is_system ? 'System Role' : 'Custom Role'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 font-mono truncate">role_{activeRole?.id}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-full border border-slate-200/80">
+                  {COLOR_PRESETS.map((p) => {
+                    const isActive = editColor.toLowerCase() === p.hex.toLowerCase();
+                    return (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => setEditColor(p.hex)}
+                        title={p.name}
+                        className={`w-3.5 h-3.5 rounded-full transition-all hover:scale-110 cursor-pointer ${p.bgClass} ${
+                          isActive ? 'ring-2 ring-brand-500 ring-offset-1 scale-110' : ''
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+                {!activeRole?.is_system && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newTitle = prompt('Edit Role Name:', activeRole?.name);
+                      if (newTitle && newTitle.trim()) {
+                        setEditName(newTitle.trim());
+                      }
+                    }}
+                    className="text-brand-600 text-xs font-semibold hover:underline cursor-pointer"
+                  >
+                    Edit Name
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 mt-2.5 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+              {activeRole?.description ||
+                'Grants permission to scan passbook physical QR tokens, record door-to-door cash collections, and dispatch instant WhatsApp receipts.'}
+            </p>
+            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">Assigned Personnel:</span>
+              <span className="font-bold text-slate-900">
+                {assignedPersonnel.length} Staff Member{assignedPersonnel.length === 1 ? '' : 's'}
+              </span>
+            </div>
+          </div>
+
+          {/* Category 1: Navigation & Modules */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
+            <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-md bg-indigo-100 text-brand-600 text-[10px] font-bold flex items-center justify-center">1</span>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Module Navigation Access</h3>
+              </div>
+              <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
+                {CATEGORIES[0].items.filter((i) => allowedTabs.includes(i.key)).length} Allowed
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100 text-xs">
+              {CATEGORIES[0].items.map((item) => {
+                const isChecked = activeRole?.id === 'admin' || allowedTabs.includes(item.key);
+                return (
+                  <div
+                    key={item.key}
+                    onClick={() => {
+                      if (activeRole?.id !== 'admin') toggleTab(item.key);
+                    }}
+                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
+                      isChecked ? 'bg-brand-50/20' : ''
+                    }`}
+                  >
+                    <div className="pr-2 min-w-0">
+                      <span className={`font-bold block text-xs truncate ${isChecked ? 'text-brand-900' : 'text-slate-800'}`}>
+                        {item.label}
+                      </span>
+                      <span className="text-[11px] text-slate-400 block truncate">{item.desc}</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      disabled={activeRole?.id === 'admin'}
+                      onChange={() => toggleTab(item.key)}
+                      className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer shrink-0"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Category 2: Member & Passbook Operations */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
+            <div className="p-3.5 bg-emerald-50/50 border-b border-emerald-100/60 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center justify-center">2</span>
+                <h3 className="text-xs font-bold text-emerald-900 uppercase tracking-wider">Passbook &amp; Member Operations</h3>
+              </div>
+              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">Core Duties</span>
+            </div>
+            <div className="divide-y divide-slate-100 text-xs">
+              {CATEGORIES[1].items.map((item) => {
+                const isChecked = activeRole?.id === 'admin' || allowedActions.includes(item.key);
+                return (
+                  <div
+                    key={item.key}
+                    onClick={() => {
+                      if (activeRole?.id !== 'admin') toggleAction(item.key);
+                    }}
+                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
+                      isChecked ? 'bg-emerald-50/10' : ''
+                    }`}
+                  >
+                    <div className="pr-2 min-w-0">
+                      <span className={`font-bold block text-xs truncate ${isChecked ? 'text-slate-900' : 'text-slate-400'}`}>
+                        {item.label}
+                      </span>
+                      <span className="text-[11px] text-slate-500 block truncate">{item.desc}</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      disabled={activeRole?.id === 'admin'}
+                      onChange={() => toggleAction(item.key)}
+                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer shrink-0"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Category 3: Live Auctions & Bidding Operations */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
+            <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-md bg-purple-100 text-purple-700 text-[10px] font-bold flex items-center justify-center">3</span>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Live Auctions &amp; Bidding Operations</h3>
+              </div>
+              <span className="text-[10px] font-semibold text-slate-500">
+                {CATEGORIES[3].items.filter((i) => allowedActions.includes(i.key)).length > 0 ? 'Active' : 'Disabled'}
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100 text-xs">
+              {CATEGORIES[3].items.map((item) => {
+                const isChecked = activeRole?.id === 'admin' || allowedActions.includes(item.key);
+                return (
+                  <div
+                    key={item.key}
+                    onClick={() => {
+                      if (activeRole?.id !== 'admin') toggleAction(item.key);
+                    }}
+                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
+                      isChecked ? 'bg-purple-50/10' : ''
+                    }`}
+                  >
+                    <div className="pr-2 min-w-0">
+                      <span className={`font-bold block text-xs truncate ${isChecked ? 'text-slate-800' : 'text-slate-400'}`}>
+                        {item.label}
+                      </span>
+                      <span className="text-[11px] text-slate-400 block truncate">{item.desc}</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      disabled={activeRole?.id === 'admin'}
+                      onChange={() => toggleAction(item.key)}
+                      className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer shrink-0"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Category 4: Treasury & Cash Custody / Vaults */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
+            <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-700 text-[10px] font-bold flex items-center justify-center">4</span>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Treasury &amp; Cash Custody / Vaults</h3>
+              </div>
+              <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
+                {CATEGORIES[4].items.filter((i) => allowedActions.includes(i.key)).length} Allowed
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100 text-xs">
+              {CATEGORIES[4].items.map((item) => {
+                const isChecked = activeRole?.id === 'admin' || allowedActions.includes(item.key);
+                return (
+                  <div
+                    key={item.key}
+                    onClick={() => {
+                      if (activeRole?.id !== 'admin') toggleAction(item.key);
+                    }}
+                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
+                      isChecked ? 'bg-brand-50/20' : ''
+                    }`}
+                  >
+                    <div className="pr-2 min-w-0">
+                      <span className={`font-bold block text-xs truncate ${isChecked ? 'text-brand-900' : 'text-slate-400'}`}>
+                        {item.label}
+                      </span>
+                      <span className="text-[11px] text-slate-500 block truncate">{item.desc}</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      disabled={activeRole?.id === 'admin'}
+                      onChange={() => toggleAction(item.key)}
+                      className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer shrink-0"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Assigned Staff Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Assigned Staff Members</h3>
+              <button
+                type="button"
+                onClick={() => setIsAssignModalOpen(true)}
+                className="text-xs font-bold text-brand-600 hover:text-brand-700 cursor-pointer"
+              >
+                + Assign
+              </button>
+            </div>
+            {assignedPersonnel.length > 0 ? (
+              <div className="space-y-2">
+                {assignedPersonnel.map((user) => (
+                  <div
+                    key={user.id}
+                    className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xs shrink-0">
+                        {user.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900 truncate">{user.full_name}</span>
+                          <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded whitespace-nowrap">
+                            {user.role === 'admin' ? 'Super Admin' : activeRole?.name}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">{user.phone_number}</p>
+                      </div>
+                    </div>
+                    {user.role !== 'admin' && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMemberFromRole(user.id, user.full_name)}
+                        className="text-[11px] text-rose-600 font-semibold hover:underline cursor-pointer shrink-0 pl-2"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 py-2">No staff members currently assigned to this role.</p>
+            )}
+          </div>
+
+        </div>
+
+        {/* Sticky Bottom Save Changes Action Bar */}
+        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-4 py-3 safe-bottom z-40 shadow-nav flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={handleResetDefaults}
+            className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+          >
+            Discard
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveRole}
+            disabled={isSaving}
+            className="flex-1 py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold shadow-md shadow-brand-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer"
+          >
+            {saveSuccess ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-300" strokeWidth={2.5} />
+                <span>Saved!</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>{isSaving ? 'Saving...' : 'Save Permission Changes'}</span>
+              </>
+            )}
+          </button>
+        </div>
+
+      </div>
 
       {/* ── CREATE NEW ROLE MODAL ── */}
       {isCreateModalOpen && (

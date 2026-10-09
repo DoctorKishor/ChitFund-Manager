@@ -1065,23 +1065,42 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
         {/* App Title & Sub-header */}
         <div className="px-5 pt-3 pb-3 flex flex-col gap-3.5 border-b border-slate-100/80">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Members &amp; Passbooks</h1>
-            <button
-              type="button"
-              onClick={handleOpenAddModal}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Plus size={14} strokeWidth={2.5} />
-              <span>Add Member</span>
-            </button>
+            {currentSubtab === 'roles' ? (
+              <div>
+                <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Roles &amp; Permissions</h1>
+                <p className="text-[11px] text-slate-400 font-medium mt-0.5">Role-based Access Control (RBAC)</p>
+              </div>
+            ) : (
+              <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Members &amp; Passbooks</h1>
+            )}
+
+            {currentSubtab === 'roles' ? (
+              <button
+                type="button"
+                onClick={() => setIsCreateRoleModalOpen(true)}
+                className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus size={14} strokeWidth={2.5} />
+                <span>New Role</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Plus size={14} strokeWidth={2.5} />
+                <span>Add Member</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-2">
-            <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+            <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold flex-1">
               <button
                 type="button"
                 onClick={() => setCurrentSubtab('directory')}
-                className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg transition-all flex-1 text-center cursor-pointer ${
                   currentSubtab === 'directory'
                     ? 'bg-white text-slate-900 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-800'
@@ -1092,22 +1111,22 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               <button
                 type="button"
                 onClick={() => setCurrentSubtab('roles')}
-                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 flex-1 text-center cursor-pointer ${
                   currentSubtab === 'roles'
-                    ? 'bg-white text-slate-900 shadow-xs font-bold'
+                    ? 'bg-white text-brand-600 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 <span>Roles &amp; Staff</span>
-                <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-bold">
-                  {customRoles.length + 3}
+                <span className="px-1.5 py-0.2 bg-brand-50 text-brand-700 rounded-full text-[9px] font-bold">
+                  {customRoles.filter((r) => !r.is_system).length} Custom
                 </span>
               </button>
             </div>
 
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-xl shadow-xs">
               <span className={`w-2 h-2 rounded-full ${isMaintenanceMode ? 'bg-amber-500 ring-2 ring-amber-200 animate-pulse' : 'bg-emerald-500 ring-2 ring-emerald-200'}`}></span>
-              <span className="text-[10px] font-bold text-slate-600">Portal:</span>
+              <span className="text-[10px] font-bold text-slate-600">{currentSubtab === 'roles' ? 'Lock:' : 'Portal:'}</span>
               <button
                 type="button"
                 disabled={isTogglingMaintenance}
@@ -1122,58 +1141,60 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           </div>
         </div>
 
-        {/* Quick Filter Tabs */}
-        <div className="px-5 pb-3">
-          <div 
-            className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            <button
-              type="button"
-              onClick={() => setTableFilter('all')}
-              className={`flex-shrink-0 px-3 py-1 rounded-full font-semibold transition-all cursor-pointer ${
-                tableFilter === 'all'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-              }`}
+        {/* Quick Filter Tabs (Directory only) */}
+        {currentSubtab === 'directory' && (
+          <div className="px-5 pb-3">
+            <div 
+              className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              All ({stats.total})
-            </button>
-            <button
-              type="button"
-              onClick={() => setTableFilter('paired')}
-              className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${
-                tableFilter === 'paired'
-                  ? 'bg-slate-900 text-white shadow-xs font-semibold'
-                  : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-              }`}
-            >
-              Linked QR ({stats.qrLinkedCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setTableFilter('unpaired')}
-              className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${
-                tableFilter === 'unpaired'
-                  ? 'bg-slate-900 text-white shadow-xs font-semibold'
-                  : 'bg-white border border-slate-200 text-amber-700 font-medium hover:bg-slate-50'
-              }`}
-            >
-              Unlinked ({stats.total - stats.qrLinkedCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setTableFilter('pending_mpin')}
-              className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${
-                tableFilter === 'pending_mpin'
-                  ? 'bg-slate-900 text-white shadow-xs font-semibold'
-                  : 'bg-white border border-slate-200 text-slate-500 font-medium hover:bg-slate-50'
-              }`}
-            >
-              Pending MPIN ({stats.pendingMpinCount})
-            </button>
+              <button
+                type="button"
+                onClick={() => setTableFilter('all')}
+                className={`flex-shrink-0 px-3 py-1 rounded-full font-semibold transition-all cursor-pointer ${
+                  tableFilter === 'all'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                }`}
+              >
+                All ({stats.total})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTableFilter('paired')}
+                className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${
+                  tableFilter === 'paired'
+                    ? 'bg-slate-900 text-white shadow-xs font-semibold'
+                    : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                }`}
+              >
+                Linked QR ({stats.qrLinkedCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTableFilter('unpaired')}
+                className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${
+                  tableFilter === 'unpaired'
+                    ? 'bg-slate-900 text-white shadow-xs font-semibold'
+                    : 'bg-white border border-slate-200 text-amber-700 font-medium hover:bg-slate-50'
+                }`}
+              >
+                Unlinked ({stats.total - stats.qrLinkedCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTableFilter('pending_mpin')}
+                className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${
+                  tableFilter === 'pending_mpin'
+                    ? 'bg-slate-900 text-white shadow-xs font-semibold'
+                    : 'bg-white border border-slate-200 text-slate-500 font-medium hover:bg-slate-50'
+                }`}
+              >
+                Pending MPIN ({stats.pendingMpinCount})
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </header>
 
       {/* ── SUBTAB 1: ROLES & PERMISSIONS VIEW ── */}
