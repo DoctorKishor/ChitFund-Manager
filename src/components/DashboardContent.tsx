@@ -3490,11 +3490,13 @@ Thank you for your prompt payment! 🙏`;
                             <span>
                               {mNum === 0 
                                 ? `${label} Launch` 
-                                : isSelected 
-                                ? `${label} (Current Cycle)` 
+                                : mNum === activeCycle 
+                                ? `${label} (Active)` 
+                                : isPast
+                                ? `${label}`
                                 : isFinale 
                                 ? `${label} (Finale)` 
-                                : label}
+                                : `${label} (Upcoming)`}
                             </span>
                           </button>
                         </React.Fragment>
@@ -4505,37 +4507,50 @@ Thank you for your prompt payment! 🙏`;
                 {/* Step Indicators for Months */}
                 <div className="flex items-center gap-1.5 pt-1 overflow-x-auto scrollbar-none">
                   {monthsRange.map((m) => {
+                    const isGroupActiveMonth = m === (activeGroup?.currentMonth ?? 0);
                     const isCompleted = m < (activeGroup?.currentMonth ?? 0);
-                    const isActive = m === selectedDashboardMonth;
+                    const isInspecting = m === selectedDashboardMonth;
                     return (
                       <button
                         key={m}
                         type="button"
                         onClick={() => setSelectedDashboardMonth(m)}
-                        className="flex-1 min-w-[50px] flex flex-col items-center group cursor-pointer"
+                        className={`flex-1 min-w-[54px] flex flex-col items-center group cursor-pointer p-1 rounded-xl transition-all ${
+                          isInspecting
+                            ? 'bg-brand-50/70 border-2 border-brand-500 shadow-2xs'
+                            : 'hover:bg-slate-50 border border-transparent'
+                        }`}
                       >
                         <div
                           className={`w-full h-1.5 rounded-full mb-1.5 transition-all ${
-                            isActive
-                              ? 'bg-brand-500 ring-2 ring-brand-500/30'
-                              : isCompleted
+                            isCompleted
                               ? 'bg-emerald-500'
+                              : isGroupActiveMonth
+                              ? 'bg-brand-500'
                               : 'bg-slate-200'
                           }`}
                         />
                         <span
                           className={`text-[10px] ${
-                            isActive
-                              ? 'font-extrabold text-brand-600'
+                            isInspecting
+                              ? 'font-extrabold text-brand-700'
                               : isCompleted
                               ? 'font-bold text-emerald-700'
+                              : isGroupActiveMonth
+                              ? 'font-bold text-brand-600'
                               : 'font-medium text-slate-500'
                           }`}
                         >
                           M{m}
                         </span>
-                        <span className="text-[9px] text-slate-400">
-                          {isActive ? 'Active' : isCompleted ? 'Completed' : 'Upcoming'}
+                        <span className={`text-[9px] ${
+                          isGroupActiveMonth
+                            ? 'font-bold text-brand-600'
+                            : isCompleted
+                            ? 'font-medium text-emerald-600'
+                            : 'text-slate-400'
+                        }`}>
+                          {isGroupActiveMonth ? 'Active' : isCompleted ? 'Completed' : 'Upcoming'}
                         </span>
                       </button>
                     );
@@ -10096,18 +10111,18 @@ Thank you for your prompt payment! 🙏`;
         );
       })()}
 
-      {/* ── FLOATING ACTION BUTTON (FAB) & SPEED-DIAL MENU ──────────────────── */}
+      {/* ── FLOATING ACTION BUTTON (FAB) & SPEED-DIAL MENU (DESKTOP ONLY) ────── */}
       {activeTab === 'dashboard' && (
         <>
           {/* Backdrop Blur Overlay when FAB is Open */}
           {isFabOpen && (
             <div
               onClick={() => setIsFabOpen(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-2xs z-40 animate-in fade-in duration-150"
+              className="hidden md:block fixed inset-0 bg-black/40 backdrop-blur-2xs z-40 animate-in fade-in duration-150"
             />
           )}
 
-          <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 flex flex-col items-end gap-2.5 select-none">
+          <div className="hidden md:flex fixed bottom-6 right-6 z-40 flex-col items-end gap-2.5 select-none">
             {/* Speed Dial Menu Items */}
             {isFabOpen && (
               <div className="flex flex-col items-end gap-2 animate-in slide-in-from-bottom-3 duration-200">
