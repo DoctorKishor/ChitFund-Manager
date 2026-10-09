@@ -46,7 +46,7 @@ import {
 import AuctionCountdownBanner from '@/components/AuctionCountdownBanner';
 import { HelpTooltip } from '@/components/HelpTooltip';
 import AuctionScheduleModal from '@/components/AuctionScheduleModal';
-import { computeNextAuctionDateTime } from '@/utils/auctionSchedule';
+import { computeNextAuctionDateTime, calculateAuctionCountdown, CountdownState } from '@/utils/auctionSchedule';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import { useAuth } from '@/context/AuthContext';
 import { useWallet, WalletType } from '@/context/WalletContext';
@@ -128,6 +128,45 @@ export default function LiveAuctionEngine() {
   const [members, setMembers] = useState<Member[]>([]);
   const [historicalAuctionLogs, setHistoricalAuctionLogs] = useState<HistoricalAuctionLog[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Live countdown state for scheduled auction rounds
+  const [countdown, setCountdown] = useState<CountdownState>(() => {
+    const target = computeNextAuctionDateTime({
+      auction_day_of_month: group?.auction_day_of_month,
+      auction_time: group?.auction_time,
+      next_auction_date: group?.next_auction_date,
+      next_auction_time: group?.next_auction_time,
+      start_date: group?.startDate,
+      current_month: group?.currentMonth,
+    });
+    return calculateAuctionCountdown(target);
+  });
+
+  useEffect(() => {
+    if (!group) return;
+    const tick = () => {
+      const target = computeNextAuctionDateTime({
+        auction_day_of_month: group.auction_day_of_month,
+        auction_time: group.auction_time,
+        next_auction_date: group.next_auction_date,
+        next_auction_time: group.next_auction_time,
+        start_date: group.startDate,
+        current_month: group.currentMonth,
+      });
+      setCountdown(calculateAuctionCountdown(target));
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [
+    group?.auction_day_of_month,
+    group?.auction_time,
+    group?.next_auction_date,
+    group?.next_auction_time,
+    group?.startDate,
+    group?.currentMonth,
+  ]);
 
   // Selected Historical Log for full detailed view
   const [selectedHistoricalLog, setSelectedHistoricalLog] = useState<HistoricalAuctionLog | null>(null);
@@ -1469,36 +1508,543 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
   // ── STAGE 1: AUCTION OVERVIEW & SCHEDULE HUB ─────────────────────────────
   if (stage === 'overview') {
     return (
-      <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-200 text-white">
-        {/* Top Header Chit Selector */}
-        <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#6359E9]/20 border border-[#6359E9]/40 text-[#64CFF6] flex items-center justify-center shrink-0">
-              <Gavel size={20} />
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Live Auction Hub</span>
-              <h2 className="text-sm sm:text-base font-black text-white leading-tight">
-                {group.name}
-              </h2>
-            </div>
-          </div>
+      <div className="flex flex-col flex-1 min-w-0 animate-in fade-in duration-200">
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider">Select Chit Group:</span>
-            <select
-              value={selectedGroupId}
-              onChange={(e) => setSelectedGroupId(e.target.value)}
-              className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none cursor-pointer transition-colors shadow-2xs"
-            >
-              {allGroups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name} (Month {g.currentMonth} of {g.durationMonths} • {formatCurrency(g.totalValue)})
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* ═════════════════════════════════════════════════════════════════════════
+            DESKTOP AUCTION TAB (LOCKED RESTING STATE) — EXACT STITCH FINTECH DESIGN
+            ═════════════════════════════════════════════════════════════════════════ */}
+        <div className="hidden md:flex flex-col flex-1 min-w-0 -m-4 sm:-m-8 bg-slate-50 min-h-screen text-slate-800">
+          
+          {/* TopHeader */}
+          <header className="h-16 bg-white border-b border-slate-200/80 px-8 flex items-center justify-between flex-shrink-0 z-20">
+            <div className="flex items-center gap-5">
+              <div>
+                <h1 className="text-lg font-bold font-display text-slate-900 tracking-tight flex items-center gap-2">
+                  Auctions &amp; Bidding Arena{' '}
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    Upcoming Session
+                  </span>
+                </h1>
+              </div>
+              <div className="h-6 w-px bg-slate-200 mx-1" />
+              
+              {/* Group Switcher Pills */}
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+                {allGroups.map((g) => {
+                  const isSelected = g.id === selectedGroupId;
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setSelectedGroupId(g.id);
+                        fetchGroupDetails(g.id);
+                      }}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-white font-bold text-brand-700 shadow-sm border border-slate-200/60'
+                          : 'font-medium text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-indigo-500' : 'bg-amber-400'}`} />
+                      <span>{g.name} ({formatCurrency(g.totalValue)})</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                        isSelected ? 'bg-brand-50 text-brand-700' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {g.currentMonth === 0 ? 'M0 Launch' : `Month ${g.currentMonth}`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Header Actions */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowScheduleModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-colors shadow-2xs cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                <span>Reschedule / Conduct Early</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const msg = `📢 *Upcoming Live Chit Auction Notice*\nGroup: ${group.name}\nMonth Cycle: Month ${group.currentMonth}\nChit Value: ${formatCurrency(group.totalValue)}\nScheduled Date: ${countdown.formattedTargetDate || formattedTargetAuctionDate} at ${countdown.formattedTargetTime || formattedTargetAuctionTime}\n\nPlease be present on the floor or connected in-app.`;
+                  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                <span>Broadcast Schedule Notice</span>
+              </button>
+            </div>
+          </header>
+
+          {/* Main Scrollable Arena Body */}
+          <main className="flex-1 overflow-y-auto p-8 space-y-7">
+            
+            {/* Arena Master Milestone & Countdown Bar */}
+            <section className="bg-gradient-to-r from-amber-500/10 via-brand-50/50 to-amber-500/10 border-2 border-amber-300 bg-white rounded-2xl p-5 shadow-sm relative overflow-hidden">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-5">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                        NEXT LIVE AUCTION IN
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        Month {group.currentMonth} Competitive Discount Bidding · {formatCurrency(group.totalValue)} Scheme Pool
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-2 mt-2">
+                      <span className="text-3xl md:text-4xl font-black font-mono tracking-wider text-slate-900 bg-white border border-amber-200 px-4 py-1.5 rounded-xl shadow-xs text-amber-900">
+                        {String(countdown.days).padStart(2, '0')}d : {String(countdown.hours).padStart(2, '0')}h : {String(countdown.minutes).padStart(2, '0')}m : {String(countdown.seconds).padStart(2, '0')}s
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 font-medium mt-1.5 flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                      Scheduled: <strong className="text-slate-900">{countdown.formattedTargetDate || formattedTargetAuctionDate} at {countdown.formattedTargetTime || formattedTargetAuctionTime} (IST)</strong>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2 text-right">
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> {eligibleCount} Floor Participants
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span>{members.length - eligibleCount} Prior Winner Spectator{members.length - eligibleCount !== 1 ? 's' : ''}</span>
+                    <span className="text-slate-300">•</span>
+                    <span className="font-bold text-brand-700">Quorum Met</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Month 0 Launch Mode Alert / Banner Context */}
+            {group.currentMonth === 0 ? (
+              <section className="p-3.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-white border border-indigo-200 text-brand-600 flex items-center justify-center font-bold text-xs shadow-2xs">
+                    M0
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900">Month 0 (Launch / Orientation Phase) Protocol</span>
+                    <p className="text-slate-500 text-[11px] mt-0.5">
+                      By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool is reserved as Organizer Commission. Once launch collections are secured, advance to Month 1 to begin live auctions.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAdvanceMonth0}
+                  disabled={isRecording}
+                  className="text-[11px] font-bold text-indigo-700 bg-white hover:bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Rocket size={13} />
+                  <span>{isRecording ? 'Advancing to Month 1...' : 'Confirm Launch & Advance to Month 1'}</span>
+                </button>
+              </section>
+            ) : (
+              <section className="p-3.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-white border border-indigo-200 text-brand-600 flex items-center justify-center font-bold text-xs shadow-2xs">
+                    M0
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900">Month 0 (Launch / Orientation Phase) Protocol</span>
+                    <p className="text-slate-500 text-[11px] mt-0.5">
+                      By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool was reserved as Organizer Commission. Group advanced to M1 on launch verification.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold text-indigo-700 bg-white px-2.5 py-1 rounded-lg border border-indigo-200">
+                  Completed &amp; Verified
+                </span>
+              </section>
+            )}
+
+            {/* Top Grid: Live Bid Console + Real-time Financial Engine + Discount Pool (Kai Iruppu) */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-7">
+              
+              {/* Left/Center 8 Cols: Contender Floor + Bidding Floor Status */}
+              <section className="xl:col-span-8 space-y-6">
+                
+                {/* Top Banner: Current Highest Discount Bid & Floor Status */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+                  <div className="flex items-start justify-between flex-wrap gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Auction Floor Status</span>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold">
+                          <span className="text-xs">🔒</span> Standby Mode
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-3 mt-2">
+                        <span className="text-2xl md:text-3xl font-black font-display text-slate-900 tracking-tight">
+                          🔒 Bidding Floor Locked Until Scheduled Time
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1.5">
+                        Countdown active · Floor bidding terminal will unlock automatically at {countdown.formattedTargetTime || formattedTargetAuctionTime} or when Admin initiates the session.
+                      </p>
+                    </div>
+                    <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-md min-w-[220px] text-right flex-shrink-0">
+                      <span className="text-[10px] uppercase font-bold text-indigo-200 tracking-wider block">
+                        Month {group.currentMonth} Prize Pool
+                      </span>
+                      <p className="text-2xl font-black font-display text-amber-400 mt-0.5">
+                        {formatCurrency(group.totalValue)}
+                      </p>
+                      <div className="text-[10px] text-slate-300 mt-1.5 pt-1.5 border-t border-white/10 flex justify-between">
+                        <span>Base Chit: {formatCurrency(group.totalValue)}</span>
+                        <span>Min Bid: ₹500</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* PRIMARY FOCUS: Active Contenders on Floor (Cards Grid) */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-display font-bold text-base text-slate-900 tracking-tight">Active Contenders on Floor</h2>
+                        <span className="text-xs font-bold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-full">
+                          {eligibleCount} Contenders · 1-Tap Ready
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {eligibleCount} Contenders in verified standby status. Bidding inputs unlock once session goes live.
+                      </p>
+                    </div>
+                    <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 font-semibold px-2.5 py-1 rounded-lg">
+                      {eligibleCount} / {members.length} Floor Quorum Met
+                    </span>
+                  </div>
+
+                  {/* Contender Grid Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    {members.map((m) => {
+                      const isWon = m.hasWonRegular;
+                      const pastWinLog = historicalAuctionLogs.find(l => l.winningBidderId === m.id || l.ticketNumber === m.ticketNumber);
+
+                      if (isWon) {
+                        return (
+                          <div key={m.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-100/60 opacity-80 lg:col-span-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="w-7 h-7 rounded-lg bg-slate-300 text-slate-600 font-bold text-xs flex items-center justify-center font-mono shrink-0">
+                                  #{m.ticketNumber}
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <h4 className="text-xs font-bold text-slate-700 truncate">{m.fullName}</h4>
+                                    <span className="text-[10px] bg-slate-200 text-slate-600 font-semibold px-1.5 py-0.2 rounded shrink-0">
+                                      {pastWinLog ? `Month ${pastWinLog.month} Winner` : 'Prior Winner'}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 truncate block">
+                                    {pastWinLog 
+                                      ? `Won in M${pastWinLog.month} (Prize: ${formatCurrency(pastWinLog.netPayout)}) · Disqualified from bidding` 
+                                      : 'Prior winner spectator · Receives dividends'}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-600 bg-white px-2.5 py-1 rounded border border-slate-200 shrink-0">
+                                Prior Winner (Spectator)
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={m.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 shadow-2xs relative transition-all">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-7 h-7 rounded-lg bg-brand-100 text-brand-700 font-bold text-xs flex items-center justify-center font-mono shrink-0">
+                                #{m.ticketNumber}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <h4 className="text-xs font-bold text-slate-900 truncate">{m.fullName}</h4>
+                                  <span className="text-[10px] bg-brand-50 text-brand-700 border border-brand-200 px-1.5 py-0.2 rounded font-semibold shrink-0">
+                                    Ready
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-semibold text-emerald-600">Registered &amp; Verified</span>
+                              </div>
+                            </div>
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" title="Present" />
+                          </div>
+                          <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-[11px]">
+                            <span className="text-slate-500 text-[10px]">Standby Contender</span>
+                            <button 
+                              disabled 
+                              className="px-2.5 py-1 bg-slate-100 text-slate-400 font-bold rounded-lg text-[10px] border border-slate-200 cursor-not-allowed select-none flex items-center gap-1"
+                            >
+                              <span>🔒 Floor Locked</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </section>
+
+              {/* Right 4 Cols: Kai Iruppu Reserve Panel + Eligibility Overview + Award Pot Action */}
+              <aside className="xl:col-span-4 space-y-6">
+                
+                {/* Kai Iruppu (Discount Pool) & Laaba Seetu Deep Dive */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
+                        🪙
+                      </div>
+                      <h3 className="font-display font-bold text-sm text-slate-900">Kai Iruppu (Discount Pool)</h3>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-md">
+                      M{group.currentMonth} ROLLOVER
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Current Accumulated Reserve</span>
+                    <p className="text-3xl font-black font-display text-slate-900 tracking-tight mt-0.5">
+                      {formatCurrency(group.kai_iruppu_pool)}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Pool Target for Laaba Seetu: <strong>{formatCurrency(group.totalValue)}</strong>
+                    </p>
+                  </div>
+
+                  {/* Progress Bar towards Laaba Seetu */}
+                  <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-600 font-medium">Laaba Seetu Threshold</span>
+                      <span className="font-bold text-amber-700">
+                        {Math.min(100, Math.round((group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}% Funded
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all duration-500" 
+                        style={{ width: `${Math.min(100, Math.max(0, (group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}%` }} 
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-snug">
+                      When this pool hits {formatCurrency(group.totalValue)}, subscribers pay <strong>₹0 dues</strong> in that upcoming cycle while full prize pot is funded from the reserve!
+                    </p>
+                  </div>
+
+                  {/* Rollover Breakdown */}
+                  <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Current Discount Pool:</span>
+                      <span className="font-mono font-bold text-slate-800">{formatCurrency(group.kai_iruppu_pool)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Remaining to Laaba Seetu:</span>
+                      <span className="font-mono font-bold text-amber-700">
+                        {formatCurrency(Math.max(0, group.totalValue - group.kai_iruppu_pool))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-slate-100 font-bold">
+                      <span className="text-slate-900">Total Group Chit Value:</span>
+                      <span className="font-mono text-brand-700">{formatCurrency(group.totalValue)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Floor Attendance Summary & Quick Roster */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display font-bold text-sm text-slate-900">Floor Attendance Status</h3>
+                    </div>
+                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                      {eligibleCount} / {members.length} Contenders
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="font-semibold text-slate-800">Floor Bidding Quorum</span>
+                      </div>
+                      <span className="font-bold text-emerald-700">Active (100%)</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                        <span className="font-semibold text-slate-800">Auctioneer Shorthand Mode</span>
+                      </div>
+                      <span className="font-bold text-brand-700 font-mono">Enabled</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pre-Session Waiting Lobby */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <h3 className="font-display font-bold text-xs uppercase tracking-wider text-slate-900">
+                        Pre-Session Waiting Lobby
+                      </h3>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono">Presence Active</span>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    {members.filter(m => !m.hasWonRegular).slice(0, 2).map((m) => (
+                      <div key={m.id} className="p-2.5 bg-slate-50 border border-slate-200/70 rounded-xl flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-6 h-6 rounded-lg bg-brand-100 text-brand-700 font-bold flex items-center justify-center font-mono text-[10px] shrink-0">
+                            #{m.ticketNumber}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-900 text-xs truncate">{m.fullName}</span>
+                              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded shrink-0">
+                                CHECKED IN
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 truncate">Device active · Standing by for M{group.currentMonth}</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-emerald-600 font-bold shrink-0">Online</span>
+                      </div>
+                    ))}
+                    {members.some(m => m.hasWonRegular) && (
+                      <div className="p-2 bg-slate-50/60 rounded-xl flex items-center justify-between text-slate-500 text-[11px]">
+                        <span className="truncate">Prior winners connected as Spectators</span>
+                        <span className="font-mono font-medium text-slate-700 shrink-0">Spectator</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Initiate Early Live Auction Session (Admin Control) */}
+                <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
+                      Admin Control
+                    </span>
+                    <span className="text-xs text-amber-300 font-semibold">Standby Mode</span>
+                  </div>
+                  <h4 className="font-display font-bold text-sm mt-3">Initiate Early Live Auction Session</h4>
+                  <p className="text-xs text-slate-300 mt-1">
+                    Overrides the countdown timer and unlocks the 2-Tap bidding console immediately for all verified contenders on the floor.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleEnterStudio}
+                    className="mt-4 w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+                    <span>Start Live Auction Now (Admin Override)</span>
+                  </button>
+                </div>
+
+              </aside>
+
+            </div>
+
+            {/* Historical Auction Records Full Ledger Card at Bottom */}
+            {historicalAuctionLogs.length > 0 && (
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold text-xs">
+                      📜
+                    </div>
+                    <div>
+                      <h3 className="font-display font-bold text-base text-slate-900">Historical Auction Ledger</h3>
+                      <p className="text-xs text-slate-500">{historicalAuctionLogs.length} Completed rounds recorded</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold px-2.5 py-1 bg-brand-50 text-brand-700 rounded-lg border border-brand-200 font-mono">
+                    {historicalAuctionLogs.length} Rounds Concluded
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {historicalAuctionLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setSelectedHistoricalLog(log);
+                      }}
+                      className="p-3.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-brand-500 rounded-xl transition-all cursor-pointer group shadow-2xs space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-slate-900 group-hover:text-brand-600 transition-colors">
+                          Month {log.month} Auction
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {new Date(log.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600 font-medium truncate">{log.winningBidderName}</span>
+                        <span className="font-mono font-bold text-emerald-600">{formatCurrency(log.netPayout)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/60 text-slate-500">
+                        <span>Discount: {formatCurrency(log.winningDiscount)}</span>
+                        <span className="text-brand-600 font-semibold group-hover:underline">View Receipt →</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </main>
         </div>
+
+        {/* ═════════════════════════════════════════════════════════════════════════
+            MOBILE AUCTION TAB (LOCKED RESTING STATE) — PRESERVED FOR STEP 9 OVERHAUL
+            ═════════════════════════════════════════════════════════════════════════ */}
+        <div className="block md:hidden space-y-3.5 sm:space-y-4 animate-in fade-in duration-200 text-white">
+          {/* Top Header Chit Selector */}
+          <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#6359E9]/20 border border-[#6359E9]/40 text-[#64CFF6] flex items-center justify-center shrink-0">
+                <Gavel size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Live Auction Hub</span>
+                <h2 className="text-sm sm:text-base font-black text-white leading-tight">
+                  {group.name}
+                </h2>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider">Select Chit Group:</span>
+              <select
+                value={selectedGroupId}
+                onChange={(e) => setSelectedGroupId(e.target.value)}
+                className="bg-[#141332] hover:bg-[#27264E] border border-[#27264E] focus:border-[#6359E9] rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none cursor-pointer transition-colors shadow-2xs"
+              >
+                {allGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} (Month {g.currentMonth} of {g.durationMonths} • {formatCurrency(g.totalValue)})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
         {/* ── COUNTDOWN & SCHEDULE BANNER ──── */}
         <AuctionCountdownBanner
@@ -1811,6 +2357,8 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               ))}
             </div>
           )}
+        </div>
+
         </div>
 
         {/* Schedule Modal */}
