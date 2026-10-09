@@ -4448,39 +4448,18 @@ Thank you for your prompt payment! 🙏`;
                   </div>
                 </div>
 
-                {/* Action Grid CTA Inside Hero */}
-                <div className="relative z-10 mt-5 grid grid-cols-3 gap-1.5 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={handleMarkAllPaid}
-                    disabled={isMarkingAllPaid || pendingList.length === 0}
-                    className="py-2.5 px-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl font-semibold flex items-center justify-center space-x-1 transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
-                  >
-                    <Check size={13} className="stroke-[2.5] shrink-0" />
-                    <span className="truncate">{isMarkingAllPaid ? 'Recording...' : 'Mark Paid'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRemindModalTab('individual');
-                      setShowRemindModal(true);
-                    }}
-                    disabled={pendingList.length === 0}
-                    className="py-2.5 px-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl font-semibold flex items-center justify-center space-x-1 transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
-                  >
-                    <Send size={13} className="shrink-0" />
-                    <span className="truncate">Remind ({pendingList.length})</span>
-                  </button>
+                {/* Primary Cycle Advance CTA Inside Hero */}
+                <div className="relative z-10 mt-5">
                   <button
                     type="button"
                     onClick={handleCloseMonth}
                     disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup?.currentMonth ?? 0)}
-                    className="py-2.5 px-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-semibold flex items-center justify-center space-x-1 shadow-md transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+                    className="w-full py-3 px-4 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-40 cursor-pointer"
                   >
-                    <span className="truncate">
-                      {selectedDashboardMonth === 0 ? 'Roll M1' : 'Close Month'}
+                    <span>
+                      {selectedDashboardMonth === 0 ? 'Confirm Launch & Roll to Month 1' : 'Conclude & Advance Month'}
                     </span>
-                    <ArrowRight size={13} className="shrink-0" />
+                    <ArrowRight size={15} className="shrink-0" />
                   </button>
                 </div>
               </section>
