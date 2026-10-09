@@ -4587,41 +4587,41 @@ Thank you for your prompt payment! 🙏`;
                   </div>
                 ) : (
                   <div>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold text-lg shadow-inner">
-                          🏆
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0">
+                          <Trophy size={16} />
                         </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h2 className="text-sm font-bold text-slate-900 leading-none">{winnerName}</h2>
-                            <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-md border border-amber-200">
-                              Ticket #{winnerTicketNum}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="text-sm font-bold font-display text-slate-900 truncate">{winnerName}</h3>
+                            <span className="px-1.5 py-0.2 text-[10px] font-bold font-mono bg-slate-100 text-slate-700 rounded border border-slate-200">
+                              #{winnerTicketNum}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-500 mt-1 flex items-center">
-                            <span className="font-medium text-slate-700">Month {selectedDashboardMonth} Winner</span>
+                          <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium truncate">
+                            <span>Month {selectedDashboardMonth} Winner</span>
                             {winnerPhone && (
                               <>
-                                <span className="mx-1.5 text-slate-300">•</span>
-                                <span className="text-slate-500 font-medium font-mono">{winnerPhone}</span>
+                                <span className="text-slate-300">•</span>
+                                <span className="text-slate-400 font-mono">{winnerPhone}</span>
                               </>
                             )}
                           </p>
                         </div>
                       </div>
                       {isSettled ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          ✓ Fully Disbursed
+                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          ✓ Disbursed
                         </span>
                       ) : isPartial ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                          Partial Disbursed
+                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          Partial
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 animate-pulse" />
-                          Disbursal Pending
+                        <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          Pending
                         </span>
                       )}
                     </div>
