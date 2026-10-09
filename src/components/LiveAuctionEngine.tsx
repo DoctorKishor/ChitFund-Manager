@@ -245,10 +245,12 @@ export default function LiveAuctionEngine() {
   const [auctionDateOverride, setAuctionDateOverride] = useState<string | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
 
-  // Live auction start confirmation and full-page 5-second countdown states
+  // Live auction start confirmation, countdown, and session timer states
   const [showStartConfirmModal, setShowStartConfirmModal] = useState<boolean>(false);
+  const [countdownTarget, setCountdownTarget] = useState<'floor' | 'stream' | null>(null);
   const [isGoingLiveCountdown, setIsGoingLiveCountdown] = useState<boolean>(false);
   const [liveCountdownSecs, setLiveCountdownSecs] = useState<number>(5);
+  const [sessionElapsedSecs, setSessionElapsedSecs] = useState<number>(0);
 
   // Fetch active groups list from Supabase
   const fetchGroupsList = async () => {
@@ -1084,6 +1086,8 @@ export default function LiveAuctionEngine() {
     };
     setRecordedWinnerSummary(summaryData);
 
+    const finalSessionDuration = formatSessionDuration(sessionElapsedSecs);
+
     // Prepare full rich concluded report data
     const concludedReport: AuctionReportData = {
       groupName: group.name,
@@ -1102,6 +1106,7 @@ export default function LiveAuctionEngine() {
       isLaabaSeetuThisMonth: isLaabaSeetuActive,
       isNextMonthLaabaSeetu: nextPool >= group.totalValue,
       concludedAt: new Date().toISOString(),
+      auctionDuration: finalSessionDuration,
       organizerName: organizationName || (profile?.fullName ? `${profile.fullName}'s Chit Funds` : "ANBAZHAKAN CHIT FUNDS"),
       organizerTagline: organizationTagline || "TRUSTED CHIT FUNDS MANAGEMENT",
       organizerInitials: organizationInitials || "CF",
@@ -1161,11 +1166,23 @@ export default function LiveAuctionEngine() {
           }
 
           await supabase.from('security_audit_logs').insert({
-            action_description: `AUCTION CLOSED: Group "${group.name}" Month ${group.currentMonth} won by ${winningMember?.fullName || 'Member'} with discount ${formatCurrency(highestBid)}. Net Payout: ${formatCurrency(netPayout)}. Group advanced to Month ${nextMonth}.`,
+            action_description: `AUCTION CLOSED: Group "${group.name}" Month ${group.currentMonth} won by ${winningMember?.fullName || 'Member'} with discount ${formatCurrency(highestBid)}. Net Payout: ${formatCurrency(netPayout)}. Session Duration: ${finalSessionDuration}. Group advanced to Month ${nextMonth}.`,
             target_table: 'auction_logs',
           });
         }
       }
+
+      // Clear local session timer for this cycle
+      if (group.id) {
+        try {
+          localStorage.removeItem(`chit_auction_timer_${group.id}_${group.currentMonth}`);
+        } catch {}
+      }
+
+      await supabase.from('security_audit_logs').insert({
+        action_description: `AUCTION CONCLUDED: "${group.name}" Month ${group.currentMonth} won by ${winnerName || 'Member'} with winning discount ${formatCurrency(highestBid)}. Net Payout: ${formatCurrency(netPayout)}. Session Duration: ${finalSessionDuration}. Group advanced to Month ${nextMonth}.`,
+        target_table: 'auction_logs',
+      });
 
       // Mark winner in local state
       if (winnerId) {
@@ -1330,15 +1347,65 @@ export default function LiveAuctionEngine() {
     }
   };
 
+  // Session Timer (Stopwatch) effect: tracks elapsed duration while on the studio auction floor
+  useEffect(() => {
+    if (stage !== 'studio' || !group) return;
+
+    const timerKey = `chit_auction_timer_${group.id}_${group.currentMonth}`;
+    let startTime = 0;
+    try {
+      startTime = Number(localStorage.getItem(timerKey));
+    } catch {}
+
+    if (!startTime || isNaN(startTime)) {
+      startTime = Date.now();
+      try {
+        localStorage.setItem(timerKey, String(startTime));
+      } catch {}
+    }
+
+    const updateTimer = () => {
+      const elapsed = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+      setSessionElapsedSecs(elapsed);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [stage, group?.id, group?.currentMonth]);
+
+  const formatSessionDuration = (secs: number) => {
+    const hrs = Math.floor(secs / 3600);
+    const mins = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (hrs > 0) {
+      return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+    return `${String(mins).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
   const handleEnterStudio = () => {
     triggerHapticFeedback('light');
     setStage('studio');
   };
 
-  // Prompt confirmation modal before launching live auction
-  const promptStartLiveAuction = () => {
+  // Prompt confirmation modal before opening auction floor
+  const promptBeginAuctionFloor = () => {
     triggerHapticFeedback('light');
+    setCountdownTarget('floor');
     setShowStartConfirmModal(true);
+  };
+
+  // Prompt confirmation modal before starting public live stream telecast
+  const promptStartLiveBroadcast = () => {
+    triggerHapticFeedback('light');
+    setCountdownTarget('stream');
+    setShowStartConfirmModal(true);
+  };
+
+  // Generic fallback alias
+  const promptStartLiveAuction = () => {
+    promptBeginAuctionFloor();
   };
 
   // Confirmed -> Initiate full-screen 5, 4, 3, 2, 1 live countdown
@@ -1349,7 +1416,7 @@ export default function LiveAuctionEngine() {
     triggerHapticFeedback('light');
   };
 
-  // 5-4-3-2-1 live stream initiation countdown effect
+  // 5-4-3-2-1 countdown effect (floor opening or live telecast broadcast)
   useEffect(() => {
     if (!isGoingLiveCountdown) return;
 
@@ -1360,37 +1427,24 @@ export default function LiveAuctionEngine() {
       }, 1000);
       return () => clearTimeout(timer);
     } else {
-      // Reached 0: Broadcast is officially live
+      // Reached 0: proceed based on target
       triggerHapticFeedback('success');
       const timer = setTimeout(() => {
         setIsGoingLiveCountdown(false);
-        setStage('studio');
-        if (group && group.currentMonth > 0 && !group.is_live_auction_active) {
-          handleBeginLiveAuction();
+        if (countdownTarget === 'floor') {
+          // Enter studio / auction floor without turning on public live stream broadcast
+          setStage('studio');
+        } else if (countdownTarget === 'stream') {
+          // Explicitly turn on public live broadcast on subscriber portal
+          if (group && group.currentMonth > 0 && !group.is_live_auction_active) {
+            handleBeginLiveAuction();
+          }
         }
+        setCountdownTarget(null);
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [isGoingLiveCountdown, liveCountdownSecs, group]);
-
-  const getCountdownStatusText = (num: number) => {
-    switch (num) {
-      case 5:
-        return 'PREPARING LIVE BIDDING ARENA...';
-      case 4:
-        return 'CONNECTING SUBSCRIBERS & FLOOR CONTENDERS...';
-      case 3:
-        return 'SYNCHRONIZING MULTI-ACCOUNT TREASURY...';
-      case 2:
-        return 'PRIMING 1-TAP BIDDING REGISTERS...';
-      case 1:
-        return 'GOING LIVE ON-AIR IN...';
-      case 0:
-        return '🔴 LIVE AUCTION BROADCAST ACTIVE!';
-      default:
-        return 'GOING LIVE...';
-    }
-  };
+  }, [isGoingLiveCountdown, liveCountdownSecs, countdownTarget, group]);
 
   const handleExitStudio = () => {
     if (bids.length > 0) {
@@ -1453,23 +1507,42 @@ export default function LiveAuctionEngine() {
   // ── RENDER START CONFIRMATION MODAL ──────────────────────────────────────
   const renderStartConfirmModal = () => {
     if (!showStartConfirmModal || !group) return null;
+    const isStreamTarget = countdownTarget === 'stream';
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
         <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
           {/* Header */}
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-indigo-50/30">
+          <div className={`p-5 border-b border-slate-100 flex items-center justify-between ${
+            isStreamTarget 
+              ? 'bg-gradient-to-r from-red-50 to-rose-50/40' 
+              : 'bg-gradient-to-r from-slate-50 to-indigo-50/40'
+          }`}>
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shadow-xs">
-                <Radio className="w-5 h-5 animate-pulse" />
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-xs ${
+                isStreamTarget ? 'bg-red-100 text-red-600' : 'bg-brand-100 text-brand-600'
+              }`}>
+                {isStreamTarget ? (
+                  <Radio className="w-5 h-5 animate-pulse" />
+                ) : (
+                  <Gavel className="w-5 h-5" />
+                )}
               </div>
               <div>
-                <h3 className="text-base font-black text-slate-900">Start Live Auction Floor?</h3>
-                <p className="text-xs text-slate-500">Initiate live broadcast & contender bidding</p>
+                <h3 className="text-base font-black text-slate-900">
+                  {isStreamTarget ? 'Broadcast Live on Portal?' : 'Open Auction Floor?'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {isStreamTarget ? 'Broadcast live telecast to enrolled subscribers' : 'Enter live bidding arena & contender floor'}
+                </p>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => setShowStartConfirmModal(false)}
+              onClick={() => {
+                setShowStartConfirmModal(false);
+                setCountdownTarget(null);
+              }}
               className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold active:scale-95 transition-all cursor-pointer"
               title="Cancel"
             >
@@ -1502,10 +1575,22 @@ export default function LiveAuctionEngine() {
               </div>
             </div>
 
-            <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-amber-900 text-xs leading-relaxed flex items-start gap-2.5">
-              <span className="text-base leading-none">⏱️</span>
+            <div className={`p-3 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5 ${
+              isStreamTarget 
+                ? 'bg-red-50/80 border-red-200 text-red-900' 
+                : 'bg-indigo-50/80 border-indigo-200 text-indigo-900'
+            }`}>
+              <span className="text-base leading-none">{isStreamTarget ? '📡' : '⏱️'}</span>
               <p>
-                Confirming will initiate a <strong>5-second broadcast countdown</strong> on all connected screens before unlocking live shout registers.
+                {isStreamTarget ? (
+                  <>
+                    Confirming will initiate a <strong>5-second broadcast countdown</strong> and immediately notify enrolled subscribers that live bidding is on-air.
+                  </>
+                ) : (
+                  <>
+                    Confirming will initiate a <strong>5-second countdown</strong> to open the live auction floor and start the session stopwatch. (Public live stream on the subscriber portal remains on standby until you choose to broadcast).
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -1514,7 +1599,10 @@ export default function LiveAuctionEngine() {
           <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
             <button
               type="button"
-              onClick={() => setShowStartConfirmModal(false)}
+              onClick={() => {
+                setShowStartConfirmModal(false);
+                setCountdownTarget(null);
+              }}
               className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
             >
               Cancel
@@ -1522,10 +1610,23 @@ export default function LiveAuctionEngine() {
             <button
               type="button"
               onClick={handleConfirmStartLive}
-              className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              className={`px-5 py-2 rounded-xl text-white text-xs font-black shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer ${
+                isStreamTarget
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-brand-600 hover:bg-brand-700'
+              }`}
             >
-              <Radio className="w-3.5 h-3.5 animate-pulse" />
-              <span>Confirm & Go Live</span>
+              {isStreamTarget ? (
+                <>
+                  <Radio className="w-3.5 h-3.5 animate-pulse" />
+                  <span>Confirm & Go Live</span>
+                </>
+              ) : (
+                <>
+                  <Gavel className="w-3.5 h-3.5" />
+                  <span>Confirm & Open Floor</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -1536,20 +1637,74 @@ export default function LiveAuctionEngine() {
   // ── RENDER 5-4-3-2-1 LIVE COUNTDOWN OVERLAY ──────────────────────────────
   const renderGoingLiveCountdownOverlay = () => {
     if (!isGoingLiveCountdown || !group) return null;
+    const isStreamTarget = countdownTarget === 'stream';
+
+    const getCountdownStatusText = (num: number) => {
+      if (isStreamTarget) {
+        switch (num) {
+          case 5:
+            return 'CONNECTING SUBSCRIBER FEEDS...';
+          case 4:
+            return 'BROADCASTING LIVE SESSION ALERT...';
+          case 3:
+            return 'TRANSMITTING REALTIME WEBSOCKET FEED...';
+          case 2:
+            return 'READYING STREAM TELECAST...';
+          case 1:
+            return 'GOING ON-AIR IN...';
+          case 0:
+            return '🔴 LIVE BROADCAST ACTIVE!';
+          default:
+            return 'GOING LIVE...';
+        }
+      } else {
+        switch (num) {
+          case 5:
+            return 'PREPARING LIVE BIDDING ARENA...';
+          case 4:
+            return 'VERIFYING CONTENDERS & ATTENDANCE...';
+          case 3:
+            return 'SYNCHRONIZING TREASURY & REGISTERS...';
+          case 2:
+            return 'OPENING AUCTION FLOOR...';
+          case 1:
+            return 'STARTING AUCTION FLOOR IN...';
+          case 0:
+            return '🏛️ AUCTION FLOOR OPEN!';
+          default:
+            return 'STARTING FLOOR...';
+        }
+      }
+    };
+
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-950 text-white overflow-hidden p-6 select-none animate-in fade-in duration-200">
         {/* Subtle Ambient Glowing Background */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18)_0%,rgba(15,23,42,0.95)_60%,rgba(2,6,23,1)_100%)] pointer-events-none" />
+        <div className={`absolute inset-0 pointer-events-none ${
+          isStreamTarget
+            ? 'bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.18)_0%,rgba(15,23,42,0.95)_60%,rgba(2,6,23,1)_100%)]'
+            : 'bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18)_0%,rgba(15,23,42,0.95)_60%,rgba(2,6,23,1)_100%)]'
+        }`} />
 
         {/* Pulse Ripple Rings */}
-        <div className="absolute w-[500px] h-[500px] rounded-full border border-indigo-500/10 animate-ping pointer-events-none" />
-        <div className="absolute w-[340px] h-[340px] rounded-full border border-indigo-400/20 animate-pulse pointer-events-none" />
+        <div className={`absolute w-[500px] h-[500px] rounded-full border pointer-events-none animate-ping ${
+          isStreamTarget ? 'border-red-500/10' : 'border-indigo-500/10'
+        }`} />
+        <div className={`absolute w-[340px] h-[340px] rounded-full border pointer-events-none animate-pulse ${
+          isStreamTarget ? 'border-red-400/20' : 'border-indigo-400/20'
+        }`} />
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-lg w-full space-y-6">
           {/* Header Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-black tracking-widest uppercase shadow-lg shadow-red-950/50">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping mr-1" />
-            LIVE STREAM INITIATION
+          <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black tracking-widest uppercase shadow-lg ${
+            isStreamTarget
+              ? 'bg-red-500/15 border border-red-500/40 text-red-400 shadow-red-950/50'
+              : 'bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 shadow-indigo-950/50'
+          }`}>
+            <span className={`w-2.5 h-2.5 rounded-full animate-ping mr-1 ${
+              isStreamTarget ? 'bg-red-500' : 'bg-indigo-400'
+            }`} />
+            {isStreamTarget ? 'LIVE STREAM BROADCAST' : 'AUCTION FLOOR OPENING'}
           </div>
 
           {/* Chit Details */}
@@ -1574,7 +1729,7 @@ export default function LiveAuctionEngine() {
             ) : (
               <div className="text-4xl sm:text-6xl font-black tracking-tight text-emerald-400 animate-in zoom-in-75 duration-300 drop-shadow-[0_0_40px_rgba(16,185,129,0.7)] flex items-center gap-3">
                 <span className="w-6 h-6 rounded-full bg-emerald-400 animate-ping" />
-                <span>ON AIR!</span>
+                <span>{isStreamTarget ? 'ON AIR!' : 'FLOOR OPEN!'}</span>
               </div>
             )}
           </div>
@@ -1604,6 +1759,23 @@ export default function LiveAuctionEngine() {
                 />
               );
             })}
+          </div>
+
+          {/* Cancel / Abort Countdown Button */}
+          <div className="pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHapticFeedback('light');
+                setIsGoingLiveCountdown(false);
+                setCountdownTarget(null);
+                setLiveCountdownSecs(5);
+              }}
+              className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/20 text-white text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-lg backdrop-blur-md"
+            >
+              <X size={15} />
+              <span>Cancel / Abort</span>
+            </button>
           </div>
         </div>
       </div>
@@ -2651,6 +2823,16 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
           {/* Header Actions */}
           <div className="flex items-center gap-3">
+            {/* Live Session Timer */}
+            <div 
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-mono text-xs font-bold shadow-2xs"
+              title="Active Live Auction Session Duration"
+            >
+              <Clock className="w-3.5 h-3.5 text-brand-600 animate-pulse shrink-0" />
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-sans font-semibold">Session:</span>
+              <span>{formatSessionDuration(sessionElapsedSecs)}</span>
+            </div>
+
             <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
               <span>{formattedTargetAuctionDate || 'No date set'} · {formattedTargetAuctionTime}</span>
@@ -2667,7 +2849,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             {group.currentMonth > 0 && !group.is_live_auction_active ? (
               <button
                 type="button"
-                onClick={promptStartLiveAuction}
+                onClick={promptStartLiveBroadcast}
                 disabled={isStartingLiveSession}
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-brand-700 border border-indigo-200 text-xs font-semibold rounded-xl shadow-2xs transition-all cursor-pointer disabled:opacity-50"
               >
@@ -3181,29 +3363,13 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               </p>
             </div>
             <div className="flex items-center space-x-1.5 shrink-0">
-              <button 
-                type="button"
-                onClick={() => setShowTimelineDrawer(true)}
-                className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors" 
-                title="Bid History"
+              <div 
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-mono text-xs font-bold shadow-2xs"
+                title="Active Live Auction Session Duration"
               >
-                History
-              </button>
-              <button 
-                type="button"
-                onClick={() => {
-                  if (bids.length === 0) {
-                    alert("Cannot close auction without any bids recorded.");
-                    return;
-                  }
-                  setShowCloseModal(true);
-                }}
-                disabled={group.currentMonth === 0 || bids.length === 0}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/25 active:scale-95 transition-all flex items-center gap-1.5 border border-emerald-500 disabled:opacity-50 cursor-pointer"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                <span>Conclude</span>
-              </button>
+                <Clock className="w-3.5 h-3.5 text-brand-600 animate-pulse shrink-0" />
+                <span>{formatSessionDuration(sessionElapsedSecs)}</span>
+              </div>
             </div>
           </div>
 
@@ -3241,7 +3407,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               {group.currentMonth > 0 && !group.is_live_auction_active ? (
                 <button
                   type="button"
-                  onClick={promptStartLiveAuction}
+                  onClick={promptStartLiveBroadcast}
                   disabled={isStartingLiveSession}
                   className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-100 text-[9px] font-black text-emerald-700 tracking-tight cursor-pointer hover:bg-emerald-200 disabled:opacity-50"
                 >
@@ -4256,6 +4422,7 @@ Congratulations to the winner! 🎉`
                     const nextMonthBonus = concludedReportData.isNextMonthLaabaSeetu 
                       ? `\n🎉 *BONUS:* Next Month (Month ${concludedReportData.month + 1}) is *LAABA SEETU (லாப சீட்டு)*! All subscribers pay *₹0 Due*!` 
                       : '';
+                    const durationText = concludedReportData.auctionDuration ? `\n⏱️ *Auction Duration:* ${concludedReportData.auctionDuration}` : '';
                     const text = 
 `🏆 *OFFICIAL AUCTION CONCLUDED REPORT*
 ───────────────────────
@@ -4265,7 +4432,7 @@ Congratulations to the winner! 🎉`
 💰 *Total Chit Value:* ${formatCurrency(concludedReportData.totalValue)}
 📉 *Winning Discount Bid:* -${formatCurrency(concludedReportData.winningDiscount)}
 💵 *Net Take-Home Prize Pot:* ${formatCurrency(concludedReportData.netPayout)}
-🏦 *New Kai Iruppu Pool:* ${formatCurrency(concludedReportData.newPool)}${nextMonthBonus}
+🏦 *New Kai Iruppu Pool:* ${formatCurrency(concludedReportData.newPool)}${nextMonthBonus}${durationText}
 ───────────────────────
 Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
 

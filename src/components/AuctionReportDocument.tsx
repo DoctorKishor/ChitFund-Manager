@@ -34,6 +34,7 @@ export interface AuctionReportData {
   isLaabaSeetuThisMonth: boolean;
   isNextMonthLaabaSeetu: boolean;
   concludedAt: string;
+  auctionDuration?: string;
   organizerName: string;
   organizerTagline?: string;
   organizerInitials?: string;
@@ -149,6 +150,11 @@ export default function AuctionReportDocument({ data, id = 'printable-auction-re
             <p className="text-[10px] sm:text-[11px] font-mono" style={{ color: '#64748b' }}>
               {formattedDate} {formattedTime ? `• ${formattedTime}` : ''}
             </p>
+            {data.auctionDuration && (
+              <p className="text-[10px] sm:text-[11px] font-mono font-bold flex items-center gap-1" style={{ color: '#4f46e5' }}>
+                <Clock size={11} /> Duration: {data.auctionDuration}
+              </p>
+            )}
           </div>
         </div>
 
