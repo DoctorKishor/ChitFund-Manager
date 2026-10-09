@@ -481,7 +481,7 @@ export default function LiveAuctionEngine() {
 
   // Real-time live presence subscription to track how many subscribers are watching
   useEffect(() => {
-    if (!selectedGroupId || stage !== 'studio') {
+    if (!selectedGroupId) {
       setLiveViewerCount(0);
       setActiveViewers([]);
       return;
@@ -551,7 +551,7 @@ export default function LiveAuctionEngine() {
       presenceChannelRef.current = null;
       supabase.removeChannel(presenceChannel);
     };
-  }, [selectedGroupId, stage, members]);
+  }, [selectedGroupId, members]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -1172,9 +1172,11 @@ export default function LiveAuctionEngine() {
         }
       }
 
-      // Clear local session timer for this cycle
+      // Clear local session timer for this cycle and reset to 0
+      setSessionElapsedSecs(0);
       if (group.id) {
         try {
+          localStorage.removeItem(`chit_auction_elapsed_${group.id}_${group.currentMonth}`);
           localStorage.removeItem(`chit_auction_timer_${group.id}_${group.currentMonth}`);
         } catch {}
       }
@@ -1347,31 +1349,58 @@ export default function LiveAuctionEngine() {
     }
   };
 
-  // Session Timer (Stopwatch) effect: tracks elapsed duration while on the studio auction floor
+  // Session Timer (Stopwatch) effect:
+  // - Tracks elapsed duration while the admin is on the studio auction floor.
+  // - PAUSES when admin navigates back to overview page (stage === 'overview').
+  // - RESUMES from paused elapsed seconds when returning to studio floor.
+  // - RESETS to 00:00 when auction is concluded, waiting for the next auction cycle to begin.
   useEffect(() => {
-    if (stage !== 'studio' || !group) return;
+    if (!group?.id) return;
 
-    const timerKey = `chit_auction_timer_${group.id}_${group.currentMonth}`;
-    let startTime = 0;
+    const storageKey = `chit_auction_elapsed_${group.id}_${group.currentMonth}`;
+
+    // Read stored accumulated elapsed seconds
+    let accumulatedSecs = 0;
     try {
-      startTime = Number(localStorage.getItem(timerKey));
-    } catch {}
-
-    if (!startTime || isNaN(startTime)) {
-      startTime = Date.now();
-      try {
-        localStorage.setItem(timerKey, String(startTime));
-      } catch {}
+      const stored = localStorage.getItem(storageKey);
+      if (stored !== null) {
+        accumulatedSecs = Number(stored);
+        if (isNaN(accumulatedSecs) || accumulatedSecs < 0) accumulatedSecs = 0;
+      }
+    } catch {
+      accumulatedSecs = 0;
     }
 
-    const updateTimer = () => {
-      const elapsed = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
-      setSessionElapsedSecs(elapsed);
-    };
+    setSessionElapsedSecs(accumulatedSecs);
 
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
+    // If NOT in studio (i.e. admin on overview page), the timer is PAUSED
+    if (stage !== 'studio') {
+      return;
+    }
+
+    // In studio: tick every second and accumulate
+    const segmentStart = Date.now();
+    const baseElapsed = accumulatedSecs;
+
+    const interval = setInterval(() => {
+      const currentSegment = Math.floor((Date.now() - segmentStart) / 1000);
+      const totalElapsed = baseElapsed + currentSegment;
+      setSessionElapsedSecs(totalElapsed);
+      try {
+        localStorage.setItem(storageKey, String(totalElapsed));
+      } catch {}
+    }, 1000);
+
+    return () => {
+      // Pause interval and persist exact elapsed count on leaving studio
+      clearInterval(interval);
+      const finalSegment = Math.floor((Date.now() - segmentStart) / 1000);
+      const finalElapsed = baseElapsed + finalSegment;
+      setSessionElapsedSecs(finalElapsed);
+      try {
+        localStorage.setItem(storageKey, String(finalElapsed));
+      } catch {}
+    };
   }, [stage, group?.id, group?.currentMonth]);
 
   const formatSessionDuration = (secs: number) => {
@@ -2302,38 +2331,54 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span className={`w-2 h-2 rounded-full ${activeViewers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
                       <h3 className="font-display font-bold text-xs uppercase tracking-wider text-slate-900">
                         Pre-Session Waiting Lobby
                       </h3>
                     </div>
-                    <span className="text-[10px] text-slate-400 font-mono">Presence Active</span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {activeViewers.length > 0 ? `${activeViewers.length} Connected` : 'Standby'}
+                    </span>
                   </div>
                   <div className="space-y-2 text-xs">
-                    {members.filter(m => !m.hasWonRegular).slice(0, 2).map((m) => (
-                      <div key={m.id} className="p-2.5 bg-slate-50 border border-slate-200/70 rounded-xl flex items-center justify-between">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="w-6 h-6 rounded-lg bg-brand-100 text-brand-700 font-bold flex items-center justify-center font-mono text-[10px] shrink-0">
-                            #{m.ticketNumber}
-                          </span>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-900 text-xs truncate">{m.fullName}</span>
-                              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded shrink-0">
-                                CHECKED IN
+                    {activeViewers.length === 0 ? (
+                      <div className="p-3.5 bg-slate-50/70 border border-dashed border-slate-200 rounded-xl text-center">
+                        <Users className="w-4 h-4 text-slate-300 mx-auto mb-1" />
+                        <p className="text-[11px] font-semibold text-slate-600">No subscribers currently in lobby</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Subscribers appear here live when they open this chit session</p>
+                      </div>
+                    ) : (
+                      <>
+                        {activeViewers.map((viewer) => {
+                          const isSpectator = viewer.hasWonRegular;
+                          return (
+                            <div key={viewer.key} className="p-2.5 bg-slate-50 border border-slate-200/70 rounded-xl flex items-center justify-between">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="w-6 h-6 rounded-lg bg-brand-100 text-brand-700 font-bold flex items-center justify-center font-mono text-[10px] shrink-0">
+                                  {viewer.ticketNumber ? `#${viewer.ticketNumber}` : '•'}
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-slate-900 text-xs truncate">{viewer.fullName}</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                                      isSpectator ? 'bg-slate-100 text-slate-600' : 'bg-emerald-100 text-emerald-800'
+                                    }`}>
+                                      {isSpectator ? 'SPECTATOR' : 'CONNECTED'}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 truncate">
+                                    {isSpectator ? 'Prior winner viewing session' : `Device active · Standing by for M${group.currentMonth}`}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] text-emerald-600 font-bold shrink-0 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Online
                               </span>
                             </div>
-                            <p className="text-[10px] text-slate-500 truncate">Device active · Standing by for M{group.currentMonth}</p>
-                          </div>
-                        </div>
-                        <span className="text-[10px] text-emerald-600 font-bold shrink-0">Online</span>
-                      </div>
-                    ))}
-                    {members.some(m => m.hasWonRegular) && (
-                      <div className="p-2 bg-slate-50/60 rounded-xl flex items-center justify-between text-slate-500 text-[11px]">
-                        <span className="truncate">Prior winners connected as Spectators</span>
-                        <span className="font-mono font-medium text-slate-700 shrink-0">Spectator</span>
-                      </div>
+                          );
+                        })}
+                      </>
                     )}
                   </div>
                 </div>
@@ -3908,7 +3953,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             className="flex md:hidden fixed inset-0 z-50 flex-col justify-end bg-slate-900/60 backdrop-blur-xs max-w-md mx-auto animate-in fade-in duration-150"
             id="quick-bid-mobile-sheet"
           >
-            <div className="bg-white rounded-t-3xl p-5 shadow-2xl border-t border-slate-200 animate-in slide-in-from-bottom duration-200">
+            <div className="bg-white rounded-t-3xl p-5 shadow-2xl border-t border-slate-200 animate-in slide-in-from-bottom duration-200 max-h-[90vh] overflow-y-auto">
               {/* Grab Handle */}
               <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3.5" />
 
@@ -3943,7 +3988,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 </button>
               </div>
 
-              {/* Instant 12-Grid Quick Increments (3x4) */}
+              {/* Instant 18-Grid Quick Increments (3x6) */}
               <div className="mt-3.5">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-semibold text-emerald-600">Instant Log on Tap</span>
@@ -3955,7 +4000,9 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     { delta: 500, label: '+₹500' },
                     { delta: 750, label: '+₹750' },
                     { delta: 1000, label: '+₹1,000' },
+                    { delta: 1250, label: '+₹1,250' },
                     { delta: 1500, label: '+₹1,500' },
+                    { delta: 1750, label: '+₹1,750' },
                     { delta: 2000, label: '+₹2,000' },
                     { delta: 2500, label: '+₹2,500' },
                     { delta: 3000, label: '+₹3,000' },
@@ -3963,6 +4010,10 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     { delta: 4000, label: '+₹4,000' },
                     { delta: 4500, label: '+₹4,500' },
                     { delta: 5000, label: '+₹5,000' },
+                    { delta: 6000, label: '+₹6,000' },
+                    { delta: 7000, label: '+₹7,000' },
+                    { delta: 8000, label: '+₹8,000' },
+                    { delta: 10000, label: '+₹10,000' },
                   ].map((item) => {
                     const basePrice = highestBid > 0 ? highestBid : startingBaselineBid;
                     const price = basePrice + item.delta;
@@ -3975,7 +4026,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                           triggerHapticFeedback('light');
                           recordBid(price, activeContender.id);
                         }}
-                        className="py-2.5 px-2 bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-xl text-center active:scale-95 transition-all flex flex-col items-center justify-center cursor-pointer shadow-2xs group"
+                        className="py-3 px-2 min-h-[58px] bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-xl text-center active:scale-95 transition-all flex flex-col items-center justify-center cursor-pointer shadow-2xs group"
                       >
                         <span className="text-xs sm:text-sm font-black text-slate-900 font-mono tracking-tight group-hover:text-brand-700 transition-colors">
                           {formatCurrency(price)}
