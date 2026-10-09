@@ -45,23 +45,23 @@ body {
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
-/* Custom Scrollbar for Midnight Theme */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #141332;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27264E;
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6359E9;
+  background: #94a3b8;
 }
 
 /* Hide scrollbar utility */
