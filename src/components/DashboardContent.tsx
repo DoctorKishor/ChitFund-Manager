@@ -9873,68 +9873,80 @@ Thank you for your prompt payment! 🙏`;
         const groupBroadcastMsg = generateGroupBroadcastText(pendingMembersList, activeGroup, selectedDashboardMonth);
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in overflow-y-auto">
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl max-w-md sm:max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto my-auto text-white">
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in overflow-y-auto no-scrollbar">
+            <div className="bg-white border border-slate-200/90 rounded-t-3xl sm:rounded-3xl max-w-md sm:max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto no-scrollbar scrollbar-none text-slate-800 animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
+              {/* Drag Handle on Mobile */}
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto -mt-1 mb-2 sm:hidden" />
+
               {/* Header */}
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
-                    Remind All
-                  </h3>
-                  <p className="text-xs font-semibold text-[#AEABD8] mt-0.5">
-                    {pendingMembersList.length} pending {pendingMembersList.length === 1 ? 'member' : 'members'} · Month {selectedDashboardMonth}
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                      Dues Reminder
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 font-mono">
+                      {pendingMembersList.length} Pending
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {activeGroup?.name || 'Chit Group'} · Cycle Month {selectedDashboardMonth}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowRemindModal(false)}
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#141332] border border-[#27264E] flex items-center justify-center text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+                  title="Close Modal"
                 >
                   <X size={16} />
                 </button>
               </div>
 
-              {/* Segmented Tab Switcher (Group Message vs Individual) */}
-              <div className="bg-[#141332] p-1 border border-[#27264E] rounded-2xl flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => setRemindModalTab('group')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                    remindModalTab === 'group'
-                      ? 'bg-[#1D1D41] text-white shadow-xs font-extrabold border border-[#27264E]'
-                      : 'text-[#AEABD8] hover:text-white'
-                  }`}
-                >
-                  Group Message
-                </button>
+              {/* Segmented Tab Switcher */}
+              <div className="bg-slate-100 p-1 border border-slate-200/80 rounded-2xl flex gap-1">
                 <button
                   type="button"
                   onClick={() => setRemindModalTab('individual')}
                   className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                     remindModalTab === 'individual'
-                      ? 'bg-[#1D1D41] text-white shadow-xs font-extrabold border border-[#27264E]'
-                      : 'text-[#AEABD8] hover:text-white'
+                      ? 'bg-white text-brand-700 shadow-xs font-black border border-slate-200/60'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Individual
+                  Individual ({pendingMembersList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRemindModalTab('group')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                    remindModalTab === 'group'
+                      ? 'bg-white text-brand-700 shadow-xs font-black border border-slate-200/60'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Group Broadcast
                 </button>
               </div>
 
               {/* Description Sub-note */}
-              <p className="text-xs text-[#AEABD8] leading-relaxed">
-                {remindModalTab === 'individual'
-                  ? "Members with a saved number get a direct WhatsApp link. Add a number for others. It's saved to their profile permanently."
-                  : `Compile a single broadcast reminder containing all ${pendingMembersList.length} pending members to paste into your WhatsApp group.`}
-              </p>
+              <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200/70 text-[11px] text-slate-600 leading-relaxed flex items-start gap-2">
+                <span className="text-brand-600 shrink-0 mt-0.5">ℹ️</span>
+                <p>
+                  {remindModalTab === 'individual'
+                    ? "Members with a saved phone number get a one-tap direct WhatsApp reminder. Add a number for others to save it permanently."
+                    : `Compile a consolidated broadcast text message for all ${pendingMembersList.length} pending members to paste into your chit WhatsApp group.`}
+                </p>
+              </div>
 
               {/* Tab 1: Individual Reminders */}
               {remindModalTab === 'individual' && (
-                <div className="space-y-3 pt-1">
+                <div className="space-y-2.5 pt-1">
                   {pendingMembersList.length === 0 ? (
-                    <div className="py-8 text-center bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-2xl space-y-1.5">
-                      <CheckCircle2 size={28} className="mx-auto text-[#02B15A]" />
-                      <p className="text-xs font-bold text-white">All members have paid for Month {selectedDashboardMonth}!</p>
-                      <p className="text-[11px] text-[#02B15A]">No pending dues to remind.</p>
+                    <div className="py-8 text-center bg-emerald-50 border border-emerald-200 rounded-2xl space-y-1.5 p-4">
+                      <CheckCircle2 size={32} className="mx-auto text-emerald-600" />
+                      <p className="text-xs font-bold text-slate-900">All members have paid for Month {selectedDashboardMonth}!</p>
+                      <p className="text-[11px] text-emerald-700">No outstanding dues left for this cycle.</p>
                     </div>
                   ) : (
                     pendingMembersList.map((member) => {
@@ -9944,26 +9956,26 @@ Thank you for your prompt payment! 🙏`;
                       return (
                         <div
                           key={member.id}
-                          className="bg-[#141332] border border-[#27264E] hover:border-[#6359E9]/50 rounded-2xl p-3.5 sm:p-4 space-y-2.5 transition-all"
+                          className="bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 rounded-2xl p-3 sm:p-3.5 space-y-2.5 transition-all shadow-2xs"
                         >
                           {/* Member Title & Pending Amount */}
                           <div className="flex items-center justify-between">
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <h4 className="font-extrabold text-xs sm:text-sm text-white leading-snug">
+                                <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 leading-snug">
                                   {member.name}
                                 </h4>
-                                <span className="text-[10px] font-bold bg-[#1D1D41] border border-[#27264E] text-[#64CFF6] px-1.5 py-0.2 rounded font-mono">
+                                <span className="text-[10px] font-bold bg-white border border-slate-200 text-slate-600 px-1.5 py-0.2 rounded font-mono">
                                   #{member.ticket}
                                 </span>
                               </div>
-                              <p className="text-xs font-bold text-[#AEABD8] mt-0.5">
-                                <strong className="text-[#FFBB38] font-extrabold">{formatCurrency(member.remaining)}</strong> pending
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Pending: <strong className="text-amber-700 font-extrabold font-mono">{formatCurrency(member.remaining)}</strong>
                               </p>
                             </div>
 
                             {hasPhone && (
-                              <span className="text-[10px] font-bold text-[#02B15A] bg-[#02B15A]/15 border border-[#02B15A]/30 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
                                 <Phone size={10} /> Saved
                               </span>
                             )}
@@ -9972,14 +9984,14 @@ Thank you for your prompt payment! 🙏`;
                           {/* Phone input & Send Button */}
                           <div className="flex items-center gap-2">
                             {hasPhone ? (
-                              <div className="flex-1 flex items-center gap-2 bg-[#1D1D41] border border-[#27264E] px-3 py-2 rounded-xl text-xs font-semibold text-white min-w-0">
-                                <Phone size={12} className="text-[#02B15A] shrink-0" />
+                              <div className="flex-1 flex items-center gap-2 bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 min-w-0 shadow-2xs">
+                                <Phone size={12} className="text-emerald-600 shrink-0" />
                                 <span className="font-mono truncate">+91 {member.phone}</span>
                               </div>
                             ) : (
                               <input
                                 type="tel"
-                                placeholder="Add phone number"
+                                placeholder="Add phone (e.g. 9840123456)"
                                 value={currentInputPhone}
                                 onChange={(e) =>
                                   setRemindPhoneInputs(prev => ({
@@ -9987,7 +9999,7 @@ Thank you for your prompt payment! 🙏`;
                                     [member.id]: e.target.value,
                                   }))
                                 }
-                                className="flex-1 px-3.5 py-2 bg-[#1D1D41] border border-[#27264E] focus:border-[#6359E9] rounded-xl text-xs font-semibold text-white placeholder-[#AEABD8]/40 focus:outline-none min-w-0"
+                                className="flex-1 px-3.5 py-2 bg-white border border-slate-200 focus:border-brand-500 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none min-w-0 shadow-2xs font-mono"
                               />
                             )}
 
@@ -9996,7 +10008,7 @@ Thank you for your prompt payment! 🙏`;
                                 href={generateMemberReminderWhatsAppUrl(member, member.remaining, activeGroup, selectedDashboardMonth)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="bg-[#02B15A] hover:bg-[#02B15A]/90 text-white font-extrabold text-xs px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95 shrink-0"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 sm:px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95 shrink-0 cursor-pointer"
                               >
                                 <Send size={13} />
                                 <span>Send</span>
@@ -10006,7 +10018,7 @@ Thank you for your prompt payment! 🙏`;
                                 type="button"
                                 onClick={() => handleSavePhoneAndSend(member, member.remaining, activeGroup, selectedDashboardMonth)}
                                 disabled={savingMemberPhoneId === member.id}
-                                className="bg-[#02B15A] hover:bg-[#02B15A]/90 text-white font-extrabold text-xs px-3.5 sm:px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95 shrink-0 disabled:opacity-50 cursor-pointer"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 sm:px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95 shrink-0 disabled:opacity-50 cursor-pointer"
                               >
                                 {savingMemberPhoneId === member.id ? (
                                   <RefreshCw size={13} className="animate-spin" />
@@ -10027,18 +10039,18 @@ Thank you for your prompt payment! 🙏`;
               {/* Tab 2: Group Broadcast Message */}
               {remindModalTab === 'group' && (
                 <div className="space-y-3 pt-1">
-                  <div className="relative bg-[#141332] border border-[#27264E] rounded-2xl p-3.5 sm:p-4 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-bold text-white border-b border-[#27264E] pb-2">
+                  <div className="relative bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-900 border-b border-slate-200 pb-2">
                       <span className="flex items-center gap-1.5">
-                        <MessageSquare size={13} className="text-[#02B15A]" />
+                        <MessageSquare size={13} className="text-emerald-600" />
                         WhatsApp Group Broadcast Template
                       </span>
-                      <span className="text-[10px] font-mono text-[#64CFF6]">
-                        {pendingMembersList.length} Subscribers
+                      <span className="text-[10px] font-mono text-brand-600 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
+                        {pendingMembersList.length} Members
                       </span>
                     </div>
 
-                    <pre className="text-xs font-sans text-[#AEABD8] whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto select-all bg-[#1D1D41] p-3 rounded-xl border border-[#27264E]">
+                    <pre className="text-xs font-mono text-slate-700 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto no-scrollbar scrollbar-none select-all bg-white p-3 rounded-xl border border-slate-200/80">
                       {groupBroadcastMsg}
                     </pre>
                   </div>
@@ -10051,9 +10063,9 @@ Thank you for your prompt payment! 🙏`;
                         setRemindCopied(true);
                         setTimeout(() => setRemindCopied(false), 2000);
                       }}
-                      className="flex items-center justify-center gap-1.5 py-2.5 bg-[#141332] hover:bg-[#27264E] text-white font-bold text-xs rounded-xl border border-[#27264E] transition-colors active:scale-95 cursor-pointer"
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors active:scale-95 cursor-pointer"
                     >
-                      {remindCopied ? <Check size={14} className="text-[#02B15A]" /> : <Copy size={14} />}
+                      {remindCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
                       <span>{remindCopied ? 'Copied to Clipboard!' : 'Copy Message'}</span>
                     </button>
 
@@ -10061,7 +10073,7 @@ Thank you for your prompt payment! 🙏`;
                       href={`https://api.whatsapp.com/send?text=${encodeURIComponent(groupBroadcastMsg)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-1.5 py-2.5 bg-[#02B15A] hover:bg-[#02B15A]/90 text-white font-extrabold text-xs rounded-xl transition-all shadow-xs active:scale-95 text-center"
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs active:scale-95 text-center cursor-pointer"
                     >
                       <Send size={14} />
                       <span>Share to Group</span>
