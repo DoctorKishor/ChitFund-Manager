@@ -245,6 +245,11 @@ export default function LiveAuctionEngine() {
   const [auctionDateOverride, setAuctionDateOverride] = useState<string | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
 
+  // Live auction start confirmation and full-page 5-second countdown states
+  const [showStartConfirmModal, setShowStartConfirmModal] = useState<boolean>(false);
+  const [isGoingLiveCountdown, setIsGoingLiveCountdown] = useState<boolean>(false);
+  const [liveCountdownSecs, setLiveCountdownSecs] = useState<number>(5);
+
   // Fetch active groups list from Supabase
   const fetchGroupsList = async () => {
     try {
@@ -1330,6 +1335,63 @@ export default function LiveAuctionEngine() {
     setStage('studio');
   };
 
+  // Prompt confirmation modal before launching live auction
+  const promptStartLiveAuction = () => {
+    triggerHapticFeedback('light');
+    setShowStartConfirmModal(true);
+  };
+
+  // Confirmed -> Initiate full-screen 5, 4, 3, 2, 1 live countdown
+  const handleConfirmStartLive = () => {
+    setShowStartConfirmModal(false);
+    setIsGoingLiveCountdown(true);
+    setLiveCountdownSecs(5);
+    triggerHapticFeedback('light');
+  };
+
+  // 5-4-3-2-1 live stream initiation countdown effect
+  useEffect(() => {
+    if (!isGoingLiveCountdown) return;
+
+    if (liveCountdownSecs > 0) {
+      const timer = setTimeout(() => {
+        triggerHapticFeedback('light');
+        setLiveCountdownSecs(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else {
+      // Reached 0: Broadcast is officially live
+      triggerHapticFeedback('success');
+      const timer = setTimeout(() => {
+        setIsGoingLiveCountdown(false);
+        setStage('studio');
+        if (group && group.currentMonth > 0 && !group.is_live_auction_active) {
+          handleBeginLiveAuction();
+        }
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isGoingLiveCountdown, liveCountdownSecs, group]);
+
+  const getCountdownStatusText = (num: number) => {
+    switch (num) {
+      case 5:
+        return 'PREPARING LIVE BIDDING ARENA...';
+      case 4:
+        return 'CONNECTING SUBSCRIBERS & FLOOR CONTENDERS...';
+      case 3:
+        return 'SYNCHRONIZING MULTI-ACCOUNT TREASURY...';
+      case 2:
+        return 'PRIMING 1-TAP BIDDING REGISTERS...';
+      case 1:
+        return 'GOING LIVE ON-AIR IN...';
+      case 0:
+        return '🔴 LIVE AUCTION BROADCAST ACTIVE!';
+      default:
+        return 'GOING LIVE...';
+    }
+  };
+
   const handleExitStudio = () => {
     if (bids.length > 0) {
       const confirmExit = window.confirm(
@@ -1626,7 +1688,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   {isCountdownUnderOneHour && (
                     <button
                       type="button"
-                      onClick={handleEnterStudio}
+                      onClick={promptStartLiveAuction}
                       className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer"
                     >
                       <svg className="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
@@ -1959,7 +2021,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     </p>
                     <button
                       type="button"
-                      onClick={handleEnterStudio}
+                      onClick={promptStartLiveAuction}
                       className="mt-4 w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
@@ -2166,7 +2228,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                     <div className="mt-4 pt-3 border-t border-white/10">
                       <button
                         type="button"
-                        onClick={handleEnterStudio}
+                        onClick={promptStartLiveAuction}
                         className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-98 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
@@ -2403,8 +2465,11 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 <ArrowLeft size={14} />
                 <span className="hidden xl:inline">Overview</span>
               </button>
-              <h1 className="text-lg font-bold font-display text-slate-900 tracking-tight flex items-center gap-2">
-                Auctions &amp; Bidding Arena
+              <h1 className="text-lg font-bold font-display text-slate-900 tracking-tight flex items-center gap-2.5">
+                <span>Auctions &amp; Bidding Arena</span>
+                <span className="text-xs font-bold text-brand-700 bg-brand-50 border border-brand-200 px-2.5 py-1 rounded-lg">
+                  {group.name} ({formatCurrency(group.totalValue)}) • Month {group.currentMonth}
+                </span>
                 {group.is_live_auction_active ? (
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
@@ -2416,41 +2481,6 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   </span>
                 )}
               </h1>
-            </div>
-
-            <div className="h-6 w-px bg-slate-200 mx-1"></div>
-
-            {/* Group Switcher Pills */}
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
-              {allGroups.map((g) => {
-                const isSelected = g.id === selectedGroupId;
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setSelectedGroupId(g.id);
-                      const targetGroup = allGroups.find(item => item.id === g.id);
-                      if (targetGroup) setGroup(targetGroup);
-                      fetchGroupDetails(g.id);
-                    }}
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-white text-brand-700 shadow-sm border border-slate-200/60'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-indigo-500' : 'bg-amber-400'}`}></span>
-                    <span>{g.name} ({formatCurrency(g.totalValue)})</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                      isSelected ? 'bg-brand-50 text-brand-700' : 'bg-slate-200 text-slate-700'
-                    }`}>
-                      {g.currentMonth === 0 ? 'M0 Launch' : `Month ${g.currentMonth}`}
-                    </span>
-                  </button>
-                );
-              })}
             </div>
           </div>
 
@@ -2472,7 +2502,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             {group.currentMonth > 0 && !group.is_live_auction_active ? (
               <button
                 type="button"
-                onClick={handleBeginLiveAuction}
+                onClick={promptStartLiveAuction}
                 disabled={isStartingLiveSession}
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-brand-700 border border-indigo-200 text-xs font-semibold rounded-xl shadow-2xs transition-all cursor-pointer disabled:opacity-50"
               >
@@ -2828,96 +2858,9 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
             </section>
 
-            {/* Right 4 Cols: Kai Iruppu Reserve Panel + Eligibility Overview + Actions */}
+            {/* Right 4 Cols: Live Shouts Stream & Award Pot Action */}
             <aside className="xl:col-span-4 space-y-6">
               
-              {/* Kai Iruppu (Discount Pool) & Laaba Seetu Deep Dive */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
-                      🪙
-                    </div>
-                    <h3 className="font-display font-bold text-sm text-slate-900">Kai Iruppu (Discount Pool)</h3>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-md">
-                    M{group.currentMonth} ROLLOVER
-                  </span>
-                </div>
-                <div className="mt-2">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Current Accumulated Reserve</span>
-                  <p className="text-3xl font-black font-display text-slate-900 tracking-tight mt-0.5 font-mono">
-                    {formatCurrency(group.kai_iruppu_pool)}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Pool Target for Laaba Seetu: <strong className="font-mono text-slate-800">{formatCurrency(group.totalValue)}</strong>
-                  </p>
-                </div>
-                {/* Progress Bar towards Laaba Seetu */}
-                <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-600 font-medium">Laaba Seetu Threshold</span>
-                    <span className="font-bold text-amber-700">
-                      {group.totalValue ? Math.min(100, Math.round((group.kai_iruppu_pool / group.totalValue) * 100)) : 0}% Funded
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all duration-300" 
-                      style={{ width: `${group.totalValue ? Math.min(100, (group.kai_iruppu_pool / group.totalValue) * 100) : 0}%` }}
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-snug">
-                    When this pool hits {formatCurrency(group.totalValue)}, subscribers pay <strong>₹0 dues</strong> in that upcoming cycle while full prize pot is funded from the reserve!
-                  </p>
-                </div>
-                {/* Rollover Breakdown */}
-                <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">M{Math.max(0, group.currentMonth - 1)} Discount Pool Rollover:</span>
-                    <span className="font-mono font-bold text-slate-800">{formatCurrency(group.kai_iruppu_pool)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">M{group.currentMonth} Winning Bid Addition:</span>
-                    <span className="font-mono font-bold text-emerald-600">+{formatCurrency(highestBid)}</span>
-                  </div>
-                  <div className="flex justify-between pt-1 border-t border-slate-100 font-bold">
-                    <span className="text-slate-900">Projected M{group.currentMonth + 1} Starting Pool:</span>
-                    <span className="font-mono text-brand-700">{formatCurrency(group.kai_iruppu_pool + highestBid)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Floor Attendance Status & Quick Roster */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-display font-bold text-sm text-slate-900">Floor Attendance Status</h3>
-                  </div>
-                  <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                    {attendingMemberIds.length} / {eligibleCount} Contenders
-                  </span>
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      <span className="font-semibold text-slate-800">Floor Bidding Quorum</span>
-                    </div>
-                    <span className="font-bold text-emerald-700">
-                      Active ({eligibleCount > 0 ? Math.round((attendingMemberIds.length / eligibleCount) * 100) : 100}%)
-                    </span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                      <span className="font-semibold text-slate-800">Auctioneer Shorthand Mode</span>
-                    </div>
-                    <span className="font-bold text-brand-700 font-mono">Enabled</span>
-                  </div>
-                </div>
-              </div>
-
               {/* Live Shouts & Audit Trail */}
               <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
                 <div className="flex items-center justify-between mb-3">
@@ -2937,7 +2880,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                       <p className="text-[10px]">Tap any contender above to log live shouts</p>
                     </div>
                   ) : (
-                    bids.slice(0, 4).map((bid, idx) => {
+                    bids.slice(0, 5).map((bid, idx) => {
                       const isTop = idx === 0;
                       const prevBidAmt = bids[idx + 1]?.amount || 0;
                       const diff = bid.amount - prevBidAmt;
@@ -2988,64 +2931,6 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                       );
                     })
                   )}
-                </div>
-              </div>
-
-              {/* Historical Auction Records */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-brand-600 flex items-center justify-center font-bold text-xs">
-                      <History className="w-4 h-4" />
-                    </div>
-                    <h3 className="font-display font-bold text-sm text-slate-900">Historical Auction Records</h3>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded-md">
-                    Archive
-                  </span>
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <span className="text-slate-500 font-medium">Completed Cycles:</span>
-                    <span className="font-bold text-slate-800 font-mono">
-                      {historicalAuctionLogs.length} Rounds Concluded
-                    </span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <span className="text-slate-500 font-medium">Total Prize Disbursed:</span>
-                    <span className="font-bold text-slate-900 font-mono">
-                      {formatCurrency(historicalAuctionLogs.reduce((sum, l) => sum + (l.netPayout || 0), 0))}
-                    </span>
-                  </div>
-                  {historicalAuctionLogs.length > 0 && (
-                    <div className="p-2.5 rounded-xl bg-brand-50/40 border border-brand-200 flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="w-2 h-2 rounded-full bg-brand-600 flex-shrink-0"></span>
-                        <span className="font-medium text-brand-700 truncate">
-                          M{historicalAuctionLogs[0].month} Winner: {historicalAuctionLogs[0].winningBidderName} (#{historicalAuctionLogs[0].ticketNumber || '—'})
-                        </span>
-                      </div>
-                      <span className="font-bold text-brand-700 font-mono flex-shrink-0">
-                        {formatCurrency(historicalAuctionLogs[0].netPayout)} payout
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="mt-4 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (historicalAuctionLogs.length > 0) {
-                        setSelectedHistoricalLog(historicalAuctionLogs[0]);
-                      } else {
-                        alert("No historical auction rounds completed yet.");
-                      }
-                    }}
-                    className="w-full py-2 px-3 bg-slate-50 hover:bg-slate-100 text-brand-600 border border-slate-200 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 group shadow-2xs cursor-pointer"
-                  >
-                    <History className="w-3.5 h-3.5 text-brand-600" />
-                    <span>View Full Historical Ledger →</span>
-                  </button>
                 </div>
               </div>
 
@@ -3157,36 +3042,6 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             </div>
           </div>
 
-          {/* Chit Group Switcher Tabs */}
-          <div className="px-5 pb-3">
-            <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs">
-              {allGroups.map((g) => {
-                const isSelected = g.id === selectedGroupId;
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setSelectedGroupId(g.id);
-                      const targetGroup = allGroups.find(item => item.id === g.id);
-                      if (targetGroup) setGroup(targetGroup);
-                      fetchGroupDetails(g.id);
-                    }}
-                    className={`flex-shrink-0 flex items-center space-x-1.5 px-3 py-1.5 font-medium rounded-full transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-brand-500 text-white shadow-sm'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                    <span>{g.name} ({formatCurrency(g.totalValue)}) • M{g.currentMonth}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Action & Attendance Sub-bar */}
           <div className="px-5 py-2 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar border-t border-slate-100 bg-slate-50/70 text-[11px]">
             <div className="flex items-center space-x-2 flex-shrink-0">
@@ -3221,7 +3076,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               {group.currentMonth > 0 && !group.is_live_auction_active ? (
                 <button
                   type="button"
-                  onClick={handleBeginLiveAuction}
+                  onClick={promptStartLiveAuction}
                   disabled={isStartingLiveSession}
                   className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-100 text-[9px] font-black text-emerald-700 tracking-tight cursor-pointer hover:bg-emerald-200 disabled:opacity-50"
                 >
@@ -3243,55 +3098,6 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
         {/* Scrollable Main Content */}
         <main className="flex-1 px-4 py-4 space-y-4 pb-28">
-          
-          {/* Hero Bidding Card: Live Discount & Net Pot Calculation */}
-          <div className="bg-white rounded-xl px-3.5 py-2.5 border border-slate-200 shadow-xs flex flex-col gap-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs">🪙</span>
-                <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide">Kai Iruppu</span>
-                <span className="text-[10px] text-slate-400 font-medium">(Reserve Pool)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono font-black text-xs text-slate-900">{formatCurrency(group.kai_iruppu_pool)}</span>
-                <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1 py-0.2 rounded font-mono">
-                  {Math.min(100, Math.round((group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}% of {formatCurrency(group.totalValue)}
-                </span>
-              </div>
-            </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-              <div 
-                className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all duration-500" 
-                style={{ width: `${Math.min(100, Math.max(0, (group.kai_iruppu_pool / (group.totalValue || 1)) * 100))}%` }} 
-              />
-            </div>
-          </div>
-
-          {/* Historical Auction Records Card */}
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-card space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-1.5">
-                <span className="text-xs">📜</span>
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Historical Auction Records</h3>
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 bg-brand-50 text-brand-600 rounded-full border border-brand-100 font-mono">
-                {historicalAuctionLogs.length} Rounds Concluded
-              </span>
-            </div>
-            <button 
-              type="button"
-              onClick={() => {
-                if (historicalAuctionLogs.length > 0) {
-                  setSelectedHistoricalLog(historicalAuctionLogs[0]);
-                } else {
-                  alert("No historical auction rounds recorded yet for this group.");
-                }
-              }}
-              className="w-full py-2 px-3 bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 flex items-center justify-center space-x-1 transition-all shadow-xs cursor-pointer"
-            >
-              <span className="text-brand-600 font-semibold">View Full Historical Ledger →</span>
-            </button>
-          </div>
 
           {/* Current Highest Discount Banner Card */}
           <section className="rounded-3xl p-5 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20">
@@ -3641,65 +3447,21 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {[
-                      { delta: 500, label: '+₹500', badge: 'LOG', tier: 'standard' },
-                      { delta: 1000, label: '+₹1,000', badge: 'LOG', tier: 'standard' },
-                      { delta: 1500, label: '+₹1,500', badge: 'LOG', tier: 'standard' },
-                      { delta: 2000, label: '+₹2,000', badge: 'POWER', tier: 'power' },
-                      { delta: 2500, label: '+₹2,500', badge: 'LOG', tier: 'standard' },
-                      { delta: 3000, label: '+₹3,000', badge: 'LOG', tier: 'standard' },
-                      { delta: 3500, label: '+₹3,500', badge: 'LOG', tier: 'standard' },
-                      { delta: 4000, label: '+₹4,000', badge: 'POWER', tier: 'power' },
-                      { delta: 4500, label: '+₹4,500', badge: 'LOG', tier: 'standard' },
-                      { delta: 5000, label: '+₹5,000', badge: 'LOG', tier: 'standard' },
-                      { delta: 6000, label: '+₹6,000', badge: 'POWER', tier: 'power' },
-                      { delta: 7500, label: '+₹7,500', badge: 'MAX', tier: 'max' },
+                      { delta: 500, label: '+₹500' },
+                      { delta: 1000, label: '+₹1,000' },
+                      { delta: 1500, label: '+₹1,500' },
+                      { delta: 2000, label: '+₹2,000' },
+                      { delta: 2500, label: '+₹2,500' },
+                      { delta: 3000, label: '+₹3,000' },
+                      { delta: 3500, label: '+₹3,500' },
+                      { delta: 4000, label: '+₹4,000' },
+                      { delta: 4500, label: '+₹4,500' },
+                      { delta: 5000, label: '+₹5,000' },
+                      { delta: 6000, label: '+₹6,000' },
+                      { delta: 7500, label: '+₹7,500' },
                     ].map((item) => {
                       const basePrice = highestBid > 0 ? highestBid : startingBaselineBid;
                       const price = basePrice + item.delta;
-
-                      if (item.tier === 'max') {
-                        return (
-                          <button
-                            key={item.delta}
-                            type="button"
-                            onClick={() => {
-                              triggerHapticFeedback('light');
-                              recordBid(price, activeContender.id);
-                            }}
-                            className="p-2.5 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 border border-amber-200 rounded-xl transition-all hover:scale-[1.02] active:scale-95 group text-left cursor-pointer"
-                          >
-                            <div className="flex items-center justify-between text-[10px] font-bold text-amber-800">
-                              <span>{item.label}</span>
-                              <span className="text-[9px] bg-amber-200 text-amber-900 px-1 rounded font-bold">{item.badge}</span>
-                            </div>
-                            <div className="text-sm font-black font-display text-amber-900 mt-0.5">
-                              {formatCurrency(price)}
-                            </div>
-                          </button>
-                        );
-                      }
-
-                      if (item.tier === 'power') {
-                        return (
-                          <button
-                            key={item.delta}
-                            type="button"
-                            onClick={() => {
-                              triggerHapticFeedback('light');
-                              recordBid(price, activeContender.id);
-                            }}
-                            className="p-2.5 bg-indigo-50/70 hover:bg-brand-100 hover:border-brand-600 border border-brand-200 rounded-xl transition-all hover:scale-[1.02] active:scale-95 group text-left cursor-pointer"
-                          >
-                            <div className="flex items-center justify-between text-[10px] font-bold text-brand-700">
-                              <span>{item.label}</span>
-                              <span className="text-[9px] bg-brand-200 text-brand-900 px-1 rounded font-bold">{item.badge}</span>
-                            </div>
-                            <div className="text-sm font-black font-display text-brand-700 mt-0.5">
-                              {formatCurrency(price)}
-                            </div>
-                          </button>
-                        );
-                      }
 
                       return (
                         <button
@@ -3709,13 +3471,12 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                             triggerHapticFeedback('light');
                             recordBid(price, activeContender.id);
                           }}
-                          className="p-2.5 bg-slate-50 hover:bg-brand-50 hover:border-brand-500 border border-slate-200 rounded-xl transition-all hover:scale-[1.02] active:scale-95 group text-left cursor-pointer"
+                          className="p-3 bg-slate-50 hover:bg-white hover:border-brand-500 border border-slate-200 rounded-xl transition-all hover:scale-[1.02] active:scale-95 group text-left cursor-pointer shadow-2xs hover:shadow-sm"
                         >
-                          <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500 group-hover:text-brand-600">
-                            <span>{item.label}</span>
-                            <span className="text-[9px] bg-slate-200/70 group-hover:bg-brand-200 text-slate-700 px-1 rounded font-bold">{item.badge}</span>
+                          <div className="text-[11px] font-semibold text-slate-500 group-hover:text-brand-600 transition-colors">
+                            {item.label}
                           </div>
-                          <div className="text-sm font-black font-display text-slate-900 group-hover:text-brand-700 mt-0.5">
+                          <div className="text-base font-black font-display text-slate-900 group-hover:text-brand-700 font-mono mt-0.5">
                             {formatCurrency(price)}
                           </div>
                         </button>
@@ -3821,37 +3582,18 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { delta: 250, label: '+₹250', tier: 'standard' },
-                    { delta: 500, label: '+₹500', tier: 'standard' },
-                    { delta: 750, label: '+₹750', tier: 'standard' },
-                    { delta: 1000, label: '+₹1,000', tier: 'standard' },
-                    { delta: 1500, label: '+₹1,500', tier: 'standard' },
-                    { delta: 2000, label: '+₹2,000', tier: 'power' },
-                    { delta: 2500, label: '+₹2,500', tier: 'standard' },
-                    { delta: 3000, label: '+₹3,000', tier: 'standard' },
-                    { delta: 3500, label: '+₹3,500', tier: 'standard' },
+                    { delta: 250, label: '+₹250' },
+                    { delta: 500, label: '+₹500' },
+                    { delta: 750, label: '+₹750' },
+                    { delta: 1000, label: '+₹1,000' },
+                    { delta: 1500, label: '+₹1,500' },
+                    { delta: 2000, label: '+₹2,000' },
+                    { delta: 2500, label: '+₹2,500' },
+                    { delta: 3000, label: '+₹3,000' },
+                    { delta: 3500, label: '+₹3,500' },
                   ].map((item) => {
                     const basePrice = highestBid > 0 ? highestBid : startingBaselineBid;
                     const price = basePrice + item.delta;
-
-                    if (item.tier === 'power') {
-                      return (
-                        <button
-                          key={item.delta}
-                          type="button"
-                          onClick={() => {
-                            triggerHapticFeedback('light');
-                            recordBid(price, activeContender.id);
-                          }}
-                          className="p-2.5 bg-brand-500 hover:bg-brand-600 border border-brand-400 rounded-xl text-left shadow-md active:scale-95 transition-transform flex flex-col justify-between cursor-pointer"
-                        >
-                          <div className="flex justify-between items-center w-full">
-                            <span className="text-xs font-black text-white font-mono">{formatCurrency(price)}</span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/20 font-bold text-indigo-200">{item.label}</span>
-                          </div>
-                        </button>
-                      );
-                    }
 
                     return (
                       <button
@@ -3861,11 +3603,11 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                           triggerHapticFeedback('light');
                           recordBid(price, activeContender.id);
                         }}
-                        className="p-2.5 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-xl text-left active:scale-95 transition-transform flex flex-col justify-between cursor-pointer"
+                        className="p-2.5 bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-xl text-left active:scale-95 transition-transform flex flex-col justify-between cursor-pointer"
                       >
                         <div className="flex justify-between items-center w-full">
                           <span className="text-xs font-black text-slate-900 font-mono">{formatCurrency(price)}</span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand-100 font-bold text-brand-700">{item.label}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/70 font-bold text-slate-600">{item.label}</span>
                         </div>
                       </button>
                     );
@@ -4514,6 +4256,160 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
         month={group?.currentMonth}
         isDark={true}
       />
+
+      {/* ── START LIVE AUCTION CONFIRMATION MODAL ───────────────────────── */}
+      {showStartConfirmModal && group && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-indigo-50/30">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shadow-xs">
+                  <Radio className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Start Live Auction Floor?</h3>
+                  <p className="text-xs text-slate-500">Initiate live broadcast & contender bidding</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowStartConfirmModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                title="Cancel"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Content Details */}
+            <div className="p-5 space-y-4">
+              <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80 space-y-2 text-xs">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span className="font-medium">Chit Group:</span>
+                  <span className="font-bold text-slate-900">{group.name}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span className="font-medium">Auction Cycle:</span>
+                  <span className="font-bold text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded font-mono">
+                    Month {group.currentMonth}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span className="font-medium">Prize Pot Value:</span>
+                  <span className="font-black text-slate-900 font-mono">{formatCurrency(group.totalValue)}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span className="font-medium">Eligible Floor Contenders:</span>
+                  <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-mono">
+                    {members.filter(m => !m.hasWonRegular).length} of {group.memberCount} Members
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-amber-900 text-xs leading-relaxed flex items-start gap-2.5">
+                <span className="text-base leading-none">⏱️</span>
+                <p>
+                  Confirming will initiate a <strong>5-second broadcast countdown</strong> on all connected screens before unlocking live shout registers.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowStartConfirmModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmStartLive}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Radio className="w-3.5 h-3.5 animate-pulse" />
+                <span>Confirm & Go Live</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FULL-SCREEN 5-4-3-2-1 LIVE STREAM COUNTDOWN OVERLAY ─────────── */}
+      {isGoingLiveCountdown && group && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-950 text-white overflow-hidden p-6 select-none animate-in fade-in duration-200">
+          {/* Subtle Ambient Glowing Background */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18)_0%,rgba(15,23,42,0.95)_60%,rgba(2,6,23,1)_100%)] pointer-events-none" />
+
+          {/* Pulse Ripple Rings */}
+          <div className="absolute w-[500px] h-[500px] rounded-full border border-indigo-500/10 animate-ping pointer-events-none" />
+          <div className="absolute w-[340px] h-[340px] rounded-full border border-indigo-400/20 animate-pulse pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col items-center text-center max-w-lg w-full space-y-6">
+            {/* Header Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-black tracking-widest uppercase shadow-lg shadow-red-950/50">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping mr-1" />
+              LIVE STREAM INITIATION
+            </div>
+
+            {/* Chit Details */}
+            <div className="space-y-1">
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                {group.name}
+              </h2>
+              <p className="text-xs sm:text-sm text-indigo-300 font-mono">
+                Cycle Month {group.currentMonth} · Pot {formatCurrency(group.totalValue)}
+              </p>
+            </div>
+
+            {/* Giant Dynamic Countdown Counter */}
+            <div className="py-6 flex items-center justify-center min-h-[160px]">
+              {liveCountdownSecs > 0 ? (
+                <div
+                  key={liveCountdownSecs}
+                  className="text-8xl sm:text-9xl font-black font-mono tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-indigo-100 to-indigo-400 animate-in zoom-in-50 duration-300 drop-shadow-[0_0_45px_rgba(99,102,241,0.6)]"
+                >
+                  {liveCountdownSecs}
+                </div>
+              ) : (
+                <div className="text-4xl sm:text-6xl font-black tracking-tight text-emerald-400 animate-in zoom-in-75 duration-300 drop-shadow-[0_0_40px_rgba(16,185,129,0.7)] flex items-center gap-3">
+                  <span className="w-6 h-6 rounded-full bg-emerald-400 animate-ping" />
+                  <span>ON AIR!</span>
+                </div>
+              )}
+            </div>
+
+            {/* Step-by-Step Text Changing Animation */}
+            <div className="min-h-[28px] flex items-center justify-center">
+              <p
+                key={`status-${liveCountdownSecs}`}
+                className="text-xs sm:text-sm font-bold font-mono tracking-widest text-indigo-200 uppercase animate-in slide-in-from-bottom-2 duration-300"
+              >
+                {getCountdownStatusText(liveCountdownSecs)}
+              </p>
+            </div>
+
+            {/* Progress Pip Indicators (5 to 1) */}
+            <div className="flex items-center gap-2 pt-2">
+              {[5, 4, 3, 2, 1].map((step) => {
+                const isPassed = liveCountdownSecs <= step;
+                return (
+                  <div
+                    key={step}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      isPassed
+                        ? 'w-8 bg-gradient-to-r from-indigo-400 to-emerald-400 shadow-[0_0_8px_rgba(99,102,241,0.6)]'
+                        : 'w-4 bg-slate-800'
+                    }`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
