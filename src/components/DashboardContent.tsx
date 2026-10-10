@@ -12,7 +12,7 @@ import UserAccessManager from './UserAccessManager';
 import SettingsManager from './SettingsManager';
 import AuctionCountdownBanner from './AuctionCountdownBanner';
 import AuctionScheduleModal from './AuctionScheduleModal';
-import QuickMemberCollectModal, { CollectableMember } from './QuickMemberCollectModal';
+import UniversalRecordPaymentModal from './UniversalRecordPaymentModal';
 import QuickPersonalDrawModal from './QuickPersonalDrawModal';
 import QuickAtmWithdrawalModal from './QuickAtmWithdrawalModal';
 import PaymentChecklistPrintModal from './PaymentChecklistPrintModal';
@@ -1407,50 +1407,44 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   // ── Floating Action Button (FAB) Speed-Dial States ───────────────────────────
   const [isFabOpen, setIsFabOpen] = useState<boolean>(false);
-  const [showQuickCollectModal, setShowQuickCollectModal] = useState<boolean>(false);
+  const [isUniversalPaymentOpen, setIsUniversalPaymentOpen] = useState<boolean>(false);
+  const [universalPaymentMemberId, setUniversalPaymentMemberId] = useState<string | null>(null);
+  const [universalPaymentGroupMemberId, setUniversalPaymentGroupMemberId] = useState<string | null>(null);
+  const [universalPaymentGroupId, setUniversalPaymentGroupId] = useState<string | null>(null);
+  const [universalPaymentMonth, setUniversalPaymentMonth] = useState<number | null>(null);
+
+  const handleOpenRecordPayment = (member?: any, groupId?: string, month?: number) => {
+    setUniversalPaymentMemberId(member?.profileId || null);
+    setUniversalPaymentGroupMemberId(member?.id || null);
+    setUniversalPaymentGroupId(groupId || activeDashboardGroupId || null);
+    setUniversalPaymentMonth(month !== undefined ? month : selectedDashboardMonth);
+    setIsUniversalPaymentOpen(true);
+  };
+
   const [showQuickPersonalDrawModal, setShowQuickPersonalDrawModal] = useState<boolean>(false);
   const [showQuickAtmModal, setShowQuickAtmModal] = useState<boolean>(false);
 
   useEffect(() => {
-    const handleOpenQuickCollectEvent = () => setShowQuickCollectModal(true);
+    const handleOpenQuickCollectEvent = () => handleOpenRecordPayment(null);
+    const handleOpenQuickAtmEvent = () => setShowQuickAtmModal(true);
+    const handleOpenQuickPersonalDrawEvent = () => setShowQuickPersonalDrawModal(true);
+    const handleOpenSendRemindersEvent = () => {
+      setRemindModalTab('individual');
+      setShowRemindModal(true);
+    };
+
     window.addEventListener('open-quick-collect', handleOpenQuickCollectEvent);
-    return () => window.removeEventListener('open-quick-collect', handleOpenQuickCollectEvent);
-  }, []);
+    window.addEventListener('open-quick-atm', handleOpenQuickAtmEvent);
+    window.addEventListener('open-quick-personal-draw', handleOpenQuickPersonalDrawEvent);
+    window.addEventListener('open-send-reminders', handleOpenSendRemindersEvent);
 
-  // Handler for member selected from Quick Collect Modal (either via search or Passbook QR scan)
-  const handleQuickMemberSelected = (member: CollectableMember) => {
-    // 1. Switch to member's chit group & month if different
-    if (member.groupId !== activeDashboardGroupId) {
-      setActiveDashboardGroupId(member.groupId);
-      setSelectedDashboardMonth(member.currentMonth !== undefined && member.currentMonth !== null ? member.currentMonth : 0);
-    }
-
-    // 2. Open existing recordingPaymentMember modal
-    setRecordingPaymentMember({
-      id: member.id,
-      ticket: member.ticket,
-      name: member.name,
-      phone: member.phone,
-      profileId: member.profileId,
-      customInstallment: member.customInstallment,
-      effectiveDue: member.effectiveDue,
-      remaining: member.remainingThisMonth,
-      totalPendingToday: member.totalPendingToday,
-    });
-    setEditingTransaction(null);
-    const defaultAmount = member.totalPendingToday > 0 
-      ? member.totalPendingToday 
-      : (member.remainingThisMonth > 0 ? member.remainingThisMonth : 20000);
-    setQuickPaymentAmount(defaultAmount.toString());
-    setPaymentWalletType('cash_in_hand');
-    setPaymentAllocationMode('auto');
-    setPaymentCustomMonths([member.currentMonth]);
-    setPaymentDateType('today');
-    setCustomPaymentDate(new Date().toISOString().split('T')[0]);
-    setPaymentNote('');
-    setPaymentReceiptUrl('');
-    setIsFabOpen(false);
-  };
+    return () => {
+      window.removeEventListener('open-quick-collect', handleOpenQuickCollectEvent);
+      window.removeEventListener('open-quick-atm', handleOpenQuickAtmEvent);
+      window.removeEventListener('open-quick-personal-draw', handleOpenQuickPersonalDrawEvent);
+      window.removeEventListener('open-send-reminders', handleOpenSendRemindersEvent);
+    };
+  }, [activeDashboardGroupId, selectedDashboardMonth]);
 
   // ── Remind All Modal States & Handlers (ChitBase Style) ─────────────────────────
   const [showRemindModal, setShowRemindModal] = useState<boolean>(false);
@@ -3443,7 +3437,7 @@ Thank you for your prompt payment! 🙏`;
               {/* Primary Quick Action: Record Payment */}
               <button
                 type="button"
-                onClick={() => setShowQuickCollectModal(true)}
+                onClick={() => handleOpenRecordPayment(null)}
                 className="inline-flex items-center gap-2 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all shrink-0 cursor-pointer"
               >
                 <Plus size={14} className="stroke-[2.5]" />
@@ -3595,15 +3589,6 @@ Thank you for your prompt payment! 🙏`;
                   {/* Bottom Action Buttons Row */}
                   <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleMarkAllPaid}
-                        disabled={isMarkingAllPaid || pendingList.length === 0}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors disabled:opacity-40 cursor-pointer"
-                      >
-                        <Check size={14} className="stroke-[2.5]" />
-                        <span>{isMarkingAllPaid ? 'Recording...' : 'Mark All Paid'}</span>
-                      </button>
 
                       {pendingList.length > 0 && (
                         <button
@@ -4088,21 +4073,7 @@ Thank you for your prompt payment! 🙏`;
 
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setRecordingPaymentMember(member);
-                                  setEditingTransaction(null);
-                                  const defaultAmount = (member.totalPendingToday > 0 
-                                    ? member.totalPendingToday 
-                                    : (member.remaining > 0 ? member.remaining : 20000));
-                                  setQuickPaymentAmount(defaultAmount.toString());
-                                  setPaymentWalletType('cash_in_hand');
-                                  setPaymentAllocationMode('auto');
-                                  setPaymentCustomMonths([selectedDashboardMonth]);
-                                  setPaymentDateType('today');
-                                  setCustomPaymentDate(new Date().toISOString().split('T')[0]);
-                                  setPaymentNote('');
-                                  setPaymentReceiptUrl('');
-                                }}
+                                onClick={() => handleOpenRecordPayment(member, activeDashboardGroupId, selectedDashboardMonth)}
                                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
                               >
                                 <Coins size={13} />
@@ -4852,21 +4823,7 @@ Thank you for your prompt payment! 🙏`;
                               )}
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setRecordingPaymentMember(member);
-                                  setEditingTransaction(null);
-                                  const defaultAmount = (member.totalPendingToday > 0 
-                                    ? member.totalPendingToday 
-                                    : (member.remaining > 0 ? member.remaining : 20000));
-                                  setQuickPaymentAmount(defaultAmount.toString());
-                                  setPaymentWalletType('cash_in_hand');
-                                  setPaymentAllocationMode('auto');
-                                  setPaymentCustomMonths([selectedDashboardMonth]);
-                                  setPaymentDateType('today');
-                                  setCustomPaymentDate(new Date().toISOString().split('T')[0]);
-                                  setPaymentNote('');
-                                  setPaymentReceiptUrl('');
-                                }}
+                                onClick={() => handleOpenRecordPayment(member, activeDashboardGroupId, selectedDashboardMonth)}
                                 className="px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center space-x-1 shadow-xs cursor-pointer"
                               >
                                 <span>Record</span>
@@ -4996,7 +4953,7 @@ Thank you for your prompt payment! 🙏`;
             {/* Floating Quick Record FAB (Desktop Only) */}
             <button
               type="button"
-              onClick={() => setShowQuickCollectModal(true)}
+              onClick={() => handleOpenRecordPayment(null)}
               className="hidden lg:flex fixed bottom-6 right-6 w-12 h-12 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white rounded-full shadow-lg shadow-brand-600/35 items-center justify-center transition-transform hover:scale-105 z-40 cursor-pointer"
               data-purpose="floating-quick-action"
               title="Quick Record Cash Entry"
@@ -5004,411 +4961,7 @@ Thank you for your prompt payment! 🙏`;
               <Plus size={22} className="stroke-[2.5]" />
             </button>
 
-            {/* Unified Quick Record & Edit Payment Modal (Fintech White Theme) */}
-            {(recordingPaymentMember || editingTransaction) && (
-              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-                <form
-                  onSubmit={editingTransaction ? handleSavePaymentEdit : handleRecordQuickPayment}
-                  className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 w-full max-w-md space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto my-auto text-slate-800"
-                >
-                  {/* Modal Header */}
-                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                        editingTransaction 
-                          ? 'bg-brand-50 text-brand-600' 
-                          : 'bg-emerald-50 text-emerald-600'
-                      }`}>
-                        {editingTransaction ? <Edit3 size={16} /> : <Coins size={16} />}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-900">
-                          {editingTransaction ? 'Edit payment' : 'Record Installment Payment'}
-                        </h4>
-                        <p className="text-[10px] text-slate-500">
-                          {editingTransaction 
-                            ? `Receipt #${editingTransaction.id.slice(0, 8)} · Month ${selectedDashboardMonth}`
-                            : `Month ${selectedDashboardMonth} · ${activeGroup?.name}`}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRecordingPaymentMember(null);
-                        setEditingTransaction(null);
-                      }}
-                      className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
 
-                  {/* Subscriber Details Card */}
-                  {(() => {
-                    const matchedMember = editingTransaction 
-                      ? dashboardGroupMembers.find(m => m.profileId === editingTransaction.profile_id || m.id === editingTransaction.group_member_id)
-                      : recordingPaymentMember;
-                    const subscriberName = matchedMember?.name || (editingTransaction ? 'Subscriber' : recordingPaymentMember?.name || 'Subscriber');
-                    const ticketNum = matchedMember?.ticket || (recordingPaymentMember ? recordingPaymentMember.ticket : '?');
-
-                    return (
-                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex justify-between items-center text-xs">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-brand-600 text-white font-bold text-xs flex items-center justify-center shrink-0 font-display">
-                            {subscriberName.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="truncate">
-                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Subscriber</span>
-                            <span className="font-bold text-slate-900 truncate block">{subscriberName}</span>
-                            <span className="text-brand-600 text-[10px] font-mono font-semibold">#{ticketNum}</span>
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          {recordingPaymentMember ? (
-                            <>
-                              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
-                                {recordingPaymentMember.totalPendingToday > recordingPaymentMember.remaining ? 'Total Due Today' : 'Remaining Due'}
-                              </span>
-                              <span className="font-extrabold text-amber-700 text-sm font-mono">
-                                {formatCurrency(recordingPaymentMember.totalPendingToday > 0 ? recordingPaymentMember.totalPendingToday : recordingPaymentMember.remaining)}
-                              </span>
-                              {recordingPaymentMember.totalPendingToday > recordingPaymentMember.remaining && (
-                                <span className="text-[9px] text-slate-500 font-medium block">
-                                  (M{selectedDashboardMonth} Due: {formatCurrency(recordingPaymentMember.remaining)})
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            (() => {
-                              const match = editingTransaction.notes?.match(/\[Batch:([A-Za-z0-9_-]+)\|Total:([0-9.]+)\|Alloc:([^\]]+)\]/);
-                              const batchTotal = match ? parseFloat(match[2]) : null;
-                              return (
-                                <>
-                                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Logged Amount</span>
-                                  <div className="flex items-center gap-1.5 justify-end flex-wrap">
-                                    <span className="font-bold text-brand-700 font-mono">{formatCurrency(Number(editingTransaction.amount || 0))}</span>
-                                    {batchTotal && batchTotal !== Number(editingTransaction.amount) && (
-                                      <span className="text-[9.5px] font-extrabold bg-brand-50 text-brand-700 border border-brand-200/60 px-1.5 py-0.2 rounded">
-                                        Part of {formatCurrency(batchTotal)} Total
-                                      </span>
-                                    )}
-                                  </div>
-                                </>
-                              );
-                            })()
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Payment Amount Input */}
-                  <div className="space-y-1.5 text-center">
-                    <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
-                      Payment Amount (₹)
-                    </label>
-                    <div className="relative max-w-[320px] mx-auto">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-400 select-none">
-                        ₹
-                      </span>
-                      <input
-                        type="number"
-                        required
-                        placeholder="0"
-                        value={quickPaymentAmount}
-                        onChange={(e) => setQuickPaymentAmount(e.target.value)}
-                        className="w-full bg-slate-50 border-2 border-slate-200 focus:border-brand-600 focus:bg-white rounded-2xl pl-10 pr-6 py-3 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight shadow-xs text-center focus:outline-none transition-all font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Payment Distribution Preview Card */}
-                  {recordingPaymentMember && parseFloat(quickPaymentAmount) > 0 && (
-                    <div className="space-y-2 bg-slate-50 border border-slate-200/80 rounded-xl p-3 animate-in fade-in duration-150">
-                      <div className="flex justify-between items-center border-b border-slate-200/60 pb-1.5">
-                        <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Coins size={12} className="text-emerald-600" />
-                          <span>How this payment applies:</span>
-                        </span>
-                        <span className="text-xs font-black text-slate-900 font-mono">
-                          Total: {formatCurrency(parseFloat(quickPaymentAmount))}
-                        </span>
-                      </div>
-
-                      {(() => {
-                        const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId) || localGroups[0];
-                        let baseDate = new Date();
-                        if (activeGroup?.startDate) {
-                          const parsed = new Date(activeGroup.startDate);
-                          if (!isNaN(parsed.getTime())) baseDate = parsed;
-                        }
-
-                        const { allocations } = computePaymentAllocations(
-                          recordingPaymentMember,
-                          quickPaymentAmount,
-                          'auto',
-                          []
-                        );
-
-                        if (allocations.length === 0) return null;
-
-                        return (
-                          <div className="space-y-1.5">
-                            {allocations.map((alloc) => {
-                              const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + alloc.month, 1);
-                              const monthName = d.toLocaleDateString('en-US', { month: 'short' });
-                              const yearShort = d.getFullYear().toString().slice(-2);
-                              const formattedMonthLabel = alloc.month === 0 
-                                ? `${monthName} '${yearShort} (M0 Launch)` 
-                                : `${monthName} '${yearShort} (M${alloc.month})`;
-
-                              const badgeStyle = alloc.type === 'arrear'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : alloc.type === 'current'
-                                ? 'bg-brand-50 text-brand-700 border-brand-200'
-                                : 'bg-purple-50 text-purple-700 border-purple-200';
-
-                              const typeName = alloc.type === 'arrear'
-                                ? 'Old Dues Cleared'
-                                : alloc.type === 'current'
-                                ? 'Month Settled'
-                                : 'Advance Credit';
-
-                              return (
-                                <div
-                                  key={alloc.month}
-                                  className="flex items-center justify-between text-xs bg-white border border-slate-200/80 rounded-lg px-2.5 py-1.5 shadow-2xs"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-slate-800">{formattedMonthLabel}</span>
-                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${badgeStyle}`}>
-                                      {typeName}
-                                    </span>
-                                    {alloc.statusAfter === 'partial' && (
-                                      <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                                        Partial (Remaining: {formatCurrency(Math.max(0, alloc.due - (alloc.priorPaid + alloc.amount)))})
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="font-black text-slate-900 font-mono">
-                                    {formatCurrency(alloc.amount)}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-
-                  {/* 4-Wallet Selector */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block">Receiving Account / Vault</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { id: 'cash_in_hand', label: 'Cash in Hand', icon: Banknote },
-                        { id: 'kishor_bank', label: 'Kishor Bank (UPI)', icon: Landmark },
-                        { id: 'dad_bank', label: 'Dad Bank', icon: Landmark },
-                        { id: 'mom_bank', label: 'Mom Bank', icon: Landmark },
-                      ].map((w) => {
-                        const Icon = w.icon;
-                        const isSelected = (paymentWalletType === w.id);
-                        return (
-                          <button
-                            key={w.id}
-                            type="button"
-                            onClick={() => setPaymentWalletType(w.id)}
-                            className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer ${
-                              isSelected
-                                ? 'bg-brand-50 border-brand-500 text-brand-700 shadow-2xs ring-1 ring-brand-500/20'
-                                : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100 text-slate-600 hover:text-slate-900'
-                            }`}
-                          >
-                            <Icon size={14} className={isSelected ? 'text-brand-600' : 'text-slate-400'} />
-                            <span className="truncate">{w.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Date Selector */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block">Date</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: 'today', label: 'Today' },
-                        { id: 'yesterday', label: 'Yesterday' },
-                        { id: 'custom', label: '📅 Custom' },
-                      ].map((d) => {
-                        const isSelected = paymentDateType === d.id;
-                        return (
-                          <button
-                            key={d.id}
-                            type="button"
-                            onClick={() => setPaymentDateType(d.id as any)}
-                            className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
-                              isSelected
-                                ? 'bg-brand-50 border-brand-500 text-brand-700 shadow-2xs'
-                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-slate-900'
-                            }`}
-                          >
-                            {d.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {paymentDateType === 'custom' && (
-                      <div className="mt-1.5 animate-in fade-in duration-150">
-                        <input
-                          type="date"
-                          value={customPaymentDate}
-                          onChange={(e) => setCustomPaymentDate(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-900 focus:outline-none"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Note (optional) */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block">Note (optional)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Paid via GPay / Handed cash to Dad"
-                      value={paymentNote}
-                      onChange={(e) => setPaymentNote(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Receipt Photo Attachment */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block">Receipt Attachment</label>
-                    {paymentReceiptUrl ? (
-                      <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
-                        <div className="flex items-center gap-2.5">
-                          <img
-                            src={paymentReceiptUrl}
-                            alt="Receipt preview"
-                            className="w-10 h-10 object-cover rounded-lg border border-emerald-300"
-                          />
-                          <div className="text-left">
-                            <span className="text-xs font-bold text-slate-900 block">Receipt Attached</span>
-                            <span className="text-[10px] text-emerald-700">Photo ready</span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setPaymentReceiptUrl('')}
-                          className="text-rose-600 hover:text-rose-800 text-xs font-bold px-2 py-1 rounded-lg hover:bg-rose-50 cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
-                        <input
-                          type="file"
-                          id="dashboard-receipt-upload"
-                          accept="image/*"
-                          onChange={handleReceiptPhotoUpload}
-                          className="hidden"
-                        />
-                        <label
-                          htmlFor="dashboard-receipt-upload"
-                          className="flex items-center justify-center gap-2 border border-dashed border-slate-300 hover:border-brand-500 bg-slate-50 hover:bg-slate-100 rounded-xl py-2.5 px-3 text-xs text-slate-600 hover:text-slate-900 font-semibold cursor-pointer transition-colors"
-                        >
-                          <Paperclip size={14} className="text-brand-600" />
-                          <span>Attach receipt photo</span>
-                        </label>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
-                    {editingTransaction ? (
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePayment(editingTransaction)}
-                        disabled={isProcessingPayment}
-                        className="w-full sm:w-auto text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
-                      >
-                        <Trash2 size={13} />
-                        <span>Delete</span>
-                      </button>
-                    ) : <div className="hidden sm:block" />}
-
-                    <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRecordingPaymentMember(null);
-                          setEditingTransaction(null);
-                        }}
-                        className="w-full sm:w-auto border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs px-4 py-2 rounded-xl transition-all text-center cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isProcessingPayment}
-                        className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2 rounded-xl transition-all shadow-sm shadow-brand-500/25 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                      >
-                        <Check size={14} className="stroke-[2.5]" />
-                        <span>
-                          {isProcessingPayment 
-                            ? 'Saving...' 
-                            : editingTransaction 
-                              ? 'Save changes' 
-                              : 'Confirm Payment'}
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* ── MODAL: RENDERED PAYMENT RECEIPT PNG SHARING ── */}
-            {viewingReceiptTx && activeGroup && (() => {
-              const memberId = viewingReceiptTx.member?.profileId || viewingReceiptTx.member?.id || viewingReceiptTx.tx?.profile_id;
-              let pastPendingDues = 0;
-              const pastPendingMonths: number[] = [];
-
-              for (let m = 0; m < selectedDashboardMonth; m++) {
-                const mDue = isLaaba ? 0 : (viewingReceiptTx.member?.customInstallment || baseInstallment);
-                const mPaid = getMemberPaidAmountForMonth(memberId, m);
-                const mRemaining = Math.max(0, mDue - mPaid);
-                if (mRemaining > 0) {
-                  pastPendingDues += mRemaining;
-                  pastPendingMonths.push(m);
-                }
-              }
-
-              return (
-                <PaymentReceiptModal
-                  isOpen={Boolean(viewingReceiptTx)}
-                  onClose={() => setViewingReceiptTx(null)}
-                  transaction={viewingReceiptTx.tx}
-                  member={viewingReceiptTx.member}
-                  group={activeGroup}
-                  month={selectedDashboardMonth}
-                  totalDue={baseInstallment}
-                  organizerCompanyName={organizationName}
-                  organizerInitials={organizationInitials}
-                  formatCurrency={formatCurrency}
-                  pastPendingDues={pastPendingDues}
-                  pastPendingMonths={pastPendingMonths}
-                  allocations={viewingReceiptTx.allocations}
-                  totalCollectedAmount={viewingReceiptTx.totalCollectedAmount}
-                />
-              );
-            })()}
           </div>
         );
       }
@@ -10102,7 +9655,7 @@ Thank you for your prompt payment! 🙏`;
                   onClick={() => {
                     triggerHapticFeedback('light');
                     setIsFabOpen(false);
-                    setShowQuickCollectModal(true);
+                    handleOpenRecordPayment(null);
                   }}
                   className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
                 >
@@ -10194,16 +9747,7 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── QUICK ACTION MODALS ──────────────────────────────────────────────── */}
       
-      {/* 1. Quick Member Collect Modal (Search + Passbook QR Scanner) */}
-      <QuickMemberCollectModal
-        isOpen={showQuickCollectModal}
-        onClose={() => setShowQuickCollectModal(false)}
-        onSelectMember={handleQuickMemberSelected}
-        activeGroupId={activeDashboardGroupId}
-        activeMonth={selectedDashboardMonth}
-      />
-
-      {/* 2. Quick Personal Draw / Spend Modal */}
+      {/* 1. Quick Personal Draw / Spend Modal */}
       <QuickPersonalDrawModal
         isOpen={showQuickPersonalDrawModal}
         onClose={() => setShowQuickPersonalDrawModal(false)}
@@ -10232,6 +9776,66 @@ Thank you for your prompt payment! 🙏`;
           onClose={() => setPrintChecklistGroup(null)}
         />
       )}
+
+      {/* ── UNIFIED UNIVERSAL RECORD PAYMENT MODAL (DAD-FRIENDLY & GLOBALLY ACCESSIBLE) ── */}
+      <UniversalRecordPaymentModal
+        isOpen={isUniversalPaymentOpen}
+        onClose={() => setIsUniversalPaymentOpen(false)}
+        initialMemberId={universalPaymentMemberId}
+        initialGroupMemberId={universalPaymentGroupMemberId}
+        initialGroupId={universalPaymentGroupId}
+        initialMonth={universalPaymentMonth}
+        onPaymentSuccess={() => {
+          if (activeDashboardGroupId) {
+            fetchDashboardData(activeDashboardGroupId);
+          }
+        }}
+        onOpenReceiptModal={(receiptPayload) => {
+          setViewingReceiptTx(receiptPayload);
+        }}
+      />
+
+      {/* ── MODAL: RENDERED PAYMENT RECEIPT PNG SHARING ── */}
+      {viewingReceiptTx && (() => {
+        const receiptGroup = localGroups.find(g => g.id === (viewingReceiptTx?.tx?.group_id || activeDashboardGroupId)) || localGroups[0];
+        if (!receiptGroup) return null;
+        const memberId = viewingReceiptTx.member?.profileId || viewingReceiptTx.member?.id || viewingReceiptTx.tx?.profile_id;
+        const isReceiptLaaba = (receiptGroup?.kaiIruppuPool || 0) >= (receiptGroup?.totalValue || 200000);
+        const receiptTotalVal = receiptGroup?.totalValue || 200000;
+        const receiptDuration = receiptGroup?.duration || receiptGroup?.memberCount || 20;
+        const receiptBaseInstallment = Math.round(receiptTotalVal / (receiptGroup?.memberCount || receiptDuration || 1));
+        let pastPendingDues = 0;
+        const pastPendingMonths: number[] = [];
+
+        for (let m = 0; m < selectedDashboardMonth; m++) {
+          const mDue = isReceiptLaaba ? 0 : (viewingReceiptTx.member?.customInstallment || receiptBaseInstallment);
+          const mPaid = getMemberPaidAmountForMonth(memberId, m);
+          const mRemaining = Math.max(0, mDue - mPaid);
+          if (mRemaining > 0) {
+            pastPendingDues += mRemaining;
+            pastPendingMonths.push(m);
+          }
+        }
+
+        return (
+          <PaymentReceiptModal
+            isOpen={Boolean(viewingReceiptTx)}
+            onClose={() => setViewingReceiptTx(null)}
+            transaction={viewingReceiptTx.tx}
+            member={viewingReceiptTx.member}
+            group={receiptGroup}
+            month={selectedDashboardMonth}
+            totalDue={receiptBaseInstallment}
+            organizerCompanyName={organizationName}
+            organizerInitials={organizationInitials}
+            formatCurrency={formatCurrency}
+            pastPendingDues={pastPendingDues}
+            pastPendingMonths={pastPendingMonths}
+            allocations={viewingReceiptTx.allocations}
+            totalCollectedAmount={viewingReceiptTx.totalCollectedAmount}
+          />
+        );
+      })()}
     </>
   );
 }

@@ -40,6 +40,7 @@ import {
   Share2,
   FileText,
   ChevronRight,
+  ChevronDown,
   Printer,
   Plus,
   DollarSign,
@@ -284,6 +285,31 @@ export default function LiveAuctionEngine() {
   const [isGoingLiveCountdown, setIsGoingLiveCountdown] = useState<boolean>(false);
   const [liveCountdownSecs, setLiveCountdownSecs] = useState<number>(5);
   const [sessionElapsedSecs, setSessionElapsedSecs] = useState<number>(0);
+
+  // Group switcher dropdown state
+  const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState<boolean>(false);
+  const groupDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (groupDropdownRef.current && !groupDropdownRef.current.contains(event.target as Node)) {
+        setIsGroupDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsGroupDropdownOpen(false);
+      }
+    }
+    if (isGroupDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isGroupDropdownOpen]);
 
   // Fetch active groups list from Supabase
   const fetchGroupsList = async () => {
@@ -1998,37 +2024,95 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               </div>
               <div className="h-6 w-px bg-slate-200 mx-1" />
               
-              {/* Group Switcher Pills */}
-              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
-                {allGroups.map((g) => {
-                  const isSelected = g.id === selectedGroupId;
-                  return (
-                    <button
-                      key={g.id}
-                      type="button"
-                      onClick={() => {
-                        triggerHapticFeedback('light');
-                        setSelectedGroupId(g.id);
-                        const targetGroup = allGroups.find(item => item.id === g.id);
-                        if (targetGroup) setGroup(targetGroup);
-                        fetchGroupDetails(g.id);
-                      }}
-                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                        isSelected
-                          ? 'bg-white font-bold text-brand-700 shadow-sm border border-slate-200/60'
-                          : 'font-medium text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-indigo-500' : 'bg-amber-400'}`} />
-                      <span>{g.name} ({formatCurrency(g.totalValue)})</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                        isSelected ? 'bg-brand-50 text-brand-700' : 'bg-slate-200 text-slate-700'
-                      }`}>
-                        {g.currentMonth === 0 ? 'M0 Launch' : `Month ${g.currentMonth}`}
+              {/* Group Switcher Dropdown */}
+              <div className="relative" ref={groupDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsGroupDropdownOpen(prev => !prev)}
+                  className="inline-flex items-center gap-2.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-semibold rounded-xl border border-slate-300 transition-all shadow-2xs cursor-pointer select-none active:scale-[0.99]"
+                  aria-haspopup="listbox"
+                  aria-expanded={isGroupDropdownOpen}
+                  title="Switch Chit Group"
+                >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${group?.currentMonth === 0 ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
+                  <span className="font-bold text-slate-900 truncate max-w-[190px]">
+                    {group ? group.name : 'Select Group'}
+                  </span>
+                  {group && (
+                    <>
+                      <span className="text-slate-500 font-mono text-[11px] shrink-0">
+                        ({formatCurrency(group.totalValue)})
                       </span>
-                    </button>
-                  );
-                })}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
+                        group.currentMonth === 0 
+                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/70' 
+                          : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {group.currentMonth === 0 ? 'M0 Launch' : `Month ${group.currentMonth}`}
+                      </span>
+                    </>
+                  )}
+                  <ChevronDown 
+                    size={14} 
+                    className={`text-slate-500 transition-transform duration-200 shrink-0 ${isGroupDropdownOpen ? 'rotate-180 text-slate-800' : ''}`} 
+                  />
+                </button>
+
+                {isGroupDropdownOpen && (
+                  <div className="absolute left-0 top-full mt-2 w-84 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <span>Chit Groups ({allGroups.length})</span>
+                      <span>Switch Live Auction</span>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto p-1 space-y-0.5">
+                      {allGroups.map((g) => {
+                        const isSelected = g.id === selectedGroupId;
+                        return (
+                          <button
+                            key={g.id}
+                            type="button"
+                            onClick={() => {
+                              triggerHapticFeedback('light');
+                              setSelectedGroupId(g.id);
+                              const targetGroup = allGroups.find(item => item.id === g.id);
+                              if (targetGroup) setGroup(targetGroup);
+                              fetchGroupDetails(g.id);
+                              setIsGroupDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                              isSelected
+                                ? 'bg-indigo-50 text-indigo-900 font-semibold'
+                                : 'hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-indigo-600' : 'bg-slate-300'}`} />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-slate-900 truncate">{g.name}</span>
+                                  <span className="text-[11px] text-slate-500 font-mono shrink-0">({formatCurrency(g.totalValue)})</span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
+                                  <span>{g.durationMonths} Months</span>
+                                  <span>•</span>
+                                  <span>{g.memberCount} Tickets</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                                g.currentMonth === 0 ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {g.currentMonth === 0 ? 'M0 Launch' : `Month ${g.currentMonth}`}
+                              </span>
+                              {isSelected && <Check size={14} className="text-indigo-600 shrink-0" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -3229,33 +3313,28 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 </div>
               </div>
 
-              {/* Chit Group Switcher Tabs */}
+              {/* Chit Group Switcher Dropdown */}
               <div className="px-4 pb-3">
-                <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs">
-                  {allGroups.map((g) => {
-                    const isSelected = g.id === selectedGroupId;
-                    return (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => {
-                          triggerHapticFeedback('light');
-                          setSelectedGroupId(g.id);
-                          const targetGroup = allGroups.find(item => item.id === g.id);
-                          if (targetGroup) setGroup(targetGroup);
-                          fetchGroupDetails(g.id);
-                        }}
-                        className={`flex-shrink-0 flex items-center space-x-1.5 px-3 py-1.5 font-medium rounded-full transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-brand-500 text-white font-semibold shadow-xs'
-                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
-                        <span>{g.name} ({formatCurrency(g.totalValue)}) • {g.currentMonth === 0 ? 'M0' : `Month ${g.currentMonth}`}</span>
-                      </button>
-                    );
-                  })}
+                <div className="relative">
+                  <select
+                    value={selectedGroupId}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      triggerHapticFeedback('light');
+                      setSelectedGroupId(newId);
+                      const targetGroup = allGroups.find(item => item.id === newId);
+                      if (targetGroup) setGroup(targetGroup);
+                      fetchGroupDetails(newId);
+                    }}
+                    className="w-full bg-slate-100 hover:bg-slate-200/70 border border-slate-300 text-slate-800 font-semibold text-xs rounded-xl px-3.5 py-2.5 pr-8 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors shadow-2xs"
+                  >
+                    {allGroups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} ({formatCurrency(g.totalValue)}) • {g.currentMonth === 0 ? 'M0 Launch' : `Month ${g.currentMonth}`}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               </div>
             </header>

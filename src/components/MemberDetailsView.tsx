@@ -8,6 +8,7 @@ import { useOrganization } from '@/context/OrganizationContext';
 import PassbookScannerModal from './PassbookScannerModal';
 import PassbookSheetGeneratorModal, { StickerItem } from './PassbookSheetGeneratorModal';
 import { PaymentReceiptModal } from './PaymentReceiptModal';
+import UniversalRecordPaymentModal from './UniversalRecordPaymentModal';
 import { getPassbookScanUrl } from '@/utils/qrCodeGenerator';
 import { 
   ArrowLeft,
@@ -2196,186 +2197,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
         </div>
       </div>
 
-      {/* ── RECORD / EDIT PAYMENT MODAL ── */}
-      {isPaymentModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 border border-slate-200 text-slate-900 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
-                  <CreditCard size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {editingTransaction ? 'Edit Recorded Payment' : 'Record Member Payment'}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    {memberName} · Ticket #{firstTicket}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPaymentModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveModalPayment} className="space-y-4">
-              {/* Target Group */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Target Chit Group</label>
-                <select
-                  value={modalTargetGroupId}
-                  onChange={(e) => setModalTargetGroupId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:outline-none"
-                  required
-                >
-                  {allChitGroups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name} ({formatCurrency(g.total_value)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Amount & Month */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Amount (₹)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="any"
-                    required
-                    value={quickPaymentAmount}
-                    onChange={(e) => setQuickPaymentAmount(e.target.value)}
-                    placeholder="10000"
-                    className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:outline-none font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Cycle Month</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={modalTargetMonth}
-                    onChange={(e) => setModalTargetMonth(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:outline-none font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Vault / Wallet Selector */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Deposit Into Account / Vault</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: 'cash_in_hand', label: 'Cash In Hand' },
-                    { id: 'kishor_bank', label: 'Kishor Bank (UPI)' },
-                    { id: 'dad_bank', label: 'Dad Bank' },
-                    { id: 'mom_bank', label: 'Mom Bank' },
-                  ].map((w) => (
-                    <button
-                      key={w.id}
-                      type="button"
-                      onClick={() => setPaymentWalletType(w.id)}
-                      className={`p-2 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
-                        paymentWalletType === w.id
-                          ? 'bg-brand-50 border-brand-500 text-brand-700'
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      {w.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Notes</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Paid via GPay / Handed cash to Dad"
-                  value={paymentNote}
-                  onChange={(e) => setPaymentNote(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none"
-                />
-              </div>
-
-              {/* Receipt Photo */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Receipt Attachment</label>
-                {paymentReceiptUrl ? (
-                  <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
-                    <div className="flex items-center gap-2">
-                      <img src={paymentReceiptUrl} alt="Receipt" className="w-9 h-9 object-cover rounded-lg" />
-                      <span className="text-xs font-bold text-emerald-700">Receipt Ready</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentReceiptUrl('')}
-                      className="text-rose-600 text-xs font-bold hover:underline cursor-pointer"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <input
-                      type="file"
-                      id="member-receipt-upload"
-                      accept="image/*"
-                      onChange={handleReceiptPhotoUpload}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="member-receipt-upload"
-                      className="flex items-center justify-center gap-2 border border-dashed border-slate-300 hover:border-brand-500 bg-slate-50 rounded-xl py-2.5 px-3 text-xs text-slate-600 hover:text-slate-900 font-semibold cursor-pointer transition-colors"
-                    >
-                      <Paperclip size={14} className="text-brand-600" />
-                      <span>Attach receipt photo</span>
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              {/* Buttons */}
-              <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                {editingTransaction ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePayment(editingTransaction)}
-                    className="text-rose-600 hover:bg-rose-50 border border-rose-200 px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    Delete
-                  </button>
-                ) : <div />}
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsPaymentModalOpen(false)}
-                    className="border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isProcessingPayment}
-                    className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {isProcessingPayment ? 'Saving...' : 'Save Payment'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* ── RECORD / EDIT PAYMENT MODAL (UNIFIED) ── */}
+      <UniversalRecordPaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        initialMemberId={memberId}
+        initialGroupId={modalTargetGroupId || null}
+        initialMonth={modalTargetMonth}
+        onPaymentSuccess={() => fetchMemberData()}
+        onOpenReceiptModal={(receiptPayload) => setViewingReceiptTx(receiptPayload)}
+      />
 
       {/* ── Camera QR Scanner Modal for Pairing ── */}
       <PassbookScannerModal
@@ -2419,15 +2250,17 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           <PaymentReceiptModal
             isOpen={Boolean(viewingReceiptTx)}
             onClose={() => setViewingReceiptTx(null)}
-            transaction={viewingReceiptTx}
-            member={{
+            transaction={viewingReceiptTx.transaction || viewingReceiptTx}
+            member={viewingReceiptTx.member || {
               name: memberProfile?.full_name || 'Subscriber',
               ticket: ticket,
               phone: memberProfile?.phone_number || ''
             }}
-            group={matchedGroup || { name: 'Chit Group', monthly_installment: 10000 }}
-            month={txMonth}
-            totalDue={matchedGroup?.monthly_installment}
+            group={viewingReceiptTx.group || matchedGroup || { name: 'Chit Group', monthly_installment: 10000 }}
+            month={viewingReceiptTx.month || txMonth}
+            totalDue={viewingReceiptTx.totalDue || matchedGroup?.monthly_installment}
+            allocations={viewingReceiptTx.allocations}
+            totalCollectedAmount={viewingReceiptTx.totalCollectedAmount}
             organizerCompanyName={organizationName}
             organizerInitials={organizationInitials}
             formatCurrency={formatCurrency}
