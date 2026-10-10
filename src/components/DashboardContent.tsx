@@ -7,7 +7,7 @@ import LiveAuctionEngine from './LiveAuctionEngine';
 import CashVaultLedger from './CashVaultLedger';
 import MemberMatrix from './MemberMatrix';
 import CommunicationBroadcastCenter from './CommunicationBroadcastCenter';
-import ReportsCenter from './ReportsCenter';
+import ReportsCenter, { ReportSubtab } from './ReportsCenter';
 import SettingsManager from './SettingsManager';
 import AuctionCountdownBanner from './AuctionCountdownBanner';
 import AuctionScheduleModal from './AuctionScheduleModal';
@@ -1336,8 +1336,52 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const selectedFifoMember = fifoMembers.find(m => m.id === selectedMemberId) ?? null;
   const selectedMemberTotalDue = selectedFifoMember ? getMemberTotalDue(selectedFifoMember) : 0;
 
-  // Dynamic Audit Log State (Starts empty, records live actions)
+  // Dynamic Audit Log State (Loaded from Supabase + live updates)
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [reportsInitialSubtab, setReportsInitialSubtab] = useState<ReportSubtab>('monthly');
+
+  // Load initial audit logs from Supabase
+  useEffect(() => {
+    const fetchRecentAuditLogs = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('security_audit_logs')
+          .select(`
+            id,
+            action_description,
+            target_table,
+            timestamp,
+            profiles:admin_id (
+              full_name,
+              role
+            )
+          `)
+          .order('timestamp', { ascending: false })
+          .limit(10);
+
+        if (!error && data && data.length > 0) {
+          const formatted = data.map((d: any) => {
+            const dt = new Date(d.timestamp);
+            const timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const isToday = dt.toDateString() === new Date().toDateString();
+            const datePrefix = isToday ? 'Today' : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return {
+              id: d.id,
+              timestamp: `${datePrefix}, ${timeStr}`,
+              table: d.target_table,
+              desc: d.action_description,
+              executor: d.profiles?.full_name ? `${d.profiles.full_name} (${d.profiles.role || 'Admin'})` : 'Admin'
+            };
+          });
+          setAuditLogs(formatted);
+        }
+      } catch (err) {
+        console.warn('Could not load initial audit logs:', err);
+      }
+    };
+
+    fetchRecentAuditLogs();
+  }, []);
 
   // ── ChitBase Master Dashboard States ──────────────────────────────────────────
   const [activeDashboardGroupId, setActiveDashboardGroupId] = useState<string>('');
@@ -4376,7 +4420,10 @@ Thank you for your prompt payment! 🙏`;
                     {setActiveTab && (
                       <button
                         type="button"
-                        onClick={() => setActiveTab('reports')}
+                        onClick={() => {
+                          setReportsInitialSubtab('system_log');
+                          setActiveTab('reports');
+                        }}
                         className="font-semibold text-brand-600 hover:underline cursor-pointer"
                       >
                         Full Log Report
@@ -5116,7 +5163,12 @@ Thank you for your prompt payment! 🙏`;
       );
 
     case 'reports':
-      return <ReportsCenter />;
+      return (
+        <ReportsCenter
+          initialSubtab={reportsInitialSubtab}
+          onSubtabChange={(sub) => setReportsInitialSubtab(sub)}
+        />
+      );
 
     case 'users':
       return (

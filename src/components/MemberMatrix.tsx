@@ -46,7 +46,8 @@ import {
   EyeOff,
   KeyRound,
   BookOpen,
-  Download
+  Download,
+  User
 } from 'lucide-react';
 
 interface MemberGroupInfo {
@@ -160,6 +161,34 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
     if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
     if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
     return digits;
+  };
+
+  const levenshteinDistance = (a: string, b: string): number => {
+    const an = a ? a.length : 0;
+    const bn = b ? b.length : 0;
+    if (an === 0) return bn;
+    if (bn === 0) return an;
+    const matrix: number[][] = [];
+    for (let i = 0; i <= bn; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= an; j++) {
+      matrix[0][j] = j;
+    }
+    for (let i = 1; i <= bn; i++) {
+      for (let j = 1; j <= an; j++) {
+        if (b.charAt(i - 1).toLowerCase() === a.charAt(j - 1).toLowerCase()) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[bn][an];
   };
 
   // Fetch Roles from Supabase
@@ -426,20 +455,14 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
     };
   }, [members, customRoles]);
 
-  // ── Filtered members list ──
-  const filteredMembers = useMemo(() => {
+  // ── Scoped members according to group, role, and search filters ──
+  const scopedMembers = useMemo(() => {
     return members.filter((m) => {
       // Role filter
       if (roleFilter !== 'all' && m.role !== roleFilter) return false;
 
       // Group filter
       if (groupFilter !== 'all' && !m.groups.some((g) => g.id === groupFilter)) return false;
-
-      // Table Status filter
-      if (tableFilter === 'paired' && !m.passbookToken) return false;
-      if (tableFilter === 'unpaired' && m.passbookToken) return false;
-      if (tableFilter === 'pending_mpin' && (m.mpin && m.mpin !== '1234')) return false;
-      if (tableFilter === 'blocked' && !m.isBlocked) return false;
 
       // Search query
       const q = searchQuery.toLowerCase().trim();
@@ -453,7 +476,54 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
         m.groups.some((g) => g.name.toLowerCase().includes(q) || String(g.ticket).includes(q) || (g.aliasName && g.aliasName.toLowerCase().includes(q)))
       );
     });
-  }, [members, roleFilter, groupFilter, qrFilter, tableFilter, searchQuery]);
+  }, [members, roleFilter, groupFilter, searchQuery]);
+
+  // Dynamic counts for tab chips strictly aligned with current scoped view
+  const scopedCounts = useMemo(() => {
+    return {
+      all: scopedMembers.length,
+      paired: scopedMembers.filter((m) => !!m.passbookToken).length,
+      unpaired: scopedMembers.filter((m) => !m.passbookToken).length,
+      blocked: scopedMembers.filter((m) => !!m.isBlocked).length,
+      pendingMpin: scopedMembers.filter((m) => !m.mpin || m.mpin === '1234').length,
+    };
+  }, [scopedMembers]);
+
+  // ── Filtered members list (scopedMembers + tableFilter) ──
+  const filteredMembers = useMemo(() => {
+    return scopedMembers.filter((m) => {
+      // Table Status filter
+      if (tableFilter === 'paired' && !m.passbookToken) return false;
+      if (tableFilter === 'unpaired' && m.passbookToken) return false;
+      if (tableFilter === 'pending_mpin' && (m.mpin && m.mpin !== '1234')) return false;
+      if (tableFilter === 'blocked' && !m.isBlocked) return false;
+      return true;
+    });
+  }, [scopedMembers, tableFilter]);
+
+  // Real-time duplicate phone check for enrollment modal
+  const duplicatePhoneMember = useMemo(() => {
+    const clean = normalizePhoneDigits(newPhoneNumber);
+    if (clean.length < 10) return null;
+    return members.find(m => normalizePhoneDigits(m.phoneNumber) === clean && m.id !== editingMember?.id) || null;
+  }, [newPhoneNumber, members, editingMember]);
+
+  // Real-time fuzzy/similar name suggestion for enrollment modal
+  const similarNameMember = useMemo(() => {
+    const input = newFullName.trim();
+    if (input.length < 3) return null;
+
+    for (const member of members) {
+      if (member.id === editingMember?.id) continue;
+      if (member.fullName.toLowerCase().trim() === input.toLowerCase().trim()) continue;
+
+      const dist = levenshteinDistance(input, member.fullName);
+      if (dist <= 2 || (input.length >= 4 && member.fullName.toLowerCase().includes(input.toLowerCase()))) {
+        return member;
+      }
+    }
+    return null;
+  }, [newFullName, members, editingMember]);
 
   // ── Active Drawer Member for Desktop Inspection Panel ──
   const activeDrawerMember = useMemo(() => {
@@ -1170,7 +1240,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
                 }`}
               >
-                All ({stats.total})
+                All ({scopedCounts.all})
               </button>
               <button
                 type="button"
@@ -1181,7 +1251,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
                 }`}
               >
-                Linked QR ({stats.qrLinkedCount})
+                Linked QR ({scopedCounts.paired})
               </button>
               <button
                 type="button"
@@ -1192,7 +1262,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     : 'bg-white border border-slate-200 text-amber-700 font-medium hover:bg-slate-50'
                 }`}
               >
-                Unlinked ({stats.total - stats.qrLinkedCount})
+                Unlinked ({scopedCounts.unpaired})
               </button>
               <button
                 type="button"
@@ -1203,7 +1273,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     : 'bg-white border border-slate-200 text-slate-500 font-medium hover:bg-slate-50'
                 }`}
               >
-                Pending MPIN ({stats.pendingMpinCount})
+                Pending MPIN ({scopedCounts.pendingMpin})
               </button>
             </div>
           </div>
@@ -1377,7 +1447,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          All ({stats.total})
+                          All ({scopedCounts.all})
                         </button>
                         <button
                           type="button"
@@ -1388,7 +1458,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          QR Paired ({stats.qrLinkedCount})
+                          QR Paired ({scopedCounts.paired})
                         </button>
                         <button
                           type="button"
@@ -1399,7 +1469,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          Unpaired ({stats.total - stats.qrLinkedCount})
+                          Unpaired ({scopedCounts.unpaired})
                         </button>
                         <button
                           type="button"
@@ -1410,7 +1480,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          Blocked ({stats.blockedCount})
+                          Blocked ({scopedCounts.blocked})
                         </button>
                       </div>
                     </div>
@@ -2000,37 +2070,144 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             </div>
 
             <form onSubmit={handleSubmitMember} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+              {/* Full Name */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
                   Full Name <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Ramesh Kumar"
-                  value={newFullName}
-                  onChange={(e) => setNewFullName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-semibold focus:outline-none"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-gray-400">
+                    <User size={14} />
+                  </span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ramesh Kumar"
+                    value={newFullName}
+                    onChange={(e) => setNewFullName(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 placeholder:text-gray-400 focus:outline-none shadow-2xs"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Similar / Fuzzy Name Suggestion (e.g. Priya vs Prisha) */}
+                {!editingMember && similarNameMember && (
+                  <div className="bg-indigo-50/80 border border-indigo-200 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-gray-900 animate-in fade-in duration-200 shadow-2xs">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 font-bold text-indigo-700">
+                        <span>💡</span>
+                        <span>Similar subscriber found in directory</span>
+                      </div>
+                      <p className="text-[11px] text-gray-600">
+                        Did you mean <strong>{similarNameMember.fullName}</strong> ({similarNameMember.phoneNumber})?
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddModalOpen(false);
+                        setDrawerMemberId(similarNameMember.id);
+                      }}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg shrink-0 transition-colors shadow-2xs self-start sm:self-auto cursor-pointer"
+                    >
+                      View {similarNameMember.fullName} →
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                  10-Digit Mobile Number <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="e.g. 9876543210"
-                  maxLength={10}
-                  value={newPhoneNumber}
-                  onChange={(e) => setNewPhoneNumber(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-mono focus:outline-none"
-                />
+              {/* 10-Digit Phone Number */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+                    10-Digit Mobile Number <span className="text-rose-500">*</span>
+                  </label>
+                  {newPhoneNumber.trim() && (
+                    <span className={`text-[10px] font-bold ${
+                      normalizePhoneDigits(newPhoneNumber).length === 10
+                        ? 'text-emerald-700'
+                        : normalizePhoneDigits(newPhoneNumber).length < 10
+                          ? 'text-amber-700'
+                          : 'text-rose-600'
+                    }`}>
+                      {normalizePhoneDigits(newPhoneNumber).length === 10
+                        ? '✓ Valid 10 digits'
+                        : `${normalizePhoneDigits(newPhoneNumber).length}/10 digits`}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-gray-400">
+                    <Phone size={14} />
+                  </span>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="e.g. 9876543210"
+                    maxLength={10}
+                    value={newPhoneNumber}
+                    onChange={(e) => setNewPhoneNumber(e.target.value)}
+                    className={`w-full bg-gray-50 border rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 placeholder:text-gray-400 focus:outline-none transition-colors font-mono shadow-2xs ${
+                      !editingMember && duplicatePhoneMember
+                        ? 'border-amber-400 focus:border-amber-500 bg-amber-50/50'
+                        : !newPhoneNumber.trim()
+                          ? 'border-gray-200 focus:border-indigo-500 focus:bg-white'
+                          : normalizePhoneDigits(newPhoneNumber).length === 10
+                            ? 'border-emerald-400 focus:border-emerald-500 bg-emerald-50/50'
+                            : 'border-amber-400 focus:border-amber-500 bg-amber-50/50'
+                    }`}
+                  />
+                </div>
+                {newPhoneNumber.trim() && normalizePhoneDigits(newPhoneNumber).length !== 10 && (
+                  <p className="text-[10px] text-amber-700 font-medium">
+                    ⚠️ Phone number must be exactly 10 digits ({normalizePhoneDigits(newPhoneNumber).length > 10 ? `${normalizePhoneDigits(newPhoneNumber).length - 10} digits too many` : `${10 - normalizePhoneDigits(newPhoneNumber).length} digits remaining`})
+                  </p>
+                )}
+                <p className="text-[10px] text-gray-500">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
+
+                {/* Duplicate Phone Warning Alert */}
+                {!editingMember && duplicatePhoneMember && (
+                  <div className="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-3.5 space-y-2 text-xs text-slate-900 animate-in fade-in duration-200 shadow-2xs">
+                    <div className="flex items-start gap-2">
+                      <Sparkles size={16} className="text-indigo-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-indigo-950 block">
+                          Existing Account Found: {duplicatePhoneMember.fullName}
+                        </span>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
+                          This phone is registered to <strong>{duplicatePhoneMember.fullName}</strong> ({duplicatePhoneMember.phoneNumber}).
+                          {newFullName.trim() && newFullName.trim().toLowerCase() !== duplicatePhoneMember.fullName.toLowerCase() ? (
+                            <>
+                              {' '}Enrolling this profile with the same phone will share this mobile number for WhatsApp alerts &amp; OTPs.
+                            </>
+                          ) : (
+                            <>
+                              {' '}A subscriber with this phone number already exists in your directory.
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-1 flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddModalOpen(false);
+                          setDrawerMemberId(duplicatePhoneMember.id);
+                        }}
+                        className="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs py-1.5 px-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <User size={13} /> View {duplicatePhoneMember.fullName}&apos;s Profile →
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* System Role */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1.5">
                   System Role <span className="text-rose-500">*</span>
                 </label>
                 <select
@@ -2112,16 +2289,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors text-center"
+                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors text-center cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full sm:w-auto bg-slate-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                 >
-                  {isSubmitting ? 'Saving...' : editingMember ? 'Save Changes' : 'Enroll Member'}
+                  {isSubmitting ? 'Saving...' : editingMember ? 'Save Changes' : `Enroll "${newFullName.trim() || 'Member'}"`}
                 </button>
               </div>
             </form>

@@ -554,12 +554,12 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         targetDueAmt = firstUnpaid.remainingDue;
       } else {
         targetM = grpBreakdown?.effectiveCurrentMonth || 0;
-        targetDueAmt = grpBreakdown?.memberInstallment || 10000;
+        targetDueAmt = 0;
       }
     }
 
     setModalTargetMonth(targetM !== undefined ? targetM : 0);
-    setQuickPaymentAmount(targetDueAmt !== undefined && targetDueAmt > 0 ? String(targetDueAmt) : '10000');
+    setQuickPaymentAmount(targetDueAmt !== undefined && targetDueAmt > 0 ? String(targetDueAmt) : '0');
     setPaymentWalletType('cash_in_hand');
     setPaymentDateType('today');
     setCustomPaymentDate(new Date().toISOString().split('T')[0]);

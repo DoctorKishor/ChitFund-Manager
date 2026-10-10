@@ -41,7 +41,8 @@ import {
   Users,
   Wallet,
   Percent,
-  Trophy
+  Trophy,
+  RefreshCw
 } from 'lucide-react';
 
 export type ReportSubtab = 
@@ -52,7 +53,8 @@ export type ReportSubtab =
   | 'earnings' 
   | 'payouts' 
   | 'member' 
-  | 'reliability';
+  | 'reliability'
+  | 'system_log';
 
 interface SubtabConfig {
   id: ReportSubtab;
@@ -70,13 +72,31 @@ const REPORT_SUBTABS: SubtabConfig[] = [
   { id: 'payouts', label: 'Payouts', icon: CreditCard, description: 'Auction prize disbursements, net payouts & debt liabilities' },
   { id: 'member', label: 'Member', icon: User, description: 'Individual subscriber ledgers, statements & ticket history' },
   { id: 'reliability', label: 'Reliability', icon: ShieldCheck, description: 'Punctuality ratings, member trust score & payment habits' },
+  { id: 'system_log', label: 'System Audit', icon: ShieldCheck, description: 'Live immutable system audit trail, security events & administrative history' },
 ];
 
-export default function ReportsCenter() {
+export interface ReportsCenterProps {
+  initialSubtab?: ReportSubtab;
+  onSubtabChange?: (subtab: ReportSubtab) => void;
+}
+
+export default function ReportsCenter({ initialSubtab, onSubtabChange }: ReportsCenterProps = {}) {
   const { profile } = useAuth();
   const { balances } = useWallet();
   const { organizationName: organizerCompanyName, organizationInitials: organizerInitials } = useOrganization();
-  const [activeSubtab, setActiveSubtab] = useState<ReportSubtab>('monthly');
+  const [activeSubtab, setActiveSubtab] = useState<ReportSubtab>(initialSubtab || 'monthly');
+
+  // Sync external initialSubtab navigation
+  useEffect(() => {
+    if (initialSubtab) {
+      setActiveSubtab(initialSubtab);
+    }
+  }, [initialSubtab]);
+
+  const handleSelectSubtab = (sub: ReportSubtab) => {
+    setActiveSubtab(sub);
+    if (onSubtabChange) onSubtabChange(sub);
+  };
 
   // Supabase Data State
   const [loading, setLoading] = useState<boolean>(true);
@@ -120,6 +140,83 @@ export default function ReportsCenter() {
   // Month & group tab refs for auto-centering
   const monthSliderRef = useRef<HTMLDivElement>(null);
   const groupSliderRef = useRef<HTMLDivElement>(null);
+
+  // ── System Audit Log State & Realtime Fetch ──
+  const [systemAuditLogs, setSystemAuditLogs] = useState<any[]>([]);
+  const [isAuditLoading, setIsAuditLoading] = useState<boolean>(false);
+  const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
+  const [auditTableFilter, setAuditTableFilter] = useState<string>('all');
+
+  const fetchSystemAuditLogs = async () => {
+    setIsAuditLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('security_audit_logs')
+        .select(`
+          id,
+          admin_id,
+          action_description,
+          target_table,
+          timestamp,
+          profiles:admin_id (
+            full_name,
+            role
+          )
+        `)
+        .order('timestamp', { ascending: false })
+        .limit(100);
+
+      if (!error && data) {
+        setSystemAuditLogs(data);
+      }
+    } catch (err) {
+      console.warn('Error fetching system audit logs:', err);
+    } finally {
+      setIsAuditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSystemAuditLogs();
+
+    const channel = supabase
+      .channel('reports_security_audit_channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'security_audit_logs' },
+        () => {
+          fetchSystemAuditLogs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const filteredAuditLogs = useMemo(() => {
+    return systemAuditLogs.filter(log => {
+      if (auditTableFilter !== 'all' && log.target_table !== auditTableFilter) return false;
+      if (!auditSearchQuery.trim()) return true;
+      const q = auditSearchQuery.toLowerCase();
+      const adminName = (log.profiles?.full_name || '').toLowerCase();
+      return (
+        (log.action_description || '').toLowerCase().includes(q) ||
+        (log.target_table || '').toLowerCase().includes(q) ||
+        adminName.includes(q) ||
+        new Date(log.timestamp).toLocaleString().toLowerCase().includes(q)
+      );
+    });
+  }, [systemAuditLogs, auditTableFilter, auditSearchQuery]);
+
+  const auditStats = useMemo(() => {
+    const total = systemAuditLogs.length;
+    const txCount = systemAuditLogs.filter(l => l.target_table === 'transactions').length;
+    const groupCount = systemAuditLogs.filter(l => l.target_table === 'chit_groups').length;
+    const treasuryCount = systemAuditLogs.filter(l => l.target_table === 'global_treasury').length;
+    return { total, txCount, groupCount, treasuryCount };
+  }, [systemAuditLogs]);
 
   // Fetch initial data
   useEffect(() => {
@@ -2365,7 +2462,7 @@ export default function ReportsCenter() {
                   </button>
 
                   <button
-                    onClick={() => setActiveSubtab('reliability')}
+                    onClick={() => handleSelectSubtab('reliability')}
                     className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
                       activeSubtab === 'reliability'
                         ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
@@ -2373,6 +2470,18 @@ export default function ReportsCenter() {
                     }`}
                   >
                     <span>⭐</span> Member Trust &amp; Reliability Score
+                  </button>
+
+                  <button
+                    onClick={() => handleSelectSubtab('system_log')}
+                    className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                      activeSubtab === 'system_log'
+                        ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                        : 'hover:bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    <span>🛡️</span> Live System Audit Log
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
                   </button>
                 </nav>
 
@@ -3037,6 +3146,170 @@ export default function ReportsCenter() {
               </section>
             )}
 
+            {/* Subtab 8: Live System Audit Log */}
+            {activeSubtab === 'system_log' && (
+              <section className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden space-y-6 animate-in fade-in duration-200">
+                {/* Header & Controls Toolbar */}
+                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
+                        <ShieldCheck size={20} />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-bold text-lg text-slate-900">
+                          Live Immutable System Audit Trail
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Continuous append-only tamper-evident ledger of administrative operations &amp; financial mutations
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Live Postgres Realtime
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={fetchSystemAuditLogs}
+                      disabled={isAuditLoading}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <RefreshCw size={13} className={isAuditLoading ? 'animate-spin text-emerald-600' : ''} />
+                      <span>Refresh</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Metric Overview Badges */}
+                <div className="px-6 grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Logged Events</span>
+                    <span className="text-xl font-black text-slate-900 font-mono mt-0.5 block">{auditStats.total}</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200/80">
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Transactions Audited</span>
+                    <span className="text-xl font-black text-emerald-900 font-mono mt-0.5 block">{auditStats.txCount}</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-200/80">
+                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">Chit Group Actions</span>
+                    <span className="text-xl font-black text-indigo-900 font-mono mt-0.5 block">{auditStats.groupCount}</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200/80">
+                    <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Treasury Reallocations</span>
+                    <span className="text-xl font-black text-amber-900 font-mono mt-0.5 block">{auditStats.treasuryCount}</span>
+                  </div>
+                </div>
+
+                {/* Search & Scope Filters */}
+                <div className="px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                    <input
+                      type="text"
+                      value={auditSearchQuery}
+                      onChange={e => setAuditSearchQuery(e.target.value)}
+                      placeholder="Search by action, table, executor, or keyword..."
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand-500 rounded-xl text-xs font-semibold text-slate-900 outline-none"
+                    />
+                  </div>
+
+                  {/* Target Table Scope Chips */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                    {(['all', 'transactions', 'chit_groups', 'global_treasury', 'group_members', 'profiles'] as const).map(tbl => (
+                      <button
+                        key={tbl}
+                        type="button"
+                        onClick={() => setAuditTableFilter(tbl)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase transition-all cursor-pointer whitespace-nowrap ${
+                          auditTableFilter === tbl
+                            ? 'bg-slate-900 text-white shadow-2xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {tbl === 'all' ? 'All Tables' : tbl.replace('_', ' ')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Structured Ledger Table */}
+                <div className="overflow-x-auto px-6 pb-6">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/80 text-[10px] uppercase font-bold text-slate-500 border-y border-slate-200">
+                      <tr>
+                        <th className="py-3 px-3.5">Timestamp</th>
+                        <th className="py-3 px-3">Scope / Table</th>
+                        <th className="py-3 px-3.5">Action Description</th>
+                        <th className="py-3 px-3">Executor</th>
+                        <th className="py-3 px-3 text-right">Event Hash ID</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {filteredAuditLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center text-slate-400 text-xs font-semibold">
+                            No system audit events found matching query.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredAuditLogs.map((log) => {
+                          const dt = new Date(log.timestamp);
+                          const dateStr = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                          const timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                          const executorName = log.profiles?.full_name || 'System / Admin';
+
+                          return (
+                            <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-3 px-3.5 whitespace-nowrap">
+                                <span className="font-mono text-slate-900 font-bold block">{dateStr}</span>
+                                <span className="font-mono text-[11px] text-slate-400">{timeStr}</span>
+                              </td>
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${
+                                  log.target_table === 'transactions'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : log.target_table === 'chit_groups'
+                                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                      : log.target_table === 'global_treasury'
+                                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                        : 'bg-slate-100 text-slate-700 border-slate-200'
+                                }`}>
+                                  {log.target_table}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3.5 max-w-md">
+                                <span className="text-slate-900 font-semibold leading-relaxed block text-xs">
+                                  {log.action_description}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px] font-bold">
+                                    {executorName.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="font-semibold text-slate-800 text-xs">{executorName}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-right whitespace-nowrap">
+                                <span className="font-mono text-[11px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/60">
+                                  #{log.id.slice(0, 8)}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
           </div>
         </main>
       </div>
@@ -3174,12 +3447,21 @@ export default function ReportsCenter() {
               Member
             </button>
             <button
-              onClick={() => setActiveSubtab('reliability')}
+              onClick={() => handleSelectSubtab('reliability')}
               className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
                 activeSubtab === 'reliability' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
               }`}
             >
               Trust Score
+            </button>
+            <button
+              onClick={() => handleSelectSubtab('system_log')}
+              className={`flex-shrink-0 px-3 py-1 rounded-xl flex items-center gap-1 cursor-pointer transition-all ${
+                activeSubtab === 'system_log' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+              }`}
+            >
+              <span>🛡️</span> System Log
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             </button>
           </div>
         </header>
@@ -3469,6 +3751,100 @@ export default function ReportsCenter() {
                   </span>
                 </div>
               ))}
+            </section>
+          )}
+
+          {/* Subtab 8 on Mobile: Live System Audit Log */}
+          {activeSubtab === 'system_log' && (
+            <section className="space-y-3 animate-in fade-in duration-200">
+              {/* Mobile Header / Quick Controls */}
+              <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
+                      <ShieldCheck size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-display font-bold text-xs text-slate-900 leading-tight">Live System Audit</h4>
+                      <p className="text-[10px] text-slate-400">Realtime database stream</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchSystemAuditLogs}
+                    disabled={isAuditLoading}
+                    className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                    title="Refresh Audit Logs"
+                  >
+                    <RefreshCw size={13} className={isAuditLoading ? 'animate-spin text-emerald-600' : ''} />
+                  </button>
+                </div>
+
+                {/* Mobile Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 text-slate-400" size={13} />
+                  <input
+                    type="text"
+                    value={auditSearchQuery}
+                    onChange={e => setAuditSearchQuery(e.target.value)}
+                    placeholder="Search logs..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none"
+                  />
+                </div>
+
+                {/* Mobile Table Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  {(['all', 'transactions', 'chit_groups', 'global_treasury', 'profiles'] as const).map(tbl => (
+                    <button
+                      key={tbl}
+                      type="button"
+                      onClick={() => setAuditTableFilter(tbl)}
+                      className={`px-2 py-1 rounded-lg text-[9px] font-bold uppercase transition-all whitespace-nowrap cursor-pointer ${
+                        auditTableFilter === tbl ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {tbl === 'all' ? 'All' : tbl.replace('_', ' ')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mobile Feed */}
+              {filteredAuditLogs.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+                  No system audit events found.
+                </div>
+              ) : (
+                filteredAuditLogs.map(log => {
+                  const dt = new Date(log.timestamp);
+                  const timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                  const dateStr = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                  return (
+                    <div key={log.id} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-mono text-slate-500 font-semibold">{dateStr}, {timeStr}</span>
+                        <span className={`font-bold uppercase text-[9px] px-1.5 py-0.2 rounded border ${
+                          log.target_table === 'transactions'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : log.target_table === 'chit_groups'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}>
+                          {log.target_table}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-slate-900 leading-snug">
+                        {log.action_description}
+                      </p>
+                      <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400 border-t border-slate-100">
+                        <span>{log.profiles?.full_name || 'Admin'}</span>
+                        <span className="font-mono">#{log.id.slice(0, 8)}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </section>
           )}
 

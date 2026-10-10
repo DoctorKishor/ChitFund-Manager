@@ -468,12 +468,27 @@ export default function UniversalRecordPaymentModal({
         // Which months to pre-select for this ticket:
         let defaultMonths: number[] = [];
         if ((initialGroupMemberId === m.id || (!initialGroupMemberId && initialGroupId === cg.id)) && initialMonth !== undefined && initialMonth !== null) {
-          defaultMonths = [Number(initialMonth)];
+          const targetMb = monthsBreakdown.find(mb => mb.month === Number(initialMonth));
+          if (targetMb && targetMb.remainingDue === 0) {
+            // Target month is already paid! Check if there's an unpaid arrear month
+            const unpaidArrear = monthsBreakdown.find(mb => mb.isArrear && mb.remainingDue > 0);
+            if (unpaidArrear) {
+              defaultMonths = [unpaidArrear.month];
+            } else {
+              defaultMonths = [];
+            }
+          } else {
+            defaultMonths = [Number(initialMonth)];
+          }
         } else if (currentMonthDue > 0) {
           defaultMonths = [currMonth];
         } else {
-          const firstUnpaid = monthsBreakdown.find(mb => mb.remainingDue > 0);
-          if (firstUnpaid) defaultMonths = [firstUnpaid.month];
+          const unpaidArrear = monthsBreakdown.find(mb => mb.isArrear && mb.remainingDue > 0);
+          if (unpaidArrear) {
+            defaultMonths = [unpaidArrear.month];
+          } else {
+            defaultMonths = [];
+          }
         }
         initialSelectedMonths[m.id] = defaultMonths;
 
@@ -598,7 +613,7 @@ export default function UniversalRecordPaymentModal({
       let grpTotal = 0;
       months.forEach(m => {
         const mb = grp.monthsBreakdown.find(x => x.month === m);
-        const defaultDue = mb ? (mb.remainingDue > 0 ? mb.remainingDue : grp.effectiveInstallment) : grp.effectiveInstallment;
+        const defaultDue = mb ? mb.remainingDue : grp.effectiveInstallment;
         const customAmt = customAmountsMap[grp.groupMemberId]?.[m];
         
         let amt = defaultDue;
@@ -1030,7 +1045,7 @@ export default function UniversalRecordPaymentModal({
                           // Calculate ticket subtotal
                           const ticketSubtotal = selectedMonths.reduce((sum, m) => {
                             const mb = grp.monthsBreakdown.find(x => x.month === m);
-                            const defaultDue = mb ? (mb.remainingDue > 0 ? mb.remainingDue : grp.effectiveInstallment) : grp.effectiveInstallment;
+                            const defaultDue = mb ? mb.remainingDue : grp.effectiveInstallment;
                             const customAmt = customAmountsMap[grp.groupMemberId]?.[m];
                             if (customAmt !== undefined && customAmt !== '') return sum + Math.max(0, parseFloat(String(customAmt)) || 0);
                             if (customAmt === '') return sum;
@@ -1040,7 +1055,7 @@ export default function UniversalRecordPaymentModal({
                           const hasCustomInTicket = selectedMonths.some(m => {
                             const c = customAmountsMap[grp.groupMemberId]?.[m];
                             const mb = grp.monthsBreakdown.find(x => x.month === m);
-                            const def = mb ? (mb.remainingDue > 0 ? mb.remainingDue : grp.effectiveInstallment) : grp.effectiveInstallment;
+                            const def = mb ? mb.remainingDue : grp.effectiveInstallment;
                             return c !== undefined && c !== '' && Number(c) !== def;
                           });
 
@@ -1201,7 +1216,7 @@ export default function UniversalRecordPaymentModal({
                                   {selectedMonths.length === 1 && (() => {
                                     const sm = selectedMonths[0];
                                     const mb = grp.monthsBreakdown.find(x => x.month === sm);
-                                    const defaultDue = mb ? (mb.remainingDue > 0 ? mb.remainingDue : grp.effectiveInstallment) : grp.effectiveInstallment;
+                                    const defaultDue = mb ? mb.remainingDue : grp.effectiveInstallment;
                                     const customVal = customAmountsMap[grp.groupMemberId]?.[sm];
                                     const isCustom = customVal !== undefined && customVal !== '' && Number(customVal) !== defaultDue;
 
@@ -1220,7 +1235,12 @@ export default function UniversalRecordPaymentModal({
                                             )}
                                           </div>
                                           <span className="text-[10px] text-slate-400 font-medium block">
-                                            Standard due: ₹{defaultDue.toLocaleString('en-IN')}
+                                            Standard due: ₹{grp.effectiveInstallment.toLocaleString('en-IN')}
+                                            {mb && mb.remainingDue === 0
+                                              ? ' · Fully Paid (₹0 due)'
+                                              : mb && mb.alreadyPaid > 0
+                                                ? ` · Paid: ₹${mb.alreadyPaid.toLocaleString('en-IN')}`
+                                                : ''}
                                           </span>
                                         </div>
 
@@ -1269,7 +1289,7 @@ export default function UniversalRecordPaymentModal({
                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         {selectedMonths.map(m => {
                                           const mb = grp.monthsBreakdown.find(x => x.month === m);
-                                          const defaultM = mb ? (mb.remainingDue > 0 ? mb.remainingDue : grp.effectiveInstallment) : grp.effectiveInstallment;
+                                          const defaultM = mb ? mb.remainingDue : grp.effectiveInstallment;
                                           const customM = customAmountsMap[grp.groupMemberId]?.[m];
                                           const isMcustom = customM !== undefined && customM !== '' && Number(customM) !== defaultM;
 
@@ -1280,7 +1300,7 @@ export default function UniversalRecordPaymentModal({
                                                   {m < grp.currentMonth ? `M${m} Arrear` : m === grp.currentMonth ? `M${m} Current` : `M${m} Advance`}
                                                 </span>
                                                 <span className="text-[10px] text-slate-400 font-mono block">
-                                                  Due: ₹{defaultM.toLocaleString('en-IN')}
+                                                  Due: ₹{defaultM.toLocaleString('en-IN')}{mb && mb.remainingDue === 0 ? ' (Paid)' : ''}
                                                 </span>
                                               </div>
 
