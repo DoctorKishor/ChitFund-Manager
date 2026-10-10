@@ -808,101 +808,73 @@ export default function SubscriberPortal() {
   return (
     <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-[#F4F6FB] text-[#151B26]">
       
-      {/* 1. TOP APP BAR / CANOPY */}
-      <header className="sticky top-0 w-full z-40 bg-gradient-to-b from-[#1C128A] via-[#2A1DB8] to-[#3424CA] text-white shadow-md">
-        {/* Android Status Bar Simulation on Mobile */}
-        <div className="flex md:hidden items-center justify-between px-4 pt-2 pb-1 text-white/80 text-[11px] font-mono">
-          <span className="font-bold text-white">9:09</span>
-          <div className="flex items-center gap-1.5 opacity-90 text-[10px]">
-            <span>4G</span>
-            <Radio size={12} />
-            <span className="w-4 h-2 rounded-xs border border-white/80 inline-flex items-center p-0.5">
-              <span className="w-full h-full bg-white rounded-xs"></span>
-            </span>
-          </div>
-        </div>
-
-        {/* App Header Canopy Content */}
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 pb-1">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-full p-0.5 flex items-center justify-center bg-white/10 ring-2 ring-white/20 shrink-0">
-              <div className="w-full h-full rounded-full bg-gradient-to-tr from-amber-400 to-indigo-300 flex items-center justify-center text-slate-900 font-extrabold text-sm shadow-xs">
-                {profile?.fullName?.charAt(0)?.toUpperCase() || 'A'}
-              </div>
-            </div>
-            <div className="flex flex-col truncate">
-              <h1 className="text-base sm:text-lg font-bold leading-tight flex items-center gap-1 truncate text-white">
-                <span>Hello, {profile?.fullName || 'Subscriber'}</span>
-                <span className="text-[16px]">👋</span>
-              </h1>
-              <span className="text-[11px] text-indigo-200 mt-0.5 truncate font-mono">
-                {groups.length} Active {groups.length === 1 ? 'Chit Group' : 'Chit Groups'} · ID #{profile?.phoneNumber ? profile.phoneNumber.slice(-4) : (profile?.id?.slice(0, 6) || 'RC-9041')}
+      {/* 1. TOP APP BAR / CANOPY (Only rendered in Overview Tab) */}
+      {activeTab === 'overview' && (
+        <header className="sticky top-0 w-full z-40 bg-gradient-to-b from-[#1C128A] via-[#2A1DB8] to-[#3424CA] text-white shadow-md">
+          {/* Android Status Bar Simulation on Mobile */}
+          <div className="flex md:hidden items-center justify-between px-4 pt-2 pb-1 text-white/80 text-[11px] font-mono">
+            <span className="font-bold text-white">9:09</span>
+            <div className="flex items-center gap-1.5 opacity-90 text-[10px]">
+              <span>4G</span>
+              <Radio size={12} />
+              <span className="w-4 h-2 rounded-xs border border-white/80 inline-flex items-center p-0.5">
+                <span className="w-full h-full bg-white rounded-xs"></span>
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {/* LIVE SYNC BUTTON */}
-            <button
-              onClick={() => loadSubscriberData(false)}
-              title="Sync Latest Data with Ledger"
-              aria-label="Refresh and sync data"
-              disabled={syncing}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
-            >
-              <RefreshCw size={14} className={syncing ? 'animate-spin text-cyan-300' : ''} />
-            </button>
+          {/* App Header Canopy Content */}
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-full p-0.5 flex items-center justify-center bg-white/10 ring-2 ring-white/20 shrink-0">
+                <div className="w-full h-full rounded-full bg-gradient-to-tr from-amber-400 to-indigo-300 flex items-center justify-center text-slate-900 font-extrabold text-sm shadow-xs">
+                  {profile?.fullName?.charAt(0)?.toUpperCase() || 'A'}
+                </div>
+              </div>
+              <div className="flex flex-col truncate">
+                <h1 className="text-base sm:text-lg font-bold leading-tight flex items-center gap-1 truncate text-white">
+                  <span>Hello, {profile?.fullName || 'Subscriber'}</span>
+                  <span className="text-[16px]">👋</span>
+                </h1>
+                <span className="text-[11px] text-indigo-200 mt-0.5 truncate font-mono">
+                  {groups.length} Active {groups.length === 1 ? 'Chit Group' : 'Chit Groups'} · ID #{profile?.phoneNumber ? profile.phoneNumber.slice(-4) : (profile?.id?.slice(0, 6) || 'RC-9041')}
+                </span>
+              </div>
+            </div>
 
-            {/* NOTIFICATIONS BELL */}
-            <button
-              aria-label="Notifications"
-              onClick={() => {
-                if (activeRescheduleNotices.length > 0) setIsAlertModalDismissed(false);
-              }}
-              className="relative w-9 h-9 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
-              type="button"
-            >
-              <Bell size={16} />
-              {(overdueGroups.length > 0 || activeRescheduleNotices.length > 0) && (
-                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-amber-400 rounded-full ring-2 ring-[#1a00a7] animate-pulse"></span>
-              )}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* LIVE SYNC BUTTON */}
+              <button
+                onClick={() => loadSubscriberData(false)}
+                title="Sync Latest Data with Ledger"
+                aria-label="Refresh and sync data"
+                disabled={syncing}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+              >
+                <RefreshCw size={14} className={syncing ? 'animate-spin text-cyan-300' : ''} />
+              </button>
+
+              {/* NOTIFICATIONS BELL */}
+              <button
+                aria-label="Notifications"
+                onClick={() => {
+                  if (activeRescheduleNotices.length > 0) setIsAlertModalDismissed(false);
+                }}
+                className="relative w-9 h-9 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+                type="button"
+              >
+                <Bell size={16} />
+                {(overdueGroups.length > 0 || activeRescheduleNotices.length > 0) && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-amber-400 rounded-full ring-2 ring-[#1a00a7] animate-pulse"></span>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* 2. MAIN CONTAINER */}
       <main className="max-w-5xl w-full mx-auto px-3.5 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 flex-1">
-            {/* PROMINENT ORANGE OVERDUE REMINDER BANNER */}
-        {overdueGroups.length > 0 && (
-          <div className="rounded-2xl p-3.5 sm:p-4 border border-amber-300 bg-amber-50 text-amber-950 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
-              <AlertTriangle size={18} className="stroke-[2.5]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <h3 className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-1.5 text-amber-900">
-                  <span>⚠️ Payment Past Due Date</span>
-                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded font-bold border bg-amber-200/60 text-amber-900 border-amber-300">
-                    {overdueGroups.length} {overdueGroups.length === 1 ? 'Chit' : 'Chits'} Overdue
-                  </span>
-                </h3>
-                <div className="text-xs sm:text-sm font-mono font-black text-rose-600">
-                  Total Overdue: ₹{totalOverdueAmount.toLocaleString('en-IN')}
-                </div>
-              </div>
-              <p className="text-[11px] mt-1 leading-relaxed font-medium text-amber-800">
-                The scheduled auction due date for{' '}
-                <strong className="font-bold text-slate-900 underline decoration-amber-400">
-                  {overdueGroups
-                    .map((g) => `${g.group.groupName} (${g.paymentInfo.daysOverdue} days past due)`)
-                    .join(', ')}
-                </strong>{' '}
-                has passed. Please settle your installment at the counter or via online transfer.
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* DESKTOP TABS (5 Streamlined Tabs at top) */}
         <div className="hidden md:flex items-center gap-2 border-b border-[#E5E9F2] pb-2">
