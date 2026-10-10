@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import { computeNextAuctionDateTime, formatTime12h, getFirstSundayOnOrAfterDay } from '@/utils/auctionSchedule';
-import { Check } from 'lucide-react';
+import { Check, X, Edit3, Sparkles } from 'lucide-react';
 
 interface GroupMetadata {
   id: string;
@@ -93,6 +93,16 @@ function formatINR(val: number): string {
     currency: 'INR',
     maximumFractionDigits: 0,
   }).format(val || 0);
+}
+
+function formatCompactINR(val: number): string {
+  if (val >= 100000) {
+    return `₹${(val / 100000).toFixed(1)}L`;
+  }
+  if (val >= 1000) {
+    return `₹${(val / 1000).toFixed(1)}k`;
+  }
+  return `₹${val}`;
 }
 
 function formatDatePretty(d: Date): string {
@@ -246,6 +256,13 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
   {
     key: 'discount_pool_balance',
     label: 'Discount Pool (₹40,500)',
+    category: 'financials',
+    description: 'Accumulated Kai Iruppu pool with ₹',
+    getValue: (m) => formatINR(m?.kaiIruppuPool ?? 40500),
+  },
+  {
+    key: 'pool_balance',
+    label: 'Pool Balance (Alias)',
     category: 'financials',
     description: 'Accumulated Kai Iruppu pool with ₹',
     getValue: (m) => formatINR(m?.kaiIruppuPool ?? 40500),
@@ -549,6 +566,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   const [copied, setCopied] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Mobile Sub-View: 'preview' | 'editor'
+  const [mobileSubView, setMobileSubView] = useState<'preview' | 'editor'>('preview');
+  const [showAllPlaceholdersModal, setShowAllPlaceholdersModal] = useState<boolean>(false);
+  const [showEditSignatureModal, setShowEditSignatureModal] = useState<boolean>(false);
+
   // Cloud Sync Status: 'synced' | 'saving' | 'error'
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'saving' | 'error'>('synced');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -582,6 +604,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   });
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 1. Fetch Cloud Templates from Supabase public.system_settings
   const fetchCloudTemplates = useCallback(async () => {
@@ -954,7 +977,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   // Insert any text / emoji / tag into textarea at cursor position
   const insertTextAtCursor = (insertedText: string) => {
     triggerHapticFeedback('light');
-    const textarea = textareaRef.current;
+    const textarea = textareaRef.current || mobileTextareaRef.current;
 
     if (textarea) {
       const cursorPos = textarea.selectionStart || 0;
@@ -975,7 +998,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
   const wrapSelectedText = (delimiter: string) => {
     triggerHapticFeedback('light');
-    const textarea = textareaRef.current;
+    const textarea = textareaRef.current || mobileTextareaRef.current;
     if (!textarea) return;
     const start = textarea.selectionStart || 0;
     const end = textarea.selectionEnd || 0;
@@ -1015,500 +1038,933 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   return (
     <div className="w-full bg-slate-50 min-h-screen text-slate-800 antialiased flex flex-col font-sans">
       
-      {/* ── TOP HEADER: EXACT STITCH DESKTOP SPEC ── */}
-      <header className="h-16 bg-white border-b border-slate-200/80 px-6 sm:px-8 flex items-center justify-between flex-shrink-0 z-20">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-base sm:text-lg font-bold font-display text-slate-900 tracking-tight whitespace-nowrap">
-              Communication &amp; WhatsApp Broadcast Center
-            </h1>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 whitespace-nowrap flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              WhatsApp API Ready
-            </span>
+      {/* ═══════════════════════════════════════════════════════════════════
+          MOBILE VIEW (360px viewport feel — block lg:hidden)
+          Matches Stitch Native Android/iOS Mobile Mockup Spec Exactly
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="block lg:hidden w-full max-w-sm mx-auto bg-[#F8FAFC] min-h-screen flex flex-col shadow-xl border-x border-slate-200/80 pb-20">
+        
+        {/* Mobile Status Bar & Top Bar */}
+        <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 pt-2">
+          {/* iOS/Android Status Bar Simulation */}
+          <div className="px-4 pt-1 pb-1 flex justify-between items-center text-xs font-semibold text-slate-900 tracking-tight">
+            <span>{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+            <div className="flex items-center space-x-1.5">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 18.25A10.93 10.93 0 0 1 1 12C1 5.92 5.92 1 12 1s11 4.92 11 11c0 2.34-.73 4.51-1.98 6.29l-.62-.62A8.96 8.96 0 0 0 21 12c0-4.97-4.03-9-9-9z"></path><circle cx="12" cy="18" r="2"></circle></svg>
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4z"></path></svg>
+              <div className="w-5 h-2.5 border border-slate-800 rounded-xs p-0.5 flex items-center">
+                <div className="w-full h-full bg-slate-800 rounded-2xs"></div>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Header Right: Quick Status & Send Trigger */}
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200/70">
-            <svg className="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 2C6.495 2 2 6.495 2 12.031c0 1.97.57 3.81 1.558 5.372L2.5 22l4.808-1.047a9.98 9.98 0 0 0 4.723 1.18c5.536 0 10.031-4.496 10.031-10.032S17.567 2 12.031 2z"></path></svg>
-            <span>Broadcasting from: <strong className="text-slate-800">{contactPhone}</strong></span>
+          {/* App Title & Quick Language Toggle */}
+          <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-100/80">
+            <div className="flex items-center gap-2">
+              <div>
+                <h1 className="text-sm font-extrabold text-slate-900 leading-tight">WhatsApp Broadcast</h1>
+                <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Direct Group Dispatch
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Language Toggle */}
+            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold">
+              <button 
+                type="button"
+                onClick={() => { setLanguage('ta'); triggerHapticFeedback('light'); }}
+                className={`px-2 py-1 rounded transition-all cursor-pointer ${language === 'ta' ? 'bg-brand-500 text-white shadow-2xs font-bold' : 'text-slate-600'}`}
+              >
+                தமிழ்
+              </button>
+              <button 
+                type="button"
+                onClick={() => { setLanguage('en'); triggerHapticFeedback('light'); }}
+                className={`px-2 py-1 rounded transition-all cursor-pointer ${language === 'en' ? 'bg-brand-500 text-white shadow-2xs font-bold' : 'text-slate-600'}`}
+              >
+                EN
+              </button>
+            </div>
           </div>
-          <button 
-            type="button"
-            onClick={() => window.open(formatWhatsAppUrl(), '_blank')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-500/25 transition-all cursor-pointer active:scale-95"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"></path></svg>
-            <span>Send via WhatsApp (1-Tap)</span>
-          </button>
-        </div>
-      </header>
 
-      {/* ── WORKSPACE BODY ── */}
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-        <div className="w-full max-w-[1550px] mx-auto space-y-5">
-
-          {/* 1. CHIT GROUP SELECTOR & STATUS STRIP */}
-          <section className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              
-              {/* Chit Group Selector Dropdown */}
-              <div className="flex flex-wrap items-center gap-3">
-                <label htmlFor="chit-group-select" className="text-xs font-bold text-slate-500 uppercase tracking-wider flex-shrink-0">
-                  Select Group:
-                </label>
-                <div className="relative min-w-[280px] sm:min-w-[340px]">
-                  <select 
-                    id="chit-group-select" 
-                    value={activeGroupKey}
-                    onChange={(e) => {
-                      setActiveGroupKey(e.target.value);
+          {/* Chit Group Filter Tabs (Horizontal Scrollable) */}
+          <div className="px-4 py-2 bg-slate-50/70 border-b border-slate-100">
+            <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar text-xs">
+              {Object.values(groupsMetadata).map((group) => {
+                const isSelected = group.id === activeGroupKey;
+                return (
+                  <button
+                    key={group.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveGroupKey(group.id);
                       triggerHapticFeedback('light');
                     }}
-                    className="w-full appearance-none bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 pr-9 text-xs font-semibold text-slate-800 shadow-xs focus:outline-none focus:ring-brand-500 focus:border-brand-500 cursor-pointer transition-all"
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                      isSelected
+                        ? 'bg-brand-500 text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
                   >
-                    {Object.values(groupsMetadata).map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name} — {formatINR(group.totalValue)} ({group.memberCount} Slots • Month {group.currentMonth} of {group.durationMonths})
-                      </option>
-                    ))}
-                    {Object.keys(groupsMetadata).length === 0 && (
-                      <option value="">Sample Test Group — ₹1,00,000 (5 Slots • Month 2 of 5)</option>
-                    )}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
-                  </div>
-                </div>
-              </div>
-
-              {/* Key Quick Details of Selected Group */}
-              <div className="flex flex-wrap items-center gap-3 text-xs">
-                {selectedMeta && (
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <span className="font-semibold text-slate-700">Installment:</span>
-                    <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md font-mono">
-                      {formatINR(selectedMeta.fixedInstallment)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Laaba Seetu Special Badge */}
-                <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-50 to-emerald-50 text-amber-800 rounded-xl border border-amber-200/80 font-bold shadow-2xs">
-                  <span>🎉</span>
-                  <span>Kai Iruppu: <strong>{formatINR(selectedMeta?.kaiIruppuPool || 40500)}</strong></span>
-                  <span className="text-[10px] bg-amber-200/60 text-amber-900 px-1.5 py-0.5 rounded font-semibold">
-                    {laabaSeetuPercentage.toFixed(1)}% to Laaba Seetu
-                  </span>
-                </div>
-              </div>
-
+                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
+                    <span>{group.name} ({formatCompactINR(group.totalValue)})</span>
+                  </button>
+                );
+              })}
+              {Object.keys(groupsMetadata).length === 0 && (
+                <button type="button" className="flex-shrink-0 px-2.5 py-1 bg-brand-500 text-white font-bold rounded-lg shadow-xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span>Sample Test (₹1L)</span>
+                </button>
+              )}
             </div>
-          </section>
+          </div>
+        </header>
 
-          {/* 2. BROADCAST CATEGORIES & BILINGUAL SWITCHER TOOLBAR */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
-            {/* 3 Categories */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold overflow-x-auto">
+        {/* Mobile Main Body */}
+        <div className="p-3.5 space-y-3">
+          
+          {/* 1. GROUP STATUS MINI-BANNER */}
+          <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-card flex items-center justify-between text-xs">
+            <div>
+              <h4 className="font-bold text-slate-900 leading-tight">
+                {selectedMeta?.name || 'Sample Test'} · Month {selectedMeta?.currentMonth ?? 2} of {selectedMeta?.durationMonths ?? 5}
+              </h4>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-mono">
+                🎉 Kai Iruppu: {formatCompactINR(selectedMeta?.kaiIruppuPool || 40500)}
+              </span>
+            </div>
+          </div>
+
+          {/* 2. BROADCAST MESSAGE CATEGORY SELECTOR PILLS */}
+          <div>
+            <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1.5 tracking-wider px-1">
+              Message Type:
+            </label>
+            <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
               <button 
                 type="button"
-                onClick={() => {
-                  setTemplateType('pre-auction');
-                  triggerHapticFeedback('light');
-                }}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                onClick={() => { setTemplateType('pre-auction'); triggerHapticFeedback('light'); }}
+                className={`p-2 rounded-xl transition-all flex flex-col items-center cursor-pointer ${
                   templateType === 'pre-auction'
-                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white border-2 border-brand-500 text-brand-700 font-bold shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50'
                 }`}
               >
-                <span>📢</span>
-                <span>1. Pre-Auction Announcement</span>
+                <span className="text-sm">📢</span>
+                <span className="text-[10px] mt-0.5 leading-tight">Pre-Auction Notice</span>
               </button>
               
               <button 
                 type="button"
-                onClick={() => {
-                  setTemplateType('post-auction');
-                  triggerHapticFeedback('light');
-                }}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                onClick={() => { setTemplateType('post-auction'); triggerHapticFeedback('light'); }}
+                className={`p-2 rounded-xl transition-all flex flex-col items-center cursor-pointer ${
                   templateType === 'post-auction'
-                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white border-2 border-brand-500 text-brand-700 font-bold shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50'
                 }`}
               >
-                <span>🏆</span>
-                <span>2. Post-Auction Summary</span>
+                <span className="text-sm">🏆</span>
+                <span className="text-[10px] mt-0.5 leading-tight">Post-Auction Result</span>
               </button>
               
               <button 
                 type="button"
-                onClick={() => {
-                  setTemplateType('payment-reminder');
-                  triggerHapticFeedback('light');
-                }}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                onClick={() => { setTemplateType('payment-reminder'); triggerHapticFeedback('light'); }}
+                className={`p-2 rounded-xl transition-all flex flex-col items-center cursor-pointer ${
                   templateType === 'payment-reminder'
-                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white border-2 border-brand-500 text-brand-700 font-bold shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50'
                 }`}
               >
-                <span>⏳</span>
-                <span>3. Payment Reminder / Dues</span>
-                <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full font-bold">
-                  {selectedMeta?.unpaidCount ?? 4} Unpaid
+                <span className="text-sm">⏳</span>
+                <span className="text-[10px] mt-0.5 leading-tight">
+                  Dues Alert ({selectedMeta?.unpaidCount ?? 4})
                 </span>
               </button>
             </div>
+          </div>
 
-            {/* Bilingual Toggle Switcher & Reset Button */}
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
-                Template Language:
-              </span>
-              <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/70 text-xs font-bold">
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setLanguage('ta');
-                    triggerHapticFeedback('light');
-                  }}
-                  className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
-                    language === 'ta'
-                      ? 'bg-brand-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>🇮🇳 தமிழ் (Tamil)</span>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setLanguage('en');
-                    triggerHapticFeedback('light');
-                  }}
-                  className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
-                    language === 'en'
-                      ? 'bg-brand-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>English</span>
-                </button>
+          {/* 3. MOBILE VIEW TOGGLE: LIVE PREVIEW VS EDIT TEMPLATE */}
+          <div className="flex items-center justify-between p-1 bg-slate-200/70 rounded-xl text-xs font-bold">
+            <button 
+              type="button"
+              onClick={() => { setMobileSubView('preview'); triggerHapticFeedback('light'); }}
+              className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                mobileSubView === 'preview'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.264 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+              <span>Live Preview</span>
+            </button>
+            
+            <button 
+              type="button"
+              onClick={() => { setMobileSubView('editor'); triggerHapticFeedback('light'); }}
+              className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                mobileSubView === 'editor'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+              <span>Edit Template</span>
+            </button>
+          </div>
+
+          {/* 4. LIVE WHATSAPP BUBBLE PREVIEW CARD */}
+          {mobileSubView === 'preview' ? (
+            <div className="rounded-2xl overflow-hidden border border-slate-300 shadow-card">
+              {/* WhatsApp Header Bar */}
+              <div className="bg-[#075E54] text-white px-3 py-2 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-emerald-700 flex items-center justify-center font-bold text-[10px] font-display shadow-inner">
+                    CF
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-[11px] leading-tight truncate w-36">
+                      {selectedMeta?.name || 'Sample Test Group'}
+                    </h5>
+                    <p className="text-[9px] text-emerald-200">
+                      {selectedMeta?.memberCount || 5} members
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-white/20 text-white px-1.5 py-0.5 rounded font-mono">
+                  {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
+
+              {/* Doodle Background & Chat Bubble */}
+              <div 
+                style={{
+                  backgroundColor: '#ECE5DD',
+                  backgroundImage: 'radial-gradient(#d3c6b6 1px, transparent 1px)',
+                  backgroundSize: '16px 16px',
+                }}
+                className="p-3"
+              >
+                {/* Date pill */}
+                <div className="text-center mb-2">
+                  <span className="bg-white/80 text-[9px] font-bold text-slate-600 px-2 py-0.5 rounded-full shadow-2xs">
+                    {language === 'ta' ? 'இன்று (Today)' : 'Today'}
+                  </span>
+                </div>
+
+                {/* WhatsApp Green Bubble */}
+                <div className="bg-[#DCF8C6] rounded-xl rounded-tr-none p-3 shadow-sm border border-emerald-200/70 text-slate-900 text-xs leading-relaxed space-y-1.5">
+                  <div className="text-[11px] leading-relaxed">
+                    {renderWhatsAppFormatted(compiledBroadcastText)}
+                  </div>
+
+                  <div className="flex justify-end items-center gap-1 text-[9px] text-slate-500 font-mono pt-0.5">
+                    <span>{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-blue-500 font-bold">✓✓</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* 4B. MOBILE INLINE TEMPLATE EDITOR */
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-card space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-800">Raw Message Composer</span>
+                <span className="text-[10px] text-slate-400 font-mono">{activeRawTemplate.length} chars</span>
+              </div>
+              <textarea 
+                ref={mobileTextareaRef}
+                rows={9}
+                value={activeRawTemplate}
+                onChange={(e) => handleTemplateChange(e.target.value)}
+                className="w-full text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 focus:bg-white focus:ring-brand-500 focus:border-brand-500 leading-relaxed transition-all resize-none shadow-inner"
+                placeholder="Type broadcast message..."
+              />
+
+              {/* Quick Emojis Strip */}
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+                {['📢', '💰', '🏆', '🎉', '🗓️', '⏰', '📍', '✅', '⚠️'].map((em) => (
+                  <button 
+                    key={em}
+                    type="button"
+                    onClick={() => insertTextAtCursor(em)}
+                    className="p-1 rounded bg-slate-50 hover:bg-slate-100 text-sm active:scale-90"
+                  >
+                    {em}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 5. QUICK PLACEHOLDER TAGS SNIPPET (Horizontal Scrollable) */}
+          <div>
+            <div className="flex items-center justify-between px-1 mb-1">
+              <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Dynamic Placeholders:</label>
+              <button 
+                type="button" 
+                onClick={() => setShowAllPlaceholdersModal(true)}
+                className="text-[10px] text-brand-600 font-semibold cursor-pointer hover:underline"
+              >
+                View All ({BROADCAST_VARIABLES.length})
+              </button>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-[11px]">
+              {[
+                '{group_name}',
+                '{auction_time}',
+                '{monthly_due}',
+                '{pool_balance}',
+                '{winner_name}',
+                '{winning_discount}',
+              ].map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => insertTextAtCursor(tag)}
+                  className="px-2 py-0.5 rounded-lg bg-indigo-50 text-brand-700 border border-brand-200 font-mono whitespace-nowrap active:scale-95 cursor-pointer text-[10px] font-semibold"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 6. SENDER DETAILS QUICK CARD */}
+          <div className="p-3 bg-white border border-slate-200 rounded-xl text-xs space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase text-slate-400">Custom Sender Signature</span>
+              <button 
+                type="button"
+                onClick={() => setShowEditSignatureModal(true)}
+                className="text-[10px] font-bold text-brand-600 hover:underline cursor-pointer flex items-center gap-1"
+              >
+                <Edit3 size={11} />
+                <span>Edit Signature</span>
+              </button>
+            </div>
+            <p className="font-bold text-slate-800 text-[11px] truncate">{signatureLine}</p>
+            <p className="text-[10px] text-slate-500 font-mono">{contactPhone}</p>
+          </div>
+
+          {/* 7. ONE-TAP ACTION BUTTONS */}
+          <div className="space-y-2 pt-1">
+            <button 
+              type="button"
+              onClick={() => window.open(formatWhatsAppUrl(), '_blank')}
+              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"></path></svg>
+              <span>Open WhatsApp &amp; Send Broadcast</span>
+            </button>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button 
+                type="button"
+                onClick={handleCopyText}
+                className="py-2 px-3 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl flex items-center justify-center gap-1.5 shadow-2xs hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+              >
+                {copied ? <Check size={14} className="text-emerald-600" /> : <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>}
+                <span>{copied ? 'Copied!' : 'Copy Message'}</span>
+              </button>
+              
               <button 
                 type="button"
                 onClick={handleResetDefaultTemplate}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-brand-600 hover:bg-slate-100 transition-colors cursor-pointer" 
-                title="Reset to verified standard template"
+                className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                <span>Reset Template</span>
               </button>
             </div>
           </div>
 
-          {/* 3. DUAL-PANE WORKSPACE: LEFT EDITOR (7 COLS) + RIGHT LIVE WHATSAPP BUBBLE PREVIEW (5 COLS) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            
-            {/* LEFT PANE: TEMPLATE EDITOR & DYNAMIC PLACEHOLDERS (7 COLS) */}
-            <section className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
-              
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        </div>
+
+        {/* Edit Signature Modal */}
+        {showEditSignatureModal && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-xs w-full p-4 space-y-3 shadow-2xl border border-slate-200 animate-in zoom-in-95">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-xs text-slate-900 uppercase">Sender Signature</h4>
+                <button type="button" onClick={() => setShowEditSignatureModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="space-y-2 text-xs">
                 <div>
-                  <h3 className="font-display font-bold text-base text-slate-900 flex items-center gap-2">
-                    <span>Template Composer &amp; Placeholders</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${
-                      cloudSyncStatus === 'synced'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : cloudSyncStatus === 'saving'
-                        ? 'bg-indigo-50 text-brand-700 border-brand-200 animate-pulse'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
-                    }`}>
-                      {cloudSyncStatus === 'synced' ? 'Dynamic Synced' : cloudSyncStatus === 'saving' ? 'Saving...' : 'Local'}
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Signature Name:</label>
+                  <input 
+                    type="text" 
+                    value={signatureLine}
+                    onChange={(e) => handleSignatureChange(e.target.value)}
+                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-semibold text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">WhatsApp Mobile:</label>
+                  <input 
+                    type="text" 
+                    value={contactPhone}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-slate-800"
+                  />
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowEditSignatureModal(false)}
+                className="w-full py-2 bg-brand-500 text-white font-bold text-xs rounded-xl shadow-xs"
+              >
+                Save &amp; Close
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* View All Placeholders Modal */}
+        {showAllPlaceholdersModal && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-xs w-full p-4 space-y-3 shadow-2xl border border-slate-200 max-h-[80vh] flex flex-col animate-in zoom-in-95">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h4 className="font-bold text-xs text-slate-900 uppercase">All Dynamic Variables</h4>
+                <button type="button" onClick={() => setShowAllPlaceholdersModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="overflow-y-auto space-y-1.5 pr-1 text-xs flex-1">
+                {BROADCAST_VARIABLES.map((v) => {
+                  const liveVal = v.getValue(selectedMeta, signatureLine, contactPhone, language);
+                  return (
+                    <button
+                      key={v.key}
+                      type="button"
+                      onClick={() => {
+                        insertTextAtCursor(`{${v.key}}`);
+                        setShowAllPlaceholdersModal(false);
+                      }}
+                      className="w-full text-left p-2 rounded-xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/80 transition-colors flex flex-col gap-0.5"
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-mono font-bold text-brand-700 text-[11px]">{`{${v.key}}`}</span>
+                        <span className="text-[9px] uppercase font-bold text-slate-400">{v.category}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500">{v.label}</span>
+                      <span className="text-[10px] font-semibold text-emerald-700 truncate">Live: {liveVal || '—'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          DESKTOP VIEW (1440px / hidden lg:flex flex-col)
+          Full-width, Two-Pane Institutional Fintech Layout
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="hidden lg:flex flex-col flex-1 w-full">
+        {/* Top Header */}
+        <header className="h-16 bg-white border-b border-slate-200/80 px-8 flex items-center justify-between flex-shrink-0 z-20">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-bold font-display text-slate-900 tracking-tight whitespace-nowrap">
+                Communication &amp; WhatsApp Broadcast Center
+              </h1>
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 whitespace-nowrap flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                WhatsApp API Ready
+              </span>
+            </div>
+          </div>
+
+          {/* Header Right: Quick Status & Send Trigger */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200/70">
+              <svg className="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 2C6.495 2 2 6.495 2 12.031c0 1.97.57 3.81 1.558 5.372L2.5 22l4.808-1.047a9.98 9.98 0 0 0 4.723 1.18c5.536 0 10.031-4.496 10.031-10.032S17.567 2 12.031 2z"></path></svg>
+              <span>Broadcasting from: <strong className="text-slate-800">{contactPhone}</strong></span>
+            </div>
+            <button 
+              type="button"
+              onClick={() => window.open(formatWhatsAppUrl(), '_blank')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-500/25 transition-all cursor-pointer active:scale-95"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"></path></svg>
+              <span>Send via WhatsApp (1-Tap)</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Workspace Body */}
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="w-full max-w-[1550px] mx-auto space-y-5">
+
+            {/* 1. CHIT GROUP SELECTOR & STATUS STRIP */}
+            <section className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                
+                {/* Chit Group Selector Dropdown */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <label htmlFor="chit-group-select-desk" className="text-xs font-bold text-slate-500 uppercase tracking-wider flex-shrink-0">
+                    Select Group:
+                  </label>
+                  <div className="relative min-w-[340px]">
+                    <select 
+                      id="chit-group-select-desk" 
+                      value={activeGroupKey}
+                      onChange={(e) => {
+                        setActiveGroupKey(e.target.value);
+                        triggerHapticFeedback('light');
+                      }}
+                      className="w-full appearance-none bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 pr-9 text-xs font-semibold text-slate-800 shadow-xs focus:outline-none focus:ring-brand-500 focus:border-brand-500 cursor-pointer transition-all"
+                    >
+                      {Object.values(groupsMetadata).map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name} — {formatINR(group.totalValue)} ({group.memberCount} Slots • Month {group.currentMonth} of {group.durationMonths})
+                        </option>
+                      ))}
+                      {Object.keys(groupsMetadata).length === 0 && (
+                        <option value="">Sample Test Group — ₹1,00,000 (5 Slots • Month 2 of 5)</option>
+                      )}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Key Quick Details of Selected Group */}
+                <div className="flex flex-wrap items-center gap-4 text-xs">
+                  {selectedMeta && (
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <span className="font-semibold text-slate-700">Installment:</span>
+                      <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md font-mono">
+                        {formatINR(selectedMeta.fixedInstallment)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Laaba Seetu Special Badge */}
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-50 to-emerald-50 text-amber-800 rounded-xl border border-amber-200/80 font-bold shadow-2xs">
+                    <span>🎉</span>
+                    <span>Kai Iruppu: <strong>{formatINR(selectedMeta?.kaiIruppuPool || 40500)}</strong></span>
+                    <span className="text-[10px] bg-amber-200/60 text-amber-900 px-1.5 py-0.5 rounded font-semibold">
+                      {laabaSeetuPercentage.toFixed(1)}% to Laaba Seetu
                     </span>
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Click any chip to inject real-time database variables directly into your message text.</p>
+                  </div>
+                </div>
+
+              </div>
+            </section>
+
+            {/* 2. BROADCAST CATEGORIES & BILINGUAL SWITCHER TOOLBAR */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+              {/* 3 Categories */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setTemplateType('pre-auction');
+                    triggerHapticFeedback('light');
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    templateType === 'pre-auction'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>📢</span>
+                  <span>1. Pre-Auction Announcement</span>
+                </button>
+                
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setTemplateType('post-auction');
+                    triggerHapticFeedback('light');
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    templateType === 'post-auction'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>🏆</span>
+                  <span>2. Post-Auction Summary</span>
+                </button>
+                
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setTemplateType('payment-reminder');
+                    triggerHapticFeedback('light');
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    templateType === 'payment-reminder'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>⏳</span>
+                  <span>3. Payment Reminder / Dues</span>
+                  <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full font-bold">
+                    {selectedMeta?.unpaidCount ?? 4} Unpaid
+                  </span>
+                </button>
+              </div>
+
+              {/* Bilingual Toggle Switcher & Reset Button */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Template Language:</span>
+                <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/70 text-xs font-bold">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setLanguage('ta');
+                      triggerHapticFeedback('light');
+                    }}
+                    className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                      language === 'ta'
+                        ? 'bg-brand-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>🇮🇳 தமிழ் (Tamil)</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setLanguage('en');
+                      triggerHapticFeedback('light');
+                    }}
+                    className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                      language === 'en'
+                        ? 'bg-brand-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>English</span>
+                  </button>
                 </div>
                 <button 
                   type="button"
                   onClick={handleResetDefaultTemplate}
-                  className="text-xs text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-1 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-brand-600 hover:bg-slate-100 transition-colors cursor-pointer" 
+                  title="Reset to verified standard template"
                 >
-                  <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
-                  <span>Reset Default</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
                 </button>
               </div>
+            </div>
 
-              {/* Dynamic Placeholders Insertion Toolbar */}
-              <div>
-                <label className="text-[11px] uppercase font-bold text-slate-500 block mb-1.5 tracking-wider">
-                  Click to Insert Dynamic Placeholder Tags:
-                </label>
-                <div className="flex flex-wrap gap-1.5 text-xs">
-                  {[
-                    { tag: '{chit_group_name}', label: '{chit_group_name}' },
-                    { tag: '{current_month}', label: '{current_month}' },
-                    { tag: '{auction_date_time}', label: '{auction_date_time}' },
-                    { tag: '{monthly_due}', label: '{monthly_due}' },
-                    { tag: '{discount_pool_balance}', label: '{discount_pool_balance}' },
-                    { tag: '{live_bidding_link}', label: '{live_bidding_link}' },
-                    { tag: '{organizer_name}', label: '{organizer_name}' },
-                    { tag: '{organizer_phone}', label: '{organizer_phone}' },
-                    { tag: '{winner_name}', label: '{winner_name}' },
-                    { tag: '{winning_discount}', label: '{winning_discount}' },
-                    { tag: '{total_chit_value}', label: '{total_chit_value}' },
-                  ].map((chip) => (
-                    <button
-                      key={chip.tag}
-                      type="button"
-                      onClick={() => insertTextAtCursor(chip.tag)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-brand-700 border border-brand-200/70 font-semibold transition-all cursor-pointer active:scale-95"
-                    >
-                      <span>+</span> {chip.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Emoji & Text Formatting Bar */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/70 text-xs">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Chit Emojis:</span>
-                  {['📢', '💰', '🏆', '🎉', '🗓️', '⏰', '📍', '✅', '⚠️'].map((emoji) => (
-                    <button 
-                      key={emoji}
-                      type="button"
-                      onClick={() => insertTextAtCursor(emoji)}
-                      className="p-1 rounded hover:bg-white text-base transition-transform hover:scale-110 active:scale-90 cursor-pointer"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-1 text-[11px] text-slate-500 font-mono">
-                  <button 
-                    type="button"
-                    onClick={() => wrapSelectedText('*')}
-                    className="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-bold hover:bg-slate-100 cursor-pointer"
-                  >
-                    *bold*
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => wrapSelectedText('_')}
-                    className="px-1.5 py-0.5 rounded bg-white border border-slate-200 italic hover:bg-slate-100 cursor-pointer"
-                  >
-                    _italic_
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => wrapSelectedText('~')}
-                    className="px-1.5 py-0.5 rounded bg-white border border-slate-200 line-through hover:bg-slate-100 cursor-pointer"
-                  >
-                    ~strike~
-                  </button>
-                </div>
-              </div>
-
-              {/* Template Raw Text Area */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-slate-700">Message Content (Raw Markdown/WhatsApp Text):</label>
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    Characters: {activeRawTemplate.length} · WhatsApp Compliant
-                  </span>
-                </div>
-                <textarea 
-                  ref={textareaRef}
-                  rows={11} 
-                  value={activeRawTemplate}
-                  onChange={(e) => handleTemplateChange(e.target.value)}
-                  className="w-full text-xs font-mono bg-slate-50/80 border border-slate-200 rounded-xl p-3.5 text-slate-800 focus:bg-white focus:ring-brand-500 focus:border-brand-500 leading-relaxed transition-all shadow-inner resize-none"
-                  placeholder="Type or customize your broadcast template..."
-                />
-              </div>
-
-              {/* 4. ORGANIZER SIGNATURE & SENDER SETTINGS */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <svg className="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
-                    <span>Organization Signature &amp; Custom Sender Details</span>
-                  </h4>
-                  <span className="text-[10px] text-slate-400 font-medium">Auto-populates {'{organizer_name}'}</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Organizer / Firm Signature Name:</label>
-                    <input 
-                      type="text" 
-                      value={signatureLine}
-                      onChange={(e) => handleSignatureChange(e.target.value)}
-                      className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 font-medium text-slate-800 focus:ring-brand-500 focus:border-brand-500 shadow-2xs" 
-                      placeholder="Dr. Kishor Anbazhakan"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Official WhatsApp Phone Number:</label>
-                    <input 
-                      type="text" 
-                      value={contactPhone}
-                      onChange={(e) => handlePhoneChange(e.target.value)}
-                      className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 font-mono text-slate-800 focus:ring-brand-500 focus:border-brand-500 shadow-2xs"
-                      placeholder="+91 99436 09010"
-                    />
-                  </div>
-                </div>
-              </div>
-
-            </section>
-
-            {/* RIGHT PANE: REALISTIC LIVE WHATSAPP BUBBLE PREVIEW (5 COLS) */}
-            <aside className="lg:col-span-5 space-y-4">
+            {/* 3. DUAL-PANE WORKSPACE: LEFT EDITOR (7 COLS) + RIGHT LIVE WHATSAPP BUBBLE PREVIEW (5 COLS) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-                    <h3 className="font-display font-bold text-sm text-slate-900">Live WhatsApp Chat Bubble Preview</h3>
-                  </div>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full font-mono">
-                    WYSIWYG
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500">This simulates the exact visual layout your subscribers will receive inside WhatsApp on Android/iOS.</p>
-              </div>
-
-              {/* WhatsApp Mobile Mockup Container */}
-              <div className="rounded-3xl shadow-xl overflow-hidden border border-slate-300/80 bg-slate-900 flex flex-col">
+              {/* LEFT PANE: TEMPLATE EDITOR & DYNAMIC PLACEHOLDERS (7 COLS) */}
+              <section className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
                 
-                {/* WhatsApp Chat Header */}
-                <div className="bg-[#075E54] text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
-                  <div className="flex items-center gap-2.5">
-                    <svg className="w-4 h-4 text-slate-200 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path></svg>
-                    <div className="w-9 h-9 rounded-full bg-emerald-700 border border-emerald-500/50 flex items-center justify-center font-bold text-sm shadow-inner font-display">
-                      CF
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold leading-tight flex items-center gap-1.5">
-                        <span>{selectedMeta?.name || 'Sample Test Group'}</span>
-                        <svg className="w-3 h-3 text-emerald-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
-                      </h4>
-                      <p className="text-[10px] text-emerald-200">
-                        {selectedMeta?.memberCount || 20} participants · {signatureLine.split(' ')[0] || 'Dr. Kishor'}, +{(selectedMeta?.memberCount || 20) - 1}
-                      </p>
-                    </div>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-display font-bold text-base text-slate-900 flex items-center gap-2">
+                      <span>Template Composer &amp; Placeholders</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-all ${
+                        cloudSyncStatus === 'synced'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : cloudSyncStatus === 'saving'
+                          ? 'bg-indigo-50 text-brand-700 border-brand-200 animate-pulse'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        {cloudSyncStatus === 'synced' ? 'Dynamic Synced' : cloudSyncStatus === 'saving' ? 'Saving...' : 'Local'}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Click any chip to inject real-time database variables directly into your message text.</p>
                   </div>
+                  <button 
+                    type="button"
+                    onClick={handleResetDefaultTemplate}
+                    className="text-xs text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-1 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                    <span>Reset Default</span>
+                  </button>
+                </div>
 
-                  <div className="flex items-center gap-2.5 text-slate-200">
-                    <svg className="w-4 h-4 cursor-pointer" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 4V3z"></path></svg>
-                    <svg className="w-4 h-4 cursor-pointer" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>
+                {/* Dynamic Placeholders Insertion Toolbar */}
+                <div>
+                  <label className="text-[11px] uppercase font-bold text-slate-500 block mb-1.5 tracking-wider">
+                    Click to Insert Dynamic Placeholder Tags:
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 text-xs">
+                    {[
+                      { tag: '{chit_group_name}', label: '{chit_group_name}' },
+                      { tag: '{current_month}', label: '{current_month}' },
+                      { tag: '{auction_date_time}', label: '{auction_date_time}' },
+                      { tag: '{monthly_due}', label: '{monthly_due}' },
+                      { tag: '{discount_pool_balance}', label: '{discount_pool_balance}' },
+                      { tag: '{live_bidding_link}', label: '{live_bidding_link}' },
+                      { tag: '{organizer_name}', label: '{organizer_name}' },
+                      { tag: '{organizer_phone}', label: '{organizer_phone}' },
+                      { tag: '{winner_name}', label: '{winner_name}' },
+                      { tag: '{winning_discount}', label: '{winning_discount}' },
+                      { tag: '{total_chit_value}', label: '{total_chit_value}' },
+                    ].map((chip) => (
+                      <button
+                        key={chip.tag}
+                        type="button"
+                        onClick={() => insertTextAtCursor(chip.tag)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-brand-700 border border-brand-200/70 font-semibold transition-all cursor-pointer active:scale-95"
+                      >
+                        <span>+</span> {chip.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* WhatsApp Chat Surface (Doodle Pattern) */}
-                <div 
-                  style={{
-                    backgroundColor: '#ECE5DD',
-                    backgroundImage: 'radial-gradient(#d3c6b6 1px, transparent 1px)',
-                    backgroundSize: '16px 16px',
-                  }}
-                  className="p-4 flex-1 flex flex-col justify-end space-y-3 min-h-[390px]"
-                >
-                  
-                  {/* Date Pill */}
-                  <div className="flex justify-center">
-                    <span className="bg-white/80 backdrop-blur-sm text-[10px] font-bold text-slate-600 px-3 py-0.5 rounded-full shadow-2xs">
-                      {language === 'ta' ? 'இன்று (Today)' : 'Today'}
+                {/* Emoji & Text Formatting Bar */}
+                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/70 text-xs">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Chit Emojis:</span>
+                    {['📢', '💰', '🏆', '🎉', '🗓️', '⏰', '📍', '✅', '⚠️'].map((emoji) => (
+                      <button 
+                        key={emoji}
+                        type="button"
+                        onClick={() => insertTextAtCursor(emoji)}
+                        className="p-1 rounded hover:bg-white text-base transition-transform hover:scale-110 active:scale-90 cursor-pointer"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] text-slate-500 font-mono">
+                    <button 
+                      type="button"
+                      onClick={() => wrapSelectedText('*')}
+                      className="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-bold hover:bg-slate-100 cursor-pointer"
+                    >
+                      *bold*
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => wrapSelectedText('_')}
+                      className="px-1.5 py-0.5 rounded bg-white border border-slate-200 italic hover:bg-slate-100 cursor-pointer"
+                    >
+                      _italic_
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => wrapSelectedText('~')}
+                      className="px-1.5 py-0.5 rounded bg-white border border-slate-200 line-through hover:bg-slate-100 cursor-pointer"
+                    >
+                      ~strike~
+                    </button>
+                  </div>
+                </div>
+
+                {/* Template Raw Text Area */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700">Message Content (Raw Markdown/WhatsApp Text):</label>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Characters: {activeRawTemplate.length} · WhatsApp Compliant
                     </span>
                   </div>
+                  <textarea 
+                    ref={textareaRef}
+                    rows={11} 
+                    value={activeRawTemplate}
+                    onChange={(e) => handleTemplateChange(e.target.value)}
+                    className="w-full text-xs font-mono bg-slate-50/80 border border-slate-200 rounded-xl p-3.5 text-slate-800 focus:bg-white focus:ring-brand-500 focus:border-brand-500 leading-relaxed transition-all shadow-inner resize-none"
+                    placeholder="Type or customize your broadcast template..."
+                  />
+                </div>
 
-                  {/* Live Chat Bubble (Rendered WhatsApp Style) */}
-                  <div className="self-end max-w-[95%] bg-[#DCF8C6] rounded-2xl rounded-tr-xs p-3.5 shadow-sm text-slate-900 border border-emerald-200/60 relative">
+                {/* 4. ORGANIZER SIGNATURE & SENDER SETTINGS */}
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <svg className="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                      <span>Organization Signature &amp; Custom Sender Details</span>
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-medium">Auto-populates {'{organizer_name}'}</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Organizer / Firm Signature Name:</label>
+                      <input 
+                        type="text" 
+                        value={signatureLine}
+                        onChange={(e) => handleSignatureChange(e.target.value)}
+                        className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 font-medium text-slate-800 focus:ring-brand-500 focus:border-brand-500 shadow-2xs" 
+                        placeholder="Dr. Kishor Anbazhakan"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Official WhatsApp Phone Number:</label>
+                      <input 
+                        type="text" 
+                        value={contactPhone}
+                        onChange={(e) => handlePhoneChange(e.target.value)}
+                        className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 font-mono text-slate-800 focus:ring-brand-500 focus:border-brand-500 shadow-2xs"
+                        placeholder="+91 99436 09010"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </section>
+
+              {/* RIGHT PANE: REALISTIC LIVE WHATSAPP BUBBLE PREVIEW (5 COLS) */}
+              <aside className="lg:col-span-5 space-y-4">
+                
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                      <h3 className="font-display font-bold text-sm text-slate-900">Live WhatsApp Chat Bubble Preview</h3>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full font-mono">
+                      WYSIWYG
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">This simulates the exact visual layout your subscribers will receive inside WhatsApp on Android/iOS.</p>
+                </div>
+
+                {/* WhatsApp Mobile Mockup Container */}
+                <div className="rounded-3xl shadow-xl overflow-hidden border border-slate-300/80 bg-slate-900 flex flex-col">
+                  
+                  {/* WhatsApp Chat Header */}
+                  <div className="bg-[#075E54] text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
+                    <div className="flex items-center gap-2.5">
+                      <svg className="w-4 h-4 text-slate-200 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path></svg>
+                      <div className="w-9 h-9 rounded-full bg-emerald-700 border border-emerald-500/50 flex items-center justify-center font-bold text-sm shadow-inner font-display">
+                        CF
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold leading-tight flex items-center gap-1.5">
+                          <span>{selectedMeta?.name || 'Sample Test Group'}</span>
+                          <svg className="w-3 h-3 text-emerald-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
+                        </h4>
+                        <p className="text-[10px] text-emerald-200">
+                          {selectedMeta?.memberCount || 20} participants · {signatureLine.split(' ')[0] || 'Dr. Kishor'}, +{(selectedMeta?.memberCount || 20) - 1}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 text-slate-200">
+                      <svg className="w-4 h-4 cursor-pointer" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 4V3z"></path></svg>
+                      <svg className="w-4 h-4 cursor-pointer" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>
+                    </div>
+                  </div>
+
+                  {/* WhatsApp Chat Surface (Doodle Pattern) */}
+                  <div 
+                    style={{
+                      backgroundColor: '#ECE5DD',
+                      backgroundImage: 'radial-gradient(#d3c6b6 1px, transparent 1px)',
+                      backgroundSize: '16px 16px',
+                    }}
+                    className="p-4 flex-1 flex flex-col justify-end space-y-3 min-h-[390px]"
+                  >
                     
-                    {/* Message Body with Simulated WhatsApp Styling */}
-                    <div className="text-xs leading-relaxed space-y-2 text-slate-800">
-                      {renderWhatsAppFormatted(compiledBroadcastText)}
+                    {/* Date Pill */}
+                    <div className="flex justify-center">
+                      <span className="bg-white/80 backdrop-blur-sm text-[10px] font-bold text-slate-600 px-3 py-0.5 rounded-full shadow-2xs">
+                        {language === 'ta' ? 'இன்று (Today)' : 'Today'}
+                      </span>
                     </div>
 
-                    {/* Bubble Timestamp & WhatsApp Double Checkmarks */}
-                    <div className="flex items-center justify-end gap-1 mt-1.5 text-[10px] text-slate-500 font-mono">
-                      <span>{new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
-                      <svg className="w-3.5 h-3.5 text-blue-500 inline" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M12.354 4.354a.5.5 0 0 0-.708-.708L5 10.293 1.854 7.146a.5.5 0 1 0-.708.708l3.5 3.5a.5.5 0 0 0 .708 0l7-7zm-4.5 4.5a.5.5 0 0 0-.708-.708L5 10.293 3.854 9.146a.5.5 0 0 0-.708.708l1.5 1.5a.5.5 0 0 0 .708 0l2.5-2.5z"></path>
-                      </svg>
+                    {/* Live Chat Bubble (Rendered WhatsApp Style) */}
+                    <div className="self-end max-w-[95%] bg-[#DCF8C6] rounded-2xl rounded-tr-xs p-3.5 shadow-sm text-slate-900 border border-emerald-200/60 relative">
+                      
+                      {/* Message Body with Simulated WhatsApp Styling */}
+                      <div className="text-xs leading-relaxed space-y-2 text-slate-800">
+                        {renderWhatsAppFormatted(compiledBroadcastText)}
+                      </div>
+
+                      {/* Bubble Timestamp & WhatsApp Double Checkmarks */}
+                      <div className="flex items-center justify-end gap-1 mt-1.5 text-[10px] text-slate-500 font-mono">
+                        <span>{new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <svg className="w-3.5 h-3.5 text-blue-500 inline" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M12.354 4.354a.5.5 0 0 0-.708-.708L5 10.293 1.854 7.146a.5.5 0 1 0-.708.708l3.5 3.5a.5.5 0 0 0 .708 0l7-7zm-4.5 4.5a.5.5 0 0 0-.708-.708L5 10.293 3.854 9.146a.5.5 0 0 0-.708.708l1.5 1.5a.5.5 0 0 0 .708 0l2.5-2.5z"></path>
+                        </svg>
+                      </div>
                     </div>
+
+                  </div>
+
+                  {/* Fake Input Bar */}
+                  <div className="bg-[#F0F2F5] px-3 py-2 flex items-center gap-2 border-t border-slate-200">
+                    <div className="w-7 h-7 rounded-full bg-slate-300 text-slate-600 flex items-center justify-center text-xs">😊</div>
+                    <div className="flex-1 bg-white rounded-full py-1.5 px-3 text-xs text-slate-400">Message ready for transmission...</div>
+                    <button 
+                      type="button"
+                      onClick={() => window.open(formatWhatsAppUrl(), '_blank')}
+                      className="w-8 h-8 rounded-full bg-[#128C7E] hover:bg-emerald-700 active:scale-95 text-white flex items-center justify-center text-xs shadow transition-all cursor-pointer"
+                      title="Send via WhatsApp"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
+                    </button>
                   </div>
 
                 </div>
 
-                {/* Fake Input Bar */}
-                <div className="bg-[#F0F2F5] px-3 py-2 flex items-center gap-2 border-t border-slate-200">
-                  <div className="w-7 h-7 rounded-full bg-slate-300 text-slate-600 flex items-center justify-center text-xs">😊</div>
-                  <div className="flex-1 bg-white rounded-full py-1.5 px-3 text-xs text-slate-400">Message ready for transmission...</div>
+                {/* 5. ONE-CLICK DISPATCH ACTIONS & STATUS BAR */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs space-y-2.5">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">One-Click Dispatch Actions:</h4>
+                  
                   <button 
                     type="button"
                     onClick={() => window.open(formatWhatsAppUrl(), '_blank')}
-                    className="w-8 h-8 rounded-full bg-[#128C7E] hover:bg-emerald-700 active:scale-95 text-white flex items-center justify-center text-xs shadow transition-all cursor-pointer"
-                    title="Send via WhatsApp"
+                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
                   >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"></path></svg>
+                    <span>Launch WhatsApp &amp; Send Pre-filled Message</span>
                   </button>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <button 
+                      type="button"
+                      onClick={handleCopyText}
+                      className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-98"
+                    >
+                      {copied ? (
+                        <Check size={14} className="text-emerald-600" />
+                      ) : (
+                        <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                      )}
+                      <span>{copied ? 'Copied!' : 'Copy Formatted Text'}</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => window.open(formatSmsUrl(), '_blank')}
+                      className="py-2 px-3 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-brand-200/60 cursor-pointer active:scale-98"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                      <span>Send SMS Broadcast</span>
+                    </button>
+                  </div>
+
+                  <div className="pt-2 text-[11px] text-slate-400 text-center truncate">
+                    <span>Direct deep-link integration: <code className="font-mono text-slate-600 bg-slate-100 px-1 py-0.5 rounded text-[10px]">https://api.whatsapp.com/send?text=...</code></span>
+                  </div>
                 </div>
 
-              </div>
+              </aside>
 
-              {/* 5. ONE-CLICK DISPATCH ACTIONS & STATUS BAR */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs space-y-2.5">
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">One-Click Dispatch Actions:</h4>
-                
-                <button 
-                  type="button"
-                  onClick={() => window.open(formatWhatsAppUrl(), '_blank')}
-                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"></path></svg>
-                  <span>Launch WhatsApp &amp; Send Pre-filled Message</span>
-                </button>
-
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <button 
-                    type="button"
-                    onClick={handleCopyText}
-                    className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-98"
-                  >
-                    {copied ? (
-                      <Check size={14} className="text-emerald-600" />
-                    ) : (
-                      <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
-                    )}
-                    <span>{copied ? 'Copied!' : 'Copy Formatted Text'}</span>
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => window.open(formatSmsUrl(), '_blank')}
-                    className="py-2 px-3 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-brand-200/60 cursor-pointer active:scale-98"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
-                    <span>Send SMS Broadcast</span>
-                  </button>
-                </div>
-
-                <div className="pt-2 text-[11px] text-slate-400 text-center truncate">
-                  <span>Direct deep-link integration: <code className="font-mono text-slate-600 bg-slate-100 px-1 py-0.5 rounded text-[10px]">https://api.whatsapp.com/send?text=...</code></span>
-                </div>
-              </div>
-
-            </aside>
+            </div>
 
           </div>
+        </main>
+      </div>
 
-        </div>
-      </main>
     </div>
   );
 }
