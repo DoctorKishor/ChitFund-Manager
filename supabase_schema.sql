@@ -50,7 +50,7 @@ create table public.chit_groups (
   current_month integer not null default 0 check (current_month >= 0),
   kai_iruppu_pool numeric not null default 0 check (kai_iruppu_pool >= 0),
   laaba_seetu_rules jsonb not null default '{}'::jsonb,
-  status text not null default 'active' check (status in ('draft', 'active', 'completed')),
+  status text not null default 'active' check (status in ('draft', 'active', 'completed', 'deleted', 'archived')),
   start_date date default current_date,
   auction_day_of_month integer default 10,
   auction_time text default '19:00',
@@ -62,6 +62,8 @@ create table public.chit_groups (
   live_auction_started_at timestamp with time zone default null,
   live_bid_stream jsonb default '[]'::jsonb,
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
+  updated_at timestamp with time zone default timezone('utc'::text, now()),
+  deleted_at timestamp with time zone default null,
   constraint check_member_count_eq_duration check (member_count = duration_months)
 );
 
@@ -120,9 +122,10 @@ create table public.auction_logs (
   group_id uuid not null references public.chit_groups(id) on delete cascade,
   month integer not null check (month >= 0),
   bid_stream jsonb not null default '[]'::jsonb,
-  winning_bidder_id uuid not null references public.profiles(id) on delete restrict,
+  winning_bidder_id uuid references public.profiles(id) on delete set null,
+  winning_member_id uuid references public.group_members(id) on delete set null,
   winning_discount numeric not null check (winning_discount >= 0),
-  runner_up_bidder_id uuid references public.profiles(id) on delete restrict,
+  runner_up_bidder_id uuid references public.profiles(id) on delete set null,
   is_laaba_seetu boolean not null default false,
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   constraint unique_auction_group_month unique (group_id, month)
@@ -131,12 +134,11 @@ create table public.auction_logs (
 -- login_attempts: MPIN rate limiting
 create table if not exists public.login_attempts (
   id uuid primary key default gen_random_uuid(),
-  phone_number text not null,
+  phone_digits text not null,
   attempted_at timestamp with time zone not null default timezone('utc'::text, now()),
-  success boolean not null default false,
-  ip_address text default null
+  was_successful boolean not null default false
 );
-create index if not exists idx_login_attempts_phone_time on public.login_attempts (phone_number, attempted_at);
+create index if not exists idx_login_attempts_phone_time on public.login_attempts (phone_digits, attempted_at);
 
 -- security_audit_logs: Logs of administrative database actions
 create table public.security_audit_logs (
@@ -647,6 +649,7 @@ begin
   -- 2. Fetch Enrolled Chit Groups
   select coalesce(jsonb_agg(jsonb_build_object(
     'groupId', cg.id,
+    'groupMemberId', gm.id,
     'groupName', cg.name,
     'totalValue', cg.total_value,
     'memberCount', cg.member_count,
@@ -699,6 +702,7 @@ begin
   select coalesce(jsonb_agg(jsonb_build_object(
     'id', t.id,
     'groupId', t.group_id,
+    'groupMemberId', t.group_member_id,
     'groupName', coalesce(cg.name, 'Direct'),
     'type', t.type,
     'amount', t.amount,
@@ -806,6 +810,17 @@ create table if not exists public.system_settings (
 insert into public.system_settings (key, value)
 values ('maintenance_mode', '{"enabled": false, "message": "Scheduled upgrades in progress."}'::jsonb)
 on conflict (key) do nothing;
+
+alter table public.system_settings enable row level security;
+
+create policy "Allow public read system_settings" on public.system_settings
+  for select
+  using (true);
+
+create policy "Allow admin manage system_settings" on public.system_settings
+  for all
+  using (public.is_admin_or_manager())
+  with check (public.is_admin_or_manager());
 
 -- ==========================================
 -- 9. Secure Test Database Reset / Purge RPC
@@ -1278,15 +1293,22 @@ declare
   v_winner_name text;
 begin
   select name into v_group_name from public.chit_groups where id = p_group_id;
-  select full_name into v_winner_name from public.profiles where id = p_winner_profile_id;
+  
+  if p_winner_profile_id is not null then
+    select full_name into v_winner_name from public.profiles where id = p_winner_profile_id;
+  elsif p_winner_member_id is not null then
+    select coalesce(alias_name, 'Ticket #' || ticket_number) into v_winner_name 
+    from public.group_members where id = p_winner_member_id;
+  end if;
 
   update public.chit_groups
   set current_month = p_next_month,
-      kai_iruppu_pool = p_next_pool,
+      kai_iruppu_pool = round(p_next_pool, 2),
       status = case when p_is_completing then 'completed' else 'active' end,
       is_live_auction_active = false,
       live_auction_started_at = null,
-      live_bid_stream = '[]'::jsonb
+      live_bid_stream = '[]'::jsonb,
+      updated_at = timezone('utc'::text, now())
   where id = p_group_id;
 
   if p_winner_member_id is not null then
@@ -1295,25 +1317,27 @@ begin
     where id = p_winner_member_id;
   end if;
 
-  if p_winner_profile_id is not null then
-    insert into public.auction_logs (
-      group_id,
-      month,
-      bid_stream,
-      winning_bidder_id,
-      winning_discount,
-      is_laaba_seetu,
-      created_at
-    ) values (
-      p_group_id,
-      p_month,
-      p_bid_stream,
-      p_winner_profile_id,
-      p_winning_discount,
-      p_is_laaba_seetu,
-      now()
-    );
-  end if;
+  -- Always insert into auction_logs, even if winner is an offline subscriber without profile_id
+  insert into public.auction_logs (
+    group_id,
+    month,
+    bid_stream,
+    winning_bidder_id,
+    winning_member_id,
+    winning_discount,
+    is_laaba_seetu,
+    created_at
+  ) values (
+    p_group_id,
+    p_month,
+    p_bid_stream,
+    p_winner_profile_id,
+    p_winner_member_id,
+    p_winning_discount,
+    p_is_laaba_seetu,
+    now()
+  )
+  on conflict (group_id, month) do nothing;
 
   insert into public.security_audit_logs (
     admin_id,
@@ -1328,6 +1352,104 @@ begin
   );
 
   return jsonb_build_object('success', true);
+end;
+$$;
+
+-- Atomic Month 0 Launch Confirmation & Organizer Profit Allocation
+create or replace function public.confirm_month0_launch(
+  p_group_id uuid,
+  p_wallet text,
+  p_admin_id uuid default auth.uid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_group record;
+  v_current_bal numeric;
+  v_new_bal numeric;
+  v_payout_note text;
+begin
+  select id, name, total_value, current_month
+  into v_group
+  from public.chit_groups
+  where id = p_group_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Chit group not found.');
+  end if;
+
+  if v_group.current_month <> 0 then
+    return jsonb_build_object('success', false, 'error', 'Group is already advanced past Month 0.');
+  end if;
+
+  insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
+  values (p_wallet, 0, 0, p_admin_id)
+  on conflict (wallet_type) do nothing;
+
+  select current_balance into v_current_bal
+  from public.global_treasury
+  where wallet_type = p_wallet
+  for update;
+
+  if v_current_bal < v_group.total_value then
+    return jsonb_build_object(
+      'success', false,
+      'error', 'Insufficient balance in ' || p_wallet || '. Available: ₹' || v_current_bal || ', Required: ₹' || v_group.total_value
+    );
+  end if;
+
+  v_new_bal := v_current_bal - v_group.total_value;
+  update public.global_treasury
+  set current_balance = v_new_bal,
+      last_updated_by = p_admin_id
+  where wallet_type = p_wallet;
+
+  update public.chit_groups
+  set current_month = 1,
+      updated_at = timezone('utc'::text, now())
+  where id = p_group_id;
+
+  v_payout_note := '[Organizer Profit] Month 0 Launch — Full chit value ₹' || v_group.total_value || ' collected and allocated as Organizer Profit for "' || v_group.name || '".';
+  insert into public.transactions (
+    group_id,
+    wallet_type,
+    from_wallet,
+    type,
+    status,
+    amount,
+    notes,
+    cycle_month,
+    created_by
+  ) values (
+    p_group_id,
+    p_wallet,
+    p_wallet,
+    'organizer_profit',
+    'completed',
+    v_group.total_value,
+    v_payout_note,
+    0,
+    p_admin_id
+  );
+
+  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
+  values (
+    p_admin_id,
+    'LAUNCH CONFIRMED: "' || v_group.name || '" — ₹' || v_group.total_value || ' Organizer Profit recorded from ' || p_wallet || '. Group advanced to Month 1.',
+    'chit_groups',
+    now()
+  );
+
+  return jsonb_build_object(
+    'success', true,
+    'new_month', 1,
+    'wallet', p_wallet,
+    'new_balance', v_new_bal
+  );
 end;
 $$;
 

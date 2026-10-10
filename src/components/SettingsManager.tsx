@@ -313,23 +313,29 @@ export default function SettingsManager() {
       setResetErrorMsg(null);
       setResetSuccessMsg(null);
 
-      const { error } = await supabase.rpc('reset_test_database', {
-        caller_id: profile?.id || user?.id,
+      const { data: rpcRes, error } = await supabase.rpc('reset_test_database', {
+        p_confirm_phrase: 'WIPE_ALL_DATA',
       });
 
-      if (error) {
-        console.warn('RPC reset_test_database failed, performing direct cascade reset:', error);
+      if (error || (rpcRes && !rpcRes.success)) {
+        const errorDetail = rpcRes?.error || error?.message;
+        console.warn('RPC reset_test_database returned error, attempting direct cascade reset:', errorDetail);
 
-        await supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('auction_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('group_members').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('chit_groups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('profiles').delete().eq('role', 'subscriber');
-        await supabase.from('global_treasury').update({
-          current_balance: 0,
-          pending_verification_balance: 0,
-          last_updated_by: profile?.id || null
-        }).neq('wallet_type', '');
+        try {
+          await supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('auction_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('group_members').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('chit_groups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('passbook_inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          await supabase.from('profiles').delete().eq('role', 'subscriber');
+          await supabase.from('global_treasury').update({
+            current_balance: 0,
+            pending_verification_balance: 0,
+            last_updated_by: profile?.id || null
+          }).neq('wallet_type', '');
+        } catch (directErr: any) {
+          throw new Error(errorDetail || directErr.message || 'Database reset failed.');
+        }
       }
 
       triggerHapticFeedback('success');

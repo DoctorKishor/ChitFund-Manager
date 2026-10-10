@@ -8,7 +8,6 @@ import CashVaultLedger from './CashVaultLedger';
 import MemberMatrix from './MemberMatrix';
 import CommunicationBroadcastCenter from './CommunicationBroadcastCenter';
 import ReportsCenter from './ReportsCenter';
-import UserAccessManager from './UserAccessManager';
 import SettingsManager from './SettingsManager';
 import AuctionCountdownBanner from './AuctionCountdownBanner';
 import AuctionScheduleModal from './AuctionScheduleModal';
@@ -17,7 +16,6 @@ import QuickPersonalDrawModal from './QuickPersonalDrawModal';
 import QuickAtmWithdrawalModal from './QuickAtmWithdrawalModal';
 import PaymentChecklistPrintModal from './PaymentChecklistPrintModal';
 import { PaymentReceiptModal } from './PaymentReceiptModal';
-import TopStatusRibbon from './TopStatusRibbon';
 import SlideToConfirm from './SlideToConfirm';
 import { HelpTooltip } from './HelpTooltip';
 import { triggerHapticFeedback } from '../utils/haptics';
@@ -1650,6 +1648,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         .select(`
           id,
           ticket_number,
+          alias_name,
           has_won_regular,
           profile_id,
           custom_installment,
@@ -1673,8 +1672,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
               ticket: m.ticket_number,
               hasWon: m.has_won_regular,
               profileId: m.profile_id,
+              aliasName: m.alias_name || null,
               customInstallment: m.custom_installment ? Number(m.custom_installment) : null,
-              name: prof?.full_name || `Subscriber #${m.ticket_number}`,
+              name: m.alias_name || prof?.full_name || `Subscriber #${m.ticket_number}`,
               phone: prof?.phone_number || '',
             };
           })
@@ -1745,17 +1745,27 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     }
   }, [activeDashboardGroupId]);
 
-  // Helper: compute total collections paid by member for a specific month
-  const getMemberPaidAmountForMonth = (profileIdOrMemberId: string, month: number) => {
+  // Helper: compute total collections paid by member for a specific month (with multi-ticket separation)
+  const getMemberPaidAmountForMonth = (ticketMemberId: string, month: number, fallbackProfileId?: string) => {
     const monthPattern = new RegExp(`\\bMonth\\s+${month}\\b|\\bM${month}\\b`, 'i');
     return dashboardTransactions
-      .filter(t => 
-        t.type === 'collection' && 
-        (t.profile_id === profileIdOrMemberId || t.group_member_id === profileIdOrMemberId) &&
-        (t.cycle_month !== null && t.cycle_month !== undefined
+      .filter(t => {
+        if (t.type !== 'collection') return false;
+        
+        const isMonthMatch = t.cycle_month !== null && t.cycle_month !== undefined
           ? Number(t.cycle_month) === Number(month)
-          : (t.notes ? monthPattern.test(t.notes) : false))
-      )
+          : (t.notes ? monthPattern.test(t.notes) : false);
+        if (!isMonthMatch) return false;
+
+        // 1. If transaction was tagged with a specific ticket group_member_id, strictly match that ticket
+        if (t.group_member_id) {
+          return t.group_member_id === ticketMemberId;
+        }
+
+        // 2. Fallback for legacy untagged transactions: match by profile_id
+        const targetProfileId = fallbackProfileId || ticketMemberId;
+        return t.profile_id === targetProfileId;
+      })
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   };
 
@@ -1815,7 +1825,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     }[] = [];
 
     for (let m = 0; m <= duration; m++) {
-      const alreadyPaid = getMemberPaidAmountForMonth(member.profileId || member.id, m);
+      const alreadyPaid = getMemberPaidAmountForMonth(member.id || member.profileId, m, member.profileId);
       const isArrear = m < activeCurrentCycleMonth;
       const isCurrent = m === activeCurrentCycleMonth;
       const isFuture = m > activeCurrentCycleMonth;
@@ -2344,12 +2354,27 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       if (disburseReceiptFileToUpload) {
         try {
           const compressedBlob = await compressImage(disburseReceiptFileToUpload);
-          const reader = new FileReader();
-          const base64Data = await new Promise<string>((resolve) => {
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(compressedBlob);
-          });
-          finalReceiptUrl = base64Data;
+          const fileName = `payout_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;
+          const filePath = `${activeDashboardGroupId}/${fileName}`;
+
+          const { error: storageErr } = await supabase.storage
+            .from('receipts')
+            .upload(filePath, compressedBlob, {
+              contentType: 'image/jpeg',
+              upsert: true,
+            });
+
+          if (!storageErr) {
+            const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(filePath);
+            finalReceiptUrl = publicUrl;
+          } else {
+            console.warn('Disbursal receipt storage upload error, falling back to data URL:', storageErr.message);
+            const reader = new FileReader();
+            finalReceiptUrl = await new Promise<string>((resolve) => {
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(compressedBlob);
+            });
+          }
         } catch (compErr) {
           console.warn('Disbursal receipt compression warning:', compErr);
         }
@@ -2360,35 +2385,37 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         : '';
       const noteText = `Month ${selectedDashboardMonth} Winner Prize Payout - ${winnerName} (Discount: ${formatCurrency(winningBid)})${deductionSummaryStr}${disbursePayoutNote.trim() ? ` — Note: ${disbursePayoutNote.trim()}` : ''}`;
 
-      // 1. If net cash handed over > 0, insert 'payout' transaction and debit wallet
+      const netPayoutAmount = netPrizePot || (netCashAmount + totalDeductions);
+
+      // 1. Always record 'payout' transaction for the net prize won by subscriber
+      const { error: txError } = await supabase
+        .from('transactions')
+        .insert({
+          group_id: activeGroup.id,
+          group_member_id: memberMatch?.id || null,
+          profile_id: memberMatch?.profileId || (winnerProfileId || null),
+          type: 'payout',
+          status: 'completed',
+          amount: netPayoutAmount,
+          cycle_month: selectedDashboardMonth,
+          wallet_type: disbursePayoutWallet,
+          notes: noteText,
+          verification_proof_url: finalReceiptUrl,
+          created_at: effectiveDate,
+          created_by: profile?.id || null,
+        });
+
+      if (txError) {
+        alert(`Failed to save prize payout: ${txError.message}`);
+        return;
+      }
+
+      // 2. Debit treasury wallet by actual physical/bank net cash handed over
       if (netCashAmount > 0) {
-        const { error: txError } = await supabase
-          .from('transactions')
-          .insert({
-            group_id: activeGroup.id,
-            group_member_id: memberMatch?.id || null,
-            profile_id: memberMatch?.profileId || (winnerProfileId || null),
-            type: 'payout',
-            status: 'completed',
-            amount: netCashAmount,
-            cycle_month: selectedDashboardMonth,
-            wallet_type: disbursePayoutWallet,
-            notes: noteText,
-            verification_proof_url: finalReceiptUrl,
-            created_at: effectiveDate,
-            created_by: profile?.id || null,
-          });
-
-        if (txError) {
-          alert(`Failed to save prize payout: ${txError.message}`);
-          return;
-        }
-
-        // Debit treasury wallet by net cash amount
         await updateBalance(disbursePayoutWallet as any, -netCashAmount);
       }
 
-      // 2. For each deducted month, insert 'collection' transaction automatically
+      // 3. For each deducted month, insert 'collection' transaction automatically
       if (deductionsList.length > 0) {
         const collectionRows = deductionsList.map(d => ({
           group_id: activeGroup.id,
@@ -2499,7 +2526,7 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
     const pendingMembers: { member: any; unpaidAmount: number }[] = [];
     dashboardGroupMembers.forEach(m => {
       const memDue = m.customInstallment !== null ? m.customInstallment : monthDue;
-      const paid = getMemberPaidAmountForMonth(m.profileId || m.id, selectedDashboardMonth);
+      const paid = getMemberPaidAmountForMonth(m.id || m.profileId, selectedDashboardMonth, m.profileId);
       const remaining = Math.max(0, memDue - paid);
       if (remaining > 0) {
         pendingMembers.push({ member: m, unpaidAmount: remaining });
@@ -3256,7 +3283,7 @@ Thank you for your prompt payment! 🙏`;
         // Compute dues, paid, status for each member
         const memberStats = dashboardGroupMembers.map(member => {
           const effectiveDue = isLaaba ? 0 : (member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : defaultDue);
-          const paid = getMemberPaidAmountForMonth(member.profileId || member.id, selectedDashboardMonth);
+          const paid = getMemberPaidAmountForMonth(member.id || member.profileId, selectedDashboardMonth, member.profileId);
           const remaining = Math.max(0, effectiveDue - paid);
           const status = remaining === 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid';
 
@@ -3266,7 +3293,7 @@ Thank you for your prompt payment! 🙏`;
           for (let m = 0; m <= activeCycle; m++) {
             const mDue = isLaaba ? 0 : (member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : defaultDue);
             totalDueUpToActiveCycle += mDue;
-            totalPaidUpToActiveCycle += getMemberPaidAmountForMonth(member.profileId || member.id, m);
+            totalPaidUpToActiveCycle += getMemberPaidAmountForMonth(member.id || member.profileId, m, member.profileId);
           }
           const totalPendingToday = Math.max(0, totalDueUpToActiveCycle - totalPaidUpToActiveCycle);
 
@@ -3298,7 +3325,11 @@ Thank you for your prompt payment! 🙏`;
 
         // Recent transactions for this group / month
         const currentMonthTransactions = dashboardTransactions.filter(t => 
-          t.type === 'collection' && (t.notes?.includes(`Month ${selectedDashboardMonth}`) || !t.notes)
+          t.type === 'collection' && (
+            t.cycle_month !== null && t.cycle_month !== undefined
+              ? Number(t.cycle_month) === Number(selectedDashboardMonth)
+              : (t.notes ? new RegExp(`\\bMonth\\s+${selectedDashboardMonth}\\b|\\bM${selectedDashboardMonth}\\b`, 'i').test(t.notes) : true)
+          )
         );
 
         // Kai Iruppu (கை இருப்பு) Accumulated Pool & Laaba Seetu Metrics
@@ -9510,7 +9541,7 @@ Thank you for your prompt payment! 🙏`;
         const pendingMembersList = dashboardGroupMembers
           .map(member => {
             const effectiveDue = isLaaba ? 0 : (member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : defaultDue);
-            const paid = getMemberPaidAmountForMonth(member.profileId || member.id, selectedDashboardMonth);
+            const paid = getMemberPaidAmountForMonth(member.id || member.profileId, selectedDashboardMonth, member.profileId);
             const remaining = Math.max(0, effectiveDue - paid);
             return {
               ...member,
@@ -9898,7 +9929,8 @@ Thank you for your prompt payment! 🙏`;
         const activeNonDraftGroups = localGroups.filter(g => g.status !== 'draft' && g.status !== 'deleted');
         const receiptGroup = localGroups.find(g => g.id === (viewingReceiptTx?.tx?.group_id || activeDashboardGroupId)) || activeNonDraftGroups[0];
         if (!receiptGroup) return null;
-        const memberId = viewingReceiptTx.member?.profileId || viewingReceiptTx.member?.id || viewingReceiptTx.tx?.profile_id;
+        const ticketMemberId = viewingReceiptTx.member?.id || viewingReceiptTx.tx?.group_member_id;
+        const profileId = viewingReceiptTx.member?.profileId || viewingReceiptTx.tx?.profile_id;
         const isReceiptLaaba = (receiptGroup?.kaiIruppuPool || 0) >= (receiptGroup?.totalValue || 200000);
         const receiptTotalVal = receiptGroup?.totalValue || 200000;
         const receiptDuration = receiptGroup?.duration || receiptGroup?.memberCount || 20;
@@ -9908,7 +9940,7 @@ Thank you for your prompt payment! 🙏`;
 
         for (let m = 0; m < selectedDashboardMonth; m++) {
           const mDue = isReceiptLaaba ? 0 : (viewingReceiptTx.member?.customInstallment || receiptBaseInstallment);
-          const mPaid = getMemberPaidAmountForMonth(memberId, m);
+          const mPaid = getMemberPaidAmountForMonth(ticketMemberId || profileId, m, profileId);
           const mRemaining = Math.max(0, mDue - mPaid);
           if (mRemaining > 0) {
             pastPendingDues += mRemaining;

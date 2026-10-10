@@ -32,6 +32,8 @@ export interface PaymentChecklistGroup {
   startDate?: string;
   auctionDayOfMonth?: number;
   auctionTime?: string;
+  kaiIruppuPool?: number;
+  kai_iruppu_pool?: number;
 }
 
 interface PaymentChecklistPrintModalProps {
@@ -75,6 +77,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
   // Raw fetched database records
   const [members, setMembers] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [auctions, setAuctions] = useState<any[]>([]);
 
   // Active selected months list
   const activeMonthsList = useMemo(() => {
@@ -151,31 +154,37 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
       try {
         setLoadingData(true);
 
-        const { data: memData } = await supabase
-          .from('group_members')
-          .select(`
-            id,
-            ticket_number,
-            profile_id,
-            alias_name,
-            custom_installment,
-            profiles:profile_id (
+        const [{ data: memData }, { data: txData }, { data: auctionData }] = await Promise.all([
+          supabase
+            .from('group_members')
+            .select(`
               id,
-              full_name,
-              phone_number
-            )
-          `)
-          .eq('group_id', group.id)
-          .order('ticket_number', { ascending: true });
-
-        const { data: txData } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('group_id', group.id)
-          .eq('type', 'collection');
+              ticket_number,
+              profile_id,
+              alias_name,
+              custom_installment,
+              profiles:profile_id (
+                id,
+                full_name,
+                phone_number
+              )
+            `)
+            .eq('group_id', group.id)
+            .order('ticket_number', { ascending: true }),
+          supabase
+            .from('transactions')
+            .select('*')
+            .eq('group_id', group.id)
+            .eq('type', 'collection'),
+          supabase
+            .from('auction_logs')
+            .select('month, is_laaba_seetu')
+            .eq('group_id', group.id),
+        ]);
 
         setMembers(memData || []);
         setTransactions(txData || []);
+        setAuctions(auctionData || []);
       } catch (err) {
         console.error('Error fetching checklist data:', err);
       } finally {
@@ -189,7 +198,6 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
   // Build rows for all tickets 1..totalMembers
   const checklistRows: MemberRow[] = useMemo(() => {
     const rows: MemberRow[] = [];
-    const monthCount = activeMonthsList.length;
 
     for (let t = 1; t <= totalMembers; t++) {
       const memRow = members.find(m => m.ticket_number === t);
@@ -197,8 +205,19 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
       const rawName = memRow?.alias_name || prof?.full_name || (memRow?.profile_id ? `MEMBER #${t}` : `TICKET #${t}`);
       const upperName = rawName.toUpperCase();
       
-      const singleDue = memRow?.custom_installment ? Number(memRow.custom_installment) : baseMonthlyInstallment;
-      const totalDue = singleDue * monthCount;
+      const memberBaseDue = memRow?.custom_installment ? Number(memRow.custom_installment) : baseMonthlyInstallment;
+
+      // Sum expected due across all selected months (accounting for Laaba Seetu = ₹0)
+      let totalDue = 0;
+      activeMonthsList.forEach(mNum => {
+        const monthAuction = (auctions || []).find((a: any) => Number(a.month) === mNum);
+        const poolVal = Number(group.kaiIruppuPool || group.kai_iruppu_pool || 0);
+        const isLaaba = !!monthAuction?.is_laaba_seetu || (mNum === currentGroupMonth && mNum > 0 && poolVal >= Number(group.totalValue || 200000));
+        if (!isLaaba) {
+          totalDue += memberBaseDue;
+        }
+      });
+      const singleDue = activeMonthsList.length > 0 ? Math.round(totalDue / activeMonthsList.length) : memberBaseDue;
 
       let paidDate = '';
       let paidAmount: number | undefined = undefined;

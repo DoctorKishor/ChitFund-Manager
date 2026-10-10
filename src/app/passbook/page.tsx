@@ -8,7 +8,7 @@ import { QrCode, CheckCircle2, AlertCircle, ArrowRight, RefreshCw } from 'lucide
 function PassbookResolverContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { loginWithPassbookToken } = useAuth();
+  const { profile, loginWithPassbookToken } = useAuth();
   const [status, setStatus] = useState<'resolving' | 'success' | 'error'>('resolving');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -22,6 +22,29 @@ function PassbookResolverContent() {
         setStatus('error');
         setErrorMessage('No passbook key found in this QR code URL.');
         return;
+      }
+
+      // If user is currently signed in as an admin or manager, don't kick them out!
+      // Instead, find the subscriber and route them to Member Details cleanly
+      if (profile?.role === 'admin' || profile?.role === 'manager') {
+        try {
+          const { supabase } = await import('@/utils/supabase/client');
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .eq('passbook_token', token)
+            .maybeSingle();
+
+          if (prof && isMounted) {
+            setStatus('success');
+            setTimeout(() => {
+              router.replace(`/?tab=members&memberId=${prof.id}`);
+            }, 800);
+            return;
+          }
+        } catch (e) {
+          console.warn('Admin passbook resolve note:', e);
+        }
       }
 
       setStatus('resolving');
@@ -45,7 +68,7 @@ function PassbookResolverContent() {
     return () => {
       isMounted = false;
     };
-  }, [token, loginWithPassbookToken, router]);
+  }, [token, loginWithPassbookToken, profile?.role, router]);
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden">

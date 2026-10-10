@@ -55,6 +55,7 @@ export interface EnrolledGroupInfo {
     isArrear: boolean;
     isCurrent: boolean;
     isAdvance: boolean;
+    isLaaba?: boolean;
   }[];
   totalArrearsDue: number;
   currentMonthDue: number;
@@ -347,7 +348,7 @@ export default function UniversalRecordPaymentModal({
         return cg && cg.status !== 'draft';
       });
 
-      // 2. Fetch past collection transactions for this member
+      // 2. Fetch past collection transactions & auction logs for member's groups
       const groupIds = activeMemberships.map((m: any) => m.group_id).filter(Boolean);
       const memberIds = activeMemberships.map((m: any) => m.id).filter(Boolean);
 
@@ -363,7 +364,14 @@ export default function UniversalRecordPaymentModal({
       } else {
         txQuery = txQuery.eq('profile_id', profileId);
       }
-      const { data: txs } = await txQuery;
+
+      const [{ data: txs }, { data: auctionData }] = await Promise.all([
+        txQuery,
+        supabase
+          .from('auction_logs')
+          .select('group_id, month, is_laaba_seetu')
+          .in('group_id', groupIds.length > 0 ? groupIds : ['00000000-0000-0000-0000-000000000000']),
+      ]);
 
       // 3. Build group info and dues breakdown
       const initialEnabled: Record<string, boolean> = {};
@@ -414,7 +422,11 @@ export default function UniversalRecordPaymentModal({
             .filter((t: any) => Number(t.cycle_month) === cycle)
             .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
 
-          const expectedDue = effectiveInst;
+          // Check if this cycle is a Laaba Seetu month (free installment = ₹0)
+          const monthAuction = (auctionData || []).find((a: any) => a.group_id === cg.id && Number(a.month) === cycle);
+          const isLaaba = !!monthAuction?.is_laaba_seetu || (cycle === currMonth && cycle > 0 && Number(cg.kai_iruppu_pool || 0) >= totalVal);
+
+          const expectedDue = isLaaba ? 0 : effectiveInst;
           const remainingDue = Math.max(0, expectedDue - alreadyPaid);
           const isArrear = cycle < currMonth && remainingDue > 0;
           const isCurrent = cycle === currMonth;
@@ -435,6 +447,7 @@ export default function UniversalRecordPaymentModal({
             isArrear,
             isCurrent,
             isAdvance,
+            isLaaba,
           });
         }
 
@@ -706,7 +719,14 @@ export default function UniversalRecordPaymentModal({
       }
 
       // 5. Update Treasury Wallet Balance
-      await updateBalance(effectiveWallet, totalCollectionAmount);
+      const balRes = await updateBalance(effectiveWallet, totalCollectionAmount);
+      if (balRes && !balRes.success) {
+        console.warn('Treasury balance sync note:', balRes.error);
+        await supabase.from('security_audit_logs').insert({
+          action_description: `TREASURY UPDATE NOTE: Collection ₹${totalCollectionAmount.toLocaleString('en-IN')} recorded in batch [${batchId}], but automated treasury wallet credit had a note: ${balRes.error}`,
+          target_table: 'global_treasury',
+        });
+      }
 
       // 6. Security Audit Log
       await supabase.from('security_audit_logs').insert({
@@ -1127,7 +1147,8 @@ export default function UniversalRecordPaymentModal({
                                     {(() => {
                                       const currentMb = grp.monthsBreakdown.find(mb => mb.isCurrent);
                                       const isSelected = selectedMonths.includes(grp.currentMonth);
-                                      const remaining = currentMb?.remainingDue ?? grp.effectiveInstallment;
+                                      const isLaaba = !!currentMb?.isLaaba;
+                                      const remaining = currentMb?.remainingDue ?? (isLaaba ? 0 : grp.effectiveInstallment);
 
                                       return (
                                         <button
@@ -1135,13 +1156,13 @@ export default function UniversalRecordPaymentModal({
                                           onClick={() => handleToggleMonth(grp.groupMemberId, grp.currentMonth)}
                                           className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
                                             isSelected
-                                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-500/20'
-                                              : 'bg-white text-slate-800 border-slate-300 hover:border-emerald-500'
+                                              ? (isLaaba ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-500/20' : 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-500/20')
+                                              : (isLaaba ? 'bg-purple-50 text-purple-700 border-purple-300 hover:border-purple-500' : 'bg-white text-slate-800 border-slate-300 hover:border-emerald-500')
                                           }`}
                                         >
-                                          <span>M{grp.currentMonth} Current</span>
+                                          <span>M{grp.currentMonth} {isLaaba ? '🎉 Laaba Seetu' : 'Current'}</span>
                                           <span className="font-mono text-[10px] opacity-90">
-                                            (₹{remaining.toLocaleString('en-IN')})
+                                            ({isLaaba ? 'Free ₹0' : `₹${remaining.toLocaleString('en-IN')}`})
                                           </span>
                                         </button>
                                       );

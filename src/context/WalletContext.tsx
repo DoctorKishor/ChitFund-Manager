@@ -150,10 +150,10 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error || !data?.success) {
-        // Revert optimistic update on failure (MED-12)
+        // Revert optimistic update by subtracting delta (MED-12)
         setBalances((prev) => ({
           ...prev,
-          [wallet]: previousBal,
+          [wallet]: (prev[wallet] || 0) - amount,
         }));
         const errMsg = data?.error || error?.message || 'Transaction rejected by treasury.';
         console.warn('mutate_wallet_balance failed, reverted optimistic balance:', errMsg);
@@ -173,7 +173,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       // Revert optimistic update on error
       setBalances((prev) => ({
         ...prev,
-        [wallet]: previousBal,
+        [wallet]: (prev[wallet] || 0) - amount,
       }));
       console.error('Error updating treasury balance in Supabase:', err);
       return { success: false, error: err.message || 'Unknown error' };

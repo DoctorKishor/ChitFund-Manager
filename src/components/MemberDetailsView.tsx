@@ -354,10 +354,36 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         maxAuctionMonth
       );
 
-      // Group collections
-      const groupTransactions = memberTransactions.filter(
-        (t: any) => (t.group_id === g.id || t.group_member_id === enroll.id) && t.type === 'collection'
+      // Group collections specifically attributed to this ticket
+      const memberTicketsInThisGroup = memberEnrollments.filter(
+        (x: any) => ((x.chit_groups?.id || x.group_id) === g.id)
       );
+
+      const groupTransactions = memberTransactions.filter((t: any) => {
+        if (t.group_id !== g.id) return false;
+        if (t.type !== 'collection') return false;
+
+        // If transaction has explicit group_member_id, match it directly
+        if (t.group_member_id) {
+          return t.group_member_id === enroll.id;
+        }
+
+        // If transaction notes mention ticket number explicitly
+        if (t.notes && (t.notes.includes(`Ticket #${enroll.ticket_number}`) || t.notes.includes(`Ticket #${enroll.ticket_number} `))) {
+          return true;
+        }
+
+        // If member only has 1 ticket in this group and notes don't specify a different ticket
+        if (memberTicketsInThisGroup.length === 1) {
+          const ticketMatch = t.notes && t.notes.match(/Ticket\s*#(\d+)/i);
+          if (ticketMatch && Number(ticketMatch[1]) !== enroll.ticket_number) {
+            return false;
+          }
+          return true;
+        }
+
+        return false;
+      });
       const totalPaidForGroup = groupTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
       const monthDues: {
@@ -729,7 +755,11 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       }
 
       await supabase.from('transactions').delete().eq('id', tx.id);
-      await updateBalance(tx.wallet_type as any, -amt);
+      
+      // Determine if transaction was an outflow (payout / draw) or inflow (collection / transfer_in)
+      const isOutflow = tx.type === 'payout' || tx.type === 'personal_draw';
+      const balanceDelta = isOutflow ? amt : -amt;
+      await updateBalance(tx.wallet_type as any, balanceDelta);
 
       if (editingTransaction?.id === tx.id) {
         setIsPaymentModalOpen(false);

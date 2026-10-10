@@ -323,10 +323,10 @@ export default function CashVaultLedger() {
     }
 
     if (type === 'atm_withdrawal') {
-      if (targetWallet === 'cash_in_hand') {
+      if (targetWallet === 'cash_in_hand' || perspectiveWallet === 'cash_in_hand') {
         return { isCredit: true, badgeLabel: '🏧 ATM Relocation (+)', badgeColor: 'bg-amber-100 text-amber-800 border-amber-200' };
       }
-      return { isCredit: false, badgeLabel: '🏧 ATM Relocation', badgeColor: 'bg-amber-100 text-amber-800 border-amber-200' };
+      return { isCredit: false, badgeLabel: '🏧 ATM Relocation (-)', badgeColor: 'bg-amber-100 text-amber-800 border-amber-200' };
     }
 
     if (type === 'transfer_in') {
@@ -334,7 +334,12 @@ export default function CashVaultLedger() {
     }
 
     if (type === 'transfer') {
-      return { isCredit: true, badgeLabel: '🔄 Vault Transfer', badgeColor: 'bg-indigo-50 text-brand-700 border-brand-200/60' };
+      // If notes indicate a deposit/float/repayment inflow
+      if (notes.includes('floating deposit') || notes.includes('repayment') || notes.includes('deposit')) {
+        return { isCredit: true, badgeLabel: '🔄 Vault Deposit (+)', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200/60' };
+      }
+      // Outgoing inter-vault transfer debit
+      return { isCredit: false, badgeLabel: '🔄 Vault Transfer (-)', badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200/60' };
     }
 
     return { isCredit: false, badgeLabel: '💸 Outflow (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200/60' };
@@ -492,15 +497,16 @@ export default function CashVaultLedger() {
       if (selectedWalletFilter !== 'all') {
         matchesWallet = tx.wallet_type === selectedWalletFilter ||
           (tx.type === 'atm_withdrawal' && (
-            (selectedWalletFilter === 'kishor_bank' && (notes.includes('kishor') || (!notes.includes('dad') && !notes.includes('mom')))) ||
-            (selectedWalletFilter === 'dad_bank' && notes.includes('dad')) ||
-            (selectedWalletFilter === 'mom_bank' && notes.includes('mom'))
+            (selectedWalletFilter === 'cash_in_hand' && (tx.to_wallet === 'cash_in_hand' || notes.includes('cash box') || notes.includes('cash in hand'))) ||
+            (selectedWalletFilter === 'kishor_bank' && (tx.from_wallet === 'kishor_bank' || notes.includes('kishor') || (!notes.includes('dad') && !notes.includes('mom')))) ||
+            (selectedWalletFilter === 'dad_bank' && (tx.from_wallet === 'dad_bank' || notes.includes('dad'))) ||
+            (selectedWalletFilter === 'mom_bank' && (tx.from_wallet === 'mom_bank' || notes.includes('mom')))
           )) ||
-          (tx.type === 'transfer' && (
-            (selectedWalletFilter === 'kishor_bank' && (notes.includes('kishor') || tx.wallet_type === 'kishor_bank')) ||
-            (selectedWalletFilter === 'dad_bank' && (notes.includes('dad') || notes.includes('anbazhakan') || tx.wallet_type === 'dad_bank')) ||
-            (selectedWalletFilter === 'mom_bank' && (notes.includes('mom') || notes.includes('parimalam') || tx.wallet_type === 'mom_bank')) ||
-            (selectedWalletFilter === 'cash_in_hand' && (notes.includes('cash') || tx.wallet_type === 'cash_in_hand'))
+          ((tx.type === 'transfer' || tx.type === 'transfer_in') && (
+            (selectedWalletFilter === 'kishor_bank' && (tx.from_wallet === 'kishor_bank' || tx.to_wallet === 'kishor_bank' || notes.includes('kishor') || tx.wallet_type === 'kishor_bank')) ||
+            (selectedWalletFilter === 'dad_bank' && (tx.from_wallet === 'dad_bank' || tx.to_wallet === 'dad_bank' || notes.includes('dad') || notes.includes('anbazhakan') || tx.wallet_type === 'dad_bank')) ||
+            (selectedWalletFilter === 'mom_bank' && (tx.from_wallet === 'mom_bank' || tx.to_wallet === 'mom_bank' || notes.includes('mom') || notes.includes('parimalam') || tx.wallet_type === 'mom_bank')) ||
+            (selectedWalletFilter === 'cash_in_hand' && (tx.from_wallet === 'cash_in_hand' || tx.to_wallet === 'cash_in_hand' || notes.includes('cash') || tx.wallet_type === 'cash_in_hand'))
           ));
       }
 

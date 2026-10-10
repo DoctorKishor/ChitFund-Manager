@@ -34,6 +34,33 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const PASSBOOK_SESSION_KEY = 'cf_passbook_token_session';
 const PHONE_SESSION_KEY = 'cf_phone_subscriber_session';
 
+const encodePhoneSession = (data: { phone: string; mpin: string }) => {
+  try {
+    return btoa(encodeURIComponent(JSON.stringify({ p: data.phone, m: data.mpin, t: Date.now() })));
+  } catch {
+    return JSON.stringify(data);
+  }
+};
+
+const decodePhoneSession = (raw: string): { phone: string; mpin: string } | null => {
+  try {
+    const decoded = decodeURIComponent(atob(raw));
+    const parsed = JSON.parse(decoded);
+    if (parsed.p && parsed.m) {
+      return { phone: parsed.p, mpin: parsed.m };
+    }
+    if (parsed.phone && parsed.mpin) {
+      return { phone: parsed.phone, mpin: parsed.mpin };
+    }
+  } catch {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.phone && parsed.mpin) return parsed;
+    } catch {}
+  }
+  return null;
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -238,8 +265,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.setItem(PASSBOOK_SESSION_KEY, userData.passbookToken);
           localStorage.removeItem(PHONE_SESSION_KEY);
         } else {
-          // Persist phone session for refresh persistence (MED-06)
-          localStorage.setItem(PHONE_SESSION_KEY, JSON.stringify({ phone: cleanPhone, mpin: cleanMpin }));
+          // Persist phone session with encoding (MED-06)
+          localStorage.setItem(PHONE_SESSION_KEY, encodePhoneSession({ phone: cleanPhone, mpin: cleanMpin }));
           localStorage.removeItem(PASSBOOK_SESSION_KEY);
         }
       }
@@ -340,9 +367,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const savedPhoneSession = localStorage.getItem(PHONE_SESSION_KEY);
           if (savedPhoneSession) {
             try {
-              const { phone, mpin } = JSON.parse(savedPhoneSession);
-              if (phone && mpin) {
-                const res = await loginWithPhoneAndMpin(phone, mpin);
+              const decoded = decodePhoneSession(savedPhoneSession);
+              if (decoded?.phone && decoded?.mpin) {
+                const res = await loginWithPhoneAndMpin(decoded.phone, decoded.mpin);
                 if (res.success && isMounted) {
                   initialAuthDone = true;
                   setLoading(false);
@@ -350,6 +377,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 } else if (typeof window !== 'undefined') {
                   localStorage.removeItem(PHONE_SESSION_KEY);
                 }
+              } else if (typeof window !== 'undefined') {
+                localStorage.removeItem(PHONE_SESSION_KEY);
               }
             } catch {
               localStorage.removeItem(PHONE_SESSION_KEY);
@@ -390,7 +419,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await fetchProfile(session.user.id, session.user.email);
         setLoading(false);
       } else if (event === 'SIGNED_OUT') {
-        if (typeof window !== 'undefined' && !localStorage.getItem(PASSBOOK_SESSION_KEY)) {
+        if (
+          typeof window !== 'undefined' &&
+          !localStorage.getItem(PASSBOOK_SESSION_KEY) &&
+          !localStorage.getItem(PHONE_SESSION_KEY)
+        ) {
           setUser(null);
           setProfile(null);
           setLoading(false);

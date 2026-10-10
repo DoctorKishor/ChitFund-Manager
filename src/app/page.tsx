@@ -19,6 +19,16 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab) {
+        setActiveTab(tab);
+      }
+    }
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F4F6FB] flex items-center justify-center text-[#151B26] px-4 selection:bg-[#2A1DB8] selection:text-white">

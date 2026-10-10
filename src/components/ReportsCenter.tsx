@@ -284,11 +284,26 @@ export default function ReportsCenter() {
     const totalVal = Number(selectedGroup.total_value) || 200000;
     const duration = Number(selectedGroup.duration_months) || 20;
     const baseInst = Math.round(totalVal / duration);
-    const isLaaba = selectedMonth > 0 && (selectedGroup.kai_iruppu_pool || 0) >= totalVal;
+    const selectedMonthAuction = auctionLogs.find(
+      a => a.group_id === selectedGroup.id && Number(a.month) === Number(selectedMonth)
+    );
+    const isLaaba = selectedMonthAuction 
+      ? Boolean(selectedMonthAuction.is_laaba_seetu)
+      : (selectedMonth > 0 && Number(selectedMonth) === Number(selectedGroup.current_month) && (selectedGroup.kai_iruppu_pool || 0) >= totalVal);
     const groupEnrollments = groupMembers.filter(m => m.group_id === selectedGroup.id);
 
     // Group transactions for this specific group
     const groupTxs = transactions.filter(t => t.group_id === selectedGroup.id && t.type === 'collection');
+
+    const getMonthDueForMember = (m: number, customInst: number | null) => {
+      const inst = customInst !== null && customInst !== undefined ? Number(customInst) : baseInst;
+      if (m === 0) return inst;
+      const log = auctionLogs.find(a => a.group_id === selectedGroup.id && Number(a.month) === m);
+      const isCycleLaaba = log 
+        ? Boolean(log.is_laaba_seetu) 
+        : (m === Number(selectedGroup.current_month) && (selectedGroup.kai_iruppu_pool || 0) >= totalVal);
+      return isCycleLaaba ? 0 : inst;
+    };
 
     let totalExpected = 0;
     let totalCollected = 0;
@@ -299,15 +314,19 @@ export default function ReportsCenter() {
       const prof = Array.isArray(gm.profiles) ? gm.profiles[0] : gm.profiles;
       const memberName = gm.alias_name || prof?.full_name || `Member #${gm.ticket_number}`;
       const memberPhone = prof?.phone_number || '';
-      const dueAmount = isLaaba ? 0 : (gm.custom_installment !== null ? Number(gm.custom_installment) : baseInst);
+      const dueAmount = getMonthDueForMember(selectedMonth, gm.custom_installment);
 
-      // Total payments logged for this member across this group
+      // Total payments logged for this member across this group (with multi-ticket separation)
       const memberPaid = groupTxs
-        .filter(t => t.profile_id === gm.profile_id || t.group_member_id === gm.id)
+        .filter(t => t.group_member_id ? t.group_member_id === gm.id : (t.profile_id && t.profile_id === gm.profile_id))
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-      // Expected dues up to selectedMonth (Month 0 has 1 cycle, Month 1 has 2 cycles, etc.)
-      const expectedUpToMonth = dueAmount * (selectedMonth + 1);
+      // Expected dues cycle-by-cycle up to selectedMonth (accounting for ₹0 Laaba Seetu months)
+      let expectedUpToMonth = 0;
+      for (let m = 0; m <= selectedMonth; m++) {
+        expectedUpToMonth += getMonthDueForMember(m, gm.custom_installment);
+      }
+
       const isPaid = memberPaid >= expectedUpToMonth;
       const pendingDue = Math.max(0, expectedUpToMonth - memberPaid);
 
@@ -328,6 +347,7 @@ export default function ReportsCenter() {
         name: memberName,
         phone: memberPhone,
         dueAmount: dueAmount,
+        standardInstallment: gm.custom_installment !== null ? Number(gm.custom_installment) : baseInst,
         paidTotal: memberPaid,
         pendingDue: pendingDue,
         expectedUpToMonth: expectedUpToMonth,
@@ -354,8 +374,8 @@ export default function ReportsCenter() {
     if (selectedMonth === 0) {
       const isMonth0Disbursed = transactions.some(
         t => t.group_id === selectedGroup.id && 
-        (t.type === 'payout' || t.type === 'personal_draw') && 
-        (t.notes?.toLowerCase().includes('month 0') || t.notes?.toLowerCase().includes('launch') || t.notes?.toLowerCase().includes('organizer'))
+        (t.type === 'payout' || t.type === 'personal_draw' || t.type === 'organizer_profit') && 
+        (t.notes?.toLowerCase().includes('month 0') || t.notes?.toLowerCase().includes('launch') || t.notes?.toLowerCase().includes('organizer') || t.cycle_month === 0)
       );
 
       winnerRecord = {
@@ -376,7 +396,12 @@ export default function ReportsCenter() {
         const payoutTx = transactions.find(
           t => t.group_id === selectedGroup.id && 
           t.type === 'payout' && 
-          (t.profile_id === auction.winning_bidder_id || (t.notes && t.notes.includes(`Month ${selectedMonth}`)))
+          (
+            (auction.winning_member_id && t.group_member_id === auction.winning_member_id) ||
+            (auction.winning_bidder_id && t.profile_id === auction.winning_bidder_id) || 
+            (t.notes && t.notes.includes(`Month ${selectedMonth}`)) ||
+            t.cycle_month === selectedMonth
+          )
         );
 
         winnerRecord = {
@@ -417,7 +442,8 @@ export default function ReportsCenter() {
     const rows = [...monthlyStats.outstandingRows]
       .sort((a, b) => b.totalOwed - a.totalOwed)
       .map((m, idx) => {
-        const monthsOverdue = Math.max(1, Math.ceil(m.totalOwed / (m.dueAmount || 1)));
+        const standardInst = m.standardInstallment || m.dueAmount || 1;
+        const monthsOverdue = Math.max(1, Math.ceil(m.totalOwed / standardInst));
         
         // Compute overdue starting month
         let sinceDateLabel = activeMonthInfo.dateLabel;
@@ -494,14 +520,26 @@ export default function ReportsCenter() {
       let groupCollected = 0;
 
       members.forEach((m) => {
-        const dueAmount = isLaaba ? 0 : (m.custom_installment !== null ? Number(m.custom_installment) : baseInst);
+        const memberStandardInst = m.custom_installment !== null ? Number(m.custom_installment) : baseInst;
+        const getGroupMonthDue = (monthNum: number) => {
+          if (monthNum === 0) return memberStandardInst;
+          const log = groupAuctions.find(a => Number(a.month) === monthNum);
+          const isCycleLaaba = log ? Boolean(log.is_laaba_seetu) : (monthNum === currentM && (g.kai_iruppu_pool || 0) >= totalVal);
+          return isCycleLaaba ? 0 : memberStandardInst;
+        };
+
+        const dueAmount = getGroupMonthDue(currentM);
         groupExpected += dueAmount;
 
         const memberPaid = groupTxs
-          .filter(t => (t.profile_id === m.profile_id || t.group_member_id === m.id) && t.type === 'collection')
+          .filter(t => t.type === 'collection' && (t.group_member_id ? t.group_member_id === m.id : (t.profile_id && t.profile_id === m.profile_id)))
           .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        const expectedUpToMonth = dueAmount * (currentM + 1);
+        let expectedUpToMonth = 0;
+        for (let cycle = 0; cycle <= currentM; cycle++) {
+          expectedUpToMonth += getGroupMonthDue(cycle);
+        }
+
         const isPaid = memberPaid >= expectedUpToMonth;
         if (isPaid) {
           groupCollected += dueAmount;
@@ -895,20 +933,23 @@ export default function ReportsCenter() {
       if (isLaunched) {
         // Calculate collections received for Month 0
         const m0Collections = gTxs
-          .filter(t => t.type === 'collection' && (t.notes?.toLowerCase().includes('month 0') || t.notes?.toLowerCase().includes('launch') || !t.notes))
+          .filter(t => t.type === 'collection' && (t.cycle_month === 0 || t.notes?.toLowerCase().includes('month 0') || t.notes?.toLowerCase().includes('launch')))
           .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        // If group is active or past launch, Organizer Profit is realized
-        groupOrganizerProfit = m0Collections > 0 ? m0Collections : totalVal;
-      }
+        // Check for explicit organizer profit transactions
+        const explicitProfitTxs = gTxs
+          .filter(t => t.type === 'organizer_profit' || t.type === 'commission' || t.notes?.toLowerCase().includes('organizer profit'))
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-      // Check for explicit organizer profit transactions
-      const explicitProfitTxs = gTxs
-        .filter(t => t.type === 'commission' || t.notes?.toLowerCase().includes('organizer profit'))
-        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-      if (explicitProfitTxs > 0) {
-        groupOrganizerProfit = explicitProfitTxs;
+        if (explicitProfitTxs > 0) {
+          groupOrganizerProfit = explicitProfitTxs;
+        } else if (currentM > 0) {
+          // If group has advanced past launch, Organizer Profit is realized (up to collections or total value)
+          groupOrganizerProfit = m0Collections > 0 ? m0Collections : totalVal;
+        } else {
+          // If group is still in Month 0, ONLY actual collections count as realized profit (never assume totalVal upfront)
+          groupOrganizerProfit = m0Collections;
+        }
       }
 
       // 2. Accumulated Discount Pool (kai_iruppu_pool) towards Laaba Seetu
@@ -984,9 +1025,12 @@ export default function ReportsCenter() {
       const winnerPayoutTxs = groupTxs.filter(t => 
         t.type === 'payout' && 
         (
+          (t.cycle_month !== null && t.cycle_month !== undefined && Number(t.cycle_month) === Number(a.month)) ||
           (t.notes && monthPattern.test(t.notes)) ||
-          t.profile_id === a.winning_bidder_id ||
-          (member && (t.group_member_id === member.id || t.profile_id === member.profile_id))
+          (t.cycle_month === null && !t.notes?.match(/Month\s*\d+/i) && (
+            t.profile_id === a.winning_bidder_id ||
+            (member && (t.group_member_id === member.id || t.profile_id === member.profile_id))
+          ))
         )
       );
 
@@ -1035,10 +1079,10 @@ export default function ReportsCenter() {
       wonMembers.forEach((wm, idx) => {
         const mPayoutTxs = groupTxs.filter(t => 
           t.type === 'payout' && 
-          (t.profile_id === wm.profile_id || t.group_member_id === wm.id)
+          (t.group_member_id ? t.group_member_id === wm.id : (t.profile_id && t.profile_id === wm.profile_id))
         );
         const mDisbursed = mPayoutTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-        const mNetPayout = totalVal - 5000;
+        const mNetPayout = totalVal;
         const mOutstanding = Math.max(0, mNetPayout - mDisbursed);
         const mStatus: 'Complete' | 'Partial' | 'Pending' = mDisbursed >= mNetPayout ? 'Complete' : mDisbursed > 0 ? 'Partial' : 'Pending';
 
@@ -1222,7 +1266,7 @@ export default function ReportsCenter() {
     const memberTxs = transactions.filter(t => 
       t.group_id === selectedGroup.id && 
       t.type === 'collection' && 
-      (t.group_member_id === selectedMember.id || t.profile_id === selectedMember.profile_id)
+      (t.group_member_id ? t.group_member_id === selectedMember.id : (t.profile_id && t.profile_id === selectedMember.profile_id))
     );
 
     // Build monthly breakdown rows for elapsed months (Month 1..currentM)
@@ -1338,7 +1382,7 @@ export default function ReportsCenter() {
       const memberTxs = transactions.filter(t => 
         t.group_id === selectedGroup.id && 
         t.type === 'collection' && 
-        (t.group_member_id === member.id || t.profile_id === member.profile_id)
+        (t.group_member_id ? t.group_member_id === member.id : (t.profile_id && t.profile_id === member.profile_id))
       );
 
       let onTimeCount = 0;

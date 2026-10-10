@@ -1234,16 +1234,15 @@ export default function LiveAuctionEngine() {
             }).eq('id', winnerId);
           }
 
-          if (winningMember?.profileId) {
-            await supabase.from('auction_logs').insert({
-              group_id: group.id,
-              month: group.currentMonth,
-              bid_stream: bids,
-              winning_bidder_id: winningMember.profileId,
-              winning_discount: highestBid,
-              is_laaba_seetu: isLaabaSeetuActive,
-            });
-          }
+          await supabase.from('auction_logs').insert({
+            group_id: group.id,
+            month: group.currentMonth,
+            bid_stream: bids,
+            winning_bidder_id: winningMember?.profileId || null,
+            winning_member_id: (winnerId && !winnerId.startsWith('slot-')) ? winnerId : null,
+            winning_discount: highestBid,
+            is_laaba_seetu: isLaabaSeetuActive,
+          });
 
           await supabase.from('security_audit_logs').insert({
             action_description: `AUCTION CLOSED: Group "${group.name}" Month ${group.currentMonth} won by ${winningMember?.fullName || 'Member'} with discount ${formatCurrency(highestBid)}. Net Payout: ${formatCurrency(netPayout)}. Session Duration: ${finalSessionDuration}. Group advanced to Month ${nextMonth}.`,
@@ -5894,7 +5893,20 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
             </div>
 
             {/* Scrollable Report Body */}
-            <div className="p-2 sm:p-6 overflow-y-auto bg-slate-950 flex-1">
+            <div className="p-2 sm:p-6 overflow-y-auto bg-slate-950 flex-1 space-y-4">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-300">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">⚠️</span>
+                  <div>
+                    <strong className="text-amber-200">Pending Treasury Disbursal:</strong>
+                    <span> Net take-home payout of {formatCurrency(concludedReportData.netPayout)} to {concludedReportData.winnerName} must be debited from the Treasury (Cash Box or Bank).</span>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold text-amber-400 bg-amber-500/20 px-2.5 py-1 rounded-md shrink-0 w-fit">
+                  Disburse on Overview Dashboard
+                </span>
+              </div>
+
               <div ref={printableReportRef} className="bg-slate-50 rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <AuctionReportDocument 
                   data={concludedReportData} 

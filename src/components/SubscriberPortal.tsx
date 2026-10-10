@@ -53,7 +53,6 @@ import {
   Flag
 } from 'lucide-react';
 import AuctionCountdownBanner from '@/components/AuctionCountdownBanner';
-import AuctionCountdownStack from '@/components/AuctionCountdownStack';
 import AuctionRescheduleAlertModal, { RescheduledGroupNotice } from '@/components/AuctionRescheduleAlertModal';
 import LiveAuctionStartedModal, { LiveGroupDetails } from '@/components/LiveAuctionStartedModal';
 import SubscriberLiveAuctionArena, { LiveBidItem, GroupMemberItem } from '@/components/SubscriberLiveAuctionArena';
@@ -61,6 +60,7 @@ import { computeNextAuctionDateTime, formatTime12h } from '@/utils/auctionSchedu
 
 interface EnrolledGroup {
   groupId: string;
+  groupMemberId?: string;
   groupName: string;
   totalValue: number;
   memberCount: number;
@@ -89,6 +89,7 @@ interface EnrolledGroup {
 interface SubscriberTransaction {
   id: string;
   groupId: string;
+  groupMemberId?: string | null;
   groupName: string;
   type: string;
   amount: number;
@@ -158,12 +159,28 @@ function getGroupPaymentStatus(
     maxAuctionMonth
   );
 
-  const groupTransactions = transactions.filter(
-    (t) =>
-      (t.groupId === grp.groupId || t.groupName === grp.groupName) &&
-      t.type === 'collection' &&
-      t.status === 'completed'
-  );
+  const groupTransactions = transactions.filter((t) => {
+    if (t.groupId !== grp.groupId && t.groupName !== grp.groupName) return false;
+    if (t.type !== 'collection' || t.status !== 'completed') return false;
+
+    // If transaction has explicit groupMemberId, match it directly
+    if (t.groupMemberId && grp.groupMemberId) {
+      return t.groupMemberId === grp.groupMemberId;
+    }
+
+    // If transaction notes mention ticket number explicitly
+    if (t.notes) {
+      if (t.notes.includes(`Ticket #${grp.ticketNumber}`) || t.notes.includes(`Ticket #${grp.ticketNumber} `)) {
+        return true;
+      }
+      const ticketMatch = t.notes.match(/Ticket\s*#(\d+)/i);
+      if (ticketMatch && Number(ticketMatch[1]) !== grp.ticketNumber) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   const totalPaidForGroup = groupTransactions.reduce(
     (sum, t) => sum + Number(t.amount || 0),
@@ -174,7 +191,7 @@ function getGroupPaymentStatus(
 
   for (let m = 0; m <= effectiveCurrentMonth; m++) {
     const monthAuction = groupAuctions.find((a) => a.month === m);
-    const isLaaba = !!monthAuction?.isLaabaSeetu;
+    const isLaaba = !!monthAuction?.isLaabaSeetu || (m === effectiveCurrentMonth && m > 0 && Number(grp.kaiIruppuPool || 0) >= Number(grp.totalValue || 200000));
     const expectedDue = isLaaba ? 0 : (grp.customInstallment || grp.monthlyInstallment);
 
     // Check transactions tagged with "Month <m>" or structured cycleMonth

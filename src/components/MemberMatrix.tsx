@@ -231,13 +231,13 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
         setAllChitGroups(groupsData);
       }
 
-      // 4. Fetch completed collections only (MED-03 optimization)
+      // 4. Fetch completed collections only
       const { data: txsData } = await supabase
         .from('transactions')
         .select('id, profile_id, group_id, group_member_id, amount, type, status, cycle_month, notes')
         .eq('type', 'collection')
         .eq('status', 'completed')
-        .limit(2000);
+        .order('created_at', { ascending: false });
       if (txsData) {
         setAllTransactions(txsData);
       }
@@ -246,7 +246,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       const { data: logsData } = await supabase
         .from('auction_logs')
         .select('id, group_id, month, winning_bidder_id, winning_discount, is_laaba_seetu')
-        .limit(1000);
+        .order('month', { ascending: true });
       if (logsData) {
         setAllAuctionLogs(logsData);
       }
