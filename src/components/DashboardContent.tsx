@@ -179,7 +179,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     return `${yyyy}-${mm}-${dd}`;
   });
   const [targetSlotForAssign, setTargetSlotForAssign] = useState<number | null>(null);
-  const [enrollments, setEnrollments] = useState<{ id?: string; name: string; phone: string }[]>([
+  const [enrollments, setEnrollments] = useState<{ id?: string; name: string; phone: string; aliasName?: string | null }[]>([
     { id: undefined, name: '', phone: '' },
     { id: undefined, name: '', phone: '' },
     { id: undefined, name: '', phone: '' },
@@ -402,6 +402,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           has_won_regular,
           physical_book_synced,
           profile_id,
+          alias_name,
           split_pool,
           custom_installment,
           exit_month,
@@ -431,12 +432,13 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
               hasWon: m.has_won_regular,
               bookSynced: m.physical_book_synced,
               profileId: m.profile_id || undefined,
+              aliasName: m.alias_name || null,
               splitPool: m.profile_id ? (m.split_pool || null) : null,
               customInstallment: m.profile_id && m.custom_installment ? Number(m.custom_installment) : null,
               exitMonth: m.profile_id ? (m.exit_month || null) : null,
               transferredFrom: m.profile_id ? (m.transferred_from || null) : null,
               transferEffectiveMonth: m.profile_id ? (m.transfer_effective_month || null) : null,
-              name: prof?.full_name || 'Subscriber',
+              name: m.alias_name || prof?.full_name || 'Subscriber',
               phone: prof?.phone_number || '',
             };
           })
@@ -474,6 +476,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           has_won_regular,
           physical_book_synced,
           profile_id,
+          alias_name,
           split_pool,
           custom_installment,
           exit_month,
@@ -498,7 +501,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         const row = data?.find((m: any) => m.ticket_number === tNum);
         const prof = Array.isArray(row?.profiles) ? row.profiles[0] : row?.profiles;
         const dirProfile = row?.profile_id ? masterDirectory.find(p => p.id === row.profile_id) : null;
-        const resolvedName = prof?.full_name || dirProfile?.name || (row?.profile_id ? 'Subscriber' : '');
+        const resolvedName = row?.alias_name || prof?.full_name || dirProfile?.name || (row?.profile_id ? 'Subscriber' : '');
         const resolvedPhone = prof?.phone_number || dirProfile?.phone || '';
 
         return {
@@ -507,6 +510,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           hasWon: !!row?.has_won_regular,
           bookSynced: row?.physical_book_synced ?? true,
           profileId: row?.profile_id || undefined,
+          aliasName: row?.alias_name || null,
           splitPool: row?.profile_id ? (row?.split_pool || null) : null,
           customInstallment: row?.profile_id && row?.custom_installment ? Number(row.custom_installment) : null,
           exitMonth: row?.profile_id ? (row?.exit_month || null) : null,
@@ -557,6 +561,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           group_id: editingGroup.id,
           ticket_number: m.ticket,
           profile_id: m.profileId || null,
+          alias_name: m.aliasName || null,
           has_won_regular: m.hasWon,
           physical_book_synced: m.bookSynced ?? true,
           split_pool: m.profileId ? (m.splitPool || null) : null,
@@ -615,7 +620,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     }
   };
 
-  const handleReassignTicketMember = async (ticketNum: number, currentRecordId: string | undefined, newProfileId: string, newName: string, newPhone: string) => {
+  const handleReassignTicketMember = async (ticketNum: number, currentRecordId: string | undefined, newProfileId: string, newName: string, newPhone: string, aliasName?: string | null) => {
     if (!editingGroup?.id) return;
     try {
       const { data, error } = await supabase
@@ -624,6 +629,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           group_id: editingGroup.id,
           ticket_number: ticketNum,
           profile_id: newProfileId,
+          alias_name: aliasName !== undefined ? aliasName : null,
           physical_book_synced: true,
           transferred_from: null,
           transfer_effective_month: null,
@@ -644,7 +650,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       setEditGroupMembers(prev =>
         prev.map(m =>
           m.ticket === ticketNum
-            ? { ...m, id: assignedId, profileId: newProfileId, name: newName, phone: newPhone, transferredFrom: null, transferEffectiveMonth: null, exitMonth: null, splitPool: null, customInstallment: null }
+            ? { ...m, id: assignedId, profileId: newProfileId, name: newName, phone: newPhone, aliasName: aliasName !== undefined ? aliasName : null, transferredFrom: null, transferEffectiveMonth: null, exitMonth: null, splitPool: null, customInstallment: null }
             : m
         )
       );
@@ -653,7 +659,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         setWorkspaceMembers(prev =>
           prev.map(m =>
             m.ticket === ticketNum
-              ? { ...m, id: assignedId, profileId: newProfileId, name: newName, phone: newPhone, transferredFrom: null, transferEffectiveMonth: null, exitMonth: null, splitPool: null, customInstallment: null }
+              ? { ...m, id: assignedId, profileId: newProfileId, name: newName, phone: newPhone, aliasName: aliasName !== undefined ? aliasName : null, transferredFrom: null, transferEffectiveMonth: null, exitMonth: null, splitPool: null, customInstallment: null }
               : m
           )
         );
@@ -1309,7 +1315,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   // Dashboard Dues & Collection States (Real defaults: 0)
   const [actualCollections, setActualCollections] = useState(0);
   const targetCollections = useMemo(() => {
-    return localGroups.reduce((acc, g) => acc + (g.totalValue / (g.duration || 1)), 0);
+    return localGroups
+      .filter(g => g.status !== 'draft' && g.status !== 'deleted')
+      .reduce((acc, g) => acc + (g.totalValue / (g.duration || 1)), 0);
   }, [localGroups]);
 
   // FIFO Cumulative Ledger — Starts empty until groups & dues are registered
@@ -1620,7 +1628,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   // Auto-select first active group when groups load
   useEffect(() => {
-    const validGroups = localGroups.filter(g => g.status !== 'deleted');
+    const validGroups = localGroups.filter(g => g.status !== 'deleted' && g.status !== 'draft');
     if (validGroups.length > 0) {
       if (!activeDashboardGroupId || !validGroups.some(g => g.id === activeDashboardGroupId)) {
         const firstActive = validGroups.find(g => g.status === 'active') || validGroups[0];
@@ -1783,7 +1791,8 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       return { allocations: [], deferredArrears: [], unallocated: totalAmount, totalAllocated: 0, monthsSummary: [] };
     }
 
-    const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId) || localGroups[0];
+    const activeNonDraftGroups = localGroups.filter(g => g.status !== 'draft' && g.status !== 'deleted');
+    const activeGroup = activeNonDraftGroups.find(g => g.id === activeDashboardGroupId) || activeNonDraftGroups[0];
     const duration = activeGroup?.duration || activeGroup?.memberCount || 20;
     const totalChitVal = activeGroup?.totalValue || 200000;
     const baseInst = Math.round(totalChitVal / (activeGroup?.memberCount || duration || 1));
@@ -2883,6 +2892,69 @@ Thank you for your prompt payment! 🙏`;
     return null;
   }, [newMemberName, masterDirectory]);
 
+  const handleEnrollAlias = async (existingProfile: { id?: string; name: string; phone: string }, aliasName: string) => {
+    try {
+      setIsCreatingMember(true);
+      const isAlias = aliasName.trim().toLowerCase() !== existingProfile.name.trim().toLowerCase();
+      const effectiveAlias = isAlias ? aliasName.trim() : null;
+      const effectiveName = isAlias ? aliasName.trim() : existingProfile.name;
+
+      if (editingGroup && existingProfile.id) {
+        const firstEmptySlot = editGroupMembers.find(m => !m.profileId);
+        if (firstEmptySlot) {
+          await handleReassignTicketMember(
+            firstEmptySlot.ticket,
+            firstEmptySlot.id,
+            existingProfile.id,
+            effectiveName,
+            existingProfile.phone,
+            effectiveAlias
+          );
+        }
+      }
+
+      const targetSlot = (targetSlotForAssign !== null && targetSlotForAssign >= 0) 
+        ? targetSlotForAssign 
+        : enrollments.findIndex(e => e.name === '');
+
+      if (targetSlot !== -1 && targetSlot < enrollments.length) {
+        setEnrollments(prev => {
+          const copy = [...prev];
+          copy[targetSlot] = {
+            id: existingProfile.id,
+            name: effectiveName,
+            phone: existingProfile.phone,
+            aliasName: effectiveAlias,
+          };
+          return copy;
+        });
+      }
+
+      // Add audit log
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      await supabase.from('security_audit_logs').insert({
+        action_description: isAlias
+          ? `TICKET ENROLLED UNDER ALIAS: "${effectiveName}" linked to account "${existingProfile.name}" (${existingProfile.phone})`
+          : `EXISTING SUBSCRIBER ENROLLED: "${existingProfile.name}" (${existingProfile.phone})`,
+        target_table: 'group_members',
+      });
+
+      // Reset modal state
+      setNewMemberName('');
+      setNewMemberPhone('');
+      setMemberSearchQuery('');
+      setIsSearchDropdownOpen(false);
+      setTargetSlotForAssign(null);
+      setShowCreateMemberModal(false);
+      triggerHapticFeedback('success');
+    } catch (err: any) {
+      alert(`Error enrolling member: ${err.message}`);
+    } finally {
+      setIsCreatingMember(false);
+    }
+  };
+
   const handleCreateAndAssignMember = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanName = newMemberName.trim();
@@ -2909,7 +2981,7 @@ Thank you for your prompt payment! 🙏`;
     // Check duplicate phone in master directory
     const existingWithPhone = masterDirectory.find(m => normalizePhone(m.phone) === normalizedDigits);
     if (existingWithPhone) {
-      alert(`Duplicate Phone Error: Phone number "${cleanPhone}" is already registered to "${existingWithPhone.name}". Please use a unique number or assign ${existingWithPhone.name} directly.`);
+      await handleEnrollAlias(existingWithPhone, cleanName);
       return;
     }
 
@@ -3051,6 +3123,7 @@ Thank you for your prompt payment! 🙏`;
             group_id: groupData.id,
             profile_id: slot.id,
             ticket_number: ticketNum,
+            alias_name: (slot as any).aliasName || null,
             has_won_regular: false,
             physical_book_synced: true,
           }));
@@ -3169,7 +3242,8 @@ Thank you for your prompt payment! 🙏`;
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard': {
-        const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId) || localGroups[0];
+        const activeNonDraftGroups = localGroups.filter(g => g.status !== 'draft' && g.status !== 'deleted');
+        const activeGroup = activeNonDraftGroups.find(g => g.id === activeDashboardGroupId) || activeNonDraftGroups[0];
         const totalDuration = activeGroup?.duration || activeGroup?.memberCount || 20;
         const totalChitVal = activeGroup?.totalValue || 200000;
         const baseInstallment = Math.round(totalChitVal / (activeGroup?.memberCount || totalDuration || 1));
@@ -3391,10 +3465,10 @@ Thank you for your prompt payment! 🙏`;
                   <Briefcase size={13} className="text-brand-600" />
                   CHITS:
                 </span>
-                {localGroups.filter(g => g.status !== 'deleted').length === 0 ? (
+                {localGroups.filter(g => g.status !== 'deleted' && g.status !== 'draft').length === 0 ? (
                   <span className="text-xs text-slate-400 italic">No active chit groups found</span>
                 ) : (
-                  localGroups.filter(g => g.status !== 'deleted').map((group) => {
+                  localGroups.filter(g => g.status !== 'deleted' && g.status !== 'draft').map((group) => {
                     const isSelected = (activeGroup?.id === group.id);
                     return (
                       <button
@@ -4324,7 +4398,7 @@ Thank you for your prompt payment! 🙏`;
               {/* Chit Group Switcher Tabs */}
               <div className="px-1">
                 <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none py-1 text-xs">
-                  {localGroups.filter(g => g.status !== 'deleted').map((group) => {
+                  {localGroups.filter(g => g.status !== 'deleted' && g.status !== 'draft').map((group) => {
                     const isSelected = activeGroup?.id === group.id;
                     return (
                       <button
@@ -8750,36 +8824,56 @@ Thank you for your prompt payment! 🙏`;
                 )}
                 <p className="text-[10px] text-slate-500">Used for WhatsApp auction broadcasts &amp; collection alerts</p>
 
-                {/* Duplicate Phone Warning Alert */}
+                {/* Duplicate Phone Warning Alert & Smart Ticket Alias Option */}
                 {duplicatePhoneSubscriber && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2.5 text-xs text-amber-950 animate-in fade-in duration-200 shadow-2xs">
+                  <div className="bg-brand-50/70 border border-brand-200 rounded-2xl p-3.5 space-y-2.5 text-xs text-slate-900 animate-in fade-in duration-200 shadow-2xs">
                     <div className="flex items-start gap-2">
-                      <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                      <Sparkles size={16} className="text-brand-600 shrink-0 mt-0.5" />
                       <div>
-                        <span className="font-bold text-amber-800 block">Phone number already registered</span>
+                        <span className="font-bold text-brand-900 block">Existing Account Found: {duplicatePhoneSubscriber.name}</span>
                         <p className="text-[11px] text-slate-600 mt-0.5">
-                          This phone number is already registered to <strong>{duplicatePhoneSubscriber.name}</strong> ({duplicatePhoneSubscriber.phone}).
+                          {newMemberName.trim() && newMemberName.trim().toLowerCase() !== duplicatePhoneSubscriber.name.toLowerCase() ? (
+                            <>
+                              This phone is registered to <strong>{duplicatePhoneSubscriber.name}</strong>. Enrolling this ticket will set the ticket display name as <strong>{newMemberName.trim()}</strong> with alerts going to {duplicatePhoneSubscriber.phone}.
+                            </>
+                          ) : (
+                            <>
+                              This phone number is already registered to <strong>{duplicatePhoneSubscriber.name}</strong> ({duplicatePhoneSubscriber.phone}).
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCreateMemberModal(false);
-                        if (editingGroup) {
-                          const firstEmpty = editGroupMembers.find(m => !m.profileId);
-                          if (firstEmpty) {
-                            handleReassignTicketMember(firstEmpty.ticket, firstEmpty.id, duplicatePhoneSubscriber.id!, duplicatePhoneSubscriber.name, duplicatePhoneSubscriber.phone);
+                    <div className="pt-1 flex flex-col gap-2">
+                      {newMemberName.trim() && newMemberName.trim().toLowerCase() !== duplicatePhoneSubscriber.name.toLowerCase() && (
+                        <button
+                          type="button"
+                          onClick={() => handleEnrollAlias(duplicatePhoneSubscriber, newMemberName.trim())}
+                          className="w-full bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white font-bold text-xs py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                        >
+                          <Check size={14} /> Enroll {newMemberName.trim()} (Shared Phone: {duplicatePhoneSubscriber.phone}) →
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreateMemberModal(false);
+                          if (editingGroup) {
+                            const firstEmpty = editGroupMembers.find(m => !m.profileId);
+                            if (firstEmpty) {
+                              handleReassignTicketMember(firstEmpty.ticket, firstEmpty.id, duplicatePhoneSubscriber.id!, duplicatePhoneSubscriber.name, duplicatePhoneSubscriber.phone, null);
+                            }
+                          } else {
+                            handleAssignExistingMember(duplicatePhoneSubscriber);
                           }
-                        } else {
-                          handleAssignExistingMember(duplicatePhoneSubscriber);
-                        }
-                      }}
-                      className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-2 px-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
-                    >
-                      <UserPlus size={13} /> Assign {duplicatePhoneSubscriber.name} to Open Slot Instead →
-                    </button>
+                        }}
+                        className="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs py-1.5 px-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <UserPlus size={13} /> Assign {duplicatePhoneSubscriber.name} Directly (No Alias) →
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -8794,21 +8888,23 @@ Thank you for your prompt payment! 🙏`;
                 </button>
                 <button
                   type="submit"
-                  disabled={isCreatingMember || !newMemberName.trim() || !newMemberPhone.trim() || duplicatePhoneSubscriber !== null}
-                  className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center cursor-pointer ${
-                    duplicatePhoneSubscriber !== null
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
-                      : 'bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50'
-                  }`}
+                  disabled={isCreatingMember || !newMemberName.trim() || !newMemberPhone.trim() || normalizePhone(newMemberPhone).length !== 10}
+                  className="w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center cursor-pointer bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50"
                 >
                   {isCreatingMember ? (
                     <>
                       <RefreshCw size={13} className="animate-spin" /> Saving...
                     </>
                   ) : duplicatePhoneSubscriber ? (
-                    <>
-                      <AlertCircle size={14} /> Phone Already In Use
-                    </>
+                    newMemberName.trim().toLowerCase() !== duplicatePhoneSubscriber.name.toLowerCase() ? (
+                      <>
+                        <Check size={14} /> Enroll &quot;{newMemberName.trim()}&quot;
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus size={14} /> Assign {duplicatePhoneSubscriber.name}
+                      </>
+                    )
                   ) : (
                     <>
                       <Check size={14} /> Register &amp; Enroll
@@ -8823,7 +8919,8 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── Disburse Winner Prize Payout Modal ────────────────────────────────────── */}
       {showDisbursePayoutModal && (() => {
-        const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId) || localGroups[0];
+        const activeNonDraftGroups = localGroups.filter(g => g.status !== 'draft' && g.status !== 'deleted');
+        const activeGroup = activeNonDraftGroups.find(g => g.id === activeDashboardGroupId) || activeNonDraftGroups[0];
         const totalDuration = activeGroup?.duration || activeGroup?.memberCount || 20;
         const totalChitVal = activeGroup?.totalValue || 200000;
         const currentMonthAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(selectedDashboardMonth));
@@ -9401,7 +9498,8 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── Remind All Modal (ChitBase Feature) ─────────────────────────────────── */}
       {showRemindModal && (() => {
-        const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId) || localGroups[0];
+        const activeNonDraftGroups = localGroups.filter(g => g.status !== 'draft' && g.status !== 'deleted');
+        const activeGroup = activeNonDraftGroups.find(g => g.id === activeDashboardGroupId) || activeNonDraftGroups[0];
         const isLaaba = (activeGroup?.kaiIruppuPool || 0) >= (activeGroup?.totalValue || 200000);
         const totalChitVal = activeGroup?.totalValue || 200000;
         const totalDuration = activeGroup?.duration || activeGroup?.memberCount || 20;
@@ -9797,7 +9895,8 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── MODAL: RENDERED PAYMENT RECEIPT PNG SHARING ── */}
       {viewingReceiptTx && (() => {
-        const receiptGroup = localGroups.find(g => g.id === (viewingReceiptTx?.tx?.group_id || activeDashboardGroupId)) || localGroups[0];
+        const activeNonDraftGroups = localGroups.filter(g => g.status !== 'draft' && g.status !== 'deleted');
+        const receiptGroup = localGroups.find(g => g.id === (viewingReceiptTx?.tx?.group_id || activeDashboardGroupId)) || activeNonDraftGroups[0];
         if (!receiptGroup) return null;
         const memberId = viewingReceiptTx.member?.profileId || viewingReceiptTx.member?.id || viewingReceiptTx.tx?.profile_id;
         const isReceiptLaaba = (receiptGroup?.kaiIruppuPool || 0) >= (receiptGroup?.totalValue || 200000);

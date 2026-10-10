@@ -756,7 +756,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
         // Fetch group memberships
         const { data: membersData } = await supabase
           .from('group_members')
-          .select('group_id, profile_id, ticket_number');
+          .select('group_id, profile_id, ticket_number, alias_name');
 
         // Fetch collections to count unpaid subscribers
         const { data: collectionsData } = await supabase
@@ -812,6 +812,9 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             );
             if (matchedMember) {
               winnerTicket = matchedMember.ticket_number;
+              if (matchedMember.alias_name) {
+                winnerName = matchedMember.alias_name;
+              }
             }
           }
 

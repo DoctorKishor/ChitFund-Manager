@@ -124,6 +124,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
           profile_id,
           group_id,
           ticket_number,
+          alias_name,
           has_won_regular,
           custom_installment,
           physical_book_synced,
@@ -141,7 +142,11 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         .eq('profile_id', memberId);
 
       if (enrollData) {
-        setMemberEnrollments(enrollData);
+        const nonDraftEnrollments = enrollData.filter((e: any) => {
+          const g = Array.isArray(e.chit_groups) ? e.chit_groups[0] : e.chit_groups;
+          return g && g.status !== 'draft';
+        });
+        setMemberEnrollments(nonDraftEnrollments);
       }
 
       // 3. Fetch Transactions for this member
@@ -155,10 +160,11 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         setMemberTransactions(txData);
       }
 
-      // 4. Fetch All Groups & Auction Logs
+      // 4. Fetch All Groups & Auction Logs (excluding drafts)
       const { data: groupsData } = await supabase
         .from('chit_groups')
         .select('*')
+        .neq('status', 'draft')
         .order('created_at', { ascending: false });
 
       if (groupsData) {
@@ -327,7 +333,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
   const groupDuesBreakdowns = useMemo(() => {
     return memberEnrollments.map((enroll) => {
       const g = Array.isArray(enroll.chit_groups) ? enroll.chit_groups[0] : enroll.chit_groups;
-      if (!g) return null;
+      if (!g || g.status === 'draft') return null;
 
       const duration = Number(g.duration_months) || 20;
       const totalVal = Number(g.total_value) || 200000;
@@ -445,6 +451,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         groupId: g.id,
         groupName: g.name,
         ticketNumber: enroll.ticket_number,
+        aliasName: enroll.alias_name || null,
         totalValue: totalVal,
         durationMonths: duration,
         memberInstallment: memberInst,
@@ -824,7 +831,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         const g = Array.isArray(e.chit_groups) ? e.chit_groups[0] : e.chit_groups;
         items.push({
           token: memberProfile.passbook_token,
-          name: memberName,
+          name: e.alias_name || memberName,
           phone: memberProfile.phone_number,
           groupName: g?.name || 'Chit Group',
           ticketNumber: e.ticket_number,
@@ -1442,6 +1449,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
                                     Ticket #{grpDues.ticketNumber}
                                   </span>
+                                  {grpDues.aliasName && (
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                      {grpDues.aliasName}
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-xs text-slate-500 mt-0.5">
                                   {grpDues.durationMonths} Months Duration · Current: Cycle {grpDues.effectiveCurrentMonth} of {grpDues.durationMonths} · {grpDues.durationMonths} Total Members

@@ -318,7 +318,7 @@ export default function LiveAuctionEngine() {
       const { data: groupsData } = await supabase
         .from('chit_groups')
         .select('*')
-        .in('status', ['active', 'draft'])
+        .eq('status', 'active')
         .order('created_at', { ascending: false });
 
       if (groupsData && groupsData.length > 0) {
@@ -403,6 +403,7 @@ export default function LiveAuctionEngine() {
           ticket_number,
           has_won_regular,
           profile_id,
+          alias_name,
           profiles:profile_id (
             id,
             full_name
@@ -417,7 +418,7 @@ export default function LiveAuctionEngine() {
           return {
             id: m.id,
             profileId: m.profile_id,
-            fullName: prof?.full_name || `Member (Ticket #${m.ticket_number})`,
+            fullName: m.alias_name || prof?.full_name || `Member (Ticket #${m.ticket_number})`,
             ticketNumber: m.ticket_number,
             hasWonRegular: !!m.has_won_regular,
           };

@@ -127,10 +127,11 @@ export default function ReportsCenter() {
       try {
         setLoading(true);
 
-        // 1. Fetch active chit groups
+        // 1. Fetch active chit groups (excluding drafts)
         const { data: groups, error: groupsErr } = await supabase
           .from('chit_groups')
           .select('*')
+          .neq('status', 'draft')
           .order('created_at', { ascending: true });
 
         if (groupsErr) {
@@ -152,6 +153,7 @@ export default function ReportsCenter() {
             profile_id,
             group_id,
             ticket_number,
+            alias_name,
             custom_installment,
             has_won_regular,
             physical_book_synced,
@@ -295,7 +297,7 @@ export default function ReportsCenter() {
 
     const memberRows = groupEnrollments.map((gm) => {
       const prof = Array.isArray(gm.profiles) ? gm.profiles[0] : gm.profiles;
-      const memberName = prof?.full_name || `Member #${gm.ticket_number}`;
+      const memberName = gm.alias_name || prof?.full_name || `Member #${gm.ticket_number}`;
       const memberPhone = prof?.phone_number || '';
       const dueAmount = isLaaba ? 0 : (gm.custom_installment !== null ? Number(gm.custom_installment) : baseInst);
 
@@ -734,8 +736,8 @@ export default function ReportsCenter() {
     const contributorsMap = new Map<string, { name: string; paymentCount: number; totalPaid: number }>();
     collectionTxs.forEach(t => {
       const profId = t.profile_id || t.created_by || 'unknown';
-      const member = groupMembers.find(m => m.profile_id === profId);
-      const name = member?.profiles?.full_name || t.notes?.replace('Collection from ', '') || 'Subscriber';
+      const member = groupMembers.find(m => (t.group_member_id && m.id === t.group_member_id) || m.profile_id === profId);
+      const name = member?.alias_name || member?.profiles?.full_name || t.notes?.replace('Collection from ', '') || 'Subscriber';
       
       if (!contributorsMap.has(profId)) {
         contributorsMap.set(profId, { name, paymentCount: 0, totalPaid: 0 });
@@ -751,8 +753,8 @@ export default function ReportsCenter() {
     const payoutsMap = new Map<string, { name: string; payoutCount: number; totalPaid: number }>();
     payoutTxs.forEach(t => {
       const profId = t.profile_id || 'unknown';
-      const member = groupMembers.find(m => m.profile_id === profId);
-      const name = member?.profiles?.full_name || t.notes?.replace('Payout to ', '') || 'Winner';
+      const member = groupMembers.find(m => (t.group_member_id && m.id === t.group_member_id) || m.profile_id === profId);
+      const name = member?.alias_name || member?.profiles?.full_name || t.notes?.replace('Payout to ', '') || 'Winner';
       
       if (!payoutsMap.has(profId)) {
         payoutsMap.set(profId, { name, payoutCount: 0, totalPaid: 0 });
@@ -975,7 +977,7 @@ export default function ReportsCenter() {
       const netPayout = Number(a.net_payout) || (totalVal - discount);
       
       const member = members.find(m => m.profile_id === a.winning_bidder_id || m.id === a.winning_bidder_id);
-      const winnerName = member?.profiles?.full_name || a.profiles?.full_name || (a as any).winner_name || 'Subscriber';
+      const winnerName = member?.alias_name || member?.profiles?.full_name || a.profiles?.full_name || (a as any).winner_name || 'Subscriber';
 
       // Find all payout transactions recorded for this group & month / winner
       const monthPattern = new RegExp(`\\bMonth\\s+${a.month}\\b|\\bM${a.month}\\b|\\bM\\s*${a.month}\\b`, 'i');
@@ -1052,7 +1054,7 @@ export default function ReportsCenter() {
 
         winnersList.push({
           id: wm.id,
-          winnerName: wm.profiles?.full_name || 'Winner',
+          winnerName: wm.alias_name || wm.profiles?.full_name || 'Winner',
           month: idx + 1,
           subtitle: `M${idx + 1} · ${methodLabel}`,
           awardedAmount: totalVal,
@@ -1108,7 +1110,7 @@ export default function ReportsCenter() {
       const isCurrentValid = activeGroupMembers.some(m => m.id === selectedMemberId || m.profile_id === selectedMemberId);
       if (!isCurrentValid) {
         setSelectedMemberId(activeGroupMembers[0].id);
-        setMemberSearchQuery(activeGroupMembers[0].profiles?.full_name || '');
+        setMemberSearchQuery(activeGroupMembers[0].alias_name || activeGroupMembers[0].profiles?.full_name || '');
       }
     } else {
       setSelectedMemberId('');
@@ -1122,7 +1124,7 @@ export default function ReportsCenter() {
     const q = memberSearchQuery.toLowerCase().trim();
     if (!q) return activeGroupMembers;
     return activeGroupMembers.filter(m => {
-      const name = (m.profiles?.full_name || '').toLowerCase();
+      const name = (m.alias_name || m.profiles?.full_name || '').toLowerCase();
       const phone = (m.profiles?.phone_number || '').toLowerCase();
       const ticket = String(m.ticket_number || '');
       return name.includes(q) || phone.includes(q) || ticket.includes(q);
@@ -1278,7 +1280,7 @@ export default function ReportsCenter() {
     const totalOwes = Math.max(0, totalDue - totalPaid);
 
     return {
-      memberName: selectedMember.profiles?.full_name || 'Subscriber',
+      memberName: selectedMember.alias_name || selectedMember.profiles?.full_name || 'Subscriber',
       ticketNumber: selectedMember.ticket_number || 1,
       phoneNumber: selectedMember.profiles?.phone_number || '',
       hasWon,
@@ -1327,7 +1329,7 @@ export default function ReportsCenter() {
     const today = new Date();
 
     const evaluatedMembers = activeGroupMembers.map((member) => {
-      const memberName = member.profiles?.full_name || 'Subscriber';
+      const memberName = member.alias_name || member.profiles?.full_name || 'Subscriber';
       const ticketNumber = member.ticket_number || 1;
       const phoneNumber = member.profiles?.phone_number || '';
       const monthlyInstallment = Number(member.custom_installment) || Math.round(totalVal / memberCount);
@@ -2882,7 +2884,7 @@ export default function ReportsCenter() {
                   {isSearchDropdownOpen && (
                     <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg z-30 divide-y divide-slate-100">
                       {activeGroupMembers
-                        .filter(m => m.profiles?.full_name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) || String(m.ticket_number).includes(memberSearchQuery))
+                        .filter(m => (m.alias_name || m.profiles?.full_name || '').toLowerCase().includes(memberSearchQuery.toLowerCase()) || String(m.ticket_number).includes(memberSearchQuery))
                         .map(m => (
                           <div
                             key={m.id}
@@ -2892,7 +2894,7 @@ export default function ReportsCenter() {
                             }}
                             className="p-2.5 hover:bg-slate-50 cursor-pointer flex items-center justify-between text-xs"
                           >
-                            <span className="font-bold text-slate-900">{m.profiles?.full_name}</span>
+                            <span className="font-bold text-slate-900">{m.alias_name || m.profiles?.full_name}</span>
                             <span className="font-mono text-slate-500">Ticket #{m.ticket_number}</span>
                           </div>
                         ))}

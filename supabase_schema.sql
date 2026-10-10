@@ -78,6 +78,7 @@ create table public.group_members (
   exit_month integer default null,
   transferred_from uuid references public.profiles(id),
   transfer_effective_month integer default null,
+  alias_name text default null,
   constraint unique_group_ticket unique (group_id, ticket_number)
 );
 
@@ -690,6 +691,8 @@ begin
     'status', cg.status,
     'startDate', cg.start_date,
     'ticketNumber', gm.ticket_number,
+    'aliasName', gm.alias_name,
+    'ticketHolderName', coalesce(gm.alias_name, (select full_name from public.profiles where id = gm.profile_id)),
     'hasWonRegular', gm.has_won_regular,
     'customInstallment', gm.custom_installment,
     'physicalBookSynced', coalesce(gm.physical_book_synced, false),
@@ -707,7 +710,8 @@ begin
       select coalesce(jsonb_agg(jsonb_build_object(
         'id', gm2.id,
         'profileId', gm2.profile_id,
-        'fullName', coalesce(p2.full_name, 'Ticket #' || gm2.ticket_number),
+        'fullName', coalesce(gm2.alias_name, p2.full_name, 'Ticket #' || gm2.ticket_number),
+        'aliasName', gm2.alias_name,
         'ticketNumber', gm2.ticket_number,
         'hasWonRegular', gm2.has_won_regular
       ) order by gm2.ticket_number), '[]'::jsonb)
@@ -719,7 +723,12 @@ begin
   into v_groups
   from public.group_members gm
   join public.chit_groups cg on cg.id = gm.group_id
-  where gm.profile_id = p_profile_id;
+  where (gm.profile_id = p_profile_id or gm.profile_id in (
+    select id from public.profiles where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = (
+      select right(regexp_replace(phone_number, '\D', '', 'g'), 10) from public.profiles where id = p_profile_id
+    )
+  ))
+    and cg.status not in ('draft', 'deleted');
 
   -- 3. Fetch Transactions for this Subscriber
   select coalesce(jsonb_agg(jsonb_build_object(
@@ -737,8 +746,24 @@ begin
   into v_transactions
   from public.transactions t
   left join public.chit_groups cg on cg.id = t.group_id
-  where t.profile_id = p_profile_id
-     or t.group_member_id in (select id from public.group_members where profile_id = p_profile_id);
+  where (
+    t.profile_id = p_profile_id
+    or t.profile_id in (
+      select id from public.profiles where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = (
+        select right(regexp_replace(phone_number, '\D', '', 'g'), 10) from public.profiles where id = p_profile_id
+      )
+    )
+    or t.group_member_id in (
+      select id from public.group_members 
+      where profile_id = p_profile_id 
+         or profile_id in (
+           select id from public.profiles where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = (
+             select right(regexp_replace(phone_number, '\D', '', 'g'), 10) from public.profiles where id = p_profile_id
+           )
+         )
+    )
+  )
+    and (cg.status is null or cg.status not in ('draft', 'deleted'));
 
   -- 4. Fetch Auction Logs for the Subscriber's Chit Groups
   select coalesce(jsonb_agg(jsonb_build_object(
@@ -752,15 +777,28 @@ begin
     'isLaabaSeetu', al.is_laaba_seetu,
     'createdAt', al.created_at,
     'netPayout', (cg.total_value - al.winning_discount),
-    'isCurrentSubscriberWinner', (al.winning_bidder_id = p_profile_id)
+    'isCurrentSubscriberWinner', (
+      al.winning_bidder_id = p_profile_id
+      or al.winning_bidder_id in (
+        select id from public.profiles where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = (
+          select right(regexp_replace(phone_number, '\D', '', 'g'), 10) from public.profiles where id = p_profile_id
+        )
+      )
+    )
   ) order by al.created_at desc), '[]'::jsonb)
   into v_auctions
   from public.auction_logs al
   join public.chit_groups cg on cg.id = al.group_id
   join public.profiles p on p.id = al.winning_bidder_id
   where al.group_id in (
-    select group_id from public.group_members where profile_id = p_profile_id
-  );
+    select group_id from public.group_members 
+    where profile_id = p_profile_id
+       or profile_id in (
+         select id from public.profiles where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = (
+           select right(regexp_replace(phone_number, '\D', '', 'g'), 10) from public.profiles where id = p_profile_id
+         )
+       )
+  ) and cg.status not in ('draft', 'deleted');
 
   return jsonb_build_object(
     'success', true,
@@ -1233,7 +1271,11 @@ begin
     )
   );
 end;
-$$;
+-- Realtime Read Policies for Subscriber Portal Realtime Sync
+create policy if not exists "Allow public read of active chit_groups" on public.chit_groups for select to public using (status not in ('draft', 'deleted'));
+create policy if not exists "Allow public read of auction_logs" on public.auction_logs for select to public using (group_id in (select id from public.chit_groups where status not in ('draft', 'deleted')));
+create policy if not exists "Allow public read of completed collections" on public.transactions for select to public using (type in ('collection', 'payout') and status = 'completed');
+
 
 
 

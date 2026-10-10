@@ -21,7 +21,8 @@ import {
   Landmark,
   MinusCircle,
   Bell,
-  ChevronRight
+  ChevronRight,
+  LogOut
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -46,7 +47,7 @@ export default function MobileBottomNav({
   onOpenDrawer,
   onQuickRecord 
 }: MobileBottomNavProps) {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
   const activeUserRole = profile?.role || 'subscriber';
   const isSubscriber = activeUserRole === 'subscriber';
 
@@ -506,19 +507,35 @@ export default function MobileBottomNav({
               )}
             </div>
 
-            {/* User Session Info footer */}
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 rounded-full bg-brand-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
-                  {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'A'}
+            {/* User Session Info & Log Out Footer */}
+            <div className="pt-2.5 border-t border-slate-100 space-y-2.5">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-brand-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                    {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'A'}
+                  </div>
+                  <span className="font-semibold text-slate-800 truncate text-xs">
+                    {profile?.fullName || 'Organizer'}
+                  </span>
                 </div>
-                <span className="font-semibold text-slate-800 truncate">
-                  {profile?.fullName || 'Organizer'}
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                  {profile?.role || 'Admin'}
                 </span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
-                {profile?.role || 'Admin'}
-              </span>
+
+              {/* Log Out Button */}
+              <button
+                type="button"
+                onClick={async () => {
+                  triggerHapticFeedback('light');
+                  setIsMoreSheetOpen(false);
+                  await signOut();
+                }}
+                className="w-full h-10 rounded-xl bg-red-50 hover:bg-red-100 active:scale-[0.98] border border-red-200/80 text-red-600 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+              >
+                <LogOut size={15} />
+                <span>Log Out of Workspace</span>
+              </button>
             </div>
           </div>
         </div>

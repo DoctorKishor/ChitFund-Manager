@@ -157,6 +157,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             id,
             ticket_number,
             profile_id,
+            alias_name,
             custom_installment,
             profiles:profile_id (
               id,
@@ -193,7 +194,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
     for (let t = 1; t <= totalMembers; t++) {
       const memRow = members.find(m => m.ticket_number === t);
       const prof = Array.isArray(memRow?.profiles) ? memRow?.profiles[0] : memRow?.profiles;
-      const rawName = prof?.full_name || (memRow?.profile_id ? `MEMBER #${t}` : `TICKET #${t}`);
+      const rawName = memRow?.alias_name || prof?.full_name || (memRow?.profile_id ? `MEMBER #${t}` : `TICKET #${t}`);
       const upperName = rawName.toUpperCase();
       
       const singleDue = memRow?.custom_installment ? Number(memRow.custom_installment) : baseMonthlyInstallment;

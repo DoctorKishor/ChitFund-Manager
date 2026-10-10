@@ -53,6 +53,7 @@ interface MemberGroupInfo {
   id: string;
   name: string;
   ticket: number;
+  aliasName?: string | null;
   totalValue?: number;
   duration?: number;
   currentMonth?: number;
@@ -204,12 +205,14 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
           profile_id,
           group_id,
           ticket_number,
+          alias_name,
           chit_groups (
             id,
             name,
             total_value,
             duration_months,
-            current_month
+            current_month,
+            status
           )
         `);
 
@@ -217,10 +220,11 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
         console.warn('Note fetching member groups:', memberGroupsError.message);
       }
 
-      // 3. Fetch chit groups list for filter
+      // 3. Fetch chit groups list for filter (excluding drafts)
       const { data: groupsData } = await supabase
         .from('chit_groups')
-        .select('id, name, total_value, duration_months, current_month')
+        .select('id, name, total_value, duration_months, current_month, status')
+        .neq('status', 'draft')
         .order('name', { ascending: true });
 
       if (groupsData) {
@@ -246,13 +250,18 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       if (profilesData) {
         setMembers(
           profilesData.map((p: any) => {
-            const memberGroupRecords = (memberGroupsData || []).filter((gm: any) => gm.profile_id === p.id);
+            const memberGroupRecords = (memberGroupsData || []).filter((gm: any) => {
+              if (gm.profile_id !== p.id) return false;
+              const groupObj = Array.isArray(gm.chit_groups) ? gm.chit_groups[0] : gm.chit_groups;
+              return groupObj && groupObj.status !== 'draft';
+            });
             const assignedGroups: MemberGroupInfo[] = memberGroupRecords.map((gm: any) => {
               const groupObj = Array.isArray(gm.chit_groups) ? gm.chit_groups[0] : gm.chit_groups;
               return {
                 id: gm.group_id,
                 name: groupObj?.name || 'Chit Group',
                 ticket: gm.ticket_number,
+                aliasName: gm.alias_name || null,
                 totalValue: groupObj?.total_value,
                 duration: groupObj?.duration_months || groupObj?.duration,
                 currentMonth: groupObj?.current_month,
@@ -437,7 +446,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
         m.phoneNumber.toLowerCase().includes(q) ||
         m.role.toLowerCase().includes(q) ||
         (m.passbookToken && m.passbookToken.toLowerCase().includes(q)) ||
-        m.groups.some((g) => g.name.toLowerCase().includes(q) || String(g.ticket).includes(q))
+        m.groups.some((g) => g.name.toLowerCase().includes(q) || String(g.ticket).includes(q) || (g.aliasName && g.aliasName.toLowerCase().includes(q)))
       );
     });
   }, [members, roleFilter, groupFilter, qrFilter, tableFilter, searchQuery]);
@@ -652,7 +661,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       target.groups.forEach((g) => {
         items.push({
           token: target.passbookToken!,
-          name: target.fullName,
+          name: g.aliasName || target.fullName,
           phone: target.phoneNumber,
           groupName: g.name,
           ticketNumber: g.ticket,
@@ -682,7 +691,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
           m.groups.forEach((g) => {
             items.push({
               token: m.passbookToken!,
-              name: m.fullName,
+              name: g.aliasName || m.fullName,
               phone: m.phoneNumber,
               groupName: g.name,
               ticketNumber: g.ticket,
@@ -1499,7 +1508,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                           : 'bg-amber-50 text-amber-800 border-amber-200/60'
                                       }`}
                                     >
-                                      <span className="font-bold">{g.name}:</span> #{g.ticket}
+                                      <span className="font-bold">{g.name}:</span> #{g.ticket}{g.aliasName ? ` · ${g.aliasName}` : ''}
                                     </span>
                                   ))}
                                 </div>

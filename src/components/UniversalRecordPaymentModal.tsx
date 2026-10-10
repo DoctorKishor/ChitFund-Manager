@@ -37,6 +37,7 @@ export interface EnrolledGroupInfo {
   groupMemberId: string;
   groupName: string;
   ticketNumber: number;
+  aliasName?: string | null;
   totalValue: number;
   memberCount: number;
   durationMonths: number;
@@ -223,15 +224,47 @@ export default function UniversalRecordPaymentModal({
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const { data, error } = await supabase
+        const { data: profData, error } = await supabase
           .from('profiles')
           .select('id, full_name, phone_number, passbook_token')
           .eq('is_deleted', false)
           .or(`full_name.ilike.%${cleanQuery}%,phone_number.ilike.%${cleanQuery}%`)
           .limit(8);
 
-        if (!error && data) {
-          setSearchResults(data);
+        // Also search group_members by alias_name
+        const { data: aliasData } = await supabase
+          .from('group_members')
+          .select(`
+            profile_id,
+            alias_name,
+            profiles:profile_id (
+              id,
+              full_name,
+              phone_number,
+              passbook_token,
+              is_deleted
+            )
+          `)
+          .ilike('alias_name', `%${cleanQuery}%`)
+          .not('profile_id', 'is', null)
+          .limit(8);
+
+        const combined: any[] = [...(profData || [])];
+        const seenIds = new Set(combined.map(p => p.id));
+
+        (aliasData || []).forEach((row: any) => {
+          const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+          if (prof && !prof.is_deleted && !seenIds.has(prof.id)) {
+            seenIds.add(prof.id);
+            combined.push({
+              ...prof,
+              matchedAlias: row.alias_name,
+            });
+          }
+        });
+
+        if (!error && combined) {
+          setSearchResults(combined);
         }
       } catch (err) {
         console.error('Search error:', err);
@@ -286,6 +319,7 @@ export default function UniversalRecordPaymentModal({
         .select(`
           id,
           ticket_number,
+          alias_name,
           custom_installment,
           group_id,
           chit_groups:group_id (
@@ -307,9 +341,15 @@ export default function UniversalRecordPaymentModal({
         return;
       }
 
+      // Filter out draft groups
+      const activeMemberships = (memberships || []).filter((m: any) => {
+        const cg = Array.isArray(m.chit_groups) ? m.chit_groups[0] : m.chit_groups;
+        return cg && cg.status !== 'draft';
+      });
+
       // 2. Fetch past collection transactions for this member
-      const groupIds = memberships.map((m: any) => m.group_id).filter(Boolean);
-      const memberIds = memberships.map((m: any) => m.id).filter(Boolean);
+      const groupIds = activeMemberships.map((m: any) => m.group_id).filter(Boolean);
+      const memberIds = activeMemberships.map((m: any) => m.id).filter(Boolean);
       const { data: txs } = await supabase
         .from('transactions')
         .select('group_id, group_member_id, cycle_month, amount, status, notes')
@@ -322,8 +362,8 @@ export default function UniversalRecordPaymentModal({
       const initialEnabled: Record<string, boolean> = {};
       const initialSelectedMonths: Record<string, number[]> = {};
 
-      const builtGroups: EnrolledGroupInfo[] = memberships.map((m: any) => {
-        const cg = m.chit_groups;
+      const builtGroups: EnrolledGroupInfo[] = activeMemberships.map((m: any) => {
+        const cg = Array.isArray(m.chit_groups) ? m.chit_groups[0] : m.chit_groups;
         const totalVal = Number(cg.total_value) || 200000;
         const memCount = Number(cg.member_count) || 20;
         const durMonths = Number(cg.duration_months) || 20;
@@ -417,6 +457,7 @@ export default function UniversalRecordPaymentModal({
           groupMemberId: m.id,
           groupName: cg.name,
           ticketNumber: m.ticket_number,
+          aliasName: m.alias_name || null,
           totalValue: totalVal,
           memberCount: memCount,
           durationMonths: durMonths,
@@ -619,7 +660,10 @@ export default function UniversalRecordPaymentModal({
       const rowsToInsert = calculatedItemsList.map(item => {
         const typeLabel = item.isArrear ? ' (Arrear Cleared)' : item.isAdvance ? ' (Advance Pre-paid)' : '';
         const userNotePart = paymentNote.trim() ? ` — Note: ${paymentNote.trim()}` : '';
-        const noteText = `Month ${item.month}${typeLabel} collection payment - Ticket #${item.group.ticketNumber} (${selectedMember.fullName})${userNotePart} ${batchTag}`;
+        const ticketDisplay = item.group.aliasName 
+          ? `${item.group.aliasName} (Ticket #${item.group.ticketNumber})` 
+          : `Ticket #${item.group.ticketNumber} (${selectedMember.fullName})`;
+        const noteText = `Month ${item.month}${typeLabel} collection payment - ${ticketDisplay}${userNotePart} ${batchTag}`;
 
         return {
           group_id: item.group.groupId,
@@ -672,7 +716,7 @@ export default function UniversalRecordPaymentModal({
         },
         member: {
           id: selectedMember.id,
-          name: selectedMember.fullName,
+          name: firstGroup.aliasName || selectedMember.fullName,
           phone: selectedMember.phoneNumber,
           ticket: firstGroup.ticketNumber,
         },
@@ -862,7 +906,14 @@ export default function UniversalRecordPaymentModal({
                                 {(member.full_name || member.fullName || 'U').charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                <span className="text-xs font-bold text-slate-900 block">{member.full_name || member.fullName || 'Subscriber'}</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-bold text-slate-900 block">{member.full_name || member.fullName || 'Subscriber'}</span>
+                                  {member.matchedAlias && (
+                                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                                      {member.matchedAlias}
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-[11px] text-slate-500 font-mono">{member.phone_number || member.phoneNumber || 'No phone'}</span>
                               </div>
                             </div>
@@ -994,6 +1045,11 @@ export default function UniversalRecordPaymentModal({
                                       <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-700">
                                         Ticket #{grp.ticketNumber}
                                       </span>
+                                      {grp.aliasName && (
+                                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                          {grp.aliasName}
+                                        </span>
+                                      )}
                                     </div>
                                     <span className="text-[10px] text-slate-500 font-mono">
                                       Due: ₹{grp.effectiveInstallment.toLocaleString('en-IN')}/mo · Current: M{grp.currentMonth}

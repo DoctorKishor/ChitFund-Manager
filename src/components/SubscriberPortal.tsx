@@ -43,7 +43,14 @@ import {
   Shield,
   QrCode,
   Sliders,
-  Copy
+  Copy,
+  Crown,
+  ArrowRight,
+  Gift,
+  Bell,
+  Receipt,
+  BookOpen,
+  Flag
 } from 'lucide-react';
 import AuctionCountdownBanner from '@/components/AuctionCountdownBanner';
 import AuctionCountdownStack from '@/components/AuctionCountdownStack';
@@ -386,6 +393,14 @@ export default function SubscriberPortal() {
   // Expandable monthly dues breakdown state per group
   const [expandedBreakdownGroupIds, setExpandedBreakdownGroupIds] = useState<string[]>([]);
 
+  // Screen 1, 2 & 3 states: Apple Wallet card stack, Passbook filter, Schedule filter, Payment modal
+  const [selectedCardIndex, setSelectedCardIndex] = useState<number>(0);
+  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [passbookFilter, setPassbookFilter] = useState<'all' | 'installments' | 'payouts'>('all');
+  const [scheduleFilter, setScheduleFilter] = useState<'all' | 'paid' | 'pending'>('all');
+  const [showScheduleInfoModal, setShowScheduleInfoModal] = useState<boolean>(false);
+  const [showMpinForm, setShowMpinForm] = useState<boolean>(false);
+
   const toggleBreakdown = (groupId: string) => {
     setExpandedBreakdownGroupIds((prev) =>
       prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
@@ -630,6 +645,17 @@ export default function SubscriberPortal() {
           loadSubscriberData(true);
         }
       )
+      .on('broadcast', { event: 'data_changed' }, () => {
+        loadSubscriberData(true);
+      })
+      .subscribe();
+
+    // Also listen to global broadcast channel for zero-latency cross-client updates
+    const broadcastChan = supabase
+      .channel('chit_fund_global_sync')
+      .on('broadcast', { event: 'data_changed' }, () => {
+        loadSubscriberData(true);
+      })
       .subscribe();
 
     // Auto-sync on window focus and tab visibility change
@@ -640,13 +666,14 @@ export default function SubscriberPortal() {
     window.addEventListener('focus', handleFocusSync);
     document.addEventListener('visibilitychange', handleFocusSync);
 
-    // 10s silent background sync fallback
+    // 3s silent background sync fallback for rapid realtime updates
     const pollInterval = setInterval(() => {
       loadSubscriberData(true);
-    }, 10000);
+    }, 3000);
 
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(broadcastChan);
       window.removeEventListener('focus', handleFocusSync);
       document.removeEventListener('visibilitychange', handleFocusSync);
       clearInterval(pollInterval);
@@ -750,14 +777,14 @@ export default function SubscriberPortal() {
 
   const wonGroupsCount = groups.filter(g => g.hasWonRegular).length;
 
-  const isDark = true;
+  const isDark = false;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-[#141332] text-white">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-[#F4F6FB] text-[#151B26]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-9 h-9 border-3 border-[#6359E9] border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-medium tracking-tight text-[#AEABD8]">Loading Member Passbook...</span>
+          <div className="w-9 h-9 border-3 border-[#2A1DB8] border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold tracking-tight text-[#636F85]">Loading Member Passbook...</span>
         </div>
       </div>
     );
@@ -779,72 +806,66 @@ export default function SubscriberPortal() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-[#141332] text-white">
+    <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-[#F4F6FB] text-[#151B26]">
       
-      {/* 1. TOP APP BAR */}
-      <header className="sticky top-0 z-30 border-b border-[#27264E] bg-[#1D1D41]/95 backdrop-blur-md transition-all text-white">
-        <div className="max-w-5xl mx-auto px-3.5 sm:px-6 h-14 flex items-center justify-between gap-2">
-          
-          {/* User Identity / Brand */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-r from-[#9C2CF3] to-[#3A6FF9] text-white font-bold flex items-center justify-center text-xs shadow-md shrink-0">
-              {profile?.fullName?.charAt(0)?.toUpperCase() || 'M'}
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold truncate text-white">
-                  {profile?.fullName || 'Subscriber'}
-                </span>
-                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 uppercase shrink-0">
-                  Member
-                </span>
+      {/* 1. TOP APP BAR / CANOPY */}
+      <header className="sticky top-0 w-full z-40 bg-gradient-to-b from-[#1C128A] via-[#2A1DB8] to-[#3424CA] text-white shadow-md">
+        {/* Android Status Bar Simulation on Mobile */}
+        <div className="flex md:hidden items-center justify-between px-4 pt-2 pb-1 text-white/80 text-[11px] font-mono">
+          <span className="font-bold text-white">9:09</span>
+          <div className="flex items-center gap-1.5 opacity-90 text-[10px]">
+            <span>4G</span>
+            <Radio size={12} />
+            <span className="w-4 h-2 rounded-xs border border-white/80 inline-flex items-center p-0.5">
+              <span className="w-full h-full bg-white rounded-xs"></span>
+            </span>
+          </div>
+        </div>
+
+        {/* App Header Canopy Content */}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 pb-1">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-full p-0.5 flex items-center justify-center bg-white/10 ring-2 ring-white/20 shrink-0">
+              <div className="w-full h-full rounded-full bg-gradient-to-tr from-amber-400 to-indigo-300 flex items-center justify-center text-slate-900 font-extrabold text-sm shadow-xs">
+                {profile?.fullName?.charAt(0)?.toUpperCase() || 'A'}
               </div>
-              <p className="text-[10px] text-[#AEABD8] font-mono truncate">
-                {profile?.phoneNumber || profile?.email || 'Active Member'}
-              </p>
+            </div>
+            <div className="flex flex-col truncate">
+              <h1 className="text-base sm:text-lg font-bold leading-tight flex items-center gap-1 truncate text-white">
+                <span>Hello, {profile?.fullName || 'Subscriber'}</span>
+                <span className="text-[16px]">👋</span>
+              </h1>
+              <span className="text-[11px] text-indigo-200 mt-0.5 truncate font-mono">
+                {groups.length} Active {groups.length === 1 ? 'Chit Group' : 'Chit Groups'} · ID #{profile?.phoneNumber ? profile.phoneNumber.slice(-4) : (profile?.id?.slice(0, 6) || 'RC-9041')}
+              </span>
             </div>
           </div>
 
-          {/* Right Action Icons */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {/* LIVE SYNC BUTTON */}
             <button
               onClick={() => loadSubscriberData(false)}
               title="Sync Latest Data with Ledger"
               aria-label="Refresh and sync data"
               disabled={syncing}
-              className="p-2 rounded-xl border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white transition-all text-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
             >
-              <RefreshCw size={13} className={syncing ? 'animate-spin text-[#64CFF6]' : ''} />
-              <span className="hidden sm:inline text-[11px] font-semibold">
-                {syncing ? 'Syncing...' : 'Sync'}
-              </span>
+              <RefreshCw size={14} className={syncing ? 'animate-spin text-cyan-300' : ''} />
             </button>
 
-            <FontSizeSwitcher />
-            
-            {/* LIGHT / DARK MODE TOGGLE */}
+            {/* NOTIFICATIONS BELL */}
             <button
-              onClick={toggleTheme}
-              title={`Theme: Cyber Fintech Dark`}
-              aria-label="Theme mode"
-              className="p-2 rounded-xl border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white transition-all text-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              aria-label="Notifications"
+              onClick={() => {
+                if (activeRescheduleNotices.length > 0) setIsAlertModalDismissed(false);
+              }}
+              className="relative w-9 h-9 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+              type="button"
             >
-              <Moon size={13} className="text-[#FFBB38]" />
-              <span className="hidden sm:inline text-[11px] font-semibold">
-                Dark
-              </span>
-            </button>
-
-            {/* LOGOUT */}
-            <button
-              onClick={signOut}
-              title="Sign Out"
-              aria-label="Sign Out"
-              className="p-2 rounded-xl bg-[#E41414]/15 hover:bg-[#E41414]/25 text-[#FF5555] border border-[#E41414]/30 transition-all text-xs flex items-center gap-1 active:scale-95 font-semibold cursor-pointer"
-            >
-              <LogOut size={13} />
-              <span className="hidden sm:inline text-[11px]">Logout</span>
+              <Bell size={16} />
+              {(overdueGroups.length > 0 || activeRescheduleNotices.length > 0) && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-amber-400 rounded-full ring-2 ring-[#1a00a7] animate-pulse"></span>
+              )}
             </button>
           </div>
         </div>
@@ -852,28 +873,27 @@ export default function SubscriberPortal() {
 
       {/* 2. MAIN CONTAINER */}
       <main className="max-w-5xl w-full mx-auto px-3.5 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 flex-1">
-        
-        {/* PROMINENT ORANGE OVERDUE REMINDER BANNER */}
+            {/* PROMINENT ORANGE OVERDUE REMINDER BANNER */}
         {overdueGroups.length > 0 && (
-          <div className="rounded-2xl p-3.5 sm:p-4 border border-[#FFBB38]/40 bg-[#1D1D41] text-amber-100 shadow-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-            <div className="w-8 h-8 rounded-xl bg-[#FFBB38] text-slate-950 flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+          <div className="rounded-2xl p-3.5 sm:p-4 border border-amber-300 bg-amber-50 text-amber-950 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
               <AlertTriangle size={18} className="stroke-[2.5]" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <h3 className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-1.5 text-[#FFBB38]">
+                <h3 className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-1.5 text-amber-900">
                   <span>⚠️ Payment Past Due Date</span>
-                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded font-bold border bg-[#FFBB38]/20 text-[#FFBB38] border-[#FFBB38]/40">
+                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded font-bold border bg-amber-200/60 text-amber-900 border-amber-300">
                     {overdueGroups.length} {overdueGroups.length === 1 ? 'Chit' : 'Chits'} Overdue
                   </span>
                 </h3>
-                <div className="text-xs sm:text-sm font-mono font-black text-[#E41414]">
+                <div className="text-xs sm:text-sm font-mono font-black text-rose-600">
                   Total Overdue: ₹{totalOverdueAmount.toLocaleString('en-IN')}
                 </div>
               </div>
-              <p className="text-[11px] mt-1 leading-relaxed font-medium text-[#AEABD8]">
+              <p className="text-[11px] mt-1 leading-relaxed font-medium text-amber-800">
                 The scheduled auction due date for{' '}
-                <strong className="font-bold text-white underline decoration-amber-400/40">
+                <strong className="font-bold text-slate-900 underline decoration-amber-400">
                   {overdueGroups
                     .map((g) => `${g.group.groupName} (${g.paymentInfo.daysOverdue} days past due)`)
                     .join(', ')}
@@ -885,13 +905,13 @@ export default function SubscriberPortal() {
         )}
 
         {/* DESKTOP TABS (5 Streamlined Tabs at top) */}
-        <div className="hidden md:flex items-center gap-2 border-b border-[#27264E] pb-2">
+        <div className="hidden md:flex items-center gap-2 border-b border-[#E5E9F2] pb-2">
           <button
             onClick={() => setActiveTab('overview')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'overview'
-                ? 'bg-[#6359E9] text-white shadow-md shadow-[#6359E9]/30'
-                : 'text-[#AEABD8] hover:text-white hover:bg-[#1D1D41]'
+                ? 'bg-[#2A1DB8] text-white shadow-md shadow-[#2A1DB8]/20'
+                : 'text-[#636F85] hover:text-[#151B26] hover:bg-slate-100'
             }`}
           >
             <Layers size={13} /> Overview
@@ -900,8 +920,8 @@ export default function SubscriberPortal() {
             onClick={() => setActiveTab('chits')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'chits'
-                ? 'bg-[#6359E9] text-white shadow-md shadow-[#6359E9]/30'
-                : 'text-[#AEABD8] hover:text-white hover:bg-[#1D1D41]'
+                ? 'bg-[#2A1DB8] text-white shadow-md shadow-[#2A1DB8]/20'
+                : 'text-[#636F85] hover:text-[#151B26] hover:bg-slate-100'
             }`}
           >
             <Ticket size={13} /> My Chits ({groups.length})
@@ -910,8 +930,8 @@ export default function SubscriberPortal() {
             onClick={() => setActiveTab('passbook')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'passbook'
-                ? 'bg-[#6359E9] text-white shadow-md shadow-[#6359E9]/30'
-                : 'text-[#AEABD8] hover:text-white hover:bg-[#1D1D41]'
+                ? 'bg-[#2A1DB8] text-white shadow-md shadow-[#2A1DB8]/20'
+                : 'text-[#636F85] hover:text-[#151B26] hover:bg-slate-100'
             }`}
           >
             <History size={13} /> Passbook Ledger ({transactions.length})
@@ -920,8 +940,8 @@ export default function SubscriberPortal() {
             onClick={() => setActiveTab('auctions')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'auctions'
-                ? 'bg-[#6359E9] text-white shadow-md shadow-[#6359E9]/30'
-                : 'text-[#AEABD8] hover:text-white hover:bg-[#1D1D41]'
+                ? 'bg-[#2A1DB8] text-white shadow-md shadow-[#2A1DB8]/20'
+                : 'text-[#636F85] hover:text-[#151B26] hover:bg-slate-100'
             }`}
           >
             <Trophy size={13} /> Auctions ({auctions.length})
@@ -930,8 +950,8 @@ export default function SubscriberPortal() {
             onClick={() => setActiveTab('settings')}
             className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'settings'
-                ? 'bg-[#6359E9] text-white shadow-md shadow-[#6359E9]/30'
-                : 'text-[#AEABD8] hover:text-white hover:bg-[#1D1D41]'
+                ? 'bg-[#2A1DB8] text-white shadow-md shadow-[#2A1DB8]/20'
+                : 'text-[#636F85] hover:text-[#151B26] hover:bg-slate-100'
             }`}
           >
             <Settings size={13} /> Settings &amp; Security
@@ -940,1106 +960,1703 @@ export default function SubscriberPortal() {
 
         {/* TAB CONTENTS */}
 
-        {/* TAB 1: OVERVIEW & ACTIVE CHITS (Hero Welcome only here) */}
+        {/* TAB 1: SCREEN 1 OVERVIEW & ACTIVE CHITS (Apple Wallet Popout Design) */}
         {activeTab === 'overview' && (
-          <div className="space-y-4 sm:space-y-5">
-            {/* HERO WELCOME & PORTFOLIO SNAPSHOT */}
-            <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-[#27264E] p-4 sm:p-6 transition-all bg-[#1D1D41] text-white shadow-xl">
-              <div className="absolute -top-12 -right-12 w-40 h-40 bg-[#6359E9]/15 rounded-full blur-2xl pointer-events-none" />
-              
-              <div className="relative z-10 flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2 text-[#64CFF6] font-mono text-[11px] uppercase tracking-wider font-bold">
-                  <ShieldCheck size={14} /> Official Chit Passbook
-                </div>
-              </div>
+          <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200">
+            {/* Live Auction Banner (Compact Sleek Pill) */}
+            {(() => {
+              const liveGroup = groups.find((g) => g.isLiveAuctionActive);
+              if (liveGroup) {
+                const topBid = liveGroup.liveBidStream && liveGroup.liveBidStream.length > 0
+                  ? Math.max(...liveGroup.liveBidStream.map((b) => b.amount))
+                  : 0;
 
-              {/* GREETING TITLE */}
-              <div className="relative z-10 mb-5">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight text-white">
-                  வணக்கம், {profile?.fullName || 'Subscriber'}!
-                </h1>
-              </div>
-
-              {/* 3-METRIC GRID */}
-              <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3.5 mt-3.5 sm:mt-4">
-                
-                {/* Stat 1: Total Contributed */}
-                <div className="rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between bg-[#141332] border border-[#27264E]">
-                  <div className="flex items-center justify-between mb-1 text-[#AEABD8]">
-                    <span className="text-[10px] font-semibold truncate">Total Paid</span>
-                    <div className="p-1 rounded-md shrink-0 bg-[#02B15A]/15 text-[#02B15A]">
-                      <Wallet size={13} />
+                return (
+                  <div className="bg-white rounded-2xl p-3 shadow-xs border border-[#E5E9F2] flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider truncate">
+                          Live Auction in Progress
+                        </span>
+                        <span className="text-xs text-[#636F85] font-mono truncate">
+                          Month {liveGroup.currentMonth} / {liveGroup.durationMonths} · {topBid > 0 ? `Discount ₹${topBid.toLocaleString('en-IN')}` : liveGroup.groupName}
+                        </span>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveLiveArenaGroupId(liveGroup.groupId);
+                        setActiveTab('auctions');
+                      }}
+                      className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 bg-[#2A1DB8] hover:bg-[#1B0F8C] text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
+                    >
+                      <span>Join Arena</span>
+                      <ArrowRight size={14} />
+                    </button>
                   </div>
-                  <div className="text-base sm:text-xl font-black font-mono tracking-tight text-[#02B15A] whitespace-nowrap">
-                    ₹{totalPaid.toLocaleString('en-IN')}
-                  </div>
-                  <p className="text-[9px] mt-0.5 truncate text-[#AEABD8]">Across collections</p>
-                </div>
+                );
+              }
+              return null;
+            })()}
 
-                {/* Stat 2: Enrolled Tickets */}
-                <div className="rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between bg-[#141332] border border-[#27264E]">
-                  <div className="flex items-center justify-between mb-1 text-[#AEABD8]">
-                    <span className="text-[10px] font-semibold truncate">Enrolled Chits</span>
-                    <div className="p-1 rounded-md shrink-0 bg-[#6359E9]/20 text-[#64CFF6]">
-                      <Ticket size={13} />
-                    </div>
-                  </div>
-                  <div className="text-base sm:text-xl font-black font-mono tracking-tight flex items-baseline gap-1 whitespace-nowrap text-white">
-                    <span>{groups.length}</span>
-                    <span className="text-[10px] font-normal text-[#AEABD8]">Tickets</span>
-                  </div>
-                  <p className="text-[9px] mt-0.5 truncate text-[#AEABD8]">
-                    {groups.map(g => `#${g.ticketNumber}`).join(', ') || 'No tickets'}
-                  </p>
-                </div>
-
-                {/* Stat 3: Auction Status */}
-                <div className="rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between bg-[#141332] border border-[#27264E]">
-                  <div className="flex items-center justify-between mb-1 text-[#AEABD8]">
-                    <span className="text-[10px] font-semibold truncate">Auction Status</span>
-                    <div className="p-1 rounded-md shrink-0 bg-[#FFBB38]/20 text-[#FFBB38]">
-                      <Trophy size={13} />
-                    </div>
-                  </div>
-                  <div className="text-base sm:text-xl font-black font-mono tracking-tight whitespace-nowrap">
-                    {wonGroupsCount > 0 ? (
-                      <span className="text-[#FFBB38]">{wonGroupsCount} Won</span>
-                    ) : (
-                      <span className="text-[#64CFF6]">Eligible</span>
-                    )}
-                  </div>
-                  <p className="text-[9px] mt-0.5 truncate text-[#AEABD8]">
-                    {wonGroupsCount > 0 ? 'Prize Pot disbursed' : 'Eligible for bidding'}
-                  </p>
-                </div>
-
-              </div>
-            </div>
-
+            {/* Hero Chit Passbook Card: Apple Wallet Layered 3D Card Stack */}
             {groups.length === 0 ? (
-              <div className="text-center py-10 rounded-2xl border border-[#27264E] bg-[#1D1D41] p-6 text-[#AEABD8]">
-                <Ticket className="mx-auto h-10 w-10 text-[#AEABD8] mb-2" />
-                <h3 className="text-sm font-bold text-white">No Enrolled Chits Found</h3>
-                <p className="text-[11px] text-[#AEABD8] max-w-xs mx-auto mt-1">
+              <div className="text-center py-10 rounded-2xl border border-[#E5E9F2] bg-white p-6 text-[#636F85]">
+                <Ticket className="mx-auto h-10 w-10 text-[#636F85] mb-2" />
+                <h3 className="text-sm font-bold text-[#151B26]">No Enrolled Chits Found</h3>
+                <p className="text-[11px] text-[#636F85] max-w-xs mx-auto mt-1">
                   You are not currently enrolled in any chit groups. Contact your Chit Fund Manager.
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {/* UPCOMING AUCTION COUNTDOWN STACK */}
-                <AuctionCountdownStack groups={groups} theme={theme} />
+              <div className="mt-2 relative">
+                {/* Peek Under-Cards (Apple Wallet Style Stack) */}
+                {groups.length > 1 && groups.map((g, idx) => {
+                  if (idx === selectedCardIndex) return null;
+                  const isGold = idx % 2 === 1;
+                  const gPayment = getGroupPaymentStatus(g, transactions, auctions);
+                  const isLaaba = g.kaiIruppuPool >= g.totalValue;
 
-                <div className="flex items-center justify-between px-0.5">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                    <Ticket className="text-indigo-400" size={14} /> My Enrolled Groups ({groups.length})
-                  </h2>
-                </div>
+                  return (
+                    <div
+                      key={`under-card-${g.groupId}`}
+                      onClick={() => setSelectedCardIndex(idx)}
+                      title="Tap to bring this card to front"
+                      style={{
+                        zIndex: 10 - idx,
+                        transform: `scale(${0.94 - idx * 0.02}) translateY(-${12 + idx * 6}px)`,
+                      }}
+                      className={`w-[93%] mx-auto h-20 -mb-12 rounded-2xl p-3.5 text-white shadow-lg cursor-pointer transition-all duration-300 hover:-translate-y-4 hover:scale-[0.96] flex items-start justify-between active:scale-95 ${
+                        isGold
+                          ? 'bg-gradient-to-r from-[#B45309] via-[#D97706] to-[#FBBF24] shadow-[0_4px_16px_rgba(217,119,6,0.22)]'
+                          : 'bg-gradient-to-r from-[#047857] via-[#059669] to-[#10B981] shadow-[0_4px_16px_rgba(5,150,105,0.22)]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Ticket size={17} className="text-amber-200 shrink-0" />
+                        <span className="font-bold text-xs sm:text-sm text-white truncate">{g.groupName}</span>
+                      </div>
+                      <span className="text-[10px] bg-black/25 px-2.5 py-0.5 rounded-full font-semibold text-amber-100 shrink-0">
+                        {isLaaba ? '₹0 Due (Laaba Seetu)' : `₹${gPayment.outstandingBalance.toLocaleString('en-IN')} Due`}
+                      </span>
+                    </div>
+                  );
+                })}
 
-                <div className="space-y-3">
-                  {groups.map((grp) => {
-                    const laabaProgress = Math.min(100, Math.round((grp.kaiIruppuPool / grp.totalValue) * 100));
-                    const isLaabaReady = grp.kaiIruppuPool >= grp.totalValue;
-                    const paymentInfo = getGroupPaymentStatus(grp, transactions, auctions);
-                    const monthNameLong = getChitMonthName(grp.startDate, paymentInfo.effectiveCurrentMonth, 'long');
-                    const monthNameShort = getChitMonthName(grp.startDate, paymentInfo.effectiveCurrentMonth, 'short');
-                    const isBreakdownExpanded = expandedBreakdownGroupIds.includes(grp.groupId);
+                {/* Active Front Card (Apple Wallet Popout Animation) */}
+                {(() => {
+                  const safeIndex = selectedCardIndex < groups.length ? selectedCardIndex : 0;
+                  const activeGrp = groups[safeIndex] || groups[0];
+                  const paymentInfo = getGroupPaymentStatus(activeGrp, transactions, auctions);
+                  const isLaaba = activeGrp.kaiIruppuPool >= activeGrp.totalValue;
+                  const isWon = activeGrp.hasWonRegular;
 
-                    return (
-                      <div
-                        key={grp.groupId}
-                        className="border border-[#27264E] bg-[#1D1D41] hover:border-[#6359E9]/40 transition-all rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3.5"
-                      >
-                        {/* Header: Name + Value */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 text-[10px] font-bold font-mono border border-indigo-500/20 mb-1">
-                              Ticket #{grp.ticketNumber}
+                  return (
+                    <div 
+                      key={`top-card-${activeGrp.groupId}`}
+                      className="relative z-20 w-full rounded-2xl overflow-hidden p-5 shadow-[0_16px_36px_rgba(30,27,75,0.25)] ring-1 ring-white/30 bg-gradient-to-br from-[#1a00a7] via-[#1D4ED8] to-[#0284C7] text-white transition-all duration-500 ease-out hover:shadow-[0_20px_45px_rgba(26,0,167,0.35)]"
+                    >
+                      {/* Organic Translucent Wave Overlays */}
+                      <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/15 blur-[2px] pointer-events-none" />
+                      <div className="absolute -bottom-16 -left-10 w-44 h-44 rounded-full bg-[#389BFF]/30 blur-[2px] pointer-events-none" />
+                      <div className="absolute top-1/2 right-1/4 w-32 h-32 rounded-full bg-white/10 pointer-events-none" />
+
+                      <div className="relative z-10 flex flex-col justify-between min-h-[195px]">
+                        {/* Top Row: Series & Value + Crest */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-indigo-200 tracking-wider uppercase font-bold">
+                                {activeGrp.totalValue >= 500000 ? 'Platinum Chit Series' : 'Gold Growth Series'}
+                              </span>
+                              <span className="text-[10px] bg-[#FFE082]/30 text-amber-200 font-extrabold px-2 py-0.5 rounded-full font-mono">
+                                ₹{activeGrp.totalValue.toLocaleString('en-IN')}
+                              </span>
                             </div>
-                            <h3 className={`text-sm sm:text-base font-black tracking-tight truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                              {grp.groupName}
-                            </h3>
-                            <p className="text-[10px] text-slate-400 mt-0.5">
-                              {grp.durationMonths} Months • Current: <strong className={`font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>Month {paymentInfo.effectiveCurrentMonth} ({monthNameLong})</strong>
+                            <h2 className="text-xl sm:text-2xl text-white font-extrabold leading-tight mt-1 truncate tracking-tight">
+                              {activeGrp.groupName}
+                            </h2>
+                            <p className="text-xs text-white/90 mt-0.5">
+                              Subscriber: <span className="font-semibold text-white">{profile?.fullName || 'Subscriber'}</span>
                             </p>
                           </div>
 
-                          <div className="text-right font-mono shrink-0">
-                            <span className="text-[9px] text-slate-400 uppercase font-semibold">Chit Value</span>
-                            <div className="text-sm sm:text-lg font-black text-emerald-500 whitespace-nowrap">
-                              ₹{grp.totalValue.toLocaleString('en-IN')}
-                            </div>
+                          {/* Crest Badge */}
+                          <div className="shrink-0 w-12 h-12 rounded-full p-1 bg-white/20 backdrop-blur-md flex items-center justify-center shadow-md ring-2 ring-white/40">
+                            <Trophy size={24} className="text-amber-300 drop-shadow-xs" />
                           </div>
                         </div>
 
-                        {/* Payment Status Alert Banner */}
-                        <div className={`p-2.5 sm:p-3 rounded-xl border flex flex-col xs:flex-row xs:items-center justify-between gap-2 ${
-                          paymentInfo.isSettled
-                            ? isDark
-                              ? 'bg-emerald-950/30 border-emerald-500/20 text-emerald-300'
-                              : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                            : paymentInfo.isPastDueDate
-                              ? isDark
-                                ? 'bg-rose-950/30 border-rose-500/20 text-rose-300'
-                                : 'bg-rose-50 border-rose-200 text-rose-800'
-                              : isDark
-                                ? 'bg-amber-950/30 border-amber-500/20 text-amber-300'
-                                : 'bg-amber-50/80 border-amber-200 text-amber-900'
-                        }`}>
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                              paymentInfo.isSettled
-                                ? isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
-                                : paymentInfo.isPastDueDate
-                                  ? isDark ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-700'
-                                  : isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'
-                            }`}>
-                              {paymentInfo.isSettled ? (
-                                <CheckCircle2 size={15} />
-                              ) : paymentInfo.isPastDueDate ? (
-                                <AlertTriangle size={15} />
-                              ) : (
-                                <Clock size={15} />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs font-bold leading-snug flex items-center gap-1.5 flex-wrap">
-                                {paymentInfo.isSettled ? (
-                                  <span>All Dues Settled (Up to M{paymentInfo.effectiveCurrentMonth} • {monthNameShort})</span>
-                                ) : paymentInfo.isPastDueDate ? (
-                                  paymentInfo.pendingMonthsCount > 1 ? (
-                                    <>
-                                      <span className="font-mono font-black">({paymentInfo.pendingMonthsCount} Cycles Due):</span>
-                                      <span className="font-mono font-black text-rose-500 underline decoration-rose-500/30">
-                                        ₹{paymentInfo.outstandingBalance.toLocaleString('en-IN')} Total Pending
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="font-mono font-black">(M{paymentInfo.monthDues.find(m => m.remainingDue > 0)?.month ?? paymentInfo.effectiveCurrentMonth} • {paymentInfo.monthDues.find(m => m.remainingDue > 0)?.monthNameShort ?? monthNameShort}) Past Due Date:</span>
-                                      <span className="font-mono font-black text-rose-500 underline decoration-rose-500/30">
-                                        ₹{paymentInfo.outstandingBalance.toLocaleString('en-IN')}
-                                      </span>
-                                    </>
-                                  )
-                                ) : (
-                                  <>
-                                    <span className="font-mono font-black">({paymentInfo.pendingMonthsCount > 1 ? `${paymentInfo.pendingMonthsCount} Cycles` : `M${paymentInfo.effectiveCurrentMonth}`} • {monthNameShort}) Due in {paymentInfo.daysRemaining} days:</span>
-                                    <span className={`font-mono font-black ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
-                                      ₹{paymentInfo.outstandingBalance.toLocaleString('en-IN')}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                              <p className="text-[10px] opacity-75 mt-0.5">
-                                {paymentInfo.isSettled ? (
-                                  `Paid ₹${paymentInfo.totalPaidForGroup.toLocaleString('en-IN')} in full • All cycles up to date`
-                                ) : paymentInfo.pendingMonthsCount > 1 ? (
-                                  `⚠️ Unsettled: ${paymentInfo.monthDues.filter(m => m.remainingDue > 0).map(m => `M${m.month} (₹${m.remainingDue.toLocaleString('en-IN')})`).join(' + ')}`
-                                ) : paymentInfo.isPastDueDate ? (
-                                  `⚠️ ${paymentInfo.daysOverdue} days past auction due date (${paymentInfo.formattedDueDate})`
-                                ) : (
-                                  `Due on auction day (${paymentInfo.formattedDueDate}) • Payment window open`
-                                )}
-                              </p>
-                            </div>
+                        {/* Middle Row: Ticket Badge & Status Pill */}
+                        <div className="my-3 flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur-md px-3 py-1 rounded-full text-white text-xs font-semibold border border-white/15 font-mono">
+                            <Ticket size={14} className="text-cyan-300" />
+                            <span>Ticket #{activeGrp.ticketNumber} / {activeGrp.memberCount}</span>
                           </div>
 
-                          <span className={`text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded-md self-start xs:self-center shrink-0 ${
-                            paymentInfo.isSettled
-                              ? isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-200/80 text-emerald-900'
-                              : paymentInfo.isPastDueDate
-                                ? isDark ? 'bg-rose-500/20 text-rose-300' : 'bg-rose-200/80 text-rose-900'
-                                : isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-200/80 text-amber-900'
+                          <span className={`text-white text-xs px-3 py-1 rounded-full font-bold shadow-md ring-1 ring-white/30 inline-flex items-center gap-1 ${
+                            isWon ? 'bg-[#D97706]' : 'bg-[#059669]'
                           }`}>
-                            {paymentInfo.isSettled ? 'Paid' : paymentInfo.isPastDueDate ? 'Overdue' : 'Upcoming'}
+                            {isWon ? (
+                              <>
+                                <Crown size={14} /> Won (Disbursed)
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 size={14} /> Eligible to Bid
+                              </>
+                            )}
                           </span>
                         </div>
 
-                        {/* 3-Column Key Metrics */}
-                        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-2.5 rounded-xl border bg-[#141332] border-[#27264E]">
-                          <div>
-                            <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Monthly Due</span>
-                            <div className="text-xs sm:text-sm font-bold font-mono mt-0.5 whitespace-nowrap text-white">
-                              ₹{grp.monthlyInstallment.toLocaleString('en-IN')}
+                        {/* Bottom Row: Monthly Due & Passbook Slip Button */}
+                        <div className="flex items-end justify-between pt-2.5 border-t border-white/20">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-white/80 font-medium uppercase tracking-wider">
+                              Monthly Due
+                            </span>
+                            <div className="flex items-baseline gap-2 mt-0.5">
+                              <span className="text-2xl font-extrabold tracking-tight font-mono text-white">
+                                {isLaaba ? '₹0' : `₹${paymentInfo.outstandingBalance.toLocaleString('en-IN')}`}
+                              </span>
+                              <span className="text-[10px] text-indigo-100 font-bold bg-white/10 px-2 py-0.5 rounded-full font-mono">
+                                {isLaaba ? 'Laaba Seetu Free Month' : `Due ${paymentInfo.formattedDueDate}`}
+                              </span>
                             </div>
                           </div>
-                          <div>
-                            <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Total Paid</span>
-                            <div className="text-xs sm:text-sm font-bold font-mono mt-0.5 text-[#02B15A] whitespace-nowrap">
-                              ₹{paymentInfo.totalPaidForGroup.toLocaleString('en-IN')}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPassbookGroup(activeGrp.groupId);
+                              setActiveTab('passbook');
+                            }}
+                            className="flex items-center gap-1 text-white bg-white/25 hover:bg-white/30 backdrop-blur-md px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-sm ring-1 ring-white/20 active:scale-95"
+                          >
+                            <span>Passbook Slip</span>
+                            <ChevronRight size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Card Switching Dots (if more than 1 chit enrolled) */}
+                {groups.length > 1 && (
+                  <div className="flex items-center justify-center gap-1.5 mt-2.5">
+                    {groups.map((_, dotIdx) => (
+                      <button
+                        key={`card-dot-${dotIdx}`}
+                        onClick={() => setSelectedCardIndex(dotIdx)}
+                        className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                          dotIdx === selectedCardIndex ? 'w-5 bg-[#2A1DB8]' : 'w-1.5 bg-slate-300'
+                        }`}
+                        title={`Switch to Chit #${dotIdx + 1}`}
+                      />
+                    ))}
+                    <span className="text-[10px] text-[#636F85] ml-1">Tap card or dots to switch</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Quick Stat Summary Row (Spacious & Simple Clean White Cards) */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="bg-white rounded-2xl p-3.5 shadow-xs border border-[#E5E9F2] flex flex-col justify-between">
+                <div className="flex items-center gap-1 text-[#636F85] mb-1">
+                  <Wallet size={15} className="text-[#2A1DB8] shrink-0" />
+                  <span className="text-[10px] font-semibold truncate">Total Paid</span>
+                </div>
+                <span className="text-sm sm:text-base font-mono font-extrabold text-[#151B26] truncate">
+                  ₹{totalPaid.toLocaleString('en-IN')}
+                </span>
+                <span className="text-[10px] text-[#636F85] mt-0.5 truncate">
+                  {transactions.filter(t => t.type === 'collection' && t.status === 'completed').length} Installments
+                </span>
+              </div>
+
+              <div className="bg-white rounded-2xl p-3.5 shadow-xs border border-[#E5E9F2] flex flex-col justify-between">
+                <div className="flex items-center gap-1 text-[#636F85] mb-1">
+                  <Trophy size={15} className="text-amber-500 shrink-0" />
+                  <span className="text-[10px] font-semibold truncate">Prize Status</span>
+                </div>
+                <span className={`text-sm sm:text-base font-extrabold truncate ${
+                  wonGroupsCount > 0 ? 'text-amber-600' : 'text-emerald-600'
+                }`}>
+                  {wonGroupsCount > 0 ? `${wonGroupsCount} Won` : 'Eligible'}
+                </span>
+                <span className="text-[10px] font-semibold text-emerald-600 mt-0.5 truncate">
+                  {wonGroupsCount > 0 ? 'Prize Disbursed' : 'Open to Bid'}
+                </span>
+              </div>
+
+              <div className="bg-white rounded-2xl p-3.5 shadow-xs border border-[#E5E9F2] flex flex-col justify-between">
+                <div className="flex items-center gap-1 text-[#636F85] mb-1">
+                  <Clock size={15} className="text-rose-500 shrink-0" />
+                  <span className="text-[10px] font-semibold truncate">Next Due</span>
+                </div>
+                <span className={`text-sm sm:text-base font-mono font-extrabold truncate ${
+                  totalOverdueAmount > 0 ? 'text-rose-600' : 'text-[#151B26]'
+                }`}>
+                  ₹{(totalOverdueAmount > 0 
+                    ? totalOverdueAmount 
+                    : (groups[0] ? getGroupPaymentStatus(groups[0], transactions, auctions).outstandingBalance : 0)
+                  ).toLocaleString('en-IN')}
+                </span>
+                <span className="text-[10px] text-[#636F85] mt-0.5 truncate">
+                  {overdueGroups.length > 0 ? 'Payment Overdue' : 'Due on Cycle'}
+                </span>
+              </div>
+            </div>
+
+            {/* Recent Activity (Clean White Container with 100% Real Dynamic Rows) */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between px-0.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#151B26]">
+                  Recent Activity
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('passbook')}
+                  className="text-xs text-[#2A1DB8] hover:text-[#1B0F8C] font-bold flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>View All Passbook</span>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+
+              <div className="bg-white rounded-2xl p-3.5 shadow-xs border border-[#E5E9F2] flex flex-col gap-2.5">
+                {(() => {
+                  const completedTxs = transactions.filter(t => t.type === 'collection' && t.status === 'completed');
+                  const wonAuction = auctions.find(a => a.isCurrentSubscriberWinner);
+                  const activeCardGrp = groups[selectedCardIndex] || groups[0];
+                  const hasLaaba = activeCardGrp ? activeCardGrp.kaiIruppuPool >= activeCardGrp.totalValue : false;
+
+                  if (completedTxs.length === 0 && !wonAuction && !hasLaaba) {
+                    return (
+                      <div className="py-6 text-center text-xs text-[#636F85]">
+                        No payment activity recorded yet for your account.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {/* Real Dynamic Collection Payments (up to 3) */}
+                      {completedTxs.slice(0, 3).map((tx, txIdx) => (
+                        <div key={tx.id}>
+                          <div 
+                            onClick={() => setSelectedTx(tx)}
+                            className="flex items-center justify-between py-1 cursor-pointer hover:bg-slate-50 rounded-xl px-1.5 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-11 h-11 rounded-2xl bg-[#EEECFE] text-[#2A1DB8] border border-indigo-100 flex items-center justify-center shrink-0 shadow-2xs">
+                                <Receipt size={20} />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-xs sm:text-sm font-bold text-[#151B26] leading-tight truncate">
+                                  {tx.groupName}
+                                </span>
+                                <span className="text-[11px] text-[#636F85] font-mono mt-0.5 truncate">
+                                  {!tx.walletType || tx.walletType.toLowerCase().includes('cash') ? 'Cash in Hand' : 'UPI / Bank'} · {new Date(tx.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 font-mono">
+                              <span className="text-xs sm:text-sm font-extrabold text-[#151B26] block">
+                                - ₹{Number(tx.amount).toLocaleString('en-IN')}
+                              </span>
+                              <span className="inline-block text-[10px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full mt-0.5">
+                                Paid
+                              </span>
                             </div>
                           </div>
-                          <div>
-                            <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Auction Status</span>
-                            <div className="text-xs sm:text-sm font-bold mt-0.5">
-                              {grp.hasWonRegular ? (
-                                <span className="text-[#FFBB38] flex items-center gap-1 font-mono text-xs">
-                                  <Trophy size={12} /> Won
+                          {txIdx < Math.min(completedTxs.length, 3) - 1 && (
+                            <div className="h-[1px] bg-[#E5E9F2] w-full my-1" />
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Real Dynamic Won Auction Prize Pot Disbursal (Shown only if member actually won) */}
+                      {wonAuction && (
+                        <>
+                          <div className="h-[1px] bg-[#E5E9F2] w-full my-1" />
+                          <div className="flex items-center justify-between py-1">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0 shadow-2xs">
+                                <Trophy size={20} />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-xs sm:text-sm font-bold text-[#151B26] leading-tight truncate">
+                                  Prize Pot Disbursal (Month {wonAuction.month})
+                                </span>
+                                <span className="text-[11px] text-[#636F85] mt-0.5 truncate">
+                                  {wonAuction.groupName} · Net Disbursed Payout
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 font-mono">
+                              <span className="text-xs sm:text-sm font-extrabold text-emerald-600 block">
+                                + ₹{wonAuction.netPayout.toLocaleString('en-IN')}
+                              </span>
+                              <span className="inline-block text-[10px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full mt-0.5">
+                                Disbursed
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Real Dynamic Laaba Seetu Free Month Entry (Shown only if this chit is in Laaba Seetu) */}
+                      {hasLaaba && (
+                        <>
+                          <div className="h-[1px] bg-[#E5E9F2] w-full my-1" />
+                          <div className="flex items-center justify-between py-1">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shrink-0 shadow-2xs">
+                                <Gift size={20} />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-xs sm:text-sm font-bold text-[#151B26] leading-tight truncate">
+                                  Laaba Seetu Free Month
+                                </span>
+                                <span className="text-[11px] text-[#636F85] mt-0.5 truncate">
+                                  Discount Pool Funded · ₹0 Due
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 font-mono">
+                              <span className="text-xs sm:text-sm font-extrabold text-amber-700 block">
+                                ₹0 Due
+                              </span>
+                              <span className="inline-block text-[10px] text-amber-800 font-bold bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full mt-0.5">
+                                100% Waived
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Primary Pinned Action Button */}
+            <div className="w-full pt-1">
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(true)}
+                className="w-full h-[52px] bg-[#2A1DB8] hover:bg-[#1B0F8C] text-white font-bold text-sm rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-[#2A1DB8]/20 active:scale-[0.99] transition-all cursor-pointer"
+              >
+                <Wallet size={18} />
+                <span>Make Monthly Installment Payment</span>
+              </button>
+              <div className="flex items-center justify-center gap-1.5 mt-2.5 text-center px-2">
+                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                <span className="text-[10px] text-[#636F85]">
+                  Government Registered Chit Fund · Tamil Nadu Chit Funds Act Compliant
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: SCREEN 3 SUBSCRIBER CHITS (Exact 360px Native Android 20-Month Chit Schedule) */}
+        {activeTab === 'chits' && (() => {
+          const activeGrp = groups[selectedCardIndex] || groups[0] || null;
+          const pInfo = activeGrp ? getGroupPaymentStatus(activeGrp, transactions, auctions) : null;
+          const totalMonths = activeGrp?.durationMonths || 20;
+          const paidMonthsCount = pInfo ? pInfo.monthDues.filter((m) => m.status === 'paid' || m.status === 'free_laaba').length : 0;
+          const remainingMonthsCount = Math.max(0, totalMonths - paidMonthsCount);
+          const cyclePct = activeGrp && activeGrp.durationMonths > 0
+            ? Math.min(100, Math.round(((pInfo?.effectiveCurrentMonth ?? 1) / activeGrp.durationMonths) * 100))
+            : 10;
+
+          const getMonthDateStr = (m: number) => {
+            if (!activeGrp?.startDate) return `Month ${m}`;
+            try {
+              const base = new Date(activeGrp.startDate);
+              const d = new Date(base.getFullYear(), base.getMonth() + m, base.getDate() || 15);
+              return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            } catch {
+              return `Month ${m}`;
+            }
+          };
+
+          const getMaturityDateStr = () => {
+            if (!activeGrp?.startDate) return 'Upon completion of batch';
+            try {
+              const base = new Date(activeGrp.startDate);
+              const d = new Date(base.getFullYear(), base.getMonth() + totalMonths, base.getDate() || 15);
+              return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            } catch {
+              return 'Upon completion of batch';
+            }
+          };
+
+          const m1Auction = auctions.find((a) => a.groupId === activeGrp?.groupId && a.month === 1);
+          const m1WinningBidText = m1Auction?.winningDiscount 
+            ? `Winning Bid ₹${m1Auction.winningDiscount.toLocaleString('en-IN')}` 
+            : 'Live Bidding Pending';
+
+          const currentMonthNum = pInfo?.effectiveCurrentMonth ?? 2;
+          const upcomingStartMonth = currentMonthNum + 1;
+          const upcomingMonthsCount = Math.max(0, totalMonths - upcomingStartMonth);
+          const maxRemainingPayable = upcomingMonthsCount * (activeGrp?.monthlyInstallment || 10000);
+
+          const displayedDues = pInfo?.monthDues.filter((item) => {
+            if (scheduleFilter === 'paid') return item.status === 'paid' || item.status === 'free_laaba';
+            if (scheduleFilter === 'pending') return item.remainingDue > 0;
+            return true;
+          }) || [];
+
+          return (
+            <div className="space-y-0 -mx-3.5 sm:-mx-6 -mt-4 sm:-mt-6 pb-28 animate-in fade-in duration-200 bg-[#F4F6FB] text-[#151B26]">
+              {/* 1. TOP CANOPY HEADER (Royal Indigo with Status Bar & App Bar) */}
+              <header className="w-full bg-gradient-to-b from-[#1C128A] via-[#2A1DB8] to-[#3424CA] text-white sticky top-0 z-30 shadow-sm border-b border-white/10">
+                {/* Android Native Status Bar */}
+                <div className="h-6 px-4 flex items-center justify-between text-xs font-semibold text-white/90 select-none pt-1">
+                  <span className="tracking-tight text-[11px] font-bold">9:09</span>
+                  <div className="flex items-center gap-1.5 opacity-90 text-[13px]">
+                    <span className="text-[11px] font-mono">5G</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                    <span className="text-[11px] font-mono">100%</span>
+                  </div>
+                </div>
+
+                {/* App Bar */}
+                <div className="h-14 px-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('overview')}
+                      aria-label="Back"
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white active:bg-white/15 transition-colors cursor-pointer"
+                    >
+                      <ArrowRight className="rotate-180" size={20} />
+                    </button>
+                    <h1 className="text-[17px] font-bold tracking-tight text-white">
+                      {totalMonths}-Month Chit Schedule
+                    </h1>
+                  </div>
+                  {groups.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextIdx = (selectedCardIndex + 1) % groups.length;
+                        setSelectedCardIndex(nextIdx);
+                      }}
+                      title="Switch Chit Group"
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white/90 active:bg-white/15 transition-colors cursor-pointer"
+                    >
+                      <Sliders size={18} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowScheduleInfoModal((prev) => !prev)}
+                      aria-label="Schedule Information"
+                      title="Schedule Information"
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white/90 active:bg-white/15 transition-colors cursor-pointer"
+                    >
+                      <Info size={20} />
+                    </button>
+                  )}
+                </div>
+              </header>
+
+              {/* Information modal toggle */}
+              {showScheduleInfoModal && (
+                <div className="mx-3.5 mt-2.5 p-3.5 rounded-2xl bg-white border border-[#E5E9F2] text-xs text-[#636F85] space-y-1.5 shadow-sm animate-in fade-in">
+                  <div className="flex items-center justify-between text-[#151B26] font-bold">
+                    <span className="flex items-center gap-1.5 text-[#2A1DB8]">
+                      <Sparkles size={14} /> Chit Schedule Mechanics
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowScheduleInfoModal(false)}
+                      className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p>• <strong>Month 0:</strong> Launch round reserved for Organizer Profit.</p>
+                  <p>• <strong>Months 1..N:</strong> Monthly live auctions among eligible non-winning subscribers.</p>
+                  <p>• <strong>Laaba Seetu:</strong> ₹0 free installment months funded when the group discount pool reaches the total chit value.</p>
+                </div>
+              )}
+
+              {/* MAIN SCROLLABLE CONTENT */}
+              <div className="flex flex-col w-full px-3.5 pt-3 gap-3.5">
+                {/* 2. GROUP SUMMARY CARD */}
+                <section className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-[#2A1DB8] via-[#3325D8] to-[#1C0FB3] text-white p-4 shadow-md">
+                  {/* Organic bubble wave overlays */}
+                  <div className="absolute -right-8 -bottom-10 w-36 h-36 rounded-full bg-white/10 pointer-events-none blur-lg" />
+                  <div className="absolute -left-6 -top-10 w-28 h-28 rounded-full bg-[#5244E8]/40 pointer-events-none blur-md" />
+                  
+                  <div className="relative z-10 flex flex-col gap-3">
+                    {/* Title & Subtitle */}
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-0.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-md">
+                          <ShieldCheck size={12} /> {activeGrp?.groupName || 'Chit Plan'}
+                        </span>
+                        <h2 className="text-[19px] font-extrabold tracking-tight text-white pt-1">
+                          {activeGrp?.groupName || 'Chit Group'} (₹{(activeGrp?.totalValue || 200000).toLocaleString('en-IN')})
+                        </h2>
+                        <p className="text-[12px] font-medium text-white/80">
+                          Ticket #{activeGrp?.ticketNumber ?? 1} of {activeGrp?.memberCount ?? 20} · Monthly Due ₹{(activeGrp?.monthlyInstallment || 10000).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                      <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center text-amber-300 shadow-inner shrink-0">
+                        <Wallet size={20} />
+                      </div>
+                    </div>
+
+                    {/* Term Progress */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-white/90">
+                        <span>Term Progress</span>
+                        <span className="font-mono">
+                          Month {currentMonthNum} / {totalMonths} Completed ({cyclePct}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-black/20 overflow-hidden p-0.5">
+                        <div
+                          className="bg-gradient-to-r from-emerald-400 to-emerald-300 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${Math.max(6, cyclePct)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 3 Quick Chips */}
+                    <div className="grid grid-cols-3 gap-2 pt-1 font-mono">
+                      <div className="bg-white/15 backdrop-blur-md rounded-xl p-2 text-center border border-white/10">
+                        <p className="text-[10px] text-white/75 font-semibold font-sans">Total</p>
+                        <p className="text-[14px] font-extrabold text-white">{totalMonths} Mos</p>
+                      </div>
+                      <div className="bg-white/15 backdrop-blur-md rounded-xl p-2 text-center border border-white/10">
+                        <p className="text-[10px] text-white/75 font-semibold font-sans">Paid</p>
+                        <p className="text-[14px] font-extrabold text-emerald-300">{paidMonthsCount} Mos</p>
+                      </div>
+                      <div className="bg-white/15 backdrop-blur-md rounded-xl p-2 text-center border border-white/10">
+                        <p className="text-[10px] text-white/75 font-semibold font-sans">Remaining</p>
+                        <p className="text-[14px] font-extrabold text-white">{remainingMonthsCount} Mos</p>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 3. SEGMENT FILTER TABS (Clean light pill selector) */}
+                <div className="bg-[#EEF1F6] rounded-2xl p-1 flex items-center justify-between gap-1 select-none border border-[#E5E9F2]">
+                  <button
+                    type="button"
+                    onClick={() => setScheduleFilter('all')}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-center text-[12px] font-bold transition-all cursor-pointer ${
+                      scheduleFilter === 'all'
+                        ? 'bg-[#2A1DB8] text-white shadow-xs'
+                        : 'text-[#636F85] hover:text-[#151B26]'
+                    }`}
+                  >
+                    All {totalMonths} Months
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleFilter('paid')}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-center text-[12px] font-semibold transition-all cursor-pointer ${
+                      scheduleFilter === 'paid'
+                        ? 'bg-[#2A1DB8] text-white shadow-xs font-bold'
+                        : 'text-[#636F85] hover:text-[#151B26]'
+                    }`}
+                  >
+                    Paid ({paidMonthsCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleFilter('pending')}
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-center text-[12px] font-semibold transition-all cursor-pointer ${
+                      scheduleFilter === 'pending'
+                        ? 'bg-[#2A1DB8] text-white shadow-xs font-bold'
+                        : 'text-[#636F85] hover:text-[#151B26]'
+                    }`}
+                  >
+                    Pending ({remainingMonthsCount})
+                  </button>
+                </div>
+
+                {/* 4. MONTH-BY-MONTH SCHEDULE LIST */}
+                <section className="space-y-3">
+                  {displayedDues.map((item) => {
+                    const monthDateStr = getMonthDateStr(item.month);
+                    const isCurrentDue = item.month === currentMonthNum && item.remainingDue > 0;
+                    const isPaid = item.status === 'paid';
+                    const isLaaba = item.status === 'free_laaba' || item.expectedDue === 0;
+
+                    // A. Current Due Highlight Card
+                    if (isCurrentDue) {
+                      return (
+                        <div
+                          key={`m-${item.month}`}
+                          className="bg-red-50/80 rounded-2xl p-3.5 shadow-xs border-2 border-red-300 flex flex-col gap-2.5 relative overflow-hidden"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-[14px] bg-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                                <AlertTriangle size={22} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <h3 className="text-[14px] font-bold text-red-950 leading-snug">
+                                    Month {item.month} (Current Due)
+                                  </h3>
+                                </div>
+                                <p className="text-[11px] text-red-800 font-medium">
+                                  Due by {item.formattedDueDate || monthDateStr}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right font-mono">
+                              <span className="text-[16px] font-extrabold text-red-600">
+                                ₹{item.remainingDue.toLocaleString('en-IN')} Due
+                              </span>
+                              <div className="mt-0.5">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">
+                                  {pInfo?.isPastDueDate
+                                    ? `${pInfo.daysOverdue ?? 1} Days Overdue`
+                                    : `Due in ${pInfo?.daysRemaining ?? 5} Days`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between pt-1.5 border-t border-red-200">
+                            <span className="text-[11px] font-semibold text-red-700 flex items-center gap-1">
+                              <Clock size={14} /> Immediate Payment Required
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowPaymentModal(true)}
+                              className="px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold shadow-xs active:scale-95 transition-transform cursor-pointer"
+                            >
+                              Pay Now
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // B. Laaba Seetu Free Month Card
+                    if (isLaaba) {
+                      return (
+                        <div
+                          key={`m-${item.month}`}
+                          className="bg-amber-50/80 rounded-2xl p-3.5 shadow-xs border border-amber-300 flex flex-col gap-2.5"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-[14px] bg-[#D97706] text-white flex items-center justify-center shrink-0 shadow-xs">
+                                <Sparkles size={22} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1">
+                                  <h3 className="text-[14px] font-bold text-amber-950 leading-snug">
+                                    Month {item.month} · Laaba Seetu
+                                  </h3>
+                                </div>
+                                <p className="text-[11px] text-amber-800 font-medium">
+                                  {monthDateStr} · Free Month 🎉
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right font-mono">
+                              <span className="text-[16px] font-extrabold text-amber-700">
+                                ₹0 (Free)
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between bg-amber-100/70 px-3 py-1.5 rounded-xl border border-amber-300/60">
+                            <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                              <Gift size={14} className="text-amber-600" /> 100% Waived from Discount Pool
+                            </span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-200/80 px-1.5 py-0.5 rounded">
+                              Bonus
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // C. Month 0 Launch Month Card
+                    if (item.month === 0) {
+                      return (
+                        <div
+                          key={`m-${item.month}`}
+                          className="bg-white rounded-2xl p-3.5 shadow-xs border border-[#E5E9F2] flex flex-col gap-2.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-[14px] bg-[#2A1DB8] text-white flex items-center justify-center shrink-0 shadow-xs">
+                                <Flag size={20} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <h3 className="text-[14px] font-bold text-[#151B26] leading-snug">
+                                    Month 0 (Launch Month)
+                                  </h3>
+                                </div>
+                                <p className="text-[11px] text-[#636F85]">
+                                  {monthDateStr} · Organizer Profit Round
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right flex flex-col items-end font-mono">
+                              <span className="text-[14px] font-bold text-[#151B26]">
+                                ₹{item.expectedDue.toLocaleString('en-IN')}
+                              </span>
+                              {isPaid ? (
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold mt-0.5 border border-emerald-200 font-sans">
+                                  <CheckCircle2 size={11} /> Paid
                                 </span>
                               ) : (
-                                <span className="text-[#02B15A] flex items-center gap-1 font-mono text-xs">
-                                  <CheckCircle2 size={12} /> Eligible
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold mt-0.5 border border-red-200 font-sans">
+                                  Due
                                 </span>
                               )}
                             </div>
                           </div>
                         </div>
+                      );
+                    }
 
-                        {/* Expandable Month-by-Month Dues Breakdown Matrix */}
-                        <div className="rounded-xl border border-[#27264E] bg-[#141332] overflow-hidden transition-all">
-                          <button
-                            type="button"
-                            onClick={() => toggleBreakdown(grp.groupId)}
-                            className="w-full p-2.5 sm:p-3 flex items-center justify-between text-left transition-colors cursor-pointer hover:bg-[#1D1D41]"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 bg-[#6359E9]/20 text-[#64CFF6]">
-                                <Layers size={13} />
+                    // D. Month 1 Regular Auction Month Card
+                    if (item.month === 1) {
+                      return (
+                        <div
+                          key={`m-${item.month}`}
+                          className="bg-white rounded-2xl p-3.5 shadow-xs border border-[#E5E9F2] flex flex-col gap-2.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-[14px] bg-[#0284C7] text-white flex items-center justify-center shrink-0 shadow-xs">
+                                <Gavel size={20} />
                               </div>
-                              <div className="min-w-0">
-                                <span className="text-xs font-bold block truncate text-white">
-                                  Month-by-Month Dues Breakdown
-                                </span>
-                                <span className="text-[10px] text-[#AEABD8]">
-                                  {paymentInfo.monthDues.length} active {paymentInfo.monthDues.length === 1 ? 'cycle' : 'cycles'} (M0 to M{paymentInfo.effectiveCurrentMonth})
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <div className="text-right font-mono">
-                                <span className="text-[9px] text-[#AEABD8] uppercase block">Pending</span>
-                                <span className={`text-xs font-black ${
-                                  paymentInfo.isSettled ? 'text-[#02B15A]' : 'text-[#E41414]'
-                                }`}>
-                                  {paymentInfo.isSettled ? '₹0' : `₹${paymentInfo.outstandingBalance.toLocaleString('en-IN')}`}
-                                </span>
-                              </div>
-                              <div className="p-1 rounded-md text-[#AEABD8]">
-                                {isBreakdownExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <h3 className="text-[14px] font-bold text-[#151B26] leading-snug">
+                                    Month 1 Auction
+                                  </h3>
+                                </div>
+                                <p className="text-[11px] text-[#636F85]">
+                                  {monthDateStr} · {m1WinningBidText}
+                                </p>
                               </div>
                             </div>
-                          </button>
-
-                          {/* Expanded Month Matrix */}
-                          {isBreakdownExpanded && (
-                            <div className="p-2.5 sm:p-3 pt-0 border-t border-[#27264E] bg-[#141332] space-y-2 animate-in fade-in duration-200">
-                              <div className="space-y-1.5 pt-2">
-                                {paymentInfo.monthDues.map((dueItem) => {
-                                  return (
-                                    <div
-                                      key={`due-${grp.groupId}-m${dueItem.month}`}
-                                      className={`p-2 sm:p-2.5 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
-                                        dueItem.status === 'paid'
-                                          ? 'bg-[#02B15A]/10 border-[#02B15A]/20'
-                                          : dueItem.status === 'partial'
-                                            ? 'bg-[#FFBB38]/10 border-[#FFBB38]/20'
-                                            : dueItem.status === 'free_laaba'
-                                              ? 'bg-[#6359E9]/15 border-[#6359E9]/25'
-                                              : 'bg-[#E41414]/10 border-[#E41414]/20'
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black shrink-0 ${
-                                          dueItem.month === 0
-                                            ? 'bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30'
-                                            : dueItem.isCurrentCycle
-                                              ? 'bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30'
-                                              : 'bg-[#27264E] text-[#AEABD8]'
-                                        }`}>
-                                          M{dueItem.month}
-                                        </span>
-                                        <div className="min-w-0">
-                                          <div className="font-bold flex items-center gap-1.5 flex-wrap text-[11px] sm:text-xs text-white">
-                                            <span>{dueItem.monthNameLong}</span>
-                                            {dueItem.month === 0 && (
-                                              <span className="text-[9px] font-normal text-[#FFBB38]">👑 Launch Month</span>
-                                            )}
-                                            {dueItem.isCurrentCycle && (
-                                              <span className="text-[9px] font-normal text-[#64CFF6]">⚡ Current Cycle</span>
-                                            )}
-                                          </div>
-                                          <div className="text-[10px] text-[#AEABD8] font-mono mt-0.5">
-                                            Due Date: {dueItem.formattedDueDate}
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Right: Amounts and Status Pill */}
-                                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 font-mono">
-                                        <div className="text-right">
-                                          <div className="text-[11px] sm:text-xs">
-                                            <span className="text-[#AEABD8]">Paid: </span>
-                                            <span className="font-bold text-[#02B15A]">₹{dueItem.paidAmount.toLocaleString('en-IN')}</span>
-                                            <span className="text-[#AEABD8]/60"> / ₹{dueItem.expectedDue.toLocaleString('en-IN')}</span>
-                                          </div>
-                                          {dueItem.remainingDue > 0 && (
-                                            <div className="text-[10px] font-bold text-[#E41414]">
-                                              Pending Due: ₹{dueItem.remainingDue.toLocaleString('en-IN')}
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase shrink-0 ${
-                                          dueItem.status === 'paid'
-                                            ? 'bg-[#02B15A]/20 text-[#02B15A] border border-[#02B15A]/30'
-                                            : dueItem.status === 'partial'
-                                              ? 'bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30'
-                                              : dueItem.status === 'free_laaba'
-                                                ? 'bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30'
-                                                : 'bg-[#E41414]/20 text-[#FF5555] border border-[#E41414]/30'
-                                        }`}>
-                                          {dueItem.status === 'paid'
-                                            ? 'Paid'
-                                            : dueItem.status === 'partial'
-                                              ? 'Partial'
-                                              : dueItem.status === 'free_laaba'
-                                                ? 'Free'
-                                                : 'Unpaid'}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                            <div className="text-right flex flex-col items-end font-mono">
+                              <span className="text-[14px] font-bold text-[#151B26]">
+                                ₹{item.expectedDue.toLocaleString('en-IN')}
+                              </span>
+                              {isPaid ? (
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold mt-0.5 border border-emerald-200 font-sans">
+                                  <CheckCircle2 size={11} /> Paid
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold mt-0.5 border border-red-200 font-sans">
+                                  Due
+                                </span>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </div>
+                      );
+                    }
 
-                        {/* Laaba Seetu Progress Box */}
-                        <div className="border border-[#27264E] rounded-xl p-2.5 sm:p-3 bg-[#141332]">
-                          <div className="flex items-center justify-between text-[10px] sm:text-xs mb-1.5">
-                            <span className="font-bold text-[#64CFF6] flex items-center gap-1 truncate">
-                              <Sparkles size={12} className="shrink-0" />
-                              <span>லாப சீட்டு (Laaba Seetu)</span>
-                            </span>
-                            <span className="font-mono font-bold whitespace-nowrap text-[10px] sm:text-xs text-white">
-                              ₹{grp.kaiIruppuPool.toLocaleString('en-IN')} / ₹{grp.totalValue.toLocaleString('en-IN')}
-                            </span>
+                    // E. Other Standard Month Cards
+                    return (
+                      <div
+                        key={`m-${item.month}`}
+                        className="bg-white rounded-2xl p-3.5 shadow-xs border border-[#E5E9F2] flex flex-col gap-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-[14px] bg-[#2A1DB8] text-white flex items-center justify-center shrink-0 shadow-xs">
+                              <Receipt size={20} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <h3 className="text-[14px] font-bold text-[#151B26] leading-snug">
+                                  Month {item.month} Installment
+                                </h3>
+                              </div>
+                              <p className="text-[11px] text-[#636F85]">
+                                {monthDateStr}
+                              </p>
+                            </div>
                           </div>
-
-                          {/* Progress Bar */}
-                          <div className="w-full rounded-full h-2 overflow-hidden border bg-[#1D1D41] border-[#27264E]">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                isLaabaReady
-                                  ? 'bg-gradient-to-r from-[#02B15A] to-emerald-400'
-                                  : 'bg-gradient-to-r from-[#9C2CF3] to-[#3A6FF9]'
-                              }`}
-                              style={{ width: `${Math.max(4, laabaProgress)}%` }}
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between text-[9px] text-[#AEABD8] mt-1.5">
-                            <span>{isLaabaReady ? '🎉 Target reached! Next month is FREE' : `${laabaProgress}% towards ₹0 Free Month`}</span>
-                            <span className="font-mono text-[#64CFF6] font-bold">{laabaProgress}%</span>
+                          <div className="text-right flex flex-col items-end font-mono">
+                            <span className="text-[14px] font-bold text-[#151B26]">
+                              ₹{item.expectedDue.toLocaleString('en-IN')}
+                            </span>
+                            {isPaid ? (
+                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold mt-0.5 border border-emerald-200 font-sans">
+                                <CheckCircle2 size={11} /> Paid
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold mt-0.5 border border-red-200 font-sans">
+                                ₹{item.remainingDue.toLocaleString('en-IN')} Due
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
                     );
                   })}
-                </div>
-              </div>
-            )}
 
-            {/* RECENT PASSBOOK TRANSACTIONS */}
-            <div className="border border-[#27264E] rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3 bg-[#1D1D41]">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#AEABD8] flex items-center gap-1.5">
-                  <History className="text-[#64CFF6]" size={13} /> Recent Collections ({transactions.length})
-                </h3>
-                <button
-                  onClick={() => setActiveTab('passbook')}
-                  className="text-[11px] text-[#64CFF6] hover:text-[#64CFF6]/80 font-bold flex items-center gap-0.5 cursor-pointer"
-                >
-                  View All <ChevronRight size={13} />
-                </button>
-              </div>
-
-              {transactions.length === 0 ? (
-                <div className="text-center py-6 text-[#AEABD8] text-[11px]">
-                  No verified collection receipts yet.
-                </div>
-              ) : (
-                <div className="divide-y divide-[#27264E]">
-                  {transactions.slice(0, 4).map((tx) => (
-                    <div 
-                      key={tx.id} 
-                      onClick={() => setSelectedTx(tx)}
-                      className="py-2.5 flex items-center justify-between gap-2.5 cursor-pointer rounded-lg px-1 transition-all active:scale-[0.99] hover:bg-[#141332]"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center justify-center shrink-0">
-                          <ArrowDownLeft size={14} />
+                  {/* 5. FUTURE CYCLES SECTION */}
+                  {(scheduleFilter === 'all' || scheduleFilter === 'pending') && upcomingMonthsCount > 0 && (
+                    <div className="pt-2">
+                      <h4 className="text-[13px] font-bold text-[#151B26] mb-2 flex items-center gap-1.5">
+                        <Calendar size={16} className="text-[#2A1DB8]" />
+                        Upcoming Auction Cycles (Months {upcomingStartMonth} – {totalMonths})
+                      </h4>
+                      {/* Clean Summary Card for upcoming months */}
+                      <div className="bg-white rounded-2xl p-4 shadow-xs border border-[#E5E9F2] flex flex-col gap-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-[13px] font-bold text-[#151B26]">Months {upcomingStartMonth} – {totalMonths}</p>
+                            <p className="text-[12px] font-semibold text-[#2A1DB8]">
+                              Fixed Monthly Installment: ₹{(activeGrp?.monthlyInstallment || 10000).toLocaleString('en-IN')}/mo
+                            </p>
+                          </div>
+                          <span className="w-8 h-8 rounded-full bg-[#F4F6FB] border border-[#E5E9F2] flex items-center justify-center text-[#2A1DB8] text-[11px] font-bold font-mono">
+                            {upcomingMonthsCount}
+                          </span>
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold truncate text-white">{tx.groupName}</div>
-                          <div className="text-[10px] text-[#AEABD8] font-mono flex items-center gap-1.5 mt-0.2">
-                            <span>
-                              {new Date(tx.createdAt).toLocaleDateString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                              })}
+                        {/* Business Rule Note */}
+                        <div className="bg-[#F8FAFC] rounded-xl p-2.5 border border-[#E2E8F0]">
+                          <p className="text-[11px] text-[#636F85] leading-relaxed">
+                            <strong className="text-[#151B26] font-bold">Note:</strong> Bonus Laaba Seetu free months will be credited automatically whenever the accumulated discount pool reaches the chit value of ₹{(activeGrp?.totalValue || 200000).toLocaleString('en-IN')}.
+                          </p>
+                        </div>
+                        {/* Details Grid */}
+                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#E5E9F2]">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-semibold text-[#636F85]">Total Remaining Payable</span>
+                            <span className="text-[13px] font-extrabold text-[#151B26] font-mono">
+                              ₹{maxRemainingPayable.toLocaleString('en-IN')} max
                             </span>
-                            <span>•</span>
-                            <span className="uppercase text-[9px] px-1 py-0.2 rounded font-mono bg-[#141332] text-[#AEABD8] border border-[#27264E]">
-                              {!tx.walletType || tx.walletType.toLowerCase().includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-semibold text-[#636F85]">Chit Maturity Date</span>
+                            <span className="text-[13px] font-extrabold text-[#151B26]">
+                              {getMaturityDateStr()}
                             </span>
                           </div>
                         </div>
-                      </div>
-
-                      <div className="text-right font-mono shrink-0">
-                        <div className="text-xs font-black text-emerald-500">
-                          +₹{Number(tx.amount).toLocaleString('en-IN')}
+                        {/* Regulatory Note */}
+                        <div className="flex items-center gap-1.5 pt-1 text-[10px] text-[#636F85] border-t border-dashed border-[#E5E9F2]">
+                          <Gavel size={14} className="text-[#2A1DB8] shrink-0" />
+                          <span>Regulated under Tamil Nadu Chit Funds Act, 1982.</span>
                         </div>
-                        <span className="text-[9px] uppercase font-bold text-slate-400">
-                          {tx.status}
-                        </span>
                       </div>
                     </div>
-                  ))}
+                  )}
+                </section>
+              </div>
+
+              {/* 6. FLOATING QUICK PAY ACTION BAR (Shown when there is an active due) */}
+              {pInfo && pInfo.outstandingBalance > 0 && (
+                <div className="fixed bottom-16 left-0 right-0 z-30 max-w-md mx-auto px-3.5 py-2.5 flex items-center justify-between gap-3 bg-white/95 backdrop-blur-md border-t border-[#E5E9F2] shadow-xl">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider flex items-center gap-1 font-mono">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Month {currentMonthNum} Due
+                    </span>
+                    <span className="text-[16px] font-extrabold text-[#151B26] font-mono tabular-nums leading-tight">
+                      ₹{pInfo.outstandingBalance.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(true)}
+                    className="flex-1 h-11 rounded-full bg-[#2A1DB8] hover:bg-[#1B0F8C] text-white font-bold text-[13px] flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all cursor-pointer"
+                  >
+                    <Wallet size={18} />
+                    <span>Pay Current Month</span>
+                  </button>
                 </div>
               )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
-        {/* TAB 2: ENROLLED CHITS FULL VIEW */}
-        {activeTab === 'chits' && (
-          <div className="space-y-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 px-0.5">
-              <Ticket className="text-indigo-400" size={14} /> All Enrolled Chit Tickets ({groups.length})
-            </h2>
-
-            <div className="space-y-3">
-              {groups.map((grp) => {
-                const paymentInfo = getGroupPaymentStatus(grp, transactions, auctions);
-                const monthNameLong = getChitMonthName(grp.startDate, grp.currentMonth, 'long');
-                const monthNameShort = getChitMonthName(grp.startDate, grp.currentMonth, 'short');
-
-                return (
-                  <div
-                    key={grp.groupId}
-                    className="border border-[#27264E] bg-[#1D1D41] rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#6359E9]/20 text-[#64CFF6] text-[10px] font-bold font-mono border border-[#6359E9]/30 mb-1">
-                          Ticket #{grp.ticketNumber}
-                        </span>
-                        <h3 className="text-sm sm:text-base font-black text-white">{grp.groupName}</h3>
-                        <p className="text-[10px] text-[#AEABD8] mt-0.5">
-                          {grp.durationMonths} Months Duration • {grp.memberCount} Members • Month {grp.currentMonth} ({monthNameLong}) of {grp.durationMonths}
-                        </p>
-                      </div>
-
-                      <div className="text-right font-mono shrink-0 p-2 rounded-xl border bg-[#141332] border-[#27264E]">
-                        <span className="text-[9px] text-[#AEABD8] uppercase font-semibold">Value</span>
-                        <div className="text-sm font-black text-[#02B15A] whitespace-nowrap">
-                          ₹{grp.totalValue.toLocaleString('en-IN')}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Payment Status Alert Banner */}
-                    <div className={`p-2.5 rounded-xl border flex flex-col xs:flex-row xs:items-center justify-between gap-2 ${
-                      paymentInfo.isSettled
-                        ? 'bg-[#02B15A]/15 border-[#02B15A]/30 text-[#02B15A]'
-                        : paymentInfo.isPastDueDate
-                          ? 'bg-[#E41414]/15 border-[#E41414]/30 text-[#FF5555]'
-                          : 'bg-[#FFBB38]/15 border-[#FFBB38]/30 text-[#FFBB38]'
-                    }`}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                          paymentInfo.isSettled
-                            ? 'bg-[#02B15A]/20 text-[#02B15A]'
-                            : paymentInfo.isPastDueDate
-                              ? 'bg-[#E41414]/20 text-[#FF5555]'
-                              : 'bg-[#FFBB38]/20 text-[#FFBB38]'
-                        }`}>
-                          {paymentInfo.isSettled ? (
-                            <CheckCircle2 size={15} />
-                          ) : paymentInfo.isPastDueDate ? (
-                            <AlertTriangle size={15} />
-                          ) : (
-                            <Clock size={15} />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold leading-snug flex items-center gap-1.5 flex-wrap">
-                            {paymentInfo.isSettled ? (
-                              <span>All Dues Settled (Up to M{grp.currentMonth} • {monthNameShort})</span>
-                            ) : paymentInfo.isPastDueDate ? (
-                              paymentInfo.pendingMonthsCount > 1 ? (
-                                <>
-                                  <span className="font-mono font-black">({paymentInfo.pendingMonthsCount} Mos • {monthNameShort}) Overdue:</span>
-                                  <span className="font-mono font-black text-[#E41414] underline decoration-[#E41414]/30">
-                                    ₹{paymentInfo.outstandingBalance.toLocaleString('en-IN')}
-                                  </span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="font-mono font-black">(M{grp.currentMonth} • {monthNameShort}) Past Due Date:</span>
-                                  <span className="font-mono font-black text-[#E41414] underline decoration-[#E41414]/30">
-                                    ₹{paymentInfo.outstandingBalance.toLocaleString('en-IN')}
-                                  </span>
-                                </>
-                              )
-                            ) : (
-                              <>
-                                <span className="font-mono font-black">(M{grp.currentMonth} • {monthNameShort}) Due in {paymentInfo.daysRemaining} days:</span>
-                                <span className="font-mono font-black text-[#FFBB38]">
-                                  ₹{paymentInfo.outstandingBalance.toLocaleString('en-IN')}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          <p className="text-[10px] opacity-75 mt-0.5">
-                            {paymentInfo.isSettled ? (
-                              `Paid ₹${paymentInfo.totalPaidForGroup.toLocaleString('en-IN')} in full • Up to date`
-                            ) : paymentInfo.isPastDueDate ? (
-                              `⚠️ ${paymentInfo.daysOverdue} days past auction due date (${paymentInfo.formattedDueDate})`
-                            ) : (
-                              `Due on auction day (${paymentInfo.formattedDueDate}) • Payment window open`
-                            )}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span className={`text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded-md self-start xs:self-center shrink-0 ${
-                        paymentInfo.isSettled
-                          ? 'bg-[#02B15A]/20 text-[#02B15A] border border-[#02B15A]/30'
-                          : paymentInfo.isPastDueDate
-                            ? 'bg-[#E41414]/20 text-[#FF5555] border border-[#E41414]/30'
-                            : 'bg-[#FFBB38]/20 text-[#FFBB38] border border-[#FFBB38]/30'
-                      }`}>
-                        {paymentInfo.isSettled ? 'Paid' : paymentInfo.isPastDueDate ? 'Overdue' : 'Upcoming'}
-                      </span>
-                    </div>
-
-                    {/* 3-Column Key Metrics */}
-                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-2.5 rounded-xl border bg-[#141332] border-[#27264E]">
-                      <div>
-                        <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Monthly Due</span>
-                        <div className="text-xs sm:text-sm font-bold font-mono mt-0.5 whitespace-nowrap text-white">
-                          ₹{grp.monthlyInstallment.toLocaleString('en-IN')}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Total Paid</span>
-                        <div className="text-xs sm:text-sm font-bold font-mono mt-0.5 text-[#02B15A] whitespace-nowrap">
-                          ₹{paymentInfo.totalPaidForGroup.toLocaleString('en-IN')}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-[9px] text-[#AEABD8] uppercase font-semibold block">Auction Status</span>
-                        <div className="text-xs sm:text-sm font-bold mt-0.5">
-                          {grp.hasWonRegular ? (
-                            <span className="text-[#FFBB38] flex items-center gap-1 font-mono text-xs">
-                              <Trophy size={12} /> Won
-                            </span>
-                          ) : (
-                            <span className="text-[#02B15A] flex items-center gap-1 font-mono text-xs">
-                              <CheckCircle2 size={12} /> Eligible
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: PASSBOOK LEDGER */}
+        {/* TAB 3: SCREEN 2 PASSBOOK & LEDGER (Exact 360px Native Android Design) */}
         {activeTab === 'passbook' && (
-          <div className="space-y-3.5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-0.5">
-              <div>
-                <h2 className="text-xs font-bold uppercase tracking-wider text-[#AEABD8] flex items-center gap-1.5">
-                  <History className="text-[#64CFF6]" size={14} /> Official Member Passbook
-                </h2>
+          <div className="space-y-0 -mx-3.5 sm:-mx-6 -mt-4 sm:-mt-6 animate-in fade-in duration-200">
+            {/* 1. PASSBOOK TOP ACTION BAR */}
+            <div className="bg-[#1a00a7] text-white px-4 py-2.5 flex items-center justify-between border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('overview')}
+                  aria-label="Go back to overview"
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer"
+                >
+                  <ArrowRight className="rotate-180" size={18} />
+                </button>
+                <h2 className="text-base font-bold text-white tracking-tight">Passbook &amp; Ledger</h2>
               </div>
-              <div className="text-left sm:text-right font-mono shrink-0">
-                <span className="text-[10px] text-[#AEABD8] uppercase">Verified Sum: </span>
-                <span className="text-xs sm:text-sm font-black text-[#02B15A]">
-                  ₹{transactions
-                    .filter((tx) => selectedPassbookGroup === 'all' || tx.groupId === selectedPassbookGroup || tx.groupName === selectedPassbookGroup)
-                    .reduce((acc, tx) => acc + Number(tx.amount || 0), 0)
-                    .toLocaleString('en-IN')}
-                </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  aria-label="Download PDF"
+                  title="Download / Print E-Passbook"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20 active:scale-95 transition-all cursor-pointer"
+                >
+                  <FileText size={15} />
+                </button>
+                {groups.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextIdx = (selectedCardIndex + 1) % groups.length;
+                      setSelectedCardIndex(nextIdx);
+                      setSelectedPassbookGroup(groups[nextIdx].groupId);
+                    }}
+                    aria-label="Filter group"
+                    title="Switch Chit Group"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Sliders size={15} />
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* CHIT GROUP FILTER (When enrolled in groups) */}
-            {groups.length > 0 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                <button
-                  onClick={() => setSelectedPassbookGroup('all')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shrink-0 active:scale-95 cursor-pointer flex items-center gap-1.5 ${
-                    selectedPassbookGroup === 'all'
-                      ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs'
-                      : 'bg-[#141332] text-[#AEABD8] border-[#27264E] hover:text-white hover:bg-[#1D1D41]'
-                  }`}
-                >
-                  <span>All Groups</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                    selectedPassbookGroup === 'all'
-                      ? 'bg-white/20 text-white'
-                      : 'bg-[#27264E] text-[#AEABD8]'
-                  }`}>
-                    {transactions.length}
-                  </span>
-                </button>
+            {/* 2. CANOPY HERO PASSBOOK CARD CONTAINER */}
+            {(() => {
+              const activePassbookGrp = groups.find((g) => g.groupId === selectedPassbookGroup) || groups[selectedCardIndex] || groups[0] || null;
+              const pInfo = activePassbookGrp ? getGroupPaymentStatus(activePassbookGrp, transactions, auctions) : null;
+              const cyclePct = activePassbookGrp && activePassbookGrp.durationMonths > 0
+                ? Math.min(100, Math.round(((pInfo?.effectiveCurrentMonth ?? 1) / activePassbookGrp.durationMonths) * 100))
+                : 10;
+              const isLaaba = activePassbookGrp ? activePassbookGrp.kaiIruppuPool >= activePassbookGrp.totalValue : false;
 
-                {groups.map((grp) => {
-                  const grpTxCount = transactions.filter(t => t.groupId === grp.groupId || t.groupName === grp.groupName).length;
-                  const isSelected = selectedPassbookGroup === grp.groupId || selectedPassbookGroup === grp.groupName;
-                  return (
-                    <button
-                      key={`filter-${grp.groupId}`}
-                      onClick={() => setSelectedPassbookGroup(grp.groupId)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shrink-0 active:scale-95 cursor-pointer flex items-center gap-1.5 ${
-                        isSelected
-                          ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-xs'
-                          : 'bg-[#141332] text-[#AEABD8] border-[#27264E] hover:text-white hover:bg-[#1D1D41]'
-                      }`}
-                    >
-                      <span className="truncate max-w-[160px]">{grp.groupName}</span>
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                        isSelected
-                          ? 'bg-white/20 text-white'
-                          : 'bg-[#27264E] text-[#AEABD8]'
-                      }`}>
-                        {grpTxCount}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+              // Filter transactions based on selectedPassbookGroup and passbookFilter
+              const grpTransactions = transactions.filter((tx) =>
+                selectedPassbookGroup === 'all' || !activePassbookGrp
+                  ? true
+                  : tx.groupId === activePassbookGrp.groupId || tx.groupName === activePassbookGrp.groupName
+              );
 
-            {transactions.filter((tx) => selectedPassbookGroup === 'all' || tx.groupId === selectedPassbookGroup || tx.groupName === selectedPassbookGroup).length === 0 ? (
-              <div className="text-center py-10 rounded-2xl border border-[#27264E] bg-[#1D1D41] p-6 text-[#AEABD8]">
-                <FileText className="mx-auto h-10 w-10 text-[#AEABD8] mb-2" />
-                <h3 className="text-sm font-bold text-white">No Passbook Entries Recorded</h3>
-                <p className="text-[11px] text-[#AEABD8] max-w-xs mx-auto mt-1">
-                  {selectedPassbookGroup === 'all' 
-                    ? 'Once your installments are recorded by the counter manager, entries will appear here.'
-                    : 'No collections recorded yet for this chit group.'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {transactions
-                  .filter((tx) => selectedPassbookGroup === 'all' || tx.groupId === selectedPassbookGroup || tx.groupName === selectedPassbookGroup)
-                  .map((tx) => (
-                    <div
-                      key={tx.id}
-                      onClick={() => setSelectedTx(tx)}
-                      className="border border-[#27264E] bg-[#141332] hover:bg-[#1D1D41] transition-all rounded-xl p-3 shadow-2xs flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99]"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-xl bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center justify-center shrink-0">
-                          <CheckCircle2 size={16} />
+              const completedCollections = grpTransactions.filter((t) => t.type === 'collection' && t.status === 'completed');
+              const grpTotalPaid = completedCollections.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+              const wonAuction = auctions.find((a) =>
+                activePassbookGrp ? a.groupId === activePassbookGrp.groupId && a.isCurrentSubscriberWinner : a.isCurrentSubscriberWinner
+              );
+              const prizePayoutAmt = wonAuction ? wonAuction.netPayout : (activePassbookGrp?.hasWonRegular ? activePassbookGrp.totalValue * 0.88 : 0);
+
+              return (
+                <div className="flex flex-col w-full">
+                  {/* Top Indigo Canopy with Floating Card */}
+                  <div className="bg-[#1a00a7] px-3.5 pt-2 pb-6 text-white relative overflow-hidden">
+                    <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10 pointer-events-none blur-2xl" />
+                    
+                    <div className="relative w-full mx-auto">
+                      {/* Under-shadow layer */}
+                      <div className="absolute -top-1.5 inset-x-2.5 h-14 bg-blue-600/40 rounded-2xl -z-0 transform scale-[0.97]" />
+                      
+                      {/* Hero Passbook Card */}
+                      <div className="relative z-10 w-full rounded-2xl p-4 bg-gradient-to-br from-[#1a00a7] to-[#0075d6] text-white shadow-[0_12px_28px_rgba(26,0,167,0.32)] overflow-hidden">
+                        <div className="absolute -right-6 -top-6 w-36 h-36 rounded-full bg-white/10 pointer-events-none" />
+                        <div className="absolute right-8 top-10 w-28 h-28 rounded-full bg-cyan-300/15 pointer-events-none blur-sm" />
+
+                        {/* Top Card Row */}
+                        <div className="relative z-10 flex items-center justify-between mb-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center shadow-xs">
+                              <User size={16} className="text-white" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-indigo-200">Subscriber</p>
+                              <h2 className="text-sm font-bold text-white tracking-tight">{profile?.fullName || 'Subscriber'}</h2>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full bg-white/15 backdrop-blur-md text-[11px] font-bold text-white font-mono">
+                            Ticket #{activePassbookGrp?.ticketNumber ?? 1} / {activePassbookGrp?.memberCount ?? 20}
+                          </span>
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold truncate text-white">{tx.groupName}</div>
-                          <div className="text-[10px] text-[#AEABD8] font-mono flex items-center gap-1.5 mt-0.5">
-                            <span>
-                              {new Date(tx.createdAt).toLocaleDateString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
-                            </span>
-                            <span>•</span>
-                            <span className="uppercase text-[9px] px-1.5 py-0.2 rounded font-mono bg-[#27264E] text-[#AEABD8]">
-                              {!tx.walletType || tx.walletType.toLowerCase().includes('cash') ? 'CASH IN HAND' : 'ONLINE TRANSFER'}
+
+                        {/* Middle Card Row: Group & Due */}
+                        <div className="relative z-10">
+                          <span className="inline-flex items-center gap-1 text-[11px] text-amber-200 font-bold tracking-wide">
+                            <Sparkles size={13} />
+                            {activePassbookGrp?.groupName || 'Chit Group'} (₹{activePassbookGrp?.totalValue?.toLocaleString('en-IN') || '2,00,000'} Total Value)
+                          </span>
+                          <div className="flex items-baseline justify-between mt-1">
+                            <div className="flex items-baseline gap-1.5 font-mono">
+                              <span className="text-2xl font-extrabold text-white tracking-tight">
+                                {isLaaba ? '₹0' : `₹${(pInfo?.outstandingBalance ?? 10000).toLocaleString('en-IN')}`}
+                              </span>
+                              <span className="px-1.5 py-0.2 rounded bg-amber-300/20 text-amber-200 text-[10px] font-bold font-sans">
+                                {isLaaba ? 'Free Month' : 'Due'}
+                              </span>
+                            </div>
+                            <span className="text-xs text-white/80 font-medium">
+                              {isLaaba ? 'Laaba Seetu Bonus' : `Due ${pInfo?.formattedDueDate ?? '15 Oct'}`}
                             </span>
                           </div>
                         </div>
+
+                        {/* Cycle Progress bar */}
+                        <div className="relative z-10 mt-2.5 pt-2 bg-white/10 rounded-xl px-2.5 py-2">
+                          <div className="flex justify-between items-center text-white/90 text-[11px] font-semibold mb-1">
+                            <span>Cycle Progress</span>
+                            <span className="font-mono">Month {pInfo?.effectiveCurrentMonth ?? 2} / {activePassbookGrp?.durationMonths ?? 20} · {cyclePct}% Completed</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-300 rounded-full transition-all duration-500" style={{ width: `${Math.max(6, cyclePct)}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. WHITE / LIGHT PULL-UP SHEET CONTAINER */}
+                  <div className="relative -mt-3.5 bg-[#F4F6FB] rounded-t-3xl shadow-md px-3.5 pt-3 pb-8 z-20 flex-1 border-t border-[#E5E9F2]">
+                    {/* Pull-handle bar */}
+                    <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-3.5" />
+
+                    {/* Quick Stat Glance Row */}
+                    <div className="grid grid-cols-2 gap-2.5 mb-3.5">
+                      <div className="p-3 bg-white rounded-2xl flex flex-col justify-between border border-[#E5E9F2] shadow-xs">
+                        <div className="flex items-center gap-1.5 text-[#636F85] mb-1">
+                          <Wallet size={15} className="text-[#2A1DB8]" />
+                          <span className="text-[11px] uppercase font-bold tracking-wider">Total Paid</span>
+                        </div>
+                        <p className="text-lg font-extrabold text-[#151B26] font-mono">
+                          ₹{grpTotalPaid.toLocaleString('en-IN')}
+                        </p>
+                        <span className="text-[11px] text-[#636F85] font-medium">
+                          {completedCollections.length} Installments
+                        </span>
                       </div>
 
-                      <div className="text-right font-mono shrink-0">
-                        <div className="text-sm font-black text-[#02B15A]">
-                          +₹{Number(tx.amount).toLocaleString('en-IN')}
+                      <div className="p-3 bg-white rounded-2xl flex flex-col justify-between border border-[#E5E9F2] shadow-xs">
+                        <div className="flex items-center gap-1.5 text-[#636F85] mb-1">
+                          <Trophy size={15} className="text-emerald-600" />
+                          <span className="text-[11px] uppercase font-bold tracking-wider">Prize Payout</span>
                         </div>
-                        <span className="text-[9px] uppercase font-bold text-[#AEABD8]">
-                          {tx.status}
+                        <p className="text-lg font-extrabold text-emerald-600 font-mono">
+                          ₹{prizePayoutAmt.toLocaleString('en-IN')}
+                        </p>
+                        <span className="text-[11px] text-[#636F85] font-medium">
+                          {activePassbookGrp?.hasWonRegular ? 'Auction Winner' : 'Pending Win'}
                         </span>
                       </div>
                     </div>
-                  ))}
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* TAB 4: AUCTIONS & BIDDING STUDIO */}
-        {activeTab === 'auctions' && (
-          <div className="space-y-4">
-            {/* 4.1. CHECK IF CURRENTLY INSIDE A DEDICATED LIVE AUCTION ARENA */}
-            {activeLiveArenaGroupId && groups.find((g) => g.groupId === activeLiveArenaGroupId) ? (
-              <SubscriberLiveAuctionArena
-                group={groups.find((g) => g.groupId === activeLiveArenaGroupId)!}
-                currentUserId={profile?.id}
-                isDark={isDark}
-                onExit={() => setActiveLiveArenaGroupId(null)}
-              />
-            ) : (
-              <>
-                {/* 4.2. LIVE AUCTION ACTIVE HERO CALLOUT BANNERS (IF ANY) */}
-                {groups.filter((g) => g.isLiveAuctionActive).length > 0 && (
-                  <div className="space-y-3">
-                    {groups
-                      .filter((g) => g.isLiveAuctionActive)
-                      .map((grp) => (
-                        <div
-                          key={grp.groupId}
-                          className={`p-4 sm:p-5 rounded-3xl border shadow-xl relative overflow-hidden transition-all ${
-                            isDark
-                              ? 'bg-gradient-to-r from-rose-950/70 via-slate-900 to-indigo-950/70 border-rose-500/40 text-white'
-                              : 'bg-gradient-to-r from-rose-50 via-white to-indigo-50 border-rose-300 text-slate-900'
-                          }`}
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="space-y-1.5 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 text-[10px] font-black uppercase tracking-wider">
-                                  <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" />
-                                  </span>
-                                  <span>Live Auction Active</span>
-                                </span>
-                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-400 border border-indigo-500/20">
-                                  Month {grp.currentMonth}
-                                </span>
-                              </div>
-                              <h3 className="text-base sm:text-lg font-black truncate">{grp.groupName}</h3>
-                              <p className="text-xs text-slate-400">
-                                Total Chit Value: <strong className="text-emerald-500 font-mono">₹{grp.totalValue.toLocaleString('en-IN')}</strong> · Real-time Bidding Floor Open
-                              </p>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => setActiveLiveArenaGroupId(grp.groupId)}
-                              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-600 via-indigo-600 to-indigo-700 hover:from-rose-500 hover:to-indigo-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-950/30 active:scale-95 transition-all cursor-pointer shrink-0"
-                            >
-                              <Radio size={16} className="animate-pulse" />
-                              <span>Enter Live Bidding Floor</span>
-                              <ChevronRight size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-
-                {/* UPCOMING AUCTION COUNTDOWN STACK */}
-                <AuctionCountdownStack groups={groups} theme={theme} />
-
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 px-0.5">
-                  <Trophy className="text-indigo-400" size={14} /> Group Auction History ({auctions.length})
-                </h2>
-
-                {auctions.length === 0 ? (
-                  <div className="text-center py-10 rounded-2xl border border-[#27264E] bg-[#1D1D41] p-6 text-[#AEABD8]">
-                    <Trophy className="mx-auto h-10 w-10 text-[#AEABD8] mb-2" />
-                    <h3 className="text-sm font-bold text-white">No Auction Rounds Conducted Yet</h3>
-                    <p className="text-[11px] text-[#AEABD8] max-w-xs mx-auto mt-1">
-                      Starting Month 1, live bidding discounts and winner announcements will be published here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {auctions.map((auc) => (
-                      <div
-                        key={auc.id}
-                        className={`rounded-2xl p-3.5 sm:p-5 border transition-all shadow-sm space-y-2.5 ${
-                          auc.isCurrentSubscriberWinner
-                            ? 'bg-[#1D1D41] border-[#FFBB38]/50 text-white shadow-xl' 
-                            : 'bg-[#1D1D41] border-[#27264E] text-white'
+                    {/* Filter Segment Pills [ All History | Installments | Payouts ] */}
+                    <div className="flex p-1 bg-[#EEF1F6] border border-[#E5E9F2] rounded-2xl mb-4">
+                      <button
+                        type="button"
+                        onClick={() => setPassbookFilter('all')}
+                        className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all text-center cursor-pointer ${
+                          passbookFilter === 'all'
+                            ? 'bg-[#2A1DB8] text-white shadow-xs'
+                            : 'text-[#636F85] hover:text-[#151B26]'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#6359E9]/20 text-[#64CFF6] text-[10px] font-bold font-mono border border-[#6359E9]/30 mb-1">
-                              Month {auc.month} Auction
-                            </span>
-                            <h3 className="text-xs sm:text-sm font-black truncate text-white">{auc.groupName}</h3>
-                            <p className="text-[10px] text-[#AEABD8]">
-                              {new Date(auc.createdAt).toLocaleDateString('en-IN', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
-                            </p>
+                        All History
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPassbookFilter('installments')}
+                        className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition-all text-center cursor-pointer ${
+                          passbookFilter === 'installments'
+                            ? 'bg-[#2A1DB8] text-white shadow-xs'
+                            : 'text-[#636F85] hover:text-[#151B26]'
+                        }`}
+                      >
+                        Installments
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPassbookFilter('payouts')}
+                        className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition-all text-center cursor-pointer ${
+                          passbookFilter === 'payouts'
+                            ? 'bg-[#2A1DB8] text-white shadow-xs'
+                            : 'text-[#636F85] hover:text-[#151B26]'
+                        }`}
+                      >
+                        Payouts
+                      </button>
+                    </div>
+
+                    {/* Timeline Grouped Entries */}
+                    <div className="flex flex-col gap-4">
+                      {/* Section 1: Recent Collections Timeline */}
+                      <section className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between px-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-[#2A1DB8]" />
+                            <h3 className="text-xs font-bold text-[#151B26] uppercase tracking-wide">Recent Collections</h3>
+                          </div>
+                          <span className="text-[11px] font-semibold text-[#636F85]">Verified Entries</span>
+                        </div>
+
+                        {completedCollections.length === 0 ? (
+                          <div className="p-4 rounded-2xl border border-[#E5E9F2] bg-white text-center text-xs text-[#636F85] shadow-xs">
+                            No payment receipts recorded yet for this group.
+                          </div>
+                        ) : (
+                          <div className="flex flex-col rounded-2xl border border-[#E5E9F2] overflow-hidden bg-white shadow-xs divide-y divide-[#E5E9F2]">
+                            {completedCollections
+                              .filter(() => passbookFilter !== 'payouts')
+                              .map((tx) => (
+                                <div
+                                  key={tx.id}
+                                  onClick={() => setSelectedTx(tx)}
+                                  className="p-3 flex items-center justify-between gap-2 hover:bg-[#F8FAFC] transition-colors cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-11 h-11 rounded-xl bg-[#2A1DB8] flex items-center justify-center shrink-0 text-white shadow-xs">
+                                      <Receipt size={20} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <h4 className="text-xs sm:text-sm font-bold text-[#151B26] truncate">{tx.groupName}</h4>
+                                      <p className="text-[11px] text-[#636F85] font-mono truncate">
+                                        {!tx.walletType || tx.walletType.toLowerCase().includes('cash') ? 'Cash in Hand' : 'UPI / GPay'} · {new Date(tx.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0 font-mono">
+                                    <span className="text-xs sm:text-sm font-extrabold text-[#151B26] tracking-tight block">
+                                      - ₹{Number(tx.amount).toLocaleString('en-IN')}
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+                                      Verified Paid
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                      </section>
+
+                      {/* Section 2: Payouts & Benefits */}
+                      {(passbookFilter === 'all' || passbookFilter === 'payouts') && (
+                        <section className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between px-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-amber-500" />
+                              <h3 className="text-xs font-bold text-[#151B26] uppercase tracking-wide">Benefits &amp; Payouts</h3>
+                            </div>
+                            <span className="text-[11px] font-semibold text-[#636F85]">Scheme Credits</span>
                           </div>
 
-                          {auc.isLaabaSeetu && (
-                            <span className="px-2 py-0.5 rounded-md bg-[#6359E9]/20 text-[#64CFF6] text-[10px] font-bold border border-[#6359E9]/30 shrink-0">
-                              🎉 Laaba Seetu
-                            </span>
+                          {!wonAuction && !isLaaba ? (
+                            <div className="p-4 rounded-2xl border border-[#E5E9F2] bg-white text-center text-xs text-[#636F85] shadow-xs">
+                              No auction prize payouts or bonus credits recorded yet for this chit.
+                            </div>
+                          ) : (
+                            <div className="flex flex-col rounded-2xl border border-[#E5E9F2] overflow-hidden bg-white shadow-xs divide-y divide-[#E5E9F2]">
+                              {/* Winner Payout Entry (if won) */}
+                              {wonAuction && (
+                                <div className="p-3 flex items-center justify-between gap-2 hover:bg-[#F8FAFC] transition-colors">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-11 h-11 rounded-xl bg-[#059669] flex items-center justify-center shrink-0 text-white shadow-xs">
+                                      <Trophy size={20} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <h4 className="text-xs sm:text-sm font-bold text-[#151B26] truncate">Month {wonAuction.month} Winner Prize Pot</h4>
+                                      <p className="text-[11px] text-[#636F85] truncate">Direct Bank Transfer</p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0 font-mono">
+                                    <span className="text-xs sm:text-sm font-extrabold text-emerald-600 tracking-tight block">
+                                      + ₹{wonAuction.netPayout.toLocaleString('en-IN')}
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+                                      Disbursed
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Laaba Seetu Free Month Entry (only when pool >= totalValue) */}
+                              {isLaaba && (
+                                <div className="p-3 flex items-center justify-between gap-2 hover:bg-[#F8FAFC] transition-colors">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-11 h-11 rounded-xl bg-[#D97706] flex items-center justify-center shrink-0 text-white shadow-xs">
+                                      <Gift size={20} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <h4 className="text-xs sm:text-sm font-bold text-[#151B26] truncate">Laaba Seetu Free Month</h4>
+                                      <p className="text-[11px] text-[#636F85] truncate">Scheme Benefit · Discount Pool</p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0 font-mono">
+                                    <span className="text-xs sm:text-sm font-extrabold text-amber-700 tracking-tight block">
+                                      ₹0 Due
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-800 text-[10px] font-bold">
+                                      ₹{(activePassbookGrp?.monthlyInstallment || 10000).toLocaleString('en-IN')} Waived
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           )}
-                        </div>
+                        </section>
+                      )}
+                    </div>
 
-                        {/* Breakdown */}
-                        <div className="rounded-xl p-2.5 border border-[#27264E] bg-[#141332] space-y-1.5 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] text-[#AEABD8]">Winner</span>
-                            <span className="text-[11px] font-bold flex items-center gap-1 text-white">
-                              <Trophy size={12} className="text-[#FFBB38]" />
-                              {auc.winnerName} {auc.isCurrentSubscriberWinner && '(You!)'}
-                            </span>
-                          </div>
+                    {/* Statutory Trust Note */}
+                    <div className="mt-4 p-2.5 bg-white rounded-xl flex items-center gap-2 border border-[#E5E9F2] shadow-xs">
+                      <ShieldCheck size={18} className="text-[#2A1DB8] shrink-0" />
+                      <p className="text-[11px] text-[#636F85] font-medium leading-tight">
+                        Tamil Nadu Chit Funds Act, 1982 Registered · Digitally Signed Ledger
+                      </p>
+                    </div>
 
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] text-[#AEABD8]">Winning Discount</span>
-                            <span className="text-[11px] font-mono font-bold text-[#E41414]">
-                              -₹{Number(auc.winningDiscount).toLocaleString('en-IN')}
-                            </span>
-                          </div>
-
-                          <div className="pt-1.5 border-t border-[#27264E] flex items-center justify-between">
-                            <span className="text-[11px] font-semibold text-[#64CFF6]">Winner Net Payout</span>
-                            <span className="text-xs sm:text-sm font-mono font-black text-[#02B15A]">
-                              ₹{Number(auc.netPayout).toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                    {/* Download PDF E-Passbook CTA */}
+                    <div className="mt-4 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="w-full h-11 rounded-full bg-[#2A1DB8] hover:bg-[#1B0F8C] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md active:scale-[0.98] transition-all cursor-pointer"
+                      >
+                        <FileText size={16} />
+                        <span>Download PDF E-Passbook</span>
+                      </button>
+                    </div>
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
-        {/* TAB 5: SETTINGS & SECURITY */}
-        {activeTab === 'settings' && (
-          <div className="space-y-6 animate-in fade-in duration-150">
-            {/* Header description */}
-            <div>
-              <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
-                Account Settings &amp; Security
-              </h2>
-              <p className="text-xs text-[#AEABD8] mt-0.5">
-                Manage your passbook login PIN, profile information, and app display preferences.
-              </p>
-            </div>
+        {/* TAB 4: SCREEN 4 LIVE AUCTION SCOREBOARD */}
+        {activeTab === 'auctions' && (
+          <div className="space-y-4">
+            {(() => {
+              const liveOrActiveGrp = groups.find((g) => g.groupId === activeLiveArenaGroupId) || groups.find((g) => g.isLiveAuctionActive) || groups[selectedCardIndex] || groups[0];
+              if (!liveOrActiveGrp) {
+                return (
+                  <div className="text-center py-10 rounded-2xl border border-[#E5E9F2] bg-white p-6 text-[#636F85] shadow-xs">
+                    <Trophy className="mx-auto h-10 w-10 text-[#636F85] mb-2" />
+                    <h3 className="text-sm font-bold text-[#151B26]">No Enrolled Chit Groups Yet</h3>
+                    <p className="text-[11px] text-[#636F85] max-w-xs mx-auto mt-1">
+                      Live auction scoreboards and floor feeds will appear once you are enrolled in a chit group.
+                    </p>
+                  </div>
+                );
+              }
+              return (
+                <SubscriberLiveAuctionArena
+                  group={liveOrActiveGrp}
+                  currentUserId={profile?.id}
+                  isDark={isDark}
+                  onExit={() => {
+                    setActiveLiveArenaGroupId(null);
+                    setActiveTab('overview');
+                  }}
+                />
+              );
+            })()}
+          </div>
+        )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Card 1: Change MPIN / Passcode */}
-              <div className="rounded-2xl border border-[#27264E] bg-[#1D1D41] text-white p-5 shadow-sm space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 flex items-center justify-center shrink-0">
-                      <KeyRound size={18} />
+        {/* TAB 5: SCREEN 5 ACCOUNT & SECURITY SETTINGS (Exact 360px Native Android Design) */}
+        {activeTab === 'settings' && (
+          <div className="space-y-0 -mx-3.5 sm:-mx-6 -mt-4 sm:-mt-6 pb-28 animate-in fade-in duration-200 bg-[#F4F6FB] text-[#151B26]">
+            {/* 1. TOP CANOPY HEADER (Deep Royal Indigo Gradient with Status Bar & App Bar) */}
+            <header className="w-full bg-gradient-to-b from-[#1C128A] via-[#2A1DB8] to-[#3424CA] text-white sticky top-0 z-30 shadow-md border-b border-white/10">
+              {/* Android Native Status Bar */}
+              <div className="h-6 px-4 flex items-center justify-between text-xs font-semibold text-white/90 select-none pt-1">
+                <span className="tracking-tight text-[11px] font-bold">9:09</span>
+                <div className="flex items-center gap-1.5 opacity-90 text-[13px]">
+                  <span className="text-[11px] font-mono">5G</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                  <span className="text-[11px] font-mono">100%</span>
+                </div>
+              </div>
+
+              {/* App Bar Navigation */}
+              <div className="h-14 px-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('overview')}
+                    aria-label="Go Back"
+                    className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 active:scale-95 transition-transform text-white cursor-pointer"
+                  >
+                    <ArrowRight className="rotate-180" size={20} />
+                  </button>
+                  <h1 className="text-[17px] font-bold tracking-tight text-white leading-tight">
+                    Account &amp; Settings
+                  </h1>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 text-white text-[11px] font-semibold">
+                    <ShieldCheck size={13} className="text-emerald-300" />
+                    <span>100% Protected</span>
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            {/* MAIN SCROLLABLE CONTENT */}
+            <div className="flex flex-col w-full px-3.5 pt-3 gap-3.5">
+              {/* 1. SUBSCRIBER PROFILE HERO CARD */}
+              <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1C128A] via-[#2A1DB8] to-[#3424CA] text-white p-4 shadow-md border border-indigo-400/20">
+                {/* Organic Ambient Backdrops */}
+                <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-indigo-400/20 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute -left-6 -top-6 w-28 h-28 bg-blue-400/20 rounded-full blur-xl pointer-events-none" />
+
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3">
+                    {/* Profile Avatar with Online / Verified Badge */}
+                    <div className="relative shrink-0">
+                      <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md text-white font-extrabold text-xl flex items-center justify-center ring-2 ring-white/60 shadow-md">
+                        {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'S'}
+                      </div>
+                      <span className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 ring-2 ring-white rounded-full flex items-center justify-center shadow-xs">
+                        <Check size={10} className="text-white font-bold" />
+                      </span>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white">Security PIN (MPIN)</h3>
-                      <p className="text-[11px] text-[#AEABD8]">Used for signing in to your Passbook Portal</p>
+
+                    {/* Subscriber Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h2 className="text-[17px] font-bold text-white truncate leading-tight">
+                          {profile?.fullName || 'Subscriber'}
+                        </h2>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-400/25 border border-emerald-300/40 text-[10px] font-bold text-emerald-200">
+                          Verified
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 mt-1 text-white/80 text-[12px] font-medium">
+                        <Smartphone size={13} className="text-white/70" />
+                        <span className="font-mono">
+                          {profile?.phoneNumber ? `+91 ${profile.phoneNumber}` : 'Mobile linked via Passbook'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
+                  {/* Membership Details Pill */}
+                  <div className="mt-3.5 pt-2.5 border-t border-white/15 flex items-center justify-between text-[11px] text-white/90">
+                    <div className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1.5 rounded-xl border border-white/10 w-full justify-between">
+                      <span className="font-medium flex items-center gap-1">
+                        <KeyRound size={14} className="text-indigo-200" />
+                        Member ID: <span className="font-bold text-white font-mono">#{profile?.id ? profile.id.slice(0, 7).toUpperCase() : 'SUBSCRIBER'}</span>
+                      </span>
+                      <span className="text-indigo-200 font-semibold">• {groups.length} Active Groups</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* 2. 4-DIGIT LOGIN MPIN CARD (With tactile bubbles + form) */}
+              <section className="bg-white rounded-2xl p-4 shadow-xs border border-[#E5E9F2]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-2xl bg-[#EEECFE] border border-[#2A1DB8]/20 flex items-center justify-center text-[#2A1DB8] shrink-0">
+                      <KeyRound size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-[15px] font-bold text-[#151B26] leading-tight">Quick Login MPIN</h3>
+                      <p className="text-[12px] text-[#636F85] mt-0.5 leading-snug">4-digit security PIN to log in with mobile</p>
+                    </div>
+                  </div>
                   {profile?.isDefaultPin || profile?.mpin === '1234' ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFBB38]/15 text-[#FFBB38] border border-[#FFBB38]/30 flex items-center gap-1 shrink-0">
-                      <AlertTriangle size={11} /> Default 1234
+                    <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                      Default 1234
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center gap-1 shrink-0">
-                      <ShieldCheck size={11} /> Custom PIN
+                    <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-[#2A1DB8] border border-indigo-200 shrink-0">
+                      Secured
                     </span>
                   )}
                 </div>
 
-                {/* Alerts */}
-                {pinSuccessMessage && (
-                  <div className="p-3 rounded-xl bg-[#02B15A]/10 border border-[#02B15A]/30 text-[#02B15A] text-xs flex items-center gap-2">
-                    <CheckCircle2 size={16} className="shrink-0" />
-                    <span>{pinSuccessMessage}</span>
+                {/* 4 Tactile Floating MPIN Bubbles (User-Preferred Design) */}
+                <div className="my-4 py-1 flex items-center justify-center gap-4">
+                  <div className="w-11 h-11 rounded-full bg-[#F4F6FB] border border-[#E5E9F2] flex items-center justify-center shadow-xs">
+                    <div className="w-3 h-3 rounded-full bg-[#2A1DB8]" />
                   </div>
-                )}
-
-                {pinErrorMessage && (
-                  <div className="p-3 rounded-xl bg-[#E41414]/10 border border-[#E41414]/30 text-[#FF5555] text-xs flex items-center gap-2">
-                    <AlertCircle size={16} className="shrink-0" />
-                    <span>{pinErrorMessage}</span>
+                  <div className="w-11 h-11 rounded-full bg-[#F4F6FB] border border-[#E5E9F2] flex items-center justify-center shadow-xs">
+                    <div className="w-3 h-3 rounded-full bg-[#2A1DB8]" />
                   </div>
-                )}
-
-                <form onSubmit={handleUpdatePinFromSettings} className="space-y-3 pt-1">
-                  {/* Current PIN */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-[#AEABD8] mb-1">
-                      Current PIN {(!profile?.isDefaultPin && profile?.mpin !== '1234') ? '' : '(Default is 1234)'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showCurrentPin ? 'text' : 'password'}
-                        maxLength={6}
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        placeholder="Enter current PIN"
-                        value={currentPinInput}
-                        onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
-                        className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#27264E] bg-[#141332] text-white placeholder:text-[#AEABD8]/40 transition-all outline-none focus:border-[#6359E9]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCurrentPin(!showCurrentPin)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEABD8] hover:text-white transition-colors cursor-pointer"
-                      >
-                        {showCurrentPin ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
-                    </div>
+                  <div className="w-11 h-11 rounded-full bg-[#F4F6FB] border border-[#E5E9F2] flex items-center justify-center shadow-xs">
+                    <div className="w-3 h-3 rounded-full bg-[#2A1DB8]" />
                   </div>
-
-                  {/* New PIN */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-[#AEABD8] mb-1">
-                      New 4 to 6 Digit PIN
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showNewPin ? 'text' : 'password'}
-                        maxLength={6}
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        placeholder="Enter 4-6 digit PIN"
-                        value={newPinInput}
-                        onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
-                        className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#27264E] bg-[#141332] text-white placeholder:text-[#AEABD8]/40 transition-all outline-none focus:border-[#6359E9]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNewPin(!showNewPin)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEABD8] hover:text-white transition-colors cursor-pointer"
-                      >
-                        {showNewPin ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
-                    </div>
+                  <div className="w-11 h-11 rounded-full bg-[#F4F6FB] border border-[#E5E9F2] flex items-center justify-center shadow-xs">
+                    <div className="w-3 h-3 rounded-full bg-[#2A1DB8]" />
                   </div>
+                </div>
 
-                  {/* Confirm PIN */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-[#AEABD8] mb-1">
-                      Confirm New PIN
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showConfirmPin ? 'text' : 'password'}
-                        maxLength={6}
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        placeholder="Re-enter new PIN"
-                        value={confirmPinInput}
-                        onChange={(e) => setConfirmPinInput(e.target.value.replace(/\D/g, ''))}
-                        className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#27264E] bg-[#141332] text-white placeholder:text-[#AEABD8]/40 transition-all outline-none focus:border-[#6359E9]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPin(!showConfirmPin)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEABD8] hover:text-white transition-colors cursor-pointer"
-                      >
-                        {showConfirmPin ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
-                    </div>
-                  </div>
-
+                {/* Change MPIN Action Buttons */}
+                <div className="flex items-center gap-2.5">
                   <button
-                    type="submit"
-                    disabled={isSavingPin || !newPinInput || !confirmPinInput}
-                    className="w-full mt-2 py-2.5 px-4 rounded-xl bg-[#6359E9] hover:bg-[#6F64FF] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                    type="button"
+                    onClick={() => setShowMpinForm(!showMpinForm)}
+                    className="flex-1 h-11 rounded-full bg-[#2A1DB8] hover:bg-[#1B0F8C] text-white font-semibold text-[13px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
                   >
-                    {isSavingPin ? (
-                      <>
-                        <RefreshCw size={13} className="animate-spin" /> Saving New PIN...
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck size={14} /> Update Security PIN
-                      </>
-                    )}
+                    <RefreshCw size={15} />
+                    <span>{showMpinForm ? 'Close Form' : 'Change MPIN'}</span>
                   </button>
-                </form>
-              </div>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Hello Manager, I forgot my 4-digit Passbook MPIN for ticket account (${profile?.fullName || 'Subscriber'}). Please assist with verification.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 h-11 rounded-full bg-[#F4F6FB] hover:bg-slate-100 border border-[#E5E9F2] text-[#636F85] hover:text-[#151B26] font-semibold text-[13px] flex items-center justify-center active:scale-[0.98] transition-all"
+                  >
+                    Forgot?
+                  </a>
+                </div>
 
-              {/* Card 2: Account Profile & Passbook Info */}
-              <div className="space-y-5">
-                <div className="rounded-2xl border border-[#27264E] bg-[#1D1D41] text-white p-5 shadow-sm space-y-3.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center justify-center shrink-0">
-                      <User size={18} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white">Subscriber Profile</h3>
-                      <p className="text-[11px] text-[#AEABD8]">Verified membership account details</p>
-                    </div>
+                {/* Expandable Change PIN Form */}
+                {showMpinForm && (
+                  <div className="mt-4 pt-4 border-t border-[#E5E9F2] space-y-3 animate-in fade-in duration-150">
+                    {pinSuccessMessage && (
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+                        <CheckCircle2 size={16} className="shrink-0" />
+                        <span>{pinSuccessMessage}</span>
+                      </div>
+                    )}
+
+                    {pinErrorMessage && (
+                      <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                        <AlertCircle size={16} className="shrink-0" />
+                        <span>{pinErrorMessage}</span>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleUpdatePinFromSettings} className="space-y-3">
+                      {/* Current PIN */}
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[#636F85] mb-1">
+                          Current PIN {(!profile?.isDefaultPin && profile?.mpin !== '1234') ? '' : '(Default is 1234)'}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showCurrentPin ? 'text' : 'password'}
+                            maxLength={6}
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="Enter current PIN"
+                            value={currentPinInput}
+                            onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
+                            className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#E2E8F0] bg-[#F8FAFC] text-[#151B26] placeholder:text-slate-400 transition-all outline-none focus:border-[#2A1DB8]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCurrentPin(!showCurrentPin)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#636F85] hover:text-[#151B26] cursor-pointer"
+                          >
+                            {showCurrentPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* New PIN */}
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[#636F85] mb-1">
+                          New 4-Digit PIN
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showNewPin ? 'text' : 'password'}
+                            maxLength={6}
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="Enter 4-digit PIN"
+                            value={newPinInput}
+                            onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                            className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#E2E8F0] bg-[#F8FAFC] text-[#151B26] placeholder:text-slate-400 transition-all outline-none focus:border-[#2A1DB8]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPin(!showNewPin)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#636F85] hover:text-[#151B26] cursor-pointer"
+                          >
+                            {showNewPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Confirm PIN */}
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[#636F85] mb-1">
+                          Confirm New PIN
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showConfirmPin ? 'text' : 'password'}
+                            maxLength={6}
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="Re-enter new PIN"
+                            value={confirmPinInput}
+                            onChange={(e) => setConfirmPinInput(e.target.value.replace(/\D/g, ''))}
+                            className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border border-[#E2E8F0] bg-[#F8FAFC] text-[#151B26] placeholder:text-slate-400 transition-all outline-none focus:border-[#2A1DB8]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPin(!showConfirmPin)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#636F85] hover:text-[#151B26] cursor-pointer"
+                          >
+                            {showConfirmPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isSavingPin || !newPinInput || !confirmPinInput}
+                        className="w-full mt-2 py-2.5 px-4 rounded-xl bg-[#2A1DB8] hover:bg-[#1B0F8C] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-xs active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        {isSavingPin ? (
+                          <>
+                            <RefreshCw size={13} className="animate-spin" /> Saving New PIN...
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck size={14} /> Update Security PIN
+                          </>
+                        )}
+                      </button>
+                    </form>
                   </div>
+                )}
+              </section>
 
-                  <div className="rounded-xl p-3 border border-[#27264E] bg-[#141332] space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#AEABD8]">Full Name</span>
-                      <span className="font-bold text-white">{profile?.fullName || 'Subscriber'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#AEABD8]">Phone Number</span>
-                      <span className="font-mono font-bold text-[#64CFF6]">{profile?.phoneNumber || '—'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#AEABD8]">Account Type</span>
-                      <span className="px-2 py-0.5 rounded-md bg-[#6359E9]/20 text-[#64CFF6] text-[10px] font-bold border border-[#6359E9]/30 uppercase">
-                        {profile?.role || 'Subscriber'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#AEABD8]">Passbook QR Token</span>
-                      <span className="font-mono text-[11px] text-[#02B15A] font-semibold flex items-center gap-1">
-                        <Check size={12} /> Active &amp; Verified
-                      </span>
-                    </div>
+              {/* 3. READING & DISPLAY PREFERENCES CARD (Accessibility Focus) */}
+              <section className="bg-white rounded-2xl p-4 shadow-xs border border-[#E5E9F2] space-y-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0 border border-amber-200">
+                    <Sliders size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-bold text-[#151B26] leading-tight">Display &amp; Accessibility</h3>
+                    <p className="text-[11px] text-[#636F85]">Comfortable reading for every member</p>
                   </div>
                 </div>
 
-                {/* Card 3: Display Preferences */}
-                <div className="rounded-2xl border border-[#27264E] bg-[#1D1D41] text-white p-5 shadow-sm space-y-3.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-[#6359E9]/20 text-[#64CFF6] border border-[#6359E9]/30 flex items-center justify-center shrink-0">
-                      <Sliders size={18} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white">Display &amp; Accessibility</h3>
-                      <p className="text-[11px] text-[#AEABD8]">Visual theme and text scaling options</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <div>
-                      <span className="text-xs font-semibold block text-white">Interface Theme</span>
-                      <span className="text-[10px] text-[#AEABD8]">
-                        Currently: 🌙 Cyber Fintech Dark
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={toggleTheme}
-                      className="px-3 py-1.5 rounded-xl border border-[#27264E] bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                    >
-                      <Moon size={13} className="text-[#FFBB38]" />
-                      <span>Dark</span>
-                    </button>
+                {/* Font Size Preference via FontSizeSwitcher */}
+                <div className="pt-1">
+                  <label className="block text-[12px] font-semibold text-[#151B26] mb-1.5 flex items-center justify-between">
+                    <span>Text Scaling Size</span>
+                    <span className="text-[11px] font-normal text-[#636F85]">Normal · Large · Huge</span>
+                  </label>
+                  <div className="p-1 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                    <FontSizeSwitcher />
                   </div>
                 </div>
-              </div>
+
+                {/* Theme Mode Preference */}
+                <div className="pt-1 border-t border-[#E5E9F2] flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold block text-[#151B26]">Interface Theme</span>
+                    <span className="text-[10px] text-[#636F85]">
+                      Currently: {theme === 'dark' ? '🌙 Cyber Fintech Dark' : '☀️ High-Contrast Light'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleTheme}
+                    className="px-3 py-1.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] hover:bg-slate-100 text-[#151B26] text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                  >
+                    {theme === 'dark' ? <Moon size={13} className="text-amber-500" /> : <Sun size={13} className="text-amber-500" />}
+                    <span>{theme === 'dark' ? 'Dark' : 'Light'}</span>
+                  </button>
+                </div>
+              </section>
+
+              {/* 4. CHIT OFFICE & MANAGER SUPPORT CARD */}
+              <section className="bg-white rounded-2xl p-4 shadow-xs border border-[#E5E9F2]">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 border border-blue-200">
+                    <Smartphone size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-[15px] font-bold text-[#151B26] leading-tight">Chit Office &amp; Support</h3>
+                    <p className="text-[12px] text-[#636F85] mt-0.5 leading-snug">
+                      Have a question about your passbook or auction schedules?
+                    </p>
+                  </div>
+                </div>
+
+                {/* Action Buttons Grid */}
+                <div className="mt-3.5 grid grid-cols-2 gap-2">
+                  <a
+                    href="tel:+914428120000"
+                    className="h-11 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] hover:bg-slate-100 text-[#151B26] font-semibold text-[12px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
+                  >
+                    <Smartphone size={15} className="text-[#2A1DB8]" />
+                    <span>Call Office</span>
+                  </a>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Hello Manager, I have a question regarding my chit passbook (${profile?.fullName || 'Subscriber'}).`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="h-11 rounded-xl bg-[#25D366]/15 border border-[#25D366]/30 hover:bg-[#25D366]/25 text-[#128C7E] font-semibold text-[12px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
+                  >
+                    <span>💬 WhatsApp</span>
+                  </a>
+                </div>
+
+                <div className="mt-2.5 text-[11px] text-[#636F85] flex items-center justify-center gap-1">
+                  <Clock size={13} />
+                  <span>Mon – Sat, 9:30 AM to 6:30 PM</span>
+                </div>
+              </section>
+
+              {/* 5. STATUTORY TRUST & SIGN OUT SECTION */}
+              <section className="space-y-3 pt-1">
+                {/* Statutory Government Trust Badge */}
+                <div className="bg-white border border-[#E5E9F2] shadow-xs rounded-xl p-3 flex items-start gap-2.5 text-[#636F85]">
+                  <ShieldCheck size={20} className="text-[#2A1DB8] shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#2A1DB8]">
+                      Tamil Nadu Chit Funds Act, 1982 Registered
+                    </h4>
+                    <p className="text-[11px] text-[#636F85] leading-tight mt-0.5">
+                      Digitally certified passbook records and legally binding registered chit batches.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Log Out Button */}
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="w-full h-11 rounded-xl bg-red-50 hover:bg-red-100 active:scale-[0.98] border border-red-200 text-red-600 font-bold text-[13px] flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <LogOut size={16} />
+                  <span>Log Out</span>
+                </button>
+
+                <div className="text-center pt-1 pb-2">
+                  <p className="text-[10px] text-[#636F85]/80 font-mono">
+                    Royal ChitPass Mobile v2.4 · 100% Zero-Loss Guaranteed
+                  </p>
+                </div>
+              </section>
             </div>
           </div>
         )}
@@ -2252,57 +2869,165 @@ export default function SubscriberPortal() {
         </div>
       )}
 
-      {/* 6. FIXED MOBILE BOTTOM NAVIGATION BAR (5 Streamlined Tabs) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-lg border-t border-[#27264E] px-2 py-1.5 flex items-center justify-around transition-colors bg-[#1D1D41]/95">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all cursor-pointer ${
-            activeTab === 'overview' ? 'text-[#6359E9] scale-105' : 'text-[#AEABD8]'
-          }`}
-        >
-          <Layers size={17} />
-          <span>Overview</span>
-        </button>
+      {/* 6. INSTALLMENT PAYMENT INSTRUCTIONS MODAL */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm border border-[#E5E9F2] bg-white text-[#151B26] rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto my-auto animate-in slide-in-from-bottom-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E5E9F2]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#2A1DB8] flex items-center justify-center text-white">
+                  <Wallet size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#151B26]">Make Installment Payment</h3>
+                  <span className="text-[10px] text-[#636F85]">Verified Collection Desk</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="text-xs text-[#636F85] hover:text-[#151B26] p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
 
-        <button
-          onClick={() => setActiveTab('chits')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all cursor-pointer ${
-            activeTab === 'chits' ? 'text-[#6359E9] scale-105' : 'text-[#AEABD8]'
-          }`}
-        >
-          <Ticket size={17} />
-          <span>Chits</span>
-        </button>
+            {/* Selected Chit Due Snapshot */}
+            {(() => {
+              const activeGrp = groups[selectedCardIndex] || groups[0];
+              const pInfo = activeGrp ? getGroupPaymentStatus(activeGrp, transactions, auctions) : null;
+              const dueAmt = pInfo?.outstandingBalance ?? 10000;
 
-        <button
-          onClick={() => setActiveTab('passbook')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all cursor-pointer ${
-            activeTab === 'passbook' ? 'text-[#6359E9] scale-105' : 'text-[#AEABD8]'
-          }`}
-        >
-          <History size={17} />
-          <span>Passbook</span>
-        </button>
+              return (
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[#636F85]">Chit Group:</span>
+                      <span className="font-bold text-[#151B26] truncate max-w-[180px]">{activeGrp?.groupName || 'Chit Group'}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-mono">
+                      <span className="text-[#636F85]">Ticket Number:</span>
+                      <span className="font-bold text-[#2A1DB8]">#{activeGrp?.ticketNumber || 1}</span>
+                    </div>
+                    <div className="pt-2 border-t border-[#E2E8F0] flex justify-between items-baseline font-mono">
+                      <span className="text-xs text-[#636F85]">Monthly Due:</span>
+                      <span className="text-lg font-black text-[#151B26]">
+                        ₹{dueAmt.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
 
-        <button
-          onClick={() => setActiveTab('auctions')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all cursor-pointer ${
-            activeTab === 'auctions' ? 'text-[#6359E9] scale-105' : 'text-[#AEABD8]'
-          }`}
-        >
-          <Trophy size={17} />
-          <span>Auctions</span>
-        </button>
+                  {/* Payment Instructions */}
+                  <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-xs space-y-1.5">
+                    <div className="font-bold text-[#2A1DB8] flex items-center gap-1.5">
+                      <CheckCircle2 size={14} /> Official Payment Options
+                    </div>
+                    <p className="text-[11px] text-[#636F85] leading-relaxed">
+                      You can pay via <strong>UPI (GPay / PhonePe / Paytm)</strong> to the Chit Fund treasury, or deposit cash at the office counter.
+                    </p>
+                  </div>
 
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold p-1 rounded-xl transition-all cursor-pointer ${
-            activeTab === 'settings' ? 'text-[#6359E9] scale-105' : 'text-[#AEABD8]'
-          }`}
-        >
-          <Settings size={17} />
-          <span>Settings</span>
-        </button>
+                  {/* WhatsApp Notify Button */}
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Hello Chit Manager, I would like to pay my monthly installment of ₹${dueAmt.toLocaleString(
+                        'en-IN'
+                      )} for ${activeGrp?.groupName || 'Chit Group'} (Ticket #${activeGrp?.ticketNumber || 1}). Please share payment QR or confirm cash receipt.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 rounded-xl bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                  >
+                    <span>💬 Notify Manager on WhatsApp</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(false)}
+                    className="w-full py-2.5 rounded-xl text-xs font-bold transition-all bg-[#F4F6FB] hover:bg-slate-100 text-[#151B26] border border-[#E5E9F2] cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* 7. FIXED MOBILE BOTTOM NAVIGATION BAR (Screen 1 Royal ChitPass Active Pill Design) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-[#E5E9F2] px-2 py-1.5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+        <div className="flex items-center justify-around h-16 max-w-md mx-auto">
+          {/* 1. Overview */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('overview')}
+            className={`flex flex-col items-center justify-center min-w-[56px] h-12 px-3 rounded-full transition-all duration-200 cursor-pointer ${
+              activeTab === 'overview'
+                ? 'bg-[#EEECFE] text-[#2A1DB8] font-bold shadow-xs'
+                : 'text-[#636F85] hover:text-[#151B26]'
+            }`}
+          >
+            <Layers size={18} />
+            <span className="text-[10px] mt-0.5">Overview</span>
+          </button>
+
+          {/* 2. My Chits */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('chits')}
+            className={`flex flex-col items-center justify-center min-w-[56px] h-12 px-3 rounded-full transition-all duration-200 cursor-pointer ${
+              activeTab === 'chits'
+                ? 'bg-[#EEECFE] text-[#2A1DB8] font-bold shadow-xs'
+                : 'text-[#636F85] hover:text-[#151B26]'
+            }`}
+          >
+            <Wallet size={18} />
+            <span className="text-[10px] mt-0.5">My Chits</span>
+          </button>
+
+          {/* 3. Live Arena */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('auctions')}
+            className={`flex flex-col items-center justify-center min-w-[56px] h-12 px-3 rounded-full transition-all duration-200 cursor-pointer ${
+              activeTab === 'auctions'
+                ? 'bg-[#EEECFE] text-[#2A1DB8] font-bold shadow-xs'
+                : 'text-[#636F85] hover:text-[#151B26]'
+            }`}
+          >
+            <Gavel size={18} />
+            <span className="text-[10px] mt-0.5">Live Arena</span>
+          </button>
+
+          {/* 4. Passbook */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('passbook')}
+            className={`flex flex-col items-center justify-center min-w-[56px] h-12 px-3 rounded-full transition-all duration-200 cursor-pointer ${
+              activeTab === 'passbook'
+                ? 'bg-[#EEECFE] text-[#2A1DB8] font-bold shadow-xs'
+                : 'text-[#636F85] hover:text-[#151B26]'
+            }`}
+          >
+            <BookOpen size={18} />
+            <span className="text-[10px] mt-0.5">Passbook</span>
+          </button>
+
+          {/* 5. Security / Settings */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('settings')}
+            className={`flex flex-col items-center justify-center min-w-[56px] h-12 px-3 rounded-full transition-all duration-200 cursor-pointer ${
+              activeTab === 'settings'
+                ? 'bg-[#EEECFE] text-[#2A1DB8] font-bold shadow-xs'
+                : 'text-[#636F85] hover:text-[#151B26]'
+            }`}
+          >
+            <ShieldCheck size={18} />
+            <span className="text-[10px] mt-0.5">Security</span>
+          </button>
+        </div>
       </nav>
     </div>
   );
