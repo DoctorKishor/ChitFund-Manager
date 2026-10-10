@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { X, Camera, RefreshCw, AlertTriangle, ShieldCheck, Zap, ZapOff, Check, Sparkles } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import jsQR from 'jsqr';
+import { X, Camera, RefreshCw, AlertTriangle, ShieldCheck, Zap, ZapOff, Check, Sparkles, SwitchCamera } from 'lucide-react';
 import { triggerHapticFeedback } from '@/utils/haptics';
 
 interface PassbookScannerModalProps {
@@ -76,6 +76,8 @@ export default function PassbookScannerModal({
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [hasTorch, setHasTorch] = useState<boolean>(false);
   const [isTorchOn, setIsTorchOn] = useState<boolean>(false);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [hasMultipleCameras, setHasMultipleCameras] = useState<boolean>(false);
 
   const [targetBox, setTargetBox] = useState<TargetBox>({
     centerX: 0,
@@ -87,89 +89,70 @@ export default function PassbookScannerModal({
   });
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animFrameRef = useRef<number | null>(null);
   const isLockedRef = useRef<boolean>(false);
+  const isProcessingRef = useRef<boolean>(false);
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const readerElementId = 'passbook-qr-reader-fullscreen';
+  const lastSeenQrTimeRef = useRef<number>(0);
+  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const qrCodeSuccessCallbackRef = useRef<((decodedText: string) => Promise<void>) | null>(null);
-
-  // Check torch capability
-  const checkTorchCapability = () => {
-    try {
-      const videoElem = document.querySelector(`#${readerElementId} video`) as HTMLVideoElement | null;
-      if (videoElem && videoElem.srcObject) {
-        const stream = videoElem.srcObject as MediaStream;
-        const track = stream.getVideoTracks()[0];
-        if (track && typeof track.getCapabilities === 'function') {
-          const capabilities = track.getCapabilities() as any;
-          if (capabilities && capabilities.torch) {
-            setHasTorch(true);
-          }
-        }
+  // Check multiple cameras
+  useEffect(() => {
+    if (!isOpen || typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) return;
+    navigator.mediaDevices.enumerateDevices().then((devices) => {
+      const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+      if (videoInputs.length > 1) {
+        setHasMultipleCameras(true);
       }
-    } catch {
-      // Torch not supported on device
-    }
-  };
+    }).catch(() => {});
+  }, [isOpen]);
 
+  // Clean stream helper
+  const stopCurrentStream = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsTorchOn(false);
+    setHasTorch(false);
+  }, []);
+
+  // Torch Toggle
   const toggleTorch = async () => {
+    if (!streamRef.current) return;
     try {
-      const videoElem = document.querySelector(`#${readerElementId} video`) as HTMLVideoElement | null;
-      if (videoElem && videoElem.srcObject) {
-        const stream = videoElem.srcObject as MediaStream;
-        const track = stream.getVideoTracks()[0];
-        if (track) {
-          const nextState = !isTorchOn;
-          await (track as any).applyConstraints({
-            advanced: [{ torch: nextState }],
-          });
-          setIsTorchOn(nextState);
-          triggerHapticFeedback('light');
-        }
+      const track = streamRef.current.getVideoTracks()[0];
+      if (track) {
+        const nextState = !isTorchOn;
+        await (track as any).applyConstraints({
+          advanced: [{ torch: nextState }],
+        });
+        setIsTorchOn(nextState);
+        triggerHapticFeedback('light');
       }
     } catch (err) {
       console.warn('Torch toggle warning:', err);
     }
   };
 
-  // Helper: map video frame pixel coordinates to display container coordinates
-  const mapVideoPointToContainer = (
-    point: { x: number; y: number },
-    video: HTMLVideoElement,
-    container: HTMLElement
-  ) => {
-    const cRect = container.getBoundingClientRect();
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    if (!vw || !vh) return { x: point.x, y: point.y };
-
-    const vAspect = vw / vh;
-    const cAspect = cRect.width / cRect.height;
-    let renderW: number, renderH: number, offX: number, offY: number;
-
-    if (cAspect > vAspect) {
-      renderW = cRect.width;
-      renderH = cRect.width / vAspect;
-      offX = 0;
-      offY = (cRect.height - renderH) / 2;
-    } else {
-      renderH = cRect.height;
-      renderW = cRect.height * vAspect;
-      offY = 0;
-      offX = (cRect.width - renderW) / 2;
-    }
-
-    const scale = renderW / vw;
-    return {
-      x: offX + point.x * scale,
-      y: offY + point.y * scale,
-    };
+  // Flip Camera
+  const toggleCameraFacing = () => {
+    triggerHapticFeedback('light');
+    setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
   };
 
-  // Handle successful QR detection from either BarcodeDetector or Html5Qrcode
-  const handleQrDetected = async (decodedText: string) => {
-    if (isProcessing || isLockedRef.current) return;
+  // Handle successful QR detection
+  const handleQrDetected = useCallback(async (decodedText: string) => {
+    if (isProcessingRef.current || isLockedRef.current) return;
 
     const validation = extractAndValidatePassbookToken(decodedText);
 
@@ -181,36 +164,26 @@ export default function PassbookScannerModal({
       if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
       warningTimeoutRef.current = setTimeout(() => {
         setScannerWarning(null);
-      }, 3500);
+      }, 4000);
       return;
     }
 
     // Official Passbook Token Recognized! Lock target!
     isLockedRef.current = true;
+    isProcessingRef.current = true;
     setIsLocked(true);
     triggerHapticFeedback('success');
 
-    // Pause camera feed
-    try {
-      if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-        await html5QrCodeRef.current.pause();
-      }
-    } catch {
-      // ignore pause error
+    // Pause video track visually
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+      } catch {}
     }
 
     // Tactile 350ms micro-moment for the user to experience the target lock
     await new Promise((resolve) => setTimeout(resolve, 350));
-
     setIsProcessing(true);
-
-    try {
-      if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-        await html5QrCodeRef.current.stop();
-      }
-    } catch (stopErr) {
-      console.warn('Scanner stop note:', stopErr);
-    }
 
     try {
       await onScanSuccess(validation.token);
@@ -220,195 +193,228 @@ export default function PassbookScannerModal({
       setIsProcessing(false);
       setIsLocked(false);
       isLockedRef.current = false;
+      isProcessingRef.current = false;
+      if (videoRef.current) {
+        try {
+          videoRef.current.play();
+        } catch {}
+      }
     }
-  };
+  }, [onScanSuccess]);
 
-  // ── Real-Time Dynamic Target Tracking Loop (Moves & Rotates Over QR Code) ──
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let active = true;
-    let animationFrameId: number;
-
-    const trackLoop = async () => {
-      if (!active || isLockedRef.current) return;
-
-      try {
-        const videoElem = document.querySelector(`#${readerElementId} video`) as HTMLVideoElement | null;
-        const container = containerRef.current;
-
-        if (videoElem && videoElem.readyState >= 2 && container && 'BarcodeDetector' in window) {
-          const detector =
-            (window as any)._passbookBarcodeDetector ||
-            new (window as any).BarcodeDetector({ formats: ['qr_code'] });
-          (window as any)._passbookBarcodeDetector = detector;
-
-          const barcodes = await detector.detect(videoElem);
-
-          if (barcodes && barcodes.length > 0 && active && !isLockedRef.current) {
-            const raw = barcodes[0];
-
-            if (raw.cornerPoints && raw.cornerPoints.length >= 4) {
-              const p0 = mapVideoPointToContainer(raw.cornerPoints[0], videoElem, container);
-              const p1 = mapVideoPointToContainer(raw.cornerPoints[1], videoElem, container);
-              const p2 = mapVideoPointToContainer(raw.cornerPoints[2], videoElem, container);
-              const p3 = mapVideoPointToContainer(raw.cornerPoints[3], videoElem, container);
-
-              const cx = (p0.x + p1.x + p2.x + p3.x) / 4;
-              const cy = (p0.y + p1.y + p2.y + p3.y) / 4;
-
-              const w = Math.hypot(p1.x - p0.x, p1.y - p0.y);
-              const h = Math.hypot(p3.x - p0.x, p3.y - p0.y);
-
-              // Calculate true rotation angle of the QR code in degrees
-              const angle = Math.atan2(p1.y - p0.y, p1.x - p0.x) * (180 / Math.PI);
-
-              setTargetBox({
-                centerX: cx,
-                centerY: cy,
-                width: Math.max(70, Math.min(container.clientWidth - 20, w + 16)),
-                height: Math.max(70, Math.min(container.clientHeight - 40, h + 16)),
-                angle: angle,
-                isTracking: true,
-              });
-
-              // Also trigger detection check if rawValue is present
-              if (raw.rawValue && !isLockedRef.current) {
-                handleQrDetected(raw.rawValue);
-              }
-            }
-          } else if (!isLockedRef.current && active) {
-            // When no QR code is in sight, smoothly release back to center
-            setTargetBox((prev) => (prev.isTracking ? { ...prev, isTracking: false, angle: 0 } : prev));
-          }
-        }
-      } catch {
-        // Silently skip frame misses
-      }
-
-      if (active && !isLockedRef.current) {
-        animationFrameId = requestAnimationFrame(trackLoop);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      trackLoop();
-    }, 400);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    };
-  }, [isOpen]);
-
-  // ── Camera Initialization via Html5Qrcode (Full Frame, NO Double Shaded Box!) ──
+  // Main Camera & jsQR Detection Loop
   useEffect(() => {
     if (!isOpen) return;
 
     let isMounted = true;
     isLockedRef.current = false;
+    isProcessingRef.current = false;
     setScannerError(null);
     setScannerWarning(null);
     setTestPayload(null);
     setIsLocked(false);
     setIsProcessing(false);
-    setIsTorchOn(false);
-    setHasTorch(false);
     setTargetBox({ centerX: 0, centerY: 0, width: 240, height: 240, angle: 0, isTracking: false });
 
-    const startScanner = async () => {
+    const startCamera = async () => {
       try {
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        if (!isMounted) return;
+        stopCurrentStream();
 
-        const qrScanner = new Html5Qrcode(readerElementId);
-        html5QrCodeRef.current = qrScanner;
-
-        const qrCodeSuccessCallback = async (decodedText: string) => {
-          handleQrDetected(decodedText);
+        const constraints: MediaStreamConstraints = {
+          audio: false,
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
         };
 
-        qrCodeSuccessCallbackRef.current = qrCodeSuccessCallback;
-
-        // Start scanning WITHOUT qrbox so Html5Qrcode scans 100% of the camera
-        // and NEVER injects its own duplicate #qr-shaded-region frame!
-        await qrScanner.start(
-          { facingMode: 'environment' },
-          {
-            fps: 25,
-            // Do NOT specify qrbox! This scans full frame and prevents the 2nd frame!
-          },
-          qrCodeSuccessCallback,
-          () => {}
-        );
-
-        if (isMounted) {
-          setTimeout(checkTorchCapability, 500);
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (!isMounted) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
         }
+
+        streamRef.current = stream;
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+
+        // Check torch support
+        const track = stream.getVideoTracks()[0];
+        if (track && typeof track.getCapabilities === 'function') {
+          const caps = track.getCapabilities() as any;
+          if (caps && caps.torch) {
+            setHasTorch(true);
+          }
+        }
+
+        // Initialize Offscreen Processing Canvas
+        if (!offscreenCanvasRef.current) {
+          offscreenCanvasRef.current = document.createElement('canvas');
+        }
+        const canvas = offscreenCanvasRef.current;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        // Continuous Detection & Tracking Frame Loop
+        let lastScanTimestamp = 0;
+
+        const scanFrame = (timestamp: number) => {
+          if (!isMounted || isLockedRef.current) return;
+
+          const video = videoRef.current;
+          const container = containerRef.current;
+
+          // Process every ~33ms (approx 30fps) to ensure responsive tracking without thrashing CPU
+          if (video && video.readyState >= 2 && ctx && container && timestamp - lastScanTimestamp >= 30) {
+            lastScanTimestamp = timestamp;
+
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+
+            if (vw > 0 && vh > 0) {
+              // Downsample to max dimension 640 for rapid sub-10ms decoding
+              const scale = Math.min(1, 640 / Math.max(vw, vh));
+              const cw = Math.round(vw * scale);
+              const ch = Math.round(vh * scale);
+
+              if (canvas.width !== cw || canvas.height !== ch) {
+                canvas.width = cw;
+                canvas.height = ch;
+              }
+
+              ctx.drawImage(video, 0, 0, cw, ch);
+              const imgData = ctx.getImageData(0, 0, cw, ch);
+
+              // Universal jsQR decoder (Works in 100% of browsers: Windows, Mac, iOS, Android)
+              const qr = jsQR(imgData.data, cw, ch, {
+                inversionAttempts: 'dontInvert',
+              });
+
+              if (qr && qr.location) {
+                lastSeenQrTimeRef.current = Date.now();
+
+                // Downsampled canvas coordinates
+                const p0 = qr.location.topLeftCorner;
+                const p1 = qr.location.topRightCorner;
+                const p2 = qr.location.bottomRightCorner;
+                const p3 = qr.location.bottomLeftCorner;
+
+                // Map canvas points to raw video coordinates
+                const v0 = { x: p0.x / scale, y: p0.y / scale };
+                const v1 = { x: p1.x / scale, y: p1.y / scale };
+                const v2 = { x: p2.x / scale, y: p2.y / scale };
+                const v3 = { x: p3.x / scale, y: p3.y / scale };
+
+                // Map video coordinates to container screen coordinates using object-cover projection
+                const cRect = container.getBoundingClientRect();
+                const vAspect = vw / vh;
+                const cAspect = cRect.width / cRect.height;
+                let renderW: number, renderH: number, offX: number, offY: number;
+
+                if (cAspect > vAspect) {
+                  renderW = cRect.width;
+                  renderH = cRect.width / vAspect;
+                  offX = 0;
+                  offY = (cRect.height - renderH) / 2;
+                } else {
+                  renderH = cRect.height;
+                  renderW = cRect.height * vAspect;
+                  offY = 0;
+                  offX = (cRect.width - renderW) / 2;
+                }
+
+                const toScreen = (pt: { x: number; y: number }) => ({
+                  x: offX + (pt.x / vw) * renderW,
+                  y: offY + (pt.y / vh) * renderH,
+                });
+
+                const s0 = toScreen(v0);
+                const s1 = toScreen(v1);
+                const s2 = toScreen(v2);
+                const s3 = toScreen(v3);
+
+                const cx = (s0.x + s1.x + s2.x + s3.x) / 4;
+                const cy = (s0.y + s1.y + s2.y + s3.y) / 4;
+
+                const widthDist = Math.hypot(s1.x - s0.x, s1.y - s0.y);
+                const heightDist = Math.hypot(s3.x - s0.x, s3.y - s0.y);
+
+                // Exact rotation angle in degrees
+                const angleDeg = Math.atan2(s1.y - s0.y, s1.x - s0.x) * (180 / Math.PI);
+
+                setTargetBox({
+                  centerX: cx,
+                  centerY: cy,
+                  width: Math.max(80, Math.min(cRect.width - 20, widthDist + 24)),
+                  height: Math.max(80, Math.min(cRect.height - 30, heightDist + 24)),
+                  angle: angleDeg,
+                  isTracking: true,
+                });
+
+                // Trigger verification check
+                if (qr.data && !isLockedRef.current) {
+                  handleQrDetected(qr.data);
+                }
+              } else {
+                // If not detected in current frame, hold position for 350ms before returning to center
+                const timeSinceLastSeen = Date.now() - lastSeenQrTimeRef.current;
+                if (timeSinceLastSeen > 350) {
+                  setTargetBox((prev) => (prev.isTracking ? { ...prev, isTracking: false, angle: 0 } : prev));
+                }
+              }
+            }
+          }
+
+          if (isMounted && !isLockedRef.current) {
+            animFrameRef.current = requestAnimationFrame(scanFrame);
+          }
+        };
+
+        animFrameRef.current = requestAnimationFrame(scanFrame);
       } catch (err: any) {
         if (!isMounted) return;
         console.error('Camera startup error:', err);
         setScannerError(
-          err.message ||
-            'Camera permission denied or camera not available. Please allow camera access and try again.'
+          err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
+            ? 'Camera permission was denied. Please allow camera access in your browser settings.'
+            : err.message || 'Unable to access camera.'
         );
       }
     };
 
-    startScanner();
+    startCamera();
 
     return () => {
       isMounted = false;
-      isLockedRef.current = false;
+      stopCurrentStream();
       if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
-      if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-        html5QrCodeRef.current
-          .stop()
-          .catch((e) => console.warn('Scanner cleanup warning:', e));
-      }
     };
-  }, [isOpen]);
+  }, [isOpen, facingMode, stopCurrentStream, handleQrDetected]);
 
   if (!isOpen) return null;
 
-  const handleRetryScan = async () => {
+  const handleRetryScan = () => {
     isLockedRef.current = false;
+    isProcessingRef.current = false;
     setScannerError(null);
     setScannerWarning(null);
     setTestPayload(null);
     setIsProcessing(false);
     setIsLocked(false);
     setTargetBox({ centerX: 0, centerY: 0, width: 240, height: 240, angle: 0, isTracking: false });
-
-    try {
-      if (html5QrCodeRef.current && qrCodeSuccessCallbackRef.current) {
-        if (html5QrCodeRef.current.isScanning) {
-          await html5QrCodeRef.current.stop();
-        }
-        await html5QrCodeRef.current.start(
-          { facingMode: 'environment' },
-          { fps: 25 },
-          qrCodeSuccessCallbackRef.current,
-          () => {}
-        );
-        setTimeout(checkTorchCapability, 500);
-      }
-    } catch (err) {
-      console.warn('Retry scan camera note:', err);
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
     }
   };
 
-  const handleClose = async () => {
+  const handleClose = () => {
     isLockedRef.current = false;
+    isProcessingRef.current = false;
+    stopCurrentStream();
     if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
-    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-      try {
-        await html5QrCodeRef.current.stop();
-      } catch (err) {
-        console.warn('Scanner stop error on close:', err);
-      }
-    }
     onClose();
   };
 
@@ -419,12 +425,8 @@ export default function PassbookScannerModal({
     setIsLocked(true);
     await new Promise((resolve) => setTimeout(resolve, 300));
     setIsProcessing(true);
-    try {
-      if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-        await html5QrCodeRef.current.stop();
-      }
-    } catch {}
-    // Generate a deterministic testing UUID or use raw
+    stopCurrentStream();
+
     const fallbackUuid = '00000000-0000-0000-0000-' + Math.random().toString(16).slice(2, 14).padEnd(12, '0');
     try {
       await onScanSuccess(fallbackUuid);
@@ -432,38 +434,29 @@ export default function PassbookScannerModal({
       setScannerError(err.message || 'Error processing test token.');
       setIsProcessing(false);
       setIsLocked(false);
+      isLockedRef.current = false;
+      isProcessingRef.current = false;
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200 select-none">
-      {/* Global CSS to strictly hide Html5Qrcode's internal duplicate shaded borders */}
-      <style jsx global>{`
-        #qr-shaded-region {
-          display: none !important;
-          visibility: hidden !important;
-        }
-        #passbook-qr-reader-fullscreen svg {
-          display: none !important;
-        }
-        #passbook-qr-reader-fullscreen img {
-          display: none !important;
-        }
-      `}</style>
-
       {/* ── Immersive Full-Bleed Container Shell ── */}
       <div
         ref={containerRef}
         className="relative w-full h-full sm:h-[640px] sm:max-w-md sm:rounded-3xl overflow-hidden bg-slate-950 flex flex-col justify-between shadow-2xl border-0 sm:border sm:border-slate-200/80 text-slate-900"
       >
-        {/* Full-Bleed Camera Viewport */}
-        <div
-          id={readerElementId}
-          className="absolute inset-0 w-full h-full object-cover [&_video]:w-full! [&_video]:h-full! [&_video]:object-cover!"
+        {/* Full-Bleed Native Video Viewport (No third party wrappers or duplicate SVG boxes!) */}
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          className="absolute inset-0 w-full h-full object-cover"
         />
 
         {/* Soft Camera Darkening Overlay */}
-        <div className="absolute inset-0 pointer-events-none bg-black/25 z-10" />
+        <div className="absolute inset-0 pointer-events-none bg-black/20 z-10" />
 
         {/* ── 1. Top Bar: Floating Frosted Glass Controls ── */}
         <div className="relative z-20 p-4 pt-[max(1rem,env(safe-area-inset-top))] flex items-center justify-between">
@@ -485,8 +478,19 @@ export default function PassbookScannerModal({
             </span>
           </div>
 
-          {/* Torch / Flashlight Toggle */}
-          <div className="w-10 h-10 flex items-center justify-center">
+          {/* Action Buttons: Camera Switch & Flashlight */}
+          <div className="flex items-center gap-2">
+            {hasMultipleCameras && (
+              <button
+                type="button"
+                onClick={toggleCameraFacing}
+                title="Switch Camera"
+                className="w-10 h-10 rounded-full bg-white/90 hover:bg-white text-slate-800 shadow-md backdrop-blur-md flex items-center justify-center transition-all active:scale-95 cursor-pointer border border-white/60"
+              >
+                <SwitchCamera size={17} />
+              </button>
+            )}
+
             {hasTorch ? (
               <button
                 type="button"
@@ -500,9 +504,9 @@ export default function PassbookScannerModal({
               >
                 {isTorchOn ? <Zap size={18} className="fill-current" /> : <ZapOff size={18} />}
               </button>
-            ) : (
+            ) : !hasMultipleCameras ? (
               <div className="w-10 h-10" />
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -630,7 +634,7 @@ export default function PassbookScannerModal({
                 className="px-4 py-1.5 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-transform"
               >
                 <RefreshCw size={13} />
-                <span>Retry Scanner</span>
+                <span>Retry Camera</span>
               </button>
             </div>
           ) : isProcessing ? (
