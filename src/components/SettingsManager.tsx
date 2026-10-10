@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useOrganization, computeInitials } from '@/context/OrganizationContext';
@@ -25,10 +27,7 @@ import {
   AlertTriangle,
   Layers,
   Flame,
-  Check,
   X,
-  ShieldAlert,
-  Server,
   Coins,
   Users,
   Trophy,
@@ -36,7 +35,8 @@ import {
   Building2,
   Sparkles,
   Landmark,
-  BadgeCheck
+  BadgeCheck,
+  Check
 } from 'lucide-react';
 
 type SettingsSubTab = 'organization' | 'profile' | 'security' | 'database';
@@ -165,7 +165,7 @@ export default function SettingsManager() {
     }
   }, [activeSubTab, fetchDbStats]);
 
-  // 0. Save Organization Branding Settings
+  // Save Organization Branding Settings
   const handleSaveOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
     setOrgSuccessMsg(null);
@@ -193,7 +193,7 @@ export default function SettingsManager() {
         setOrgErrorMsg(res.error || 'Failed to update organization settings.');
         triggerHapticFeedback('error');
       } else {
-        setOrgSuccessMsg('Chit Funds Organization name saved successfully! Applied globally across all tabs, reports, receipts, and PDFs.');
+        setOrgSuccessMsg('Organization branding saved successfully! Applied globally across all tabs, reports, and receipts.');
         triggerHapticFeedback('success');
       }
     } catch (err: any) {
@@ -205,7 +205,7 @@ export default function SettingsManager() {
     }
   };
 
-  // 1. Save Profile Changes
+  // Save Profile Changes
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileSuccessMsg(null);
@@ -241,7 +241,6 @@ export default function SettingsManager() {
         if (error) throw error;
       }
 
-      // Also update auth metadata if signed in via Supabase user
       if (user) {
         await supabase.auth.updateUser({
           data: {
@@ -262,7 +261,7 @@ export default function SettingsManager() {
     }
   };
 
-  // 2. Update Admin Password
+  // Update Admin Password
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordSuccessMsg(null);
@@ -301,7 +300,7 @@ export default function SettingsManager() {
     }
   };
 
-  // 3. Execute Complete Test Database Reset / Purge
+  // Execute Complete Test Database Reset / Purge
   const handleExecuteDatabaseReset = async () => {
     if (confirmKeyword.trim().toUpperCase() !== 'RESET') {
       setResetErrorMsg('Please type RESET in capital letters to confirm database purge.');
@@ -314,13 +313,11 @@ export default function SettingsManager() {
       setResetErrorMsg(null);
       setResetSuccessMsg(null);
 
-      // Call the secure RPC function
-      const { data, error } = await supabase.rpc('reset_test_database', {
+      const { error } = await supabase.rpc('reset_test_database', {
         caller_id: profile?.id || user?.id,
       });
 
       if (error) {
-        // Fallback: If RPC fails, execute sequential deletes directly via Supabase client
         console.warn('RPC reset_test_database failed, performing direct cascade reset:', error);
 
         await supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -336,7 +333,7 @@ export default function SettingsManager() {
       }
 
       triggerHapticFeedback('success');
-      setResetSuccessMsg('Database test data cleared completely! All chit groups, transactions, auctions, and test subscribers have been wiped. Treasury vaults reset to ₹0.');
+      setResetSuccessMsg('Database test data cleared successfully! All groups, transactions, auctions, and test subscribers wiped. Treasury vaults reset to ₹0.');
       setShowResetModal(false);
       setConfirmKeyword('');
       await fetchDbStats();
@@ -350,192 +347,199 @@ export default function SettingsManager() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
-      {/* ── Top Header Ribbon ── */}
-      <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-5 sm:p-6 shadow-xl">
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#6359E9] to-[#9C2CF3] text-white flex items-center justify-center font-bold text-lg shadow-lg shadow-[#6359E9]/20 shrink-0">
-              <Sliders size={24} />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
-                Settings &amp; System Management
-              </h2>
-              <p className="text-xs text-[#AEABD8] mt-0.5">
-                Manage your administrator account, security credentials, and database testing data
-              </p>
+    <div className="w-full bg-slate-50 min-h-screen text-slate-800 antialiased flex flex-col font-sans">
+      
+      {/* ═══════════════════════════════════════════════════════════════════
+          MOBILE VIEW (360px Native Android feel — block lg:hidden)
+          Spacious, Clean, Touch-First UI with Zero Unnecessary Clutter
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="block lg:hidden w-full max-w-sm mx-auto bg-[#F8FAFC] min-h-screen flex flex-col shadow-xl border-x border-slate-200/80 pb-24">
+        
+        {/* Android Status Bar & Top Bar */}
+        <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 pt-2">
+          {/* Status Bar simulation */}
+          <div className="px-4 pt-1 pb-1 flex justify-between items-center text-xs font-semibold text-slate-900 tracking-tight">
+            <span>{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+            <div className="flex items-center space-x-1.5">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 18.25A10.93 10.93 0 0 1 1 12C1 5.92 5.92 1 12 1s11 4.92 11 11c0 2.34-.73 4.51-1.98 6.29l-.62-.62A8.96 8.96 0 0 0 21 12c0-4.97-4.03-9-9-9z"></path><circle cx="12" cy="18" r="2"></circle></svg>
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4z"></path></svg>
+              <div className="w-5 h-2.5 border border-slate-800 rounded-xs p-0.5 flex items-center">
+                <div className="w-full h-full bg-slate-800 rounded-2xs"></div>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-[#141332] text-[#64CFF6] border border-[#27264E]">
-              <ShieldCheck size={14} />
-              <span className="capitalize">{profile?.role || 'Administrator'} Role</span>
+          {/* App Header */}
+          <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-100/80">
+            <div>
+              <h1 className="text-sm font-extrabold text-slate-900 leading-tight">Portal Settings</h1>
+              <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                System Controls &amp; Branding
+              </p>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-brand-50 text-brand-700 border border-brand-200">
+              Admin
             </span>
           </div>
-        </div>
 
-        {/* Subtab Selector */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none border-t border-[#27264E] mt-5 pt-4">
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('organization')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 ${
-              activeSubTab === 'organization'
-                ? 'bg-[#6359E9] text-white shadow-xs'
-                : 'bg-[#141332] hover:bg-[#141332]/80 text-[#AEABD8] hover:text-white border border-[#27264E]'
-            }`}
-          >
-            <Building2 size={14} />
-            <span>Chit Funds Branding</span>
-          </button>
+          {/* Subtab Segmented Chips */}
+          <div className="px-3 py-2 bg-slate-50/80 border-b border-slate-100">
+            <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar text-xs">
+              <button
+                type="button"
+                onClick={() => { setActiveSubTab('organization'); triggerHapticFeedback('light'); }}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeSubTab === 'organization'
+                    ? 'bg-brand-500 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Building2 size={13} />
+                <span>Branding</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('profile')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 ${
-              activeSubTab === 'profile'
-                ? 'bg-[#6359E9] text-white shadow-xs'
-                : 'bg-[#141332] hover:bg-[#141332]/80 text-[#AEABD8] hover:text-white border border-[#27264E]'
-            }`}
-          >
-            <User size={14} />
-            <span>Profile &amp; Account</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => { setActiveSubTab('profile'); triggerHapticFeedback('light'); }}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeSubTab === 'profile'
+                    ? 'bg-brand-500 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <User size={13} />
+                <span>Profile</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('security')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 ${
-              activeSubTab === 'security'
-                ? 'bg-[#6359E9] text-white shadow-xs'
-                : 'bg-[#141332] hover:bg-[#141332]/80 text-[#AEABD8] hover:text-white border border-[#27264E]'
-            }`}
-          >
-            <Lock size={14} />
-            <span>Security &amp; Password</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => { setActiveSubTab('security'); triggerHapticFeedback('light'); }}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeSubTab === 'security'
+                    ? 'bg-brand-500 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Lock size={13} />
+                <span>Security</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('database')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 ${
-              activeSubTab === 'database'
-                ? 'bg-[#E41414] text-white shadow-xs'
-                : 'bg-[#E41414]/15 hover:bg-[#E41414]/25 text-[#E41414] border border-[#E41414]/30'
-            }`}
-          >
-            <Database size={14} />
-            <span>Database &amp; Test Data</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── SUB-TAB 0: CHIT FUNDS BRANDING & ORGANIZATION ── */}
-      {activeSubTab === 'organization' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
-          {/* Main Organization Form */}
-          <div className="lg:col-span-2 bg-[#1D1D41] border border-[#27264E] rounded-3xl p-6 sm:p-7 shadow-xl space-y-6">
-            <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Building2 size={18} className="text-[#6359E9]" />
-                <span>Chit Funds Organization Branding</span>
-              </h3>
-              <p className="text-xs text-[#AEABD8] mt-0.5">
-                Configure your Chit Fund Name and official branding. Changes apply instantly across the entire application — including Receipt PNGs, PDF Reports, WhatsApp Broadcasts, and Passbook sheets.
-              </p>
+              <button
+                type="button"
+                onClick={() => { setActiveSubTab('database'); triggerHapticFeedback('light'); }}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeSubTab === 'database'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100'
+                }`}
+              >
+                <Database size={13} />
+                <span>Database</span>
+              </button>
             </div>
+          </div>
+        </header>
 
-            {orgSuccessMsg && (
-              <div className="p-3.5 rounded-2xl bg-[#02B15A]/15 border border-[#02B15A]/40 text-[#02B15A] text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <CheckCircle2 size={16} className="text-[#02B15A] shrink-0" />
-                <span>{orgSuccessMsg}</span>
-              </div>
-            )}
-
-            {orgErrorMsg && (
-              <div className="p-3.5 rounded-2xl bg-[#E41414]/15 border border-[#E41414]/40 text-[#E41414] text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <AlertCircle size={16} className="text-[#E41414] shrink-0" />
-                <span>{orgErrorMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveOrganization} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1.5">
-                  Chit Funds / Organization Name *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#AEABD8]/60">
-                    <Building2 size={15} />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={orgNameInput}
-                    onChange={(e) => setOrgNameInput(e.target.value)}
-                    placeholder="e.g. ANBAZHAKAN CHIT FUNDS or SRI LAKSHMI CHIT FUNDS"
-                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-white focus:outline-none uppercase"
-                  />
+        {/* Mobile Tab Content Body */}
+        <div className="p-3.5 space-y-3.5 flex-1">
+          
+          {/* ── MOBILE SUBTAB 1: BRANDING ── */}
+          {activeSubTab === 'organization' && (
+            <div className="space-y-3">
+              {/* Live Mini Preview Banner */}
+              <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-3.5 rounded-2xl shadow-card border border-indigo-500/20">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+                  <span className="text-[10px] uppercase font-bold text-indigo-200 tracking-wider flex items-center gap-1">
+                    <Sparkles size={11} className="text-emerald-400" />
+                    <span>Live Branding Preview</span>
+                  </span>
+                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-1.5 py-0.2 rounded font-mono font-bold">
+                    ACTIVE
+                  </span>
                 </div>
-                <p className="text-[11px] text-[#AEABD8]/70 mt-1">
-                  Printed as the primary business title on all receipt cards, statements, and PDF documents.
-                </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-brand-500 text-white font-black flex items-center justify-center text-sm shadow-md shrink-0">
+                    {orgInitialsInput.trim() || computeInitials(orgNameInput || 'CF')}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-xs font-black uppercase tracking-wide truncate text-white">
+                      {orgNameInput.trim() || 'KISHOR CHIT FUNDS'}
+                    </h3>
+                    <p className="text-[10px] text-indigo-200 truncate mt-0.5">
+                      {orgTaglineInput.trim() || 'TRUSTED COMMUNITY CHIT FUNDS'}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1.5">
-                  Official Tagline / Subtitle
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#AEABD8]/60">
-                    <Sparkles size={15} />
+              {/* Feedback messages */}
+              {orgSuccessMsg && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                  <span>{orgSuccessMsg}</span>
+                </div>
+              )}
+              {orgErrorMsg && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle size={15} className="text-rose-600 shrink-0" />
+                  <span>{orgErrorMsg}</span>
+                </div>
+              )}
+
+              {/* Form Card */}
+              <form onSubmit={handleSaveOrganization} className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-card space-y-3 text-xs">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                    Organization Name *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={orgNameInput}
+                      onChange={(e) => setOrgNameInput(e.target.value)}
+                      placeholder="e.g. KISHOR CHIT FUNDS"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 uppercase focus:outline-none"
+                    />
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                    Official Tagline
+                  </label>
                   <input
                     type="text"
                     value={orgTaglineInput}
                     onChange={(e) => setOrgTaglineInput(e.target.value)}
-                    placeholder="e.g. TRUSTED CHIT FUNDS MANAGEMENT"
-                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-10 pr-4 py-2.5 text-xs font-semibold text-white focus:outline-none uppercase"
+                    placeholder="e.g. TRUSTED CHIT FUNDS"
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 uppercase focus:outline-none"
                   />
                 </div>
-                <p className="text-[11px] text-[#AEABD8]/70 mt-1">
-                  Displayed below the company name on receipt slips and report headers.
-                </p>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1.5">
-                  Brand Monogram / Logo Initials
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#AEABD8]/60">
-                    <Landmark size={15} />
-                  </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                    Logo Initials (2-3 Chars)
+                  </label>
                   <input
                     type="text"
                     maxLength={3}
                     value={orgInitialsInput}
                     onChange={(e) => setOrgInitialsInput(e.target.value.toUpperCase())}
                     placeholder={computeInitials(orgNameInput || 'CF')}
-                    className="w-full max-w-[120px] bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-10 pr-4 py-2.5 text-xs font-mono font-black text-white focus:outline-none uppercase"
+                    className="w-24 bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3 py-2 text-xs font-mono font-black text-slate-900 uppercase focus:outline-none"
                   />
                 </div>
-                <p className="text-[11px] text-[#AEABD8]/70 mt-1">
-                  2-letter logo badge on receipts and mobile portals. (Auto-computed if empty: <strong className="font-mono text-white">{computeInitials(orgNameInput || 'CF')}</strong>)
-                </p>
-              </div>
 
-              <div className="pt-3 border-t border-[#27264E] flex justify-end">
                 <button
                   type="submit"
                   disabled={isSavingOrg}
-                  className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  className="w-full mt-2 py-3 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isSavingOrg ? (
                     <>
-                      <RefreshCw size={14} className="animate-spin" /> Saving Branding...
+                      <RefreshCw size={14} className="animate-spin" /> Saving...
                     </>
                   ) : (
                     <>
@@ -543,126 +547,62 @@ export default function SettingsManager() {
                     </>
                   )}
                 </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Live Branding Preview Card */}
-          <div className="space-y-4">
-            <div className="bg-[#1D1D41] text-white rounded-3xl p-5 border border-[#27264E] shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-[#27264E] pb-3">
-                <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles size={12} className="text-[#02B15A]" />
-                  <span>Live Branding Preview</span>
-                </span>
-                <span className="text-[9px] font-mono bg-[#02B15A]/20 text-[#02B15A] px-2 py-0.5 rounded-full font-bold">
-                  ACTIVE
-                </span>
-              </div>
-
-              {/* Sample Header Preview */}
-              <div className="bg-[#141332] p-4 rounded-2xl border border-[#27264E] space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#02B15A] to-[#64CFF6] text-black font-black flex items-center justify-center text-sm shadow-md shrink-0 border border-[#02B15A]/30">
-                    {orgInitialsInput.trim() || computeInitials(orgNameInput || 'CF')}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-black text-white uppercase tracking-wider leading-tight truncate">
-                      {orgNameInput.trim() || 'ANBAZHAKAN CHIT FUNDS'}
-                    </div>
-                    <div className="text-[9px] text-[#02B15A] font-bold tracking-widest uppercase mt-0.5 truncate">
-                      {orgTaglineInput.trim() || 'TRUSTED CHIT FUNDS MANAGEMENT'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                <div className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider">
-                  Automatic Global Synchronization:
-                </div>
-                <ul className="space-y-1.5 text-[11px] text-[#AEABD8]">
-                  <li className="flex items-center gap-2">
-                    <BadgeCheck size={14} className="text-[#02B15A] shrink-0" />
-                    <span>Payment Receipt PNGs &amp; Share Cards</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <BadgeCheck size={14} className="text-[#02B15A] shrink-0" />
-                    <span>Monthly Statements &amp; Defaulters PDFs</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <BadgeCheck size={14} className="text-[#02B15A] shrink-0" />
-                    <span>Live Auction Minutes &amp; Documents</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <BadgeCheck size={14} className="text-[#02B15A] shrink-0" />
-                    <span>Passbook Covers &amp; QR Sticker Sheets</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <BadgeCheck size={14} className="text-[#02B15A] shrink-0" />
-                    <span>WhatsApp Broadcast Templates</span>
-                  </li>
-                </ul>
-              </div>
+              </form>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* ── SUB-TAB 1: PROFILE & ACCOUNT ── */}
-      {activeSubTab === 'profile' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
-          {/* Main Profile Form */}
-          <div className="lg:col-span-2 bg-[#1D1D41] border border-[#27264E] rounded-3xl p-6 sm:p-7 shadow-xl space-y-6">
-            <div>
-              <h3 className="text-base font-bold text-white">Administrator Profile</h3>
-              <p className="text-xs text-[#AEABD8] mt-0.5">
-                Update your name and primary mobile number associated with your administrator account.
-              </p>
-            </div>
-
-            {profileSuccessMsg && (
-              <div className="p-3.5 rounded-2xl bg-[#02B15A]/15 border border-[#02B15A]/40 text-[#02B15A] text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <CheckCircle2 size={16} className="text-[#02B15A] shrink-0" />
-                <span>{profileSuccessMsg}</span>
+          {/* ── MOBILE SUBTAB 2: PROFILE ── */}
+          {activeSubTab === 'profile' && (
+            <div className="space-y-3">
+              {/* Profile Card */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-card flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-brand-500 text-white font-bold flex items-center justify-center text-base shadow-sm">
+                  {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'A'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-sm text-slate-900 truncate">
+                    {profile?.fullName || 'Administrator'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono truncate">{profile?.phoneNumber || email}</p>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
+                  {profile?.role || 'Admin'}
+                </span>
               </div>
-            )}
 
-            {profileErrorMsg && (
-              <div className="p-3.5 rounded-2xl bg-[#E41414]/15 border border-[#E41414]/40 text-[#E41414] text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <AlertCircle size={16} className="text-[#E41414] shrink-0" />
-                <span>{profileErrorMsg}</span>
-              </div>
-            )}
+              {profileSuccessMsg && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                  <span>{profileSuccessMsg}</span>
+                </div>
+              )}
+              {profileErrorMsg && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle size={15} className="text-rose-600 shrink-0" />
+                  <span>{profileErrorMsg}</span>
+                </div>
+              )}
 
-            <form onSubmit={handleSaveProfile} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1.5">
-                  Full Name *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#AEABD8]/60">
-                    <User size={15} />
-                  </div>
+              {/* Profile Form */}
+              <form onSubmit={handleSaveProfile} className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-card space-y-3 text-xs">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                    Full Name *
+                  </label>
                   <input
                     type="text"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="e.g. Dr. Kishor Anbazhakan"
-                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-10 pr-4 py-2.5 text-xs font-semibold text-white focus:outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1.5">
-                  Registered Mobile Number *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#AEABD8]/60">
-                    <Phone size={15} />
-                  </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                    Registered Mobile Number *
+                  </label>
                   <input
                     type="tel"
                     required
@@ -670,204 +610,117 @@ export default function SettingsManager() {
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     placeholder="10-digit mobile number"
-                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-10 pr-4 py-2.5 text-xs font-mono font-semibold text-white focus:outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-slate-900 focus:outline-none"
                   />
                 </div>
-                <p className="text-[11px] text-[#AEABD8]/70 mt-1">Used for OTP verifications and internal audit signatures.</p>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1.5">
-                  Admin Email Address (Supabase Auth)
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#AEABD8]/40">
-                    <Mail size={15} />
-                  </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                    Auth Email Address
+                  </label>
                   <input
                     type="email"
                     disabled
                     value={email}
-                    className="w-full bg-[#141332]/50 border border-[#27264E] rounded-xl pl-10 pr-4 py-2.5 text-xs font-semibold text-[#AEABD8]/50 cursor-not-allowed"
+                    className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-500 cursor-not-allowed"
                   />
                 </div>
-                <p className="text-[11px] text-[#AEABD8]/70 mt-1">Authenticated via Supabase Auth. Email changes require security verification.</p>
-              </div>
 
-              <div className="pt-3 border-t border-[#27264E] flex justify-end">
                 <button
                   type="submit"
                   disabled={isSavingProfile}
-                  className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                  className="w-full mt-2 py-3 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isSavingProfile ? (
                     <>
-                      <RefreshCw size={14} className="animate-spin" /> Saving Changes...
+                      <RefreshCw size={14} className="animate-spin" /> Saving...
                     </>
                   ) : (
                     <>
-                      <Save size={14} /> Save Profile Changes
+                      <Save size={14} /> Update Profile Details
                     </>
                   )}
                 </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Account Summary & Badge Card */}
-          <div className="space-y-4">
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-6 shadow-xl space-y-4">
-              <h4 className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider">Account Overview</h4>
-              
-              <div className="flex items-center space-x-3.5 pb-4 border-b border-[#27264E]">
-                <div className="w-12 h-12 rounded-full bg-[#6359E9] text-white flex items-center justify-center font-bold text-base shadow-xs">
-                  {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'A'}
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-sm font-bold text-white truncate">
-                    {profile?.fullName || 'Administrator'}
-                  </h4>
-                  <span className="text-xs text-[#AEABD8] truncate block">
-                    {profile?.phoneNumber || email}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2.5 text-xs">
-                <div className="flex justify-between py-1 border-b border-[#27264E]">
-                  <span className="text-[#AEABD8] font-medium">Access Tier</span>
-                  <span className="font-bold text-[#64CFF6] bg-[#141332] border border-[#27264E] px-2 py-0.5 rounded-md uppercase text-[10px]">
-                    {profile?.role || 'Admin'}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-[#27264E]">
-                  <span className="text-[#AEABD8] font-medium">Database Profile ID</span>
-                  <span className="font-mono text-white font-semibold text-[11px] truncate max-w-[120px]">
-                    {profile?.id || 'Active'}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-[#AEABD8] font-medium">Realtime Ledger</span>
-                  <span className="text-[#02B15A] font-bold flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-[#02B15A] animate-pulse" />
-                    Connected
-                  </span>
-                </div>
-              </div>
+              </form>
             </div>
+          )}
 
-            <div className="p-4 rounded-2xl bg-[#141332] border border-[#27264E] text-xs text-[#AEABD8] space-y-1">
-              <div className="font-bold flex items-center gap-1.5 text-white">
-                <Info size={14} className="text-[#6359E9]" />
-                <span>Need Role Delegation?</span>
-              </div>
-              <p className="text-[11px] text-[#AEABD8]/80">
-                You can assign manager roles or invite operational staff in the <strong className="text-white">Access Control</strong> tab.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+          {/* ── MOBILE SUBTAB 3: SECURITY ── */}
+          {activeSubTab === 'security' && (
+            <div className="space-y-3">
+              {passwordSuccessMsg && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                  <span>{passwordSuccessMsg}</span>
+                </div>
+              )}
+              {passwordErrorMsg && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle size={15} className="text-rose-600 shrink-0" />
+                  <span>{passwordErrorMsg}</span>
+                </div>
+              )}
 
-      {/* ── SUB-TAB 2: SECURITY & PASSWORD ── */}
-      {activeSubTab === 'security' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
-          <div className="lg:col-span-2 bg-[#1D1D41] border border-[#27264E] rounded-3xl p-6 sm:p-7 shadow-xl space-y-6">
-            <div>
-              <h3 className="text-base font-bold text-white">Change Administrator Password</h3>
-              <p className="text-xs text-[#AEABD8] mt-0.5">
-                Set a strong, new password for your administrator account.
-              </p>
-            </div>
+              {/* Password Form Card */}
+              <form onSubmit={handleUpdatePassword} className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-card space-y-3 text-xs">
+                <h4 className="font-bold text-slate-900 text-xs border-b border-slate-100 pb-2">
+                  Change Administrator Password
+                </h4>
 
-            {passwordSuccessMsg && (
-              <div className="p-3.5 rounded-2xl bg-[#02B15A]/15 border border-[#02B15A]/40 text-[#02B15A] text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <CheckCircle2 size={16} className="text-[#02B15A] shrink-0" />
-                <span>{passwordSuccessMsg}</span>
-              </div>
-            )}
-
-            {passwordErrorMsg && (
-              <div className="p-3.5 rounded-2xl bg-[#E41414]/15 border border-[#E41414]/40 text-[#E41414] text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <AlertCircle size={16} className="text-[#E41414] shrink-0" />
-                <span>{passwordErrorMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleUpdatePassword} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1.5">
-                  New Administrator Password *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#AEABD8]/60">
-                    <Lock size={15} />
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                    New Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Min 6 characters"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3 py-2 pr-10 text-xs font-mono font-semibold text-slate-900 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                    >
+                      {showNewPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
                   </div>
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Minimum 6 characters"
-                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-10 pr-10 py-2.5 text-xs font-mono font-semibold text-white focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#AEABD8] hover:text-white"
-                  >
-                    {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#AEABD8] mb-1.5">
-                  Confirm New Password *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#AEABD8]/60">
-                    <KeyRound size={15} />
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                    Confirm Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repeat password"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 rounded-xl px-3 py-2 pr-10 text-xs font-mono font-semibold text-slate-900 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                    >
+                      {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
                   </div>
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repeat new password"
-                    className="w-full bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl pl-10 pr-10 py-2.5 text-xs font-mono font-semibold text-white focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#AEABD8] hover:text-white"
-                  >
-                    {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
                 </div>
-              </div>
 
-              <div className="p-3 bg-[#141332] border border-[#27264E] rounded-2xl text-[11px] text-[#AEABD8] space-y-1">
-                <span className="font-bold text-white block">Password Requirements:</span>
-                <ul className="list-disc pl-4 space-y-0.5 text-[#AEABD8]/80">
-                  <li className={newPassword.length >= 6 ? 'text-[#02B15A] font-semibold' : ''}>
-                    At least 6 characters long
-                  </li>
-                  <li className={newPassword && newPassword === confirmPassword ? 'text-[#02B15A] font-semibold' : ''}>
-                    Passwords must match
-                  </li>
-                </ul>
-              </div>
-
-              <div className="pt-3 border-t border-[#27264E] flex justify-end">
                 <button
                   type="submit"
                   disabled={isUpdatingPassword}
-                  className="bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                  className="w-full mt-2 py-3 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isUpdatingPassword ? (
                     <>
-                      <RefreshCw size={14} className="animate-spin" /> Updating Password...
+                      <RefreshCw size={14} className="animate-spin" /> Updating...
                     </>
                   ) : (
                     <>
@@ -875,231 +728,812 @@ export default function SettingsManager() {
                     </>
                   )}
                 </button>
-              </div>
-            </form>
-          </div>
+              </form>
 
-          {/* Session Safety Card */}
-          <div className="space-y-4">
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl p-6 shadow-xl space-y-4">
-              <h4 className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider">Session Security</h4>
-              
-              <div className="p-3 rounded-2xl bg-[#141332] border border-[#02B15A]/30 text-[#02B15A] text-xs space-y-1">
-                <div className="font-bold flex items-center gap-1.5">
-                  <ShieldCheck size={14} className="text-[#02B15A]" />
-                  <span>Secure SSL &amp; RLS Protected</span>
+              {/* End Active Session Card */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-card space-y-2.5">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                  <ShieldCheck size={16} className="text-emerald-600" />
+                  <span>Session Security</span>
                 </div>
-                <p className="text-[11px] text-[#AEABD8]">
-                  Every query is strictly isolated by PostgreSQL Row-Level Security policies.
-                </p>
-              </div>
-
-              <div className="pt-2 border-t border-[#27264E]">
                 <button
                   type="button"
                   onClick={() => signOut()}
-                  className="w-full py-2.5 px-4 rounded-xl border border-[#E41414]/30 bg-[#E41414]/10 hover:bg-[#E41414]/20 text-[#E41414] font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95"
+                  className="w-full py-2.5 px-3 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
                 >
-                  <LogOut size={14} /> End Active Session / Sign Out
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── SUB-TAB 3: DATABASE & TEST DATA (DANGER ZONE) ── */}
-      {activeSubTab === 'database' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Notifications */}
-          {resetSuccessMsg && (
-            <div className="p-4 rounded-2xl bg-[#02B15A]/15 border border-[#02B15A]/40 text-[#02B15A] text-xs font-semibold flex items-start gap-3 shadow-xs">
-              <CheckCircle2 size={18} className="text-[#02B15A] shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-bold">{resetSuccessMsg}</p>
-                <p className="text-[11px] text-[#02B15A]/80">
-                  You can now create brand new test groups or deploy fresh production records.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="mt-2 inline-flex items-center gap-1.5 bg-[#02B15A] hover:bg-[#02B15A]/90 text-white font-bold text-[11px] px-3 py-1.5 rounded-lg transition-all active:scale-95"
-                >
-                  <RefreshCw size={12} /> Reload Application State
+                  <LogOut size={14} /> Sign Out of Admin Account
                 </button>
               </div>
             </div>
           )}
 
-          {resetErrorMsg && (
-            <div className="p-4 rounded-2xl bg-[#E41414]/15 border border-[#E41414]/40 text-[#E41414] text-xs font-semibold flex items-center gap-3">
-              <AlertCircle size={18} className="text-[#E41414] shrink-0" />
-              <span>{resetErrorMsg}</span>
-            </div>
-          )}
-
-          {/* Database Live Telemetry Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center justify-between text-[#AEABD8] mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Chit Groups</span>
-                <Layers size={14} className="text-[#6359E9]" />
-              </div>
-              <p className="text-xl font-black text-white font-mono">
-                {loadingDbStats ? '...' : dbStats.groupsCount}
-              </p>
-              <span className="text-[10px] text-[#AEABD8]/70 mt-0.5 block">Active &amp; Drafts</span>
-            </div>
-
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center justify-between text-[#AEABD8] mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Memberships</span>
-                <Users size={14} className="text-[#64CFF6]" />
-              </div>
-              <p className="text-xl font-black text-white font-mono">
-                {loadingDbStats ? '...' : dbStats.membershipsCount}
-              </p>
-              <span className="text-[10px] text-[#AEABD8]/70 mt-0.5 block">Enrolled Tickets</span>
-            </div>
-
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center justify-between text-[#AEABD8] mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Subscribers</span>
-                <User size={14} className="text-[#9C2CF3]" />
-              </div>
-              <p className="text-xl font-black text-white font-mono">
-                {loadingDbStats ? '...' : dbStats.subscribersCount}
-              </p>
-              <span className="text-[10px] text-[#AEABD8]/70 mt-0.5 block">Test Profiles</span>
-            </div>
-
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center justify-between text-[#AEABD8] mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Transactions</span>
-                <Coins size={14} className="text-[#02B15A]" />
-              </div>
-              <p className="text-xl font-black text-white font-mono">
-                {loadingDbStats ? '...' : dbStats.transactionsCount}
-              </p>
-              <span className="text-[10px] text-[#AEABD8]/70 mt-0.5 block">Ledger Receipts</span>
-            </div>
-
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center justify-between text-[#AEABD8] mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Auctions</span>
-                <Trophy size={14} className="text-[#FFBB38]" />
-              </div>
-              <p className="text-xl font-black text-white font-mono">
-                {loadingDbStats ? '...' : dbStats.auctionLogsCount}
-              </p>
-              <span className="text-[10px] text-[#AEABD8]/70 mt-0.5 block">Auction Logs</span>
-            </div>
-
-            <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center justify-between text-[#AEABD8] mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Audit Logs</span>
-                <History size={14} className="text-[#AEABD8]" />
-              </div>
-              <p className="text-xl font-black text-white font-mono">
-                {loadingDbStats ? '...' : dbStats.auditLogsCount}
-              </p>
-              <span className="text-[10px] text-[#AEABD8]/70 mt-0.5 block">Security Trails</span>
-            </div>
-          </div>
-
-          {/* Danger Zone Card */}
-          <div className="bg-[#1D1D41] border-2 border-[#E41414]/40 rounded-3xl p-6 sm:p-7 shadow-xl space-y-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center space-x-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-[#E41414]/20 text-[#E41414] flex items-center justify-center font-bold text-lg shrink-0">
-                  <Flame size={24} />
+          {/* ── MOBILE SUBTAB 4: DATABASE ── */}
+          {activeSubTab === 'database' && (
+            <div className="space-y-3">
+              {resetSuccessMsg && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                  <span>{resetSuccessMsg}</span>
                 </div>
-                <div>
-                  <h3 className="text-base font-black text-white flex items-center gap-2">
-                    Danger Zone: Test Database Reset
-                  </h3>
-                  <p className="text-xs text-[#AEABD8] mt-0.5">
-                    Clear test data from Supabase before publishing or initiating new simulation rounds.
+              )}
+              {resetErrorMsg && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle size={15} className="text-rose-600 shrink-0" />
+                  <span>{resetErrorMsg}</span>
+                </div>
+              )}
+
+              {/* Database Telemetry Grid (2 Cols) */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Groups</span>
+                  <p className="text-lg font-black font-mono text-slate-900 mt-0.5">
+                    {loadingDbStats ? '...' : dbStats.groupsCount}
+                  </p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Tickets</span>
+                  <p className="text-lg font-black font-mono text-slate-900 mt-0.5">
+                    {loadingDbStats ? '...' : dbStats.membershipsCount}
+                  </p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Subscribers</span>
+                  <p className="text-lg font-black font-mono text-slate-900 mt-0.5">
+                    {loadingDbStats ? '...' : dbStats.subscribersCount}
+                  </p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Transactions</span>
+                  <p className="text-lg font-black font-mono text-slate-900 mt-0.5">
+                    {loadingDbStats ? '...' : dbStats.transactionsCount}
                   </p>
                 </div>
               </div>
 
-              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md bg-[#E41414]/20 text-[#E41414]">
-                Admin Exclusive
+              {/* Danger Zone Purge Card */}
+              <div className="bg-white border-2 border-rose-200 rounded-2xl p-4 shadow-card space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-rose-700">
+                  <Flame size={16} className="text-rose-600" />
+                  <span>Danger Zone: Database Reset</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  Wipes test groups, tickets, and transactions. Admin account &amp; tables remain intact.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmKeyword('');
+                    setResetErrorMsg(null);
+                    setShowResetModal(true);
+                    triggerHapticFeedback('warning');
+                  }}
+                  className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Trash2 size={15} />
+                  <span>Purge Test Database</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          DESKTOP VIEW (1440px / hidden lg:flex flex-col)
+          Full-width, Two-Pane Institutional Fintech Layout
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="hidden lg:flex flex-col flex-1 w-full">
+        
+        {/* Top Header */}
+        <header className="h-16 bg-white border-b border-slate-200/80 px-8 flex items-center justify-between flex-shrink-0 z-20">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-bold font-display text-slate-900 tracking-tight whitespace-nowrap">
+                Portal Settings &amp; System Management
+              </h1>
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 whitespace-nowrap flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Admin Security Active
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 border border-slate-200/70">
+              <ShieldCheck size={14} className="text-emerald-600" />
+              <span>Role: <strong className="capitalize text-slate-900">{profile?.role || 'Administrator'}</strong></span>
+            </span>
+          </div>
+        </header>
+
+        {/* Workspace Body */}
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="w-full max-w-[1550px] mx-auto space-y-6">
+
+            {/* Subtab Selector Ribbon */}
+            <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => { setActiveSubTab('organization'); triggerHapticFeedback('light'); }}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all cursor-pointer ${
+                    activeSubTab === 'organization'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Building2 size={14} className={activeSubTab === 'organization' ? 'text-brand-600' : 'text-slate-400'} />
+                  <span>Chit Funds Branding</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setActiveSubTab('profile'); triggerHapticFeedback('light'); }}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all cursor-pointer ${
+                    activeSubTab === 'profile'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <User size={14} className={activeSubTab === 'profile' ? 'text-brand-600' : 'text-slate-400'} />
+                  <span>Profile &amp; Account</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setActiveSubTab('security'); triggerHapticFeedback('light'); }}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all cursor-pointer ${
+                    activeSubTab === 'security'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Lock size={14} className={activeSubTab === 'security' ? 'text-brand-600' : 'text-slate-400'} />
+                  <span>Security &amp; Password</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setActiveSubTab('database'); triggerHapticFeedback('light'); }}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all cursor-pointer ${
+                    activeSubTab === 'database'
+                      ? 'bg-rose-600 text-white shadow-2xs font-bold'
+                      : 'text-rose-700 hover:bg-rose-100/50'
+                  }`}
+                >
+                  <Database size={14} />
+                  <span>Database &amp; Test Purge</span>
+                </button>
+              </div>
+
+              <span className="text-xs text-slate-400 font-mono pr-2">
+                Supabase RLS Protected
               </span>
             </div>
 
-            {/* Scope Explanation Matrix */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 rounded-2xl bg-[#141332] border border-[#E41414]/30 space-y-2.5">
-                <div className="font-bold text-[#E41414] flex items-center gap-1.5">
-                  <Trash2 size={14} className="text-[#E41414]" />
-                  <span>Data That Will Be Completely Wiped:</span>
+            {/* ── DESKTOP SUBTAB 1: ORGANIZATION BRANDING ── */}
+            {activeSubTab === 'organization' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                {/* Left 7-Cols: Form Card */}
+                <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5">
+                  <div className="border-b border-slate-100 pb-3">
+                    <h3 className="font-display font-bold text-base text-slate-900 flex items-center gap-2">
+                      <Building2 size={18} className="text-brand-600" />
+                      <span>Chit Funds Organization Branding</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Applied globally across Receipt PNGs, PDF Reports, WhatsApp Broadcasts, and Passbook sheets.
+                    </p>
+                  </div>
+
+                  {orgSuccessMsg && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                      <span>{orgSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  {orgErrorMsg && (
+                    <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                      <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                      <span>{orgErrorMsg}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSaveOrganization} className="space-y-4 text-xs">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Chit Funds / Organization Name *
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Building2 size={15} />
+                        </div>
+                        <input
+                          type="text"
+                          required
+                          value={orgNameInput}
+                          onChange={(e) => setOrgNameInput(e.target.value)}
+                          placeholder="e.g. KISHOR CHIT FUNDS"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-slate-900 focus:outline-none uppercase transition-all"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Primary business title rendered at top of all receipts and passbooks.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Official Tagline / Subtitle
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Sparkles size={15} />
+                        </div>
+                        <input
+                          type="text"
+                          value={orgTaglineInput}
+                          onChange={(e) => setOrgTaglineInput(e.target.value)}
+                          placeholder="e.g. TRUSTED COMMUNITY CHIT FUNDS"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-medium text-slate-800 focus:outline-none uppercase transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Brand Monogram / Logo Initials (2-3 chars)
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Landmark size={15} />
+                        </div>
+                        <input
+                          type="text"
+                          maxLength={3}
+                          value={orgInitialsInput}
+                          onChange={(e) => setOrgInitialsInput(e.target.value.toUpperCase())}
+                          placeholder={computeInitials(orgNameInput || 'CF')}
+                          className="w-32 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-mono font-black text-slate-900 focus:outline-none uppercase transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={isSavingOrg}
+                        className="bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSavingOrg ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" /> Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save size={14} /> Save Organization Branding
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-                <ul className="space-y-1 text-[#AEABD8] text-[11px] list-disc pl-4">
-                  <li>All <strong className="text-white">Chit Groups</strong> and tickets</li>
-                  <li>All <strong className="text-white">Group Memberships</strong> &amp; pocket book sync records</li>
-                  <li>All <strong className="text-white">Auction Logs</strong>, bidding history &amp; winner payouts</li>
-                  <li>All <strong className="text-white">Payment Receipts</strong>, collections &amp; personal draws</li>
-                  <li>All <strong className="text-white">Test Subscriber Profiles</strong></li>
-                  <li>All historical <strong className="text-white">Audit Logs</strong></li>
-                </ul>
-              </div>
 
-              <div className="p-4 rounded-2xl bg-[#141332] border border-[#02B15A]/30 space-y-2.5">
-                <div className="font-bold text-[#02B15A] flex items-center gap-1.5">
-                  <ShieldCheck size={14} className="text-[#02B15A]" />
-                  <span>Structural Integrity &amp; Admin Accounts Preserved:</span>
+                {/* Right 5-Cols: Live Branding Preview */}
+                <div className="lg:col-span-5 space-y-4">
+                  <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-card border border-indigo-500/20 space-y-4">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-200 flex items-center gap-1.5">
+                        <Sparkles size={13} className="text-emerald-400" />
+                        <span>Live Visual Identity Preview</span>
+                      </span>
+                      <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full font-bold">
+                        ACTIVE
+                      </span>
+                    </div>
+
+                    {/* Monogram + Title Header */}
+                    <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10 flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-indigo-500 text-white font-black flex items-center justify-center text-base shadow-md shrink-0">
+                        {orgInitialsInput.trim() || computeInitials(orgNameInput || 'CF')}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-sm font-black uppercase tracking-wider text-white truncate">
+                          {orgNameInput.trim() || 'KISHOR CHIT FUNDS'}
+                        </h4>
+                        <p className="text-[11px] text-emerald-300 font-bold tracking-wider uppercase truncate mt-0.5">
+                          {orgTaglineInput.trim() || 'TRUSTED COMMUNITY CHIT FUNDS'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Sync Checklist */}
+                    <div className="space-y-2 text-xs pt-1">
+                      <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block">
+                        Synchronized Across All Outputs:
+                      </span>
+                      <ul className="space-y-1.5 text-[11px] text-slate-300">
+                        <li className="flex items-center gap-2">
+                          <BadgeCheck size={14} className="text-emerald-400 shrink-0" />
+                          <span>Payment Receipt PNGs &amp; Share Slips</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <BadgeCheck size={14} className="text-emerald-400 shrink-0" />
+                          <span>Monthly Ledger Statements &amp; PDF Reports</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <BadgeCheck size={14} className="text-emerald-400 shrink-0" />
+                          <span>Live Auction Minutes &amp; WhatsApp Templates</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
-                <ul className="space-y-1 text-[#AEABD8] text-[11px] list-disc pl-4">
-                  <li><strong className="text-white">PostgreSQL Schema</strong>, tables, indexes &amp; triggers</li>
-                  <li><strong className="text-white">Row-Level Security (RLS)</strong> access policies</li>
-                  <li><strong className="text-white">Admin &amp; Manager Auth Accounts</strong> (Dr. Kishor Anbazhakan)</li>
-                  <li><strong className="text-white">4 Treasury Vault Structures</strong> (reset to ₹0 balances: Cash Box, Kishor Bank, Dad Bank, Mom Bank)</li>
-                  <li>System settings &amp; custom roles definition</li>
-                </ul>
-              </div>
-            </div>
 
-            {/* Action Area */}
-            <div className="pt-4 border-t border-[#27264E] flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-[11px] text-[#AEABD8] text-center sm:text-left">
-                ⚠️ This operation cannot be undone. Always verify you are ready to wipe test records.
               </div>
+            )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmKeyword('');
-                  setResetErrorMsg(null);
-                  setShowResetModal(true);
-                  triggerHapticFeedback('warning');
-                }}
-                className="w-full sm:w-auto bg-[#E41414] hover:bg-[#E41414]/90 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all shadow-md shadow-[#E41414]/20 flex items-center justify-center gap-2 active:scale-95"
-              >
-                <Trash2 size={15} />
-                <span>Delete Test Database &amp; Reset</span>
-              </button>
-            </div>
+            {/* ── DESKTOP SUBTAB 2: PROFILE & ACCOUNT ── */}
+            {activeSubTab === 'profile' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                {/* Left 7-Cols: Profile Form */}
+                <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5">
+                  <div className="border-b border-slate-100 pb-3">
+                    <h3 className="font-display font-bold text-base text-slate-900">
+                      Administrator Profile Details
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Update your administrator name and primary contact number.
+                    </p>
+                  </div>
+
+                  {profileSuccessMsg && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                      <span>{profileSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  {profileErrorMsg && (
+                    <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                      <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                      <span>{profileErrorMsg}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Full Name *
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <User size={15} />
+                        </div>
+                        <input
+                          type="text"
+                          required
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="e.g. Dr. Kishor Anbazhakan"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-semibold text-slate-900 focus:outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Registered Mobile Number *
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Phone size={15} />
+                        </div>
+                        <input
+                          type="tel"
+                          required
+                          maxLength={10}
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          placeholder="10-digit mobile number"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-mono font-semibold text-slate-900 focus:outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Admin Email Address (Supabase Auth)
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Mail size={15} />
+                        </div>
+                        <input
+                          type="email"
+                          disabled
+                          value={email}
+                          className="w-full bg-slate-100 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs font-medium text-slate-500 cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={isSavingProfile}
+                        className="bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSavingProfile ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" /> Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save size={14} /> Save Profile Changes
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Right 5-Cols: Account Overview */}
+                <div className="lg:col-span-5 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Account Overview</h4>
+
+                  <div className="flex items-center space-x-3.5 pb-4 border-b border-slate-100">
+                    <div className="w-12 h-12 rounded-full bg-brand-500 text-white flex items-center justify-center font-bold text-base shadow-sm">
+                      {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'A'}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-slate-900 truncate">
+                        {profile?.fullName || 'Administrator'}
+                      </h4>
+                      <span className="text-xs text-slate-500 truncate block">
+                        {profile?.phoneNumber || email}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">Access Tier</span>
+                      <span className="font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-md uppercase text-[10px]">
+                        {profile?.role || 'Admin'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">Database Profile ID</span>
+                      <span className="font-mono text-slate-800 font-semibold text-[11px] truncate max-w-[140px]">
+                        {profile?.id || 'Active'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1.5">
+                      <span className="text-slate-500">Realtime Channel</span>
+                      <span className="text-emerald-600 font-bold flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        Connected
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ── DESKTOP SUBTAB 3: SECURITY & PASSWORD ── */}
+            {activeSubTab === 'security' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                {/* Left 7-Cols: Password Change */}
+                <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5">
+                  <div className="border-b border-slate-100 pb-3">
+                    <h3 className="font-display font-bold text-base text-slate-900">
+                      Change Administrator Password
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Set a strong password for your administrator account.
+                    </p>
+                  </div>
+
+                  {passwordSuccessMsg && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                      <span>{passwordSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  {passwordErrorMsg && (
+                    <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                      <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                      <span>{passwordErrorMsg}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleUpdatePassword} className="space-y-4 text-xs">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        New Administrator Password *
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Lock size={15} />
+                        </div>
+                        <input
+                          type={showNewPassword ? 'text' : 'password'}
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Minimum 6 characters"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl pl-10 pr-10 py-2.5 text-xs font-mono font-semibold text-slate-900 focus:outline-none transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                        >
+                          {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Confirm New Password *
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <KeyRound size={15} />
+                        </div>
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Repeat new password"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl pl-10 pr-10 py-2.5 text-xs font-mono font-semibold text-slate-900 focus:outline-none transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                        >
+                          {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={isUpdatingPassword}
+                        className="bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {isUpdatingPassword ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" /> Updating...
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={14} /> Update Password
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Right 5-Cols: Security Card */}
+                <div className="lg:col-span-5 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Session Security</h4>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                    <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                      <ShieldCheck size={14} className="text-emerald-600" />
+                      <span>PostgreSQL Row-Level Security</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      All queries are verified against caller authorization credentials in real-time.
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => signOut()}
+                      className="w-full py-2.5 px-4 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <LogOut size={14} /> End Active Session / Sign Out
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ── DESKTOP SUBTAB 4: DATABASE & TEST DATA ── */}
+            {activeSubTab === 'database' && (
+              <div className="space-y-6">
+                {resetSuccessMsg && (
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                    <span>{resetSuccessMsg}</span>
+                  </div>
+                )}
+                {resetErrorMsg && (
+                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                    <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                    <span>{resetErrorMsg}</span>
+                  </div>
+                )}
+
+                {/* 6 Metric Telemetry Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                    <div className="flex items-center justify-between text-slate-400 mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Chit Groups</span>
+                      <Layers size={14} className="text-brand-600" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-900 font-mono">
+                      {loadingDbStats ? '...' : dbStats.groupsCount}
+                    </p>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Active &amp; Draft</span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                    <div className="flex items-center justify-between text-slate-400 mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Tickets</span>
+                      <Users size={14} className="text-indigo-600" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-900 font-mono">
+                      {loadingDbStats ? '...' : dbStats.membershipsCount}
+                    </p>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Enrolled Members</span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                    <div className="flex items-center justify-between text-slate-400 mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Subscribers</span>
+                      <User size={14} className="text-purple-600" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-900 font-mono">
+                      {loadingDbStats ? '...' : dbStats.subscribersCount}
+                    </p>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Registered Profiles</span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                    <div className="flex items-center justify-between text-slate-400 mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Transactions</span>
+                      <Coins size={14} className="text-emerald-600" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-900 font-mono">
+                      {loadingDbStats ? '...' : dbStats.transactionsCount}
+                    </p>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Ledger Receipts</span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                    <div className="flex items-center justify-between text-slate-400 mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Auctions</span>
+                      <Trophy size={14} className="text-amber-500" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-900 font-mono">
+                      {loadingDbStats ? '...' : dbStats.auctionLogsCount}
+                    </p>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Live Sessions</span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+                    <div className="flex items-center justify-between text-slate-400 mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Audit Logs</span>
+                      <History size={14} className="text-slate-400" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-900 font-mono">
+                      {loadingDbStats ? '...' : dbStats.auditLogsCount}
+                    </p>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Security Trails</span>
+                  </div>
+                </div>
+
+                {/* Danger Zone Card */}
+                <div className="bg-white border-2 border-rose-200 rounded-2xl p-6 shadow-xs space-y-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center space-x-3.5">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-lg shrink-0">
+                        <Flame size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                          Danger Zone: Test Database Reset
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Clear test data from Supabase before publishing or initiating new simulation rounds.
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md bg-rose-50 text-rose-700 border border-rose-200">
+                      Admin Exclusive
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div className="p-4 rounded-xl bg-rose-50/50 border border-rose-200/70 space-y-2">
+                      <div className="font-bold text-rose-700 flex items-center gap-1.5">
+                        <Trash2 size={14} />
+                        <span>Data That Will Be Wiped:</span>
+                      </div>
+                      <ul className="space-y-1 text-slate-600 text-[11px] list-disc pl-4">
+                        <li>All <strong className="text-slate-900">Chit Groups</strong> &amp; enrolled tickets</li>
+                        <li>All <strong className="text-slate-900">Auction Logs</strong> &amp; bidding history</li>
+                        <li>All <strong className="text-slate-900">Payment Transactions</strong> &amp; receipts</li>
+                        <li>All <strong className="text-slate-900">Test Subscriber Profiles</strong></li>
+                      </ul>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/70 space-y-2">
+                      <div className="font-bold text-emerald-800 flex items-center gap-1.5">
+                        <ShieldCheck size={14} />
+                        <span>Preserved System Structures:</span>
+                      </div>
+                      <ul className="space-y-1 text-slate-600 text-[11px] list-disc pl-4">
+                        <li><strong className="text-slate-900">PostgreSQL Schema</strong>, tables, RLS policies</li>
+                        <li><strong className="text-slate-900">Administrator Accounts</strong> (Dr. Kishor Anbazhakan)</li>
+                        <li><strong className="text-slate-900">4 Treasury Vaults</strong> (balances reset to ₹0)</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400">
+                      ⚠️ This operation cannot be undone. Always verify you are ready to wipe test records.
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmKeyword('');
+                        setResetErrorMsg(null);
+                        setShowResetModal(true);
+                        triggerHapticFeedback('warning');
+                      }}
+                      className="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+                    >
+                      <Trash2 size={15} />
+                      <span>Delete Test Database &amp; Reset</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
           </div>
-        </div>
-      )}
+        </main>
 
-      {/* ── 2-STEP CONFIRMATION MODAL ── */}
+      </div>
+
+      {/* ── 2-STEP CONFIRMATION MODAL (SHARED MOBILE & DESKTOP) ── */}
       {showResetModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-[#1D1D41] rounded-3xl border border-[#27264E] p-6 sm:p-7 w-full max-w-lg space-y-5 shadow-2xl relative animate-in zoom-in-95 duration-150 text-white">
-            {/* Modal Header */}
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 w-full max-w-lg space-y-5 shadow-2xl relative animate-in zoom-in-95 duration-150 text-slate-900">
             <div className="flex justify-between items-start">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#E41414]/20 text-[#E41414] flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
                   <AlertTriangle size={20} />
                 </div>
                 <div>
-                  <h4 className="text-base font-black text-white">
+                  <h4 className="text-base font-black text-slate-900">
                     Confirm Database Test Purge
                   </h4>
-                  <p className="text-xs text-[#AEABD8]">
+                  <p className="text-xs text-slate-500">
                     Irreversible administrative operation
                   </p>
                 </div>
@@ -1107,32 +1541,28 @@ export default function SettingsManager() {
               <button
                 type="button"
                 onClick={() => setShowResetModal(false)}
-                className="text-[#AEABD8] hover:text-white p-1.5 rounded-xl hover:bg-[#141332] transition-colors"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Warning Message */}
-            <div className="p-4 rounded-2xl bg-[#141332] border border-[#E41414]/30 text-xs space-y-2">
-              <div className="font-bold flex items-center gap-1.5 text-[#E41414]">
-                <Flame size={14} className="text-[#E41414]" />
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs space-y-2">
+              <div className="font-bold flex items-center gap-1.5 text-rose-800">
+                <Flame size={14} className="text-rose-600" />
                 <span>You are about to purge all testing data:</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-[#AEABD8] pt-1">
+              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-rose-900 pt-1">
                 <div>• {dbStats.groupsCount} Chit Groups</div>
                 <div>• {dbStats.membershipsCount} Enrolled Tickets</div>
                 <div>• {dbStats.subscribersCount} Test Members</div>
                 <div>• {dbStats.transactionsCount} Transactions</div>
-                <div>• {dbStats.auctionLogsCount} Auction Logs</div>
-                <div>• Treasury Balances → ₹0</div>
               </div>
             </div>
 
-            {/* Keyword Confirmation Prompt */}
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-[#AEABD8]">
-                Type <span className="font-mono text-[#E41414] font-black">RESET</span> below to unlock confirmation:
+              <label className="block text-xs font-bold text-slate-700">
+                Type <span className="font-mono text-rose-600 font-black">RESET</span> below to unlock confirmation:
               </label>
               <input
                 type="text"
@@ -1140,11 +1570,10 @@ export default function SettingsManager() {
                 placeholder="Type RESET here"
                 value={confirmKeyword}
                 onChange={(e) => setConfirmKeyword(e.target.value)}
-                className="w-full bg-[#141332] border border-[#27264E] focus:border-[#E41414] rounded-xl px-4 py-2.5 text-xs font-mono font-bold tracking-widest text-white focus:outline-none uppercase"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-rose-500 rounded-xl px-4 py-2.5 text-xs font-mono font-bold tracking-widest text-slate-900 focus:outline-none uppercase"
               />
             </div>
 
-            {/* Slider Confirmation */}
             <div className="pt-2">
               <SlideToConfirm
                 onConfirm={handleExecuteDatabaseReset}
@@ -1157,13 +1586,12 @@ export default function SettingsManager() {
               />
             </div>
 
-            {/* Footer Buttons */}
             <div className="flex justify-end pt-2">
               <button
                 type="button"
                 onClick={() => setShowResetModal(false)}
                 disabled={isResettingDb}
-                className="border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs px-4 py-2 rounded-xl transition-all"
+                className="border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer"
               >
                 Cancel / Keep Data
               </button>
@@ -1171,6 +1599,7 @@ export default function SettingsManager() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
