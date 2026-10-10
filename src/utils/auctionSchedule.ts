@@ -50,7 +50,7 @@ export function formatTime12h(timeStr?: string | null): string {
  * Returns the First Sunday that falls on or after the specified cutoff day (e.g. 10th) for a given year & month (0-indexed).
  */
 export function getFirstSundayOnOrAfterDay(year: number, month: number, cutoffDay: number = 10): Date {
-  const safeCutoff = Math.max(1, Math.min(cutoffDay, 28));
+  const safeCutoff = Math.max(1, Math.min(cutoffDay, 31));
   const d = new Date(year, month, safeCutoff);
   while (d.getDay() !== 0) {
     d.setDate(d.getDate() + 1);

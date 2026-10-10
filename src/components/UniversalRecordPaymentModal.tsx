@@ -350,13 +350,20 @@ export default function UniversalRecordPaymentModal({
       // 2. Fetch past collection transactions for this member
       const groupIds = activeMemberships.map((m: any) => m.group_id).filter(Boolean);
       const memberIds = activeMemberships.map((m: any) => m.id).filter(Boolean);
-      const { data: txs } = await supabase
+
+      let txQuery = supabase
         .from('transactions')
         .select('group_id, group_member_id, cycle_month, amount, status, notes')
         .eq('type', 'collection')
         .eq('status', 'completed')
-        .in('group_id', groupIds.length > 0 ? groupIds : ['00000000-0000-0000-0000-000000000000'])
-        .or(`profile_id.eq.${profileId},group_member_id.in.(${memberIds.join(',') || '00000000-0000-0000-0000-000000000000'})`);
+        .in('group_id', groupIds.length > 0 ? groupIds : ['00000000-0000-0000-0000-000000000000']);
+
+      if (memberIds.length > 0) {
+        txQuery = txQuery.or(`profile_id.eq.${profileId},group_member_id.in.(${memberIds.join(',')})`);
+      } else {
+        txQuery = txQuery.eq('profile_id', profileId);
+      }
+      const { data: txs } = await txQuery;
 
       // 3. Build group info and dues breakdown
       const initialEnabled: Record<string, boolean> = {};
@@ -387,6 +394,11 @@ export default function UniversalRecordPaymentModal({
           // If member only has 1 ticket in this group and transaction doesn't specify ticket
           const memberTicketsInThisGroup = memberships.filter((x: any) => x.group_id === cg.id);
           if (memberTicketsInThisGroup.length === 1) {
+            // If notes explicitly mention another ticket number, do not match (HIGH-07)
+            const ticketMatch = t.notes && t.notes.match(/Ticket\s*#(\d+)/i);
+            if (ticketMatch && Number(ticketMatch[1]) !== m.ticket_number) {
+              return false;
+            }
             return true;
           }
           return false;

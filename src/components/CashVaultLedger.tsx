@@ -75,12 +75,6 @@ interface PersonalDraw {
   timestamp: string;
   created_at: string;
   status: 'outstanding' | 'settled';
-  settlementDetails?: {
-    settledAt: string;
-    settlementMode: 'vault_repay' | 'member_offset';
-    destWallet?: WalletType;
-    notes?: string;
-  };
 }
 
 interface FloatingDeposit {
@@ -154,15 +148,31 @@ export default function CashVaultLedger() {
   const [recoverAmount, setRecoverAmount] = useState<string>('');
   const [isProcessingRecover, setIsProcessingRecover] = useState<boolean>(false);
 
-  // Denomination Counter State
-  const [denominations, setDenominations] = useState<{ [key: number]: number }>({
-    500: 100,
-    200: 40,
-    100: 50,
-    50: 20,
-    20: 20,
-    10: 10,
+  // Denomination Counter State with localStorage persistence
+  const [denominations, setDenominations] = useState<{ [key: number]: number }>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('cf_cash_denominations');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {
+      500: 0,
+      200: 0,
+      100: 0,
+      50: 0,
+      20: 0,
+      10: 0,
+    };
   });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('cf_cash_denominations', JSON.stringify(denominations));
+      } catch {}
+    }
+  }, [denominations]);
 
   // Ledger Filter & Search
   const [ledgerSearch, setLedgerSearch] = useState<string>('');
@@ -175,7 +185,8 @@ export default function CashVaultLedger() {
       const { data: txs } = await supabase
         .from('transactions')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (txs) {
         setRecentTransactions(txs);
@@ -369,7 +380,7 @@ export default function CashVaultLedger() {
           }
         }
 
-        const isSettled = notes.toLowerCase().includes('status: settled') || notes.toLowerCase().includes('status: repaid');
+        const isSettled = /(?:status:\s*(?:settled|repaid)|\[settled\])/i.test(notes);
         const status: 'outstanding' | 'settled' = isSettled ? 'settled' : 'outstanding';
 
         let takenBy = 'Anbazhakan';
@@ -421,7 +432,7 @@ export default function CashVaultLedger() {
           depositedBy = byMatch[1].trim();
         }
 
-        const isRecovered = notes.toLowerCase().includes('status: recovered') || notes.toLowerCase().includes('status: settled');
+        const isRecovered = /(?:status:\s*(?:recovered|settled)|\[recovered\])/i.test(notes);
         const status: 'active' | 'recovered' = isRecovered ? 'recovered' : 'active';
 
         let tag = 'Temporary Float';
@@ -460,11 +471,23 @@ export default function CashVaultLedger() {
     return { total, activeCount: active.length };
   }, [computedFloatingDeposits]);
 
-  // Master Transaction Feed filtered by active wallet and type
+  // Master Transaction Feed filtered by active wallet, date range, and type
   const filteredTransactions = useMemo(() => {
     return recentTransactions.filter((tx) => {
       const notes = (tx.notes || tx.description || '').toLowerCase();
       
+      let matchesDate = true;
+      if (dateRangeFilter !== 'all' && tx.created_at) {
+        const txDate = new Date(tx.created_at);
+        const now = new Date();
+        if (dateRangeFilter === 'month') {
+          matchesDate = txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+        } else if (dateRangeFilter === '30days') {
+          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          matchesDate = txDate >= thirtyDaysAgo;
+        }
+      }
+
       let matchesWallet = true;
       if (selectedWalletFilter !== 'all') {
         matchesWallet = tx.wallet_type === selectedWalletFilter ||
@@ -498,9 +521,9 @@ export default function CashVaultLedger() {
         String(tx.amount).includes(q) ||
         tx.type.toLowerCase().includes(q);
 
-      return matchesWallet && matchesType && matchesSearch;
+      return matchesDate && matchesWallet && matchesType && matchesSearch;
     });
-  }, [recentTransactions, selectedWalletFilter, ledgerTypeFilter, ledgerSearch]);
+  }, [recentTransactions, selectedWalletFilter, ledgerTypeFilter, ledgerSearch, dateRangeFilter]);
 
   // Denomination Calculations
   const calculatedPhysicalCash = useMemo(() => {
@@ -634,7 +657,7 @@ export default function CashVaultLedger() {
     }
   };
 
-  // 3. Log Personal Spend
+  // 3. Log Personal Spend (Atomic via log_personal_draw RPC)
   const handleLogSpend = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(spendAmount);
@@ -648,31 +671,24 @@ export default function CashVaultLedger() {
     }
 
     const effectiveTakenBy = spendTakenBy === 'Other' ? (spendCustomTakenBy.trim() || 'Other') : spendTakenBy;
+    const desc = spendDesc.trim() || `${spendTag} by ${effectiveTakenBy}`;
 
     try {
       setIsSubmittingSpend(true);
-      await updateBalance(spendWallet, -amount);
 
-      const desc = spendDesc.trim() || `${spendTag} by ${effectiveTakenBy}`;
-      const fullNote = `[${spendTag}] ${desc} | Admin Logged: ${activeAdminName} | Taken By: ${effectiveTakenBy} | Status: Outstanding`;
-
-      const { error } = await supabase.from('transactions').insert([
-        {
-          wallet_type: spendWallet,
-          type: 'personal_draw',
-          status: 'completed',
-          amount: amount,
-          notes: fullNote,
-          created_by: profile?.id || null,
-        }
-      ]);
-
-      if (error) throw error;
-
-      await supabase.from('security_audit_logs').insert({
-        action_description: `PERSONAL DRAW: ₹${amount.toLocaleString('en-IN')} taken by ${effectiveTakenBy} for ${spendTag} from ${WALLET_META[spendWallet].name}.`,
-        target_table: 'transactions',
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('log_personal_draw', {
+        p_wallet: spendWallet,
+        p_amount: amount,
+        p_tag: spendTag,
+        p_desc: desc,
+        p_taken_by: effectiveTakenBy,
+        p_admin_id: profile?.id || null,
       });
+
+      if (rpcErr || !rpcData?.success) {
+        alert('Failed to record personal draw: ' + (rpcData?.error || rpcErr?.message));
+        return;
+      }
 
       setSpendAmount('');
       setSpendDesc('');
@@ -688,7 +704,7 @@ export default function CashVaultLedger() {
     }
   };
 
-  // 4. Settle Personal Debt (Put Cash Back)
+  // 4. Settle Personal Debt (Atomic via settle_personal_draw RPC)
   const handleConfirmSettle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settlingDraw) return;
@@ -704,29 +720,18 @@ export default function CashVaultLedger() {
 
     try {
       setIsProcessingSettle(true);
-      await updateBalance(settleDestWallet, amount);
 
-      await supabase.from('transactions').insert([
-        {
-          wallet_type: settleDestWallet,
-          type: 'transfer',
-          status: 'completed',
-          amount: amount,
-          notes: `Personal Draw Repayment of ${formatCurrency(amount)} by ${settlingDraw.takenBy} returned to ${WALLET_META[settleDestWallet].name} (Original: ${settlingDraw.tag})`,
-          created_by: profile?.id || null,
-        }
-      ]);
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('settle_personal_draw', {
+        p_draw_id: settlingDraw.id,
+        p_dest_wallet: settleDestWallet,
+        p_amount: amount,
+        p_admin_id: profile?.id || null,
+      });
 
-      const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const isFull = amount >= settlingDraw.amount;
-      const updatedNotes = isFull
-        ? `[${settlingDraw.tag}] ${settlingDraw.description} | Taken By: ${settlingDraw.takenBy} | Status: Settled (Repaid ${formatCurrency(amount)} into ${WALLET_META[settleDestWallet].name} on ${dateStr})`
-        : `[${settlingDraw.tag}] ${settlingDraw.description} | Taken By: ${settlingDraw.takenBy} | Status: Outstanding (Partially Repaid ${formatCurrency(amount)}, Remaining: ${formatCurrency(settlingDraw.amount - amount)})`;
-
-      await supabase
-        .from('transactions')
-        .update({ notes: updatedNotes })
-        .eq('id', settlingDraw.id);
+      if (rpcErr || !rpcData?.success) {
+        alert('Failed to settle personal debt: ' + (rpcData?.error || rpcErr?.message));
+        return;
+      }
 
       setSettlingDraw(null);
       setActiveModal('none');
@@ -880,7 +885,7 @@ export default function CashVaultLedger() {
     }
   };
 
-  // 7. Recover Floating Deposit
+  // 7. Recover Floating Deposit (Atomic via recover_floating_deposit RPC)
   const handleConfirmRecoverFloat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recoveringFloat) return;
@@ -901,39 +906,17 @@ export default function CashVaultLedger() {
     try {
       setIsProcessingRecover(true);
 
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
-        p_wallet: recoverSourceWallet,
-        p_delta: -amount,
-        p_user_id: profile?.id || null,
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('recover_floating_deposit', {
+        p_float_id: recoveringFloat.id,
+        p_source_wallet: recoverSourceWallet,
+        p_amount: amount,
+        p_admin_id: profile?.id || null,
       });
 
       if (rpcErr || !rpcData?.success) {
-        alert('Failed to debit float source: ' + (rpcData?.error || rpcErr?.message));
+        alert('Failed to recover float: ' + (rpcData?.error || rpcErr?.message));
         return;
       }
-
-      await supabase.from('transactions').insert([
-        {
-          wallet_type: recoverSourceWallet,
-          from_wallet: recoverSourceWallet,
-          type: 'personal_draw',
-          status: 'completed',
-          amount: amount,
-          notes: `[Float Recovery] ₹${amount.toLocaleString('en-IN')} returned to ${recoveringFloat.depositedBy} from ${WALLET_META[recoverSourceWallet].name} | Original deposit on ${new Date(recoveringFloat.created_at).toLocaleDateString('en-IN')}`,
-          created_by: profile?.id || null,
-        }
-      ]);
-
-      const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const isFull = amount >= recoveringFloat.amount;
-      const updatedNotes = isFull
-        ? `[Floating Deposit - ${recoveringFloat.tag}] ${recoveringFloat.notes} | Deposited By: ${recoveringFloat.depositedBy} | Status: Recovered (Withdrawn ${formatCurrency(amount)} from ${WALLET_META[recoverSourceWallet].name} on ${dateStr})`
-        : `[Floating Deposit - ${recoveringFloat.tag}] ${recoveringFloat.notes} | Deposited By: ${recoveringFloat.depositedBy} | Status: Partially Recovered (Remaining: ${formatCurrency(recoveringFloat.amount - amount)})`;
-
-      await supabase
-        .from('transactions')
-        .update({ notes: updatedNotes })
-        .eq('id', recoveringFloat.id);
 
       setRecoveringFloat(null);
       setActiveModal('none');

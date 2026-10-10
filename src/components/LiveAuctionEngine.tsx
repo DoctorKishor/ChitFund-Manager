@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/utils/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { 
   Undo2, 
   Gavel, 
@@ -273,7 +274,7 @@ export default function LiveAuctionEngine() {
   const [liveViewerCount, setLiveViewerCount] = useState<number>(0);
   const [activeViewers, setActiveViewers] = useState<ActiveViewerInfo[]>([]);
   const [showViewersModal, setShowViewersModal] = useState<boolean>(false);
-  const presenceChannelRef = useRef<any>(null);
+  const presenceChannelRef = useRef<RealtimeChannel | null>(null);
 
   // Auction date override & schedule modal
   const [auctionDateOverride, setAuctionDateOverride] = useState<string | null>(null);
@@ -387,12 +388,10 @@ export default function LiveAuctionEngine() {
         setGroup(updatedGroup);
         setAllGroups(prev => prev.map(g => g.id === groupId ? updatedGroup : g));
 
-        if (groupData.live_bid_stream && Array.isArray(groupData.live_bid_stream)) {
-          setGroupBidsMap(prev => ({
-            ...prev,
-            [groupId]: groupData.live_bid_stream,
-          }));
-        }
+        setGroupBidsMap(prev => ({
+          ...prev,
+          [groupId]: (groupData.live_bid_stream && Array.isArray(groupData.live_bid_stream)) ? groupData.live_bid_stream : [],
+        }));
       }
 
       // Fetch group members from group_members joined with profiles
@@ -742,7 +741,8 @@ export default function LiveAuctionEngine() {
     const num = parseFloat(raw);
     if (isNaN(num) || num <= 0) return 0;
     
-    if (num <= 100) {
+    // Values under 1000 are interpreted as shorthand in thousands (e.g., "29" -> 29,000; "101" -> 1,01,000)
+    if (num < 1000) {
       return Math.round(num * 1000);
     }
     return Math.round(num);
@@ -834,6 +834,11 @@ export default function LiveAuctionEngine() {
 
     if (amount <= highestBid && bids.length > 0) {
       alert(`Bid of ${formatCurrency(amount)} must be strictly higher than current top bid of ${formatCurrency(highestBid)}.`);
+      return;
+    }
+
+    if (group && amount > group.totalValue * 0.45) {
+      alert(`Bid discount cannot exceed 45% of total chit value (Max allowed: ${formatCurrency(group.totalValue * 0.45)}).`);
       return;
     }
 
@@ -984,48 +989,35 @@ export default function LiveAuctionEngine() {
     try {
       setIsRecording(true);
 
-      // 1. Advance group to Month 1
-      const { error: groupErr } = await supabase
-        .from('chit_groups')
-        .update({ current_month: 1 })
-        .eq('id', group.id);
-      if (groupErr) throw groupErr;
+      // Check if any collections were recorded for Month 0 (MED-07)
+      const { count: month0TxCount } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('group_id', group.id)
+        .eq('cycle_month', 0)
+        .eq('type', 'collection');
 
-      // 2. Atomic debit from the selected wallet
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
+      if (!month0TxCount || month0TxCount === 0) {
+        const walletName = WALLET_OPTIONS.find(w => w.id === month0PayoutWallet)?.name || month0PayoutWallet;
+        const proceedAnyway = window.confirm(
+          `⚠️ Note: Zero Month 0 collection records found for "${group.name}".\n\nAdvancing will deduct ₹${group.totalValue.toLocaleString('en-IN')} as Organizer Profit from ${walletName} and advance to Month 1.\n\nDo you want to proceed?`
+        );
+        if (!proceedAnyway) return;
+      }
+
+      // Atomic Month 0 Launch RPC in PostgreSQL (CRIT-06)
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('confirm_month0_launch', {
+        p_group_id: group.id,
         p_wallet: month0PayoutWallet,
-        p_delta: -group.totalValue,
-        p_user_id: profile?.id || null,
+        p_admin_id: profile?.id || null,
       });
 
       if (rpcErr || !rpcData?.success) {
-        // Rollback group advance if wallet update failed
-        await supabase.from('chit_groups').update({ current_month: 0 }).eq('id', group.id);
-        alert('Failed to deduct from wallet: ' + (rpcData?.error || rpcErr?.message));
+        alert('Failed to launch Month 0: ' + (rpcData?.error || rpcErr?.message));
         return;
       }
 
-      // 3. Record organizer profit transaction
-      const payoutNote = `[Organizer Profit] Month 0 Launch — Full chit value ₹${group.totalValue.toLocaleString('en-IN')} collected and allocated as Organizer Profit for "${group.name}".`;
-      await supabase.from('transactions').insert([{
-        group_id: group.id,
-        wallet_type: month0PayoutWallet,
-        from_wallet: month0PayoutWallet,
-        type: 'organizer_profit',
-        status: 'completed',
-        amount: group.totalValue,
-        notes: payoutNote,
-        cycle_month: 0,
-        created_by: profile?.id || null,
-      }]);
-
-      // 4. Audit log
       const walletName = WALLET_OPTIONS.find(w => w.id === month0PayoutWallet)?.name || month0PayoutWallet;
-      await supabase.from('security_audit_logs').insert({
-        action_description: `LAUNCH CONFIRMED: "${group.name}" — ₹${group.totalValue.toLocaleString('en-IN')} Organizer Profit recorded from ${walletName}. Group advanced to Month 1.`,
-        target_table: 'chit_groups',
-      });
-
       setGroup(prev => prev ? ({ ...prev, currentMonth: 1 }) : null);
       setAllGroups(prev => prev.map(g => g.id === group.id ? { ...g, currentMonth: 1 } : g));
       setShowMonth0Modal(false);
@@ -1122,16 +1114,44 @@ export default function LiveAuctionEngine() {
     };
   }, [selectedHistoricalLog, group, profile, organizationName, organizationTagline, organizationInitials]);
 
+  const handlePromptCloseAuction = async () => {
+    if (!group) return;
+    if (bids.length === 0 && group.currentMonth > 0) {
+      alert("Cannot conclude auction without any bids recorded.");
+      return;
+    }
+    if (winnerId && winnerId.startsWith('slot-')) {
+      alert("Cannot conclude auction with a placeholder slot ticket as the winning bidder. Please assign a registered member.");
+      return;
+    }
+    await fetchGroupDetails(group.id);
+    setShowCloseModal(true);
+  };
+
   const handleConfirmClose = async () => {
     if (!group || bids.length === 0) return;
+    if (winnerId && winnerId.startsWith('slot-')) {
+      alert('Cannot close auction with a placeholder slot as the winner. Please enroll or assign a registered member.');
+      return;
+    }
     setIsRecording(true);
 
-    const recordedMonth = group.currentMonth;
-    const nextMonth = Math.min(group.durationMonths, group.currentMonth + 1);
-    const isCompleting = group.currentMonth >= group.durationMonths;
-    const nextPool = isLaabaSeetuActive 
-      ? Math.max(0, group.kai_iruppu_pool - group.totalValue) + highestBid 
-      : group.kai_iruppu_pool + highestBid;
+    // Freshly fetch latest group data from Supabase to guarantee fresh pool balance (HIGH-02, HIGH-08)
+      const { data: freshGroup } = await supabase
+        .from('chit_groups')
+        .select('*')
+        .eq('id', group.id)
+        .single();
+
+      const freshPool = freshGroup ? Number(freshGroup.kai_iruppu_pool || 0) : Number(group.kai_iruppu_pool || 0);
+      const isFreshLaabaActive = freshPool >= group.totalValue;
+
+      const recordedMonth = group.currentMonth;
+      const nextMonth = Math.min(group.durationMonths, group.currentMonth + 1);
+      const isCompleting = group.currentMonth >= group.durationMonths;
+      const nextPool = isFreshLaabaActive 
+        ? Math.max(0, freshPool - group.totalValue) + highestBid 
+        : freshPool + highestBid;
 
     const summaryData = {
       month: recordedMonth,
@@ -1240,11 +1260,6 @@ export default function LiveAuctionEngine() {
           localStorage.removeItem(`chit_auction_timer_${group.id}_${group.currentMonth}`);
         } catch {}
       }
-
-      await supabase.from('security_audit_logs').insert({
-        action_description: `AUCTION CONCLUDED: "${group.name}" Month ${group.currentMonth} won by ${winnerName || 'Member'} with winning discount ${formatCurrency(highestBid)}. Net Payout: ${formatCurrency(netPayout)}. Session Duration: ${finalSessionDuration}. Group advanced to Month ${nextMonth}.`,
-        target_table: 'auction_logs',
-      });
 
       // Mark winner in local state
       if (winnerId) {
@@ -4190,13 +4205,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             {/* Conclude & Award Pot Button */}
             <button
               type="button"
-              onClick={() => {
-                if (bids.length === 0 && group.currentMonth > 0) {
-                  alert("Cannot conclude auction without any bids recorded.");
-                  return;
-                }
-                setShowCloseModal(true);
-              }}
+              onClick={handlePromptCloseAuction}
               disabled={group.currentMonth === 0}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-sm transition-all cursor-pointer"
             >
@@ -4632,13 +4641,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 </p>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (bids.length === 0 && group.currentMonth > 0) {
-                      alert("Cannot close auction without any bids recorded.");
-                      return;
-                    }
-                    setShowCloseModal(true);
-                  }}
+                  onClick={handlePromptCloseAuction}
                   disabled={group.currentMonth === 0}
                   className="mt-4 w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
@@ -5087,13 +5090,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
           <div className="pt-2">
             <button 
               type="button"
-              onClick={() => {
-                if (bids.length === 0) {
-                  alert("Cannot close auction without any bids recorded.");
-                  return;
-                }
-                setShowCloseModal(true);
-              }}
+              onClick={handlePromptCloseAuction}
               disabled={group.currentMonth === 0 || bids.length === 0}
               className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-2xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
             >
@@ -5372,6 +5369,12 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   <span>Log</span>
                 </button>
               </form>
+              {parsedCustomBidAmount > 0 && (
+                <div className="mt-2 text-[11px] font-semibold text-brand-700 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-lg flex items-center justify-between">
+                  <span>Interpreted: <strong>{formatCurrency(parsedCustomBidAmount)}</strong></span>
+                  <span>Net Disbursal: <strong>{formatCurrency((group?.totalValue || 0) - parsedCustomBidAmount)}</strong></span>
+                </div>
+              )}
 
               <p className="text-center text-[10px] text-slate-400 mt-2.5 font-medium">
                 ⚡ Tap any tile to instantly record bid &amp; close

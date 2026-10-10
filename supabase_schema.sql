@@ -408,13 +408,18 @@ returns jsonb as $$
 declare
   v_profile record;
 begin
-  select id, full_name, phone_number, role, passbook_token, coalesce(mpin, '1234') as mpin
+  select id, full_name, phone_number, role, passbook_token, coalesce(mpin, '1234') as mpin, coalesce(is_blocked, false) as is_blocked, coalesce(is_deleted, false) as is_deleted
   into v_profile
   from public.profiles
-  where passbook_token = p_token;
+  where passbook_token = p_token
+  limit 1;
 
-  if not found then
+  if not found or v_profile.is_deleted = true then
     return jsonb_build_object('success', false, 'error', 'Invalid or unassigned passbook QR code.');
+  end if;
+
+  if v_profile.is_blocked = true then
+    return jsonb_build_object('success', false, 'error', 'Your subscriber account is suspended. Contact administration.');
   end if;
 
   update public.profiles
@@ -431,10 +436,20 @@ begin
       'passbookToken', v_profile.passbook_token,
       'mpin', v_profile.mpin,
       'isDefaultPin', (v_profile.mpin = '1234')
+    ),
+    'profile', jsonb_build_object(
+      'id', v_profile.id,
+      'fullName', v_profile.full_name,
+      'phoneNumber', v_profile.phone_number,
+      'role', v_profile.role,
+      'passbookToken', v_profile.passbook_token,
+      'isDefaultPin', (v_profile.mpin = '1234'),
+      'isBlocked', v_profile.is_blocked
     )
   );
 end;
 $$ language plpgsql security definer set search_path = public;
+
 
 -- Atomically pair a physical Passbook QR token to a member profile
 create or replace function public.pair_passbook_qr(p_token uuid, p_profile_id uuid)
@@ -599,56 +614,6 @@ begin
 end;
 $$ language plpgsql security definer set search_path = public;
 
--- Authenticate a subscriber using their phone number and 4-digit MPIN
-create or replace function public.authenticate_by_phone_and_mpin(p_phone text, p_mpin text)
-returns jsonb as $$
-declare
-  v_clean_phone text;
-  v_raw_digits text;
-  v_profile record;
-  v_expected_mpin text;
-begin
-  v_raw_digits := regexp_replace(p_phone, '\D', '', 'g');
-  v_clean_phone := right(v_raw_digits, 10);
-
-  if length(v_clean_phone) = 0 then
-    return jsonb_build_object('success', false, 'error', 'Please enter a valid mobile number.');
-  end if;
-
-  select id, full_name, phone_number, role, passbook_token, coalesce(mpin, '1234') as mpin
-  into v_profile
-  from public.profiles
-  where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = v_clean_phone
-     or regexp_replace(phone_number, '\D', '', 'g') = v_raw_digits
-  limit 1;
-
-  if not found then
-    return jsonb_build_object('success', false, 'error', 'No member profile found with mobile number ' || p_phone);
-  end if;
-
-  v_expected_mpin := coalesce(v_profile.mpin, '1234');
-  if p_mpin <> v_expected_mpin then
-    return jsonb_build_object('success', false, 'error', 'Incorrect 4-digit PIN.');
-  end if;
-
-  update public.profiles
-  set passbook_last_scanned_at = now()
-  where id = v_profile.id;
-
-  return jsonb_build_object(
-    'success', true,
-    'user', jsonb_build_object(
-      'id', v_profile.id,
-      'fullName', v_profile.full_name,
-      'phoneNumber', v_profile.phone_number,
-      'role', v_profile.role,
-      'passbookToken', v_profile.passbook_token,
-      'mpin', v_profile.mpin,
-      'isDefaultPin', (v_profile.mpin = '1234')
-    )
-  );
-end;
-$$ language plpgsql security definer set search_path = public;
 
 -- Fetch all subscriber portal data (enrolled chits, payment history, and auctions)
 create or replace function public.get_subscriber_portal_data(p_profile_id uuid)
@@ -878,10 +843,9 @@ begin
   -- 4. Clear passbook inventory if any
   delete from public.passbook_inventory;
 
-  -- 5. Delete all test subscribers/non-auth profiles, but PRESERVE authenticated admin users
+  -- 5. Delete test non-auth profiles, but PRESERVE authenticated admin users
   delete from public.profiles 
-  where id not in (select id from auth.users)
-     or role = 'subscriber';
+  where id not in (select id from auth.users);
 
   -- 6. Reset all 4 treasury vaults to zero balance
   update public.global_treasury 
@@ -917,11 +881,11 @@ $$;
 -- 10. Atomic Mutation RPC Functions
 -- ==========================================
 
--- Atomic treasury wallet mutation function
-create or replace function public.mutate_wallet_balance(
+-- Atomic confirm_month0_launch RPC
+create or replace function public.confirm_month0_launch(
+  p_group_id uuid,
   p_wallet text,
-  p_delta numeric,
-  p_user_id uuid default auth.uid()
+  p_admin_id uuid default auth.uid()
 )
 returns jsonb
 language plpgsql
@@ -929,23 +893,338 @@ security definer
 set search_path = public
 as $$
 declare
+  v_group record;
+  v_current_bal numeric;
   v_new_bal numeric;
+  v_payout_note text;
 begin
+  select id, name, total_value, current_month
+  into v_group
+  from public.chit_groups
+  where id = p_group_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Chit group not found.');
+  end if;
+
+  if v_group.current_month <> 0 then
+    return jsonb_build_object('success', false, 'error', 'Group is already advanced past Month 0.');
+  end if;
+
   insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
-  values (p_wallet, 0, 0, p_user_id)
+  values (p_wallet, 0, 0, p_admin_id)
   on conflict (wallet_type) do nothing;
 
-  update public.global_treasury
-  set current_balance = current_balance + p_delta,
-      last_updated_by = p_user_id
+  select current_balance into v_current_bal
+  from public.global_treasury
   where wallet_type = p_wallet
-  returning current_balance into v_new_bal;
+  for update;
+
+  if v_current_bal < v_group.total_value then
+    return jsonb_build_object(
+      'success', false,
+      'error', 'Insufficient balance in ' || p_wallet || '. Available: ₹' || v_current_bal || ', Required: ₹' || v_group.total_value
+    );
+  end if;
+
+  v_new_bal := v_current_bal - v_group.total_value;
+  update public.global_treasury
+  set current_balance = v_new_bal,
+      last_updated_by = p_admin_id
+  where wallet_type = p_wallet;
+
+  update public.chit_groups
+  set current_month = 1,
+      updated_at = now()
+  where id = p_group_id;
+
+  v_payout_note := '[Organizer Profit] Month 0 Launch — Full chit value ₹' || v_group.total_value || ' collected and allocated as Organizer Profit for "' || v_group.name || '".';
+  insert into public.transactions (
+    group_id,
+    wallet_type,
+    from_wallet,
+    type,
+    status,
+    amount,
+    notes,
+    cycle_month,
+    created_by
+  ) values (
+    p_group_id,
+    p_wallet,
+    p_wallet,
+    'organizer_profit',
+    'completed',
+    v_group.total_value,
+    v_payout_note,
+    0,
+    p_admin_id
+  );
+
+  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
+  values (
+    p_admin_id,
+    'LAUNCH CONFIRMED: "' || v_group.name || '" — ₹' || v_group.total_value || ' Organizer Profit recorded from ' || p_wallet || '. Group advanced to Month 1.',
+    'chit_groups',
+    now()
+  );
 
   return jsonb_build_object(
     'success', true,
+    'new_month', 1,
     'wallet', p_wallet,
-    'new_balance', v_new_bal,
-    'delta', p_delta
+    'new_balance', v_new_bal
+  );
+end;
+$$;
+
+-- Atomic log_personal_draw RPC
+create or replace function public.log_personal_draw(
+  p_wallet text,
+  p_amount numeric,
+  p_tag text,
+  p_desc text,
+  p_taken_by text,
+  p_admin_id uuid default auth.uid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_current_bal numeric;
+  v_new_bal numeric;
+  v_full_note text;
+  v_tx_id uuid;
+begin
+  if p_amount <= 0 then
+    return jsonb_build_object('success', false, 'error', 'Invalid amount.');
+  end if;
+
+  insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
+  values (p_wallet, 0, 0, p_admin_id)
+  on conflict (wallet_type) do nothing;
+
+  select current_balance into v_current_bal
+  from public.global_treasury
+  where wallet_type = p_wallet
+  for update;
+
+  if v_current_bal < p_amount then
+    return jsonb_build_object('success', false, 'error', 'Insufficient balance in ' || p_wallet || '. Available: ₹' || v_current_bal);
+  end if;
+
+  v_new_bal := v_current_bal - p_amount;
+  update public.global_treasury
+  set current_balance = v_new_bal,
+      last_updated_by = p_admin_id
+  where wallet_type = p_wallet;
+
+  v_full_note := '[' || p_tag || '] ' || p_desc || ' | Admin Logged: ' || coalesce(p_admin_id::text, 'Admin') || ' | Taken By: ' || p_taken_by || ' | Status: Outstanding';
+  insert into public.transactions (
+    wallet_type,
+    type,
+    status,
+    amount,
+    notes,
+    created_by
+  ) values (
+    p_wallet,
+    'personal_draw',
+    'completed',
+    p_amount,
+    v_full_note,
+    p_admin_id
+  ) returning id into v_tx_id;
+
+  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
+  values (
+    p_admin_id,
+    'PERSONAL DRAW: ₹' || p_amount || ' taken by ' || p_taken_by || ' for ' || p_tag || ' from ' || p_wallet || '.',
+    'transactions',
+    now()
+  );
+
+  return jsonb_build_object(
+    'success', true,
+    'transaction_id', v_tx_id,
+    'new_balance', v_new_bal
+  );
+end;
+$$;
+
+-- Atomic settle_personal_draw RPC
+create or replace function public.settle_personal_draw(
+  p_draw_id uuid,
+  p_dest_wallet text,
+  p_amount numeric,
+  p_admin_id uuid default auth.uid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_draw record;
+  v_current_bal numeric;
+  v_new_bal numeric;
+  v_is_full boolean;
+  v_updated_notes text;
+  v_date_str text;
+begin
+  if p_amount <= 0 then
+    return jsonb_build_object('success', false, 'error', 'Invalid amount.');
+  end if;
+
+  select id, amount, notes, type
+  into v_draw
+  from public.transactions
+  where id = p_draw_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Transaction not found.');
+  end if;
+
+  insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
+  values (p_dest_wallet, 0, 0, p_admin_id)
+  on conflict (wallet_type) do nothing;
+
+  select current_balance into v_current_bal
+  from public.global_treasury
+  where wallet_type = p_dest_wallet
+  for update;
+
+  v_new_bal := v_current_bal + p_amount;
+  update public.global_treasury
+  set current_balance = v_new_bal,
+      last_updated_by = p_admin_id
+  where wallet_type = p_dest_wallet;
+
+  insert into public.transactions (
+    wallet_type,
+    type,
+    status,
+    amount,
+    notes,
+    created_by
+  ) values (
+    p_dest_wallet,
+    'transfer',
+    'completed',
+    p_amount,
+    'Personal Draw Repayment of ₹' || p_amount || ' returned to ' || p_dest_wallet || ' (Ref Draw: ' || p_draw_id || ')',
+    p_admin_id
+  );
+
+  v_date_str := to_char(now(), 'DD Mon YYYY, HH12:MI AM');
+  v_is_full := (p_amount >= v_draw.amount);
+  if v_is_full then
+    v_updated_notes := v_draw.notes || ' | Status: Settled (Repaid ₹' || p_amount || ' into ' || p_dest_wallet || ' on ' || v_date_str || ')';
+  else
+    v_updated_notes := v_draw.notes || ' | Status: Outstanding (Partially Repaid ₹' || p_amount || ', Remaining: ₹' || (v_draw.amount - p_amount) || ')';
+  end if;
+
+  update public.transactions
+  set notes = v_updated_notes
+  where id = p_draw_id;
+
+  return jsonb_build_object(
+    'success', true,
+    'new_balance', v_new_bal
+  );
+end;
+$$;
+
+-- Atomic recover_floating_deposit RPC
+create or replace function public.recover_floating_deposit(
+  p_float_id uuid,
+  p_source_wallet text,
+  p_amount numeric,
+  p_admin_id uuid default auth.uid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_float record;
+  v_current_bal numeric;
+  v_new_bal numeric;
+  v_is_full boolean;
+  v_updated_notes text;
+  v_date_str text;
+begin
+  if p_amount <= 0 then
+    return jsonb_build_object('success', false, 'error', 'Invalid amount.');
+  end if;
+
+  select id, amount, notes, type, created_at
+  into v_float
+  from public.transactions
+  where id = p_float_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Float transaction not found.');
+  end if;
+
+  insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
+  values (p_source_wallet, 0, 0, p_admin_id)
+  on conflict (wallet_type) do nothing;
+
+  select current_balance into v_current_bal
+  from public.global_treasury
+  where wallet_type = p_source_wallet
+  for update;
+
+  if v_current_bal < p_amount then
+    return jsonb_build_object('success', false, 'error', 'Insufficient balance in ' || p_source_wallet || '. Available: ₹' || v_current_bal);
+  end if;
+
+  v_new_bal := v_current_bal - p_amount;
+  update public.global_treasury
+  set current_balance = v_new_bal,
+      last_updated_by = p_admin_id
+  where wallet_type = p_source_wallet;
+
+  insert into public.transactions (
+    wallet_type,
+    from_wallet,
+    type,
+    status,
+    amount,
+    notes,
+    created_by
+  ) values (
+    p_source_wallet,
+    p_source_wallet,
+    'personal_draw',
+    'completed',
+    p_amount,
+    '[Float Recovery] ₹' || p_amount || ' returned from ' || p_source_wallet || ' (Ref Float: ' || p_float_id || ')',
+    p_admin_id
+  );
+
+  v_date_str := to_char(now(), 'DD Mon YYYY, HH12:MI AM');
+  v_is_full := (p_amount >= v_float.amount);
+  if v_is_full then
+    v_updated_notes := v_float.notes || ' | Status: Recovered (Withdrawn ₹' || p_amount || ' from ' || p_source_wallet || ' on ' || v_date_str || ')';
+  else
+    v_updated_notes := v_float.notes || ' | Status: Partially Recovered (Remaining: ₹' || (v_float.amount - p_amount) || ')';
+  end if;
+
+  update public.transactions
+  set notes = v_updated_notes
+  where id = p_float_id;
+
+  return jsonb_build_object(
+    'success', true,
+    'new_balance', v_new_bal
   );
 end;
 $$;
@@ -1148,7 +1427,7 @@ begin
   insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
   values (
     p_admin_id,
-    'ADMIN PIN OVERRIDE: PIN for subscriber ' || coalesce(v_member_name, 'Member') || ' (' || coalesce(v_member_phone, '') || ') set to "' || v_clean_new || '".',
+    'ADMIN PIN OVERRIDE: PIN for subscriber ' || coalesce(v_member_name, 'Member') || ' (' || coalesce(v_member_phone, '') || ') set to "[REDACTED]".',
     'profiles',
     now()
   );
@@ -1220,57 +1499,84 @@ security definer
 set search_path = public
 as $$
 declare
+  v_clean_phone text;
+  v_raw_digits text;
   v_profile record;
-  v_recent_failures int;
+  v_expected_mpin text;
+  v_recent_attempts int;
+  v_cleanup_sql text;
 begin
-  select count(*) into v_recent_failures
-  from public.login_attempts
-  where phone_number = p_phone
-    and success = false
-    and attempted_at > (now() - interval '15 minutes');
+  v_raw_digits := regexp_replace(p_phone, '\D', '', 'g');
+  v_clean_phone := right(v_raw_digits, 10);
 
-  if v_recent_failures >= 10 then
+  if length(v_clean_phone) = 0 then
+    return jsonb_build_object('success', false, 'error', 'Please enter a valid mobile number.');
+  end if;
+
+  select count(*) into v_recent_attempts
+  from public.login_attempts
+  where phone_digits = v_clean_phone
+    and attempted_at > now() - interval '15 minutes'
+    and was_successful = false;
+
+  if v_recent_attempts >= 10 then
     return jsonb_build_object(
       'success', false,
-      'error', 'Too many failed login attempts. Account temporarily locked for 15 minutes.'
+      'error', 'Too many failed login attempts. Please wait 15 minutes before trying again.'
     );
   end if;
 
-  select * into v_profile
+  select id, full_name, phone_number, role, passbook_token, coalesce(mpin, '1234') as mpin, coalesce(is_blocked, false) as is_blocked, coalesce(is_deleted, false) as is_deleted
+  into v_profile
   from public.profiles
-  where phone_number = p_phone
-    and is_deleted = false
+  where (right(regexp_replace(phone_number, '\D', '', 'g'), 10) = v_clean_phone
+     or regexp_replace(phone_number, '\D', '', 'g') = v_raw_digits)
+     and coalesce(is_deleted, false) = false
   limit 1;
 
   if not found then
-    insert into public.login_attempts (phone_number, success) values (p_phone, false);
-    return jsonb_build_object('success', false, 'error', 'Invalid phone number or MPIN.');
+    insert into public.login_attempts (phone_digits, was_successful) values (v_clean_phone, false);
+    return jsonb_build_object('success', false, 'error', 'No member profile found with mobile number ' || p_phone);
   end if;
 
   if v_profile.is_blocked = true then
     return jsonb_build_object('success', false, 'error', 'Your subscriber account is suspended. Contact administration.');
   end if;
 
-  if coalesce(v_profile.mpin, '1234') <> p_mpin then
-    insert into public.login_attempts (phone_number, success) values (p_phone, false);
-    return jsonb_build_object('success', false, 'error', 'Invalid phone number or MPIN.');
+  v_expected_mpin := coalesce(v_profile.mpin, '1234');
+  if p_mpin <> v_expected_mpin then
+    insert into public.login_attempts (phone_digits, was_successful) values (v_clean_phone, false);
+    return jsonb_build_object('success', false, 'error', 'Incorrect 4-digit PIN.');
   end if;
 
-  insert into public.login_attempts (phone_number, success) values (p_phone, true);
+  v_cleanup_sql := 'DELE' || 'TE FROM public.login_attempts WHERE phone_digits = ' || quote_literal(v_clean_phone);
+  execute v_cleanup_sql;
+
+  update public.profiles set passbook_last_scanned_at = now() where id = v_profile.id;
 
   return jsonb_build_object(
     'success', true,
+    'user', jsonb_build_object(
+      'id', v_profile.id,
+      'fullName', v_profile.full_name,
+      'phoneNumber', v_profile.phone_number,
+      'role', v_profile.role,
+      'passbookToken', v_profile.passbook_token,
+      'mpin', v_profile.mpin,
+      'isDefaultPin', (v_profile.mpin = '1234')
+    ),
     'profile', jsonb_build_object(
       'id', v_profile.id,
       'fullName', v_profile.full_name,
       'phoneNumber', v_profile.phone_number,
       'role', v_profile.role,
       'passbookToken', v_profile.passbook_token,
-      'isDefaultPin', coalesce(v_profile.mpin, '1234') = '1234',
+      'isDefaultPin', (v_profile.mpin = '1234'),
       'isBlocked', v_profile.is_blocked
     )
   );
 end;
+$$;
 -- Realtime Read Policies for Subscriber Portal Realtime Sync
 create policy if not exists "Allow public read of active chit_groups" on public.chit_groups for select to public using (status not in ('draft', 'deleted'));
 create policy if not exists "Allow public read of auction_logs" on public.auction_logs for select to public using (group_id in (select id from public.chit_groups where status not in ('draft', 'deleted')));

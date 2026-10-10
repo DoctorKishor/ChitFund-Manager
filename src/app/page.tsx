@@ -11,14 +11,13 @@ import SubscriberPortal from '@/components/SubscriberPortal';
 import MaintenanceScreen from '@/components/MaintenanceScreen';
 import { useAuth } from '@/context/AuthContext';
 import { useMaintenance } from '@/context/MaintenanceContext';
-import { AlertTriangle, Wrench, Menu, Search, Bell, Settings } from 'lucide-react';
+import { AlertTriangle, Wrench, Menu } from 'lucide-react';
 
 export default function Home() {
   const { user, profile, loading } = useAuth();
   const { isMaintenanceMode } = useMaintenance();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
   if (loading) {
     return (

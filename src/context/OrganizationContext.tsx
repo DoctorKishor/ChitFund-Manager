@@ -47,12 +47,16 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         const cached = localStorage.getItem(STORAGE_KEY);
         if (cached) {
           const parsed = JSON.parse(cached);
-          const name = parsed.name || DEFAULT_ORG_NAME;
-          return {
-            name,
-            tagline: parsed.tagline || DEFAULT_TAGLINE,
-            initials: parsed.initials || computeInitials(name),
-          };
+          // Discard cache if older than 24 hours (MED-01)
+          const isStale = parsed.cached_at && (Date.now() - parsed.cached_at > 24 * 60 * 60 * 1000);
+          if (!isStale) {
+            const name = parsed.name || DEFAULT_ORG_NAME;
+            return {
+              name,
+              tagline: parsed.tagline || DEFAULT_TAGLINE,
+              initials: parsed.initials || computeInitials(name),
+            };
+          }
         }
       } catch (e) {
         // Ignore JSON error
@@ -92,7 +96,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
           setOrganizationInitials(val.initials || computeInitials(val.name));
 
           if (typeof window !== 'undefined') {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(val));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...val, cached_at: Date.now() }));
           }
         }
       }

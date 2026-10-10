@@ -32,6 +32,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PASSBOOK_SESSION_KEY = 'cf_passbook_token_session';
+const PHONE_SESSION_KEY = 'cf_phone_subscriber_session';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -141,6 +142,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginWithPassbookToken = async (token: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
+      // Clear any existing Supabase session to prevent account collision (HIGH-04)
+      await supabase.auth.signOut();
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(PHONE_SESSION_KEY);
+      }
+
       const cleanToken = token.trim();
       
       const { data, error } = await supabase.rpc('authenticate_by_passbook_token', {
@@ -151,19 +158,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, error: error.message };
       }
 
-      if (!data || !data.success || !data.user) {
+      const userData = data?.user || data?.profile;
+      if (!data || !data.success || !userData) {
         return { success: false, error: data?.error || 'Invalid or unassigned Passbook QR code.' };
       }
 
-      const userPin = data.user.mpin || '1234';
+      const userPin = userData.mpin || '1234';
       const subscriberProfile: UserProfile = {
-        id: data.user.id,
-        fullName: data.user.fullName || 'Subscriber',
-        phoneNumber: data.user.phoneNumber || '',
-        role: data.user.role || 'subscriber',
-        passbookToken: data.user.passbookToken || cleanToken,
+        id: userData.id,
+        fullName: userData.fullName || 'Subscriber',
+        phoneNumber: userData.phoneNumber || '',
+        role: userData.role || 'subscriber',
+        passbookToken: userData.passbookToken || cleanToken,
         mpin: userPin,
-        isDefaultPin: data.user.isDefaultPin ?? (userPin === '1234'),
+        isDefaultPin: userData.isDefaultPin ?? (userPin === '1234'),
       };
 
       setProfile(subscriberProfile);
@@ -185,6 +193,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loginWithPhoneAndMpin = async (phone: string, mpin: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
+      // Clear any existing Supabase session to prevent collision (HIGH-04)
+      await supabase.auth.signOut();
+
       const rawDigits = phone.replace(/\D/g, '');
       const cleanPhone = rawDigits.slice(-10);
       const cleanMpin = mpin.trim();
@@ -203,27 +214,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, error: error.message };
       }
 
-      if (!data || !data.success || !data.user) {
+      const userData = data?.user || data?.profile;
+      if (!data || !data.success || !userData) {
         return { success: false, error: data?.error || 'Login failed.' };
       }
 
-      const userPin = data.user.mpin || cleanMpin || '1234';
+      const userPin = userData.mpin || cleanMpin || '1234';
       const subscriberProfile: UserProfile = {
-        id: data.user.id,
-        fullName: data.user.fullName || 'Subscriber',
-        phoneNumber: data.user.phoneNumber || '',
-        role: (data.user.role as UserRole) || 'subscriber',
-        passbookToken: data.user.passbookToken || undefined,
+        id: userData.id,
+        fullName: userData.fullName || 'Subscriber',
+        phoneNumber: userData.phoneNumber || '',
+        role: (userData.role as UserRole) || 'subscriber',
+        passbookToken: userData.passbookToken || undefined,
         mpin: userPin,
-        isDefaultPin: data.user.isDefaultPin ?? (userPin === '1234'),
+        isDefaultPin: userData.isDefaultPin ?? (userPin === '1234'),
       };
 
       setProfile(subscriberProfile);
       setUser(null);
 
       if (typeof window !== 'undefined') {
-        if (data.user.passbookToken) {
-          localStorage.setItem(PASSBOOK_SESSION_KEY, data.user.passbookToken);
+        if (userData.passbookToken) {
+          localStorage.setItem(PASSBOOK_SESSION_KEY, userData.passbookToken);
+          localStorage.removeItem(PHONE_SESSION_KEY);
+        } else {
+          // Persist phone session for refresh persistence (MED-06)
+          localStorage.setItem(PHONE_SESSION_KEY, JSON.stringify({ phone: cleanPhone, mpin: cleanMpin }));
+          localStorage.removeItem(PASSBOOK_SESSION_KEY);
         }
       }
 
@@ -318,6 +335,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               localStorage.removeItem(PASSBOOK_SESSION_KEY);
             }
           }
+
+          // 3. If no passbook token, check saved phone+mpin session (MED-06)
+          const savedPhoneSession = localStorage.getItem(PHONE_SESSION_KEY);
+          if (savedPhoneSession) {
+            try {
+              const { phone, mpin } = JSON.parse(savedPhoneSession);
+              if (phone && mpin) {
+                const res = await loginWithPhoneAndMpin(phone, mpin);
+                if (res.success && isMounted) {
+                  initialAuthDone = true;
+                  setLoading(false);
+                  return;
+                } else if (typeof window !== 'undefined') {
+                  localStorage.removeItem(PHONE_SESSION_KEY);
+                }
+              }
+            } catch {
+              localStorage.removeItem(PHONE_SESSION_KEY);
+            }
+          }
         }
 
         if (isMounted) {
@@ -370,6 +407,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(PASSBOOK_SESSION_KEY);
+      localStorage.removeItem(PHONE_SESSION_KEY);
     }
     await supabase.auth.signOut();
     setUser(null);

@@ -17,7 +17,7 @@ interface WalletContextType {
   balances: WalletBalances;
   lastChangedWallet: WalletType | null;
   loading: boolean;
-  updateBalance: (wallet: WalletType, amount: number) => Promise<void>;
+  updateBalance: (wallet: WalletType, amount: number) => Promise<{ success: boolean; error?: string; new_balance?: number }>;
   resetTreasuryToZero: () => Promise<void>;
 }
 
@@ -131,9 +131,10 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [lastChangedWallet]);
 
-  const updateBalance = async (wallet: WalletType, amount: number) => {
+  const updateBalance = async (wallet: WalletType, amount: number): Promise<{ success: boolean; error?: string; new_balance?: number }> => {
     // Optimistic local update
-    const optimisticBal = (balances[wallet] || 0) + amount;
+    const previousBal = balances[wallet] || 0;
+    const optimisticBal = previousBal + amount;
     setBalances((prev) => ({
       ...prev,
       [wallet]: optimisticBal,
@@ -141,31 +142,41 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     setLastChangedWallet(wallet);
 
     try {
-      // 1. Call atomic PostgreSQL RPC to increment/decrement safely without race conditions
+      // 1. Call atomic PostgreSQL RPC to increment/decrement safely with FOR UPDATE lock
       const { data, error } = await supabase.rpc('mutate_wallet_balance', {
         p_wallet: wallet,
         p_delta: amount,
         p_user_id: user?.id || null,
       });
 
-      if (error) {
-        console.warn('RPC mutate_wallet_balance error, falling back to direct upsert:', error.message);
-        // Fallback: direct upsert
-        await supabase
-          .from('global_treasury')
-          .upsert({
-            wallet_type: wallet,
-            current_balance: optimisticBal,
-            last_updated_by: user?.id || null,
-          }, { onConflict: 'wallet_type' });
-      } else if (data?.new_balance !== undefined) {
+      if (error || !data?.success) {
+        // Revert optimistic update on failure (MED-12)
+        setBalances((prev) => ({
+          ...prev,
+          [wallet]: previousBal,
+        }));
+        const errMsg = data?.error || error?.message || 'Transaction rejected by treasury.';
+        console.warn('mutate_wallet_balance failed, reverted optimistic balance:', errMsg);
+        return { success: false, error: errMsg };
+      }
+
+      if (data?.new_balance !== undefined) {
         setBalances((prev) => ({
           ...prev,
           [wallet]: Number(data.new_balance),
         }));
+        return { success: true, new_balance: Number(data.new_balance) };
       }
-    } catch (err) {
+
+      return { success: true };
+    } catch (err: any) {
+      // Revert optimistic update on error
+      setBalances((prev) => ({
+        ...prev,
+        [wallet]: previousBal,
+      }));
       console.error('Error updating treasury balance in Supabase:', err);
+      return { success: false, error: err.message || 'Unknown error' };
     }
   };
 
