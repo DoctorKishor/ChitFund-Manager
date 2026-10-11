@@ -5468,6 +5468,7 @@ Thank you for your prompt payment! 🙏`;
                 auctionTime={selectedWorkspaceGroup.auctionTime}
                 nextAuctionDate={selectedWorkspaceGroup.nextAuctionDate}
                 nextAuctionTime={selectedWorkspaceGroup.nextAuctionTime}
+                startDate={selectedWorkspaceGroup.startDate}
                 allowConfigure={true}
                 onScheduleUpdated={fetchGroups}
                 compact={false}
