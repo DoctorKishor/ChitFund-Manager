@@ -44,6 +44,7 @@ import {
   Trophy,
   RefreshCw
 } from 'lucide-react';
+import SystemAuditLogViewer from './SystemAuditLogViewer';
 
 export type ReportSubtab = 
   | 'monthly' 
@@ -72,7 +73,7 @@ const REPORT_SUBTABS: SubtabConfig[] = [
   { id: 'payouts', label: 'Payouts', icon: CreditCard, description: 'Auction prize disbursements, net payouts & debt liabilities' },
   { id: 'member', label: 'Member', icon: User, description: 'Individual subscriber ledgers, statements & ticket history' },
   { id: 'reliability', label: 'Reliability', icon: ShieldCheck, description: 'Punctuality ratings, member trust score & payment habits' },
-  { id: 'system_log', label: 'System Audit', icon: ShieldCheck, description: 'Live immutable system audit trail, security events & administrative history' },
+  { id: 'system_log', label: 'System Logs', icon: ShieldCheck, description: 'Live immutable system audit trail, security events & administrative history' },
 ];
 
 export interface ReportsCenterProps {
@@ -2259,6 +2260,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
           <div className="w-full max-w-[1440px] mx-auto space-y-6">
             
             {/* 1. HIGH-LEVEL PORTFOLIO ANALYTICS & EXECUTIVE KPI BENTO */}
+            {activeSubtab !== 'system_log' && (
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               
               {/* Tile 1: Active Scheme Capital */}
@@ -2387,6 +2389,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
               </div>
 
             </section>
+            )}
 
             {/* 2. MULTI-DIMENSION REPORTING SUBTABS BAR */}
             <section className="bg-white rounded-2xl border border-slate-200/80 p-2 shadow-xs">
@@ -2480,7 +2483,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                         : 'hover:bg-slate-100 text-slate-600'
                     }`}
                   >
-                    <span>🛡️</span> Live System Audit Log
+                    <span>🛡️</span> System Logs
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
                   </button>
                 </nav>
@@ -3148,166 +3151,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
 
             {/* Subtab 8: Live System Audit Log */}
             {activeSubtab === 'system_log' && (
-              <section className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden space-y-6 animate-in fade-in duration-200">
-                {/* Header & Controls Toolbar */}
-                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
-                        <ShieldCheck size={20} />
-                      </div>
-                      <div>
-                        <h3 className="font-display font-bold text-lg text-slate-900">
-                          Live Immutable System Audit Trail
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Continuous append-only tamper-evident ledger of administrative operations &amp; financial mutations
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Live Postgres Realtime
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={fetchSystemAuditLogs}
-                      disabled={isAuditLoading}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <RefreshCw size={13} className={isAuditLoading ? 'animate-spin text-emerald-600' : ''} />
-                      <span>Refresh</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Metric Overview Badges */}
-                <div className="px-6 grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Logged Events</span>
-                    <span className="text-xl font-black text-slate-900 font-mono mt-0.5 block">{auditStats.total}</span>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200/80">
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Transactions Audited</span>
-                    <span className="text-xl font-black text-emerald-900 font-mono mt-0.5 block">{auditStats.txCount}</span>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-200/80">
-                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">Chit Group Actions</span>
-                    <span className="text-xl font-black text-indigo-900 font-mono mt-0.5 block">{auditStats.groupCount}</span>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200/80">
-                    <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Treasury Reallocations</span>
-                    <span className="text-xl font-black text-amber-900 font-mono mt-0.5 block">{auditStats.treasuryCount}</span>
-                  </div>
-                </div>
-
-                {/* Search & Scope Filters */}
-                <div className="px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                    <input
-                      type="text"
-                      value={auditSearchQuery}
-                      onChange={e => setAuditSearchQuery(e.target.value)}
-                      placeholder="Search by action, table, executor, or keyword..."
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand-500 rounded-xl text-xs font-semibold text-slate-900 outline-none"
-                    />
-                  </div>
-
-                  {/* Target Table Scope Chips */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                    {(['all', 'transactions', 'chit_groups', 'global_treasury', 'group_members', 'profiles'] as const).map(tbl => (
-                      <button
-                        key={tbl}
-                        type="button"
-                        onClick={() => setAuditTableFilter(tbl)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase transition-all cursor-pointer whitespace-nowrap ${
-                          auditTableFilter === tbl
-                            ? 'bg-slate-900 text-white shadow-2xs'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                        }`}
-                      >
-                        {tbl === 'all' ? 'All Tables' : tbl.replace('_', ' ')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Structured Ledger Table */}
-                <div className="overflow-x-auto px-6 pb-6">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50/80 text-[10px] uppercase font-bold text-slate-500 border-y border-slate-200">
-                      <tr>
-                        <th className="py-3 px-3.5">Timestamp</th>
-                        <th className="py-3 px-3">Scope / Table</th>
-                        <th className="py-3 px-3.5">Action Description</th>
-                        <th className="py-3 px-3">Executor</th>
-                        <th className="py-3 px-3 text-right">Event Hash ID</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium">
-                      {filteredAuditLogs.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="py-12 text-center text-slate-400 text-xs font-semibold">
-                            No system audit events found matching query.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredAuditLogs.map((log) => {
-                          const dt = new Date(log.timestamp);
-                          const dateStr = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                          const timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-                          const executorName = log.profiles?.full_name || 'System / Admin';
-
-                          return (
-                            <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
-                              <td className="py-3 px-3.5 whitespace-nowrap">
-                                <span className="font-mono text-slate-900 font-bold block">{dateStr}</span>
-                                <span className="font-mono text-[11px] text-slate-400">{timeStr}</span>
-                              </td>
-                              <td className="py-3 px-3 whitespace-nowrap">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${
-                                  log.target_table === 'transactions'
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    : log.target_table === 'chit_groups'
-                                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                      : log.target_table === 'global_treasury'
-                                        ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                        : 'bg-slate-100 text-slate-700 border-slate-200'
-                                }`}>
-                                  {log.target_table}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3.5 max-w-md">
-                                <span className="text-slate-900 font-semibold leading-relaxed block text-xs">
-                                  {log.action_description}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 whitespace-nowrap">
-                                <div className="flex items-center gap-1.5">
-                                  <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px] font-bold">
-                                    {executorName.charAt(0).toUpperCase()}
-                                  </div>
-                                  <span className="font-semibold text-slate-800 text-xs">{executorName}</span>
-                                </div>
-                              </td>
-                              <td className="py-3 px-3 text-right whitespace-nowrap">
-                                <span className="font-mono text-[11px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/60">
-                                  #{log.id.slice(0, 8)}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+              <SystemAuditLogViewer onBack={() => handleSelectSubtab('monthly')} />
             )}
 
           </div>
@@ -3460,7 +3304,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                 activeSubtab === 'system_log' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
               }`}
             >
-              <span>🛡️</span> System Log
+              <span>🛡️</span> System Logs
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             </button>
           </div>
@@ -3470,62 +3314,64 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         <main className="flex-1 px-3.5 py-3 space-y-3 pb-24">
           
           {/* 1. COMPACT ELEGANT TOP STATS CARD */}
-          <section className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-card space-y-3">
-            <div className="flex items-start justify-between">
-              <div className="space-y-0.5">
-                <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Active CHIT VALUE</p>
-                <h2 className="text-2xl font-extrabold text-slate-900 tabular-nums tracking-tight">
-                  ₹{portfolioStats.totalAUM.toLocaleString('en-IN')}
-                </h2>
-              </div>
-              <div className="text-right">
-                <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10px]">
-                  M{selectedMonth} Active
-                </span>
-                <p className="text-[10px] text-slate-400 mt-1 font-medium">
-                  {portfolioStats.totalTicketsCount} Tickets · {portfolioStats.activeGroupsCount} Groups
-                </p>
-              </div>
-            </div>
-
-            {/* Velocity bar */}
-            <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-1.5">
-              <div className="flex justify-between items-center text-xs font-semibold">
-                <span className="text-slate-600 font-medium text-[11px]">Cycle M{selectedMonth} Velocity</span>
-                <span className="text-brand-700 font-bold text-xs">
-                  {portfolioStats.velocityPercent}%{' '}
-                  <span className="text-[10px] font-normal text-slate-500">
-                    (₹{(portfolioStats.collectedAmount / 100000).toFixed(2)}L / ₹{(portfolioStats.expectedAmount / 100000).toFixed(1)}L)
+          {activeSubtab !== 'system_log' && (
+            <section className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-card space-y-3">
+              <div className="flex items-start justify-between">
+                <div className="space-y-0.5">
+                  <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Active CHIT VALUE</p>
+                  <h2 className="text-2xl font-extrabold text-slate-900 tabular-nums tracking-tight">
+                    ₹{portfolioStats.totalAUM.toLocaleString('en-IN')}
+                  </h2>
+                </div>
+                <div className="text-right">
+                  <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10px]">
+                    M{selectedMonth} Active
                   </span>
-                </span>
+                  <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                    {portfolioStats.totalTicketsCount} Tickets · {portfolioStats.activeGroupsCount} Groups
+                  </p>
+                </div>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                <div className="bg-emerald-600 h-1.5 rounded-full" style={{ width: `${Math.min(100, portfolioStats.velocityPercent)}%` }}></div>
-              </div>
-            </div>
 
-            {/* 3-Pill Context Summary */}
-            <div className="grid grid-cols-3 gap-1.5 text-center pt-0.5">
-              <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-[9px] text-slate-400 font-medium uppercase">Cash</p>
-                <p className="text-[11px] font-bold text-slate-800 font-mono">
-                  ₹{((balances?.cash_in_hand || 64500) / 1000).toFixed(1)}k
-                </p>
+              {/* Velocity bar */}
+              <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-1.5">
+                <div className="flex justify-between items-center text-xs font-semibold">
+                  <span className="text-slate-600 font-medium text-[11px]">Cycle M{selectedMonth} Velocity</span>
+                  <span className="text-brand-700 font-bold text-xs">
+                    {portfolioStats.velocityPercent}%{' '}
+                    <span className="text-[10px] font-normal text-slate-500">
+                      (₹{(portfolioStats.collectedAmount / 100000).toFixed(2)}L / ₹{(portfolioStats.expectedAmount / 100000).toFixed(1)}L)
+                    </span>
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-emerald-600 h-1.5 rounded-full" style={{ width: `${Math.min(100, portfolioStats.velocityPercent)}%` }}></div>
+                </div>
               </div>
-              <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-[9px] text-slate-400 font-medium uppercase">Bank</p>
-                <p className="text-[11px] font-bold text-slate-800 font-mono">
-                  ₹{(((balances?.kishor_bank || 0) + (balances?.dad_bank || 0) + (balances?.mom_bank || 0) || 364000) / 100000).toFixed(2)}L
-                </p>
+
+              {/* 3-Pill Context Summary */}
+              <div className="grid grid-cols-3 gap-1.5 text-center pt-0.5">
+                <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
+                  <p className="text-[9px] text-slate-400 font-medium uppercase">Cash</p>
+                  <p className="text-[11px] font-bold text-slate-800 font-mono">
+                    ₹{((balances?.cash_in_hand || 64500) / 1000).toFixed(1)}k
+                  </p>
+                </div>
+                <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
+                  <p className="text-[9px] text-slate-400 font-medium uppercase">Bank</p>
+                  <p className="text-[11px] font-bold text-slate-800 font-mono">
+                    ₹{(((balances?.kishor_bank || 0) + (balances?.dad_bank || 0) + (balances?.mom_bank || 0) || 364000) / 100000).toFixed(2)}L
+                  </p>
+                </div>
+                <div className="p-1.5 bg-amber-50/60 rounded-lg border border-amber-200/70">
+                  <p className="text-[9px] text-amber-700 font-medium uppercase">Kai Iruppu</p>
+                  <p className="text-[11px] font-bold text-amber-900 font-mono">
+                    ₹{(portfolioStats.totalPool / 1000).toFixed(1)}k
+                  </p>
+                </div>
               </div>
-              <div className="p-1.5 bg-amber-50/60 rounded-lg border border-amber-200/70">
-                <p className="text-[9px] text-amber-700 font-medium uppercase">Kai Iruppu</p>
-                <p className="text-[11px] font-bold text-amber-900 font-mono">
-                  ₹{(portfolioStats.totalPool / 1000).toFixed(1)}k
-                </p>
-              </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           {/* 2. MONTH-BY-MONTH COLLECTION LEDGER (MOBILE TAB VIEW) */}
           {activeSubtab === 'monthly' && (
@@ -3756,96 +3602,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
 
           {/* Subtab 8 on Mobile: Live System Audit Log */}
           {activeSubtab === 'system_log' && (
-            <section className="space-y-3 animate-in fade-in duration-200">
-              {/* Mobile Header / Quick Controls */}
-              <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
-                      <ShieldCheck size={16} />
-                    </div>
-                    <div>
-                      <h4 className="font-display font-bold text-xs text-slate-900 leading-tight">Live System Audit</h4>
-                      <p className="text-[10px] text-slate-400">Realtime database stream</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={fetchSystemAuditLogs}
-                    disabled={isAuditLoading}
-                    className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
-                    title="Refresh Audit Logs"
-                  >
-                    <RefreshCw size={13} className={isAuditLoading ? 'animate-spin text-emerald-600' : ''} />
-                  </button>
-                </div>
-
-                {/* Mobile Search */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 text-slate-400" size={13} />
-                  <input
-                    type="text"
-                    value={auditSearchQuery}
-                    onChange={e => setAuditSearchQuery(e.target.value)}
-                    placeholder="Search logs..."
-                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none"
-                  />
-                </div>
-
-                {/* Mobile Table Filter Pills */}
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                  {(['all', 'transactions', 'chit_groups', 'global_treasury', 'profiles'] as const).map(tbl => (
-                    <button
-                      key={tbl}
-                      type="button"
-                      onClick={() => setAuditTableFilter(tbl)}
-                      className={`px-2 py-1 rounded-lg text-[9px] font-bold uppercase transition-all whitespace-nowrap cursor-pointer ${
-                        auditTableFilter === tbl ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {tbl === 'all' ? 'All' : tbl.replace('_', ' ')}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Mobile Feed */}
-              {filteredAuditLogs.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
-                  No system audit events found.
-                </div>
-              ) : (
-                filteredAuditLogs.map(log => {
-                  const dt = new Date(log.timestamp);
-                  const timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                  const dateStr = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-                  return (
-                    <div key={log.id} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="font-mono text-slate-500 font-semibold">{dateStr}, {timeStr}</span>
-                        <span className={`font-bold uppercase text-[9px] px-1.5 py-0.2 rounded border ${
-                          log.target_table === 'transactions'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : log.target_table === 'chit_groups'
-                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                              : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}>
-                          {log.target_table}
-                        </span>
-                      </div>
-                      <p className="text-xs font-semibold text-slate-900 leading-snug">
-                        {log.action_description}
-                      </p>
-                      <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400 border-t border-slate-100">
-                        <span>{log.profiles?.full_name || 'Admin'}</span>
-                        <span className="font-mono">#{log.id.slice(0, 8)}</span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </section>
+            <SystemAuditLogViewer onBack={() => handleSelectSubtab('monthly')} />
           )}
 
         </main>
