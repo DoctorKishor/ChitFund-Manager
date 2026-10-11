@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import PassbookScannerModal from '@/components/PassbookScannerModal';
 import { PaymentReceiptModal } from '@/components/PaymentReceiptModal';
+import { searchSubscribersFuzzy } from '@/utils/fuzzySearch';
 import {
   X,
   Check,
@@ -90,6 +91,8 @@ export default function UniversalRecordPaymentModal({
   // ── 1. Search / Member Selection State ──
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [cachedSubscribers, setCachedSubscribers] = useState<any[]>([]);
+  const [didYouMeanSuggestion, setDidYouMeanSuggestion] = useState<any | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
@@ -152,6 +155,7 @@ export default function UniversalRecordPaymentModal({
       setCustomAmountsMap({});
       setSearchQuery('');
       setSearchResults([]);
+      setDidYouMeanSuggestion(null);
       setCompletedPaymentSummary(null);
       setIsReceiptOpen(false);
       setPaymentMode('cash');
@@ -162,6 +166,54 @@ export default function UniversalRecordPaymentModal({
       return;
     }
 
+    // Preload subscribers and aliases for instant 0ms fuzzy search with "Did you mean?" support
+    const preloadSubscribers = async () => {
+      try {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, full_name, phone_number, passbook_token')
+          .eq('is_deleted', false)
+          .order('full_name', { ascending: true });
+
+        const { data: members } = await supabase
+          .from('group_members')
+          .select('profile_id, alias_name, ticket_number')
+          .not('profile_id', 'is', null);
+
+        const aliasMap = new Map<string, { aliases: string[]; tickets: number[] }>();
+        (members || []).forEach((m: any) => {
+          if (!m.profile_id) return;
+          const existing = aliasMap.get(m.profile_id) || { aliases: [], tickets: [] };
+          if (m.alias_name && !existing.aliases.includes(m.alias_name)) {
+            existing.aliases.push(m.alias_name);
+          }
+          if (m.ticket_number && !existing.tickets.includes(m.ticket_number)) {
+            existing.tickets.push(m.ticket_number);
+          }
+          aliasMap.set(m.profile_id, existing);
+        });
+
+        const combined = (profs || []).map((p: any) => {
+          const extra = aliasMap.get(p.id);
+          return {
+            ...p,
+            fullName: p.full_name,
+            phoneNumber: p.phone_number,
+            passbookToken: p.passbook_token,
+            aliases: extra?.aliases || [],
+            tickets: extra?.tickets || [],
+            primaryAlias: extra?.aliases?.[0] || null,
+          };
+        });
+
+        setCachedSubscribers(combined);
+      } catch (err) {
+        console.error('Error preloading subscribers for fuzzy search:', err);
+      }
+    };
+
+    preloadSubscribers();
+
     // If modal opened with an initial member profile ID
     if (initialMemberId) {
       loadMemberById(initialMemberId);
@@ -169,6 +221,27 @@ export default function UniversalRecordPaymentModal({
       loadMemberByGroupMemberId(initialGroupMemberId);
     }
   }, [isOpen, initialMemberId, initialGroupMemberId]);
+
+  // Unified select member handler
+  const handleSelectMember = (member: {
+    id: string;
+    fullName?: string;
+    full_name?: string;
+    phoneNumber?: string;
+    phone_number?: string;
+    passbookToken?: string | null;
+    passbook_token?: string | null;
+  }) => {
+    triggerHapticFeedback('light');
+    setSelectedMember({
+      id: member.id,
+      fullName: member.full_name || member.fullName || 'Subscriber',
+      phoneNumber: member.phone_number || member.phoneNumber || '',
+      passbookToken: member.passbook_token || member.passbookToken || null,
+    });
+    setDidYouMeanSuggestion(null);
+    fetchMemberGroupsAndDues(member.id);
+  };
 
   // Load member by Profile ID
   const loadMemberById = async (profileId: string) => {
@@ -181,13 +254,7 @@ export default function UniversalRecordPaymentModal({
         .single();
 
       if (!error && prof) {
-        setSelectedMember({
-          id: prof.id,
-          fullName: prof.full_name || 'Subscriber',
-          phoneNumber: prof.phone_number || '',
-          passbookToken: prof.passbook_token || null,
-        });
-        await fetchMemberGroupsAndDues(prof.id);
+        handleSelectMember(prof);
       }
     } catch (err) {
       console.error('Error loading member profile:', err);
@@ -216,27 +283,57 @@ export default function UniversalRecordPaymentModal({
   };
 
   // ─────────────────────────────────────────────────────────────
-  // SUBSCRIBER SEARCH (Name, Phone, or QR)
+  // SUBSCRIBER SEARCH (Name, Phone, or QR) With Fuzzy & "Did you mean?"
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen || selectedMember) return;
-    const cleanQuery = searchQuery.trim().toLowerCase();
+    const cleanQuery = searchQuery.trim();
     if (cleanQuery.length === 0) {
       setSearchResults([]);
+      setDidYouMeanSuggestion(null);
+      setIsSearching(false);
       return;
     }
 
+    setIsSearching(true);
     const timer = setTimeout(async () => {
-      setIsSearching(true);
       try {
-        const { data: profData, error } = await supabase
+        // 1. If subscribers are cached, perform instant high-precision fuzzy search
+        if (cachedSubscribers.length > 0) {
+          const { allMatches, didYouMean } = searchSubscribersFuzzy(
+            cleanQuery,
+            cachedSubscribers,
+            sub => ({
+              name: sub.full_name || sub.fullName || '',
+              phone: sub.phone_number || sub.phoneNumber || '',
+              alias: sub.primaryAlias || (sub.aliases?.[0] || ''),
+              ticket: sub.tickets?.[0] ?? null,
+            })
+          );
+
+          setSearchResults(
+            allMatches.map(m => ({
+              ...m.item,
+              isFuzzyMatch: m.isFuzzy,
+              matchScore: m.score,
+              matchedField: m.matchedField,
+              matchedValue: m.matchedValue,
+            }))
+          );
+
+          setDidYouMeanSuggestion(didYouMean ? didYouMean.item : null);
+          setIsSearching(false);
+          return;
+        }
+
+        // 2. Direct Supabase query fallback while cache is loading
+        const { data: profData } = await supabase
           .from('profiles')
           .select('id, full_name, phone_number, passbook_token')
           .eq('is_deleted', false)
-          .or(`full_name.ilike.%${cleanQuery}%,phone_number.ilike.%${cleanQuery}%`)
+          .or(`full_name.ilike.%${cleanQuery.toLowerCase()}%,phone_number.ilike.%${cleanQuery.toLowerCase()}%`)
           .limit(8);
 
-        // Also search group_members by alias_name
         const { data: aliasData } = await supabase
           .from('group_members')
           .select(`
@@ -250,7 +347,7 @@ export default function UniversalRecordPaymentModal({
               is_deleted
             )
           `)
-          .ilike('alias_name', `%${cleanQuery}%`)
+          .ilike('alias_name', `%${cleanQuery.toLowerCase()}%`)
           .not('profile_id', 'is', null)
           .limit(8);
 
@@ -268,18 +365,17 @@ export default function UniversalRecordPaymentModal({
           }
         });
 
-        if (!error && combined) {
-          setSearchResults(combined);
-        }
+        setSearchResults(combined);
+        setDidYouMeanSuggestion(null);
       } catch (err) {
         console.error('Search error:', err);
       } finally {
         setIsSearching(false);
       }
-    }, 200);
+    }, 120);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, isOpen, selectedMember]);
+  }, [searchQuery, isOpen, selectedMember, cachedSubscribers]);
 
   // Handle QR Passbook Scanner Result
   const handleScanPassbook = async (token: string) => {
@@ -1048,51 +1144,115 @@ export default function UniversalRecordPaymentModal({
                         <RefreshCw size={14} className="animate-spin text-emerald-500" />
                         <span>Searching members...</span>
                       </div>
-                    ) : searchResults.length > 0 ? (
-                      <div className="space-y-1.5 max-h-56 overflow-y-auto border border-slate-200 rounded-2xl p-1.5 bg-slate-50">
-                        {searchResults.map(member => (
-                          <button
-                            key={member.id}
-                            type="button"
-                            onClick={() => {
-                              triggerHapticFeedback('light');
-                              setSelectedMember({
-                                id: member.id,
-                                fullName: member.full_name || member.fullName || 'Subscriber',
-                                phoneNumber: member.phone_number || member.phoneNumber || '',
-                                passbookToken: member.passbook_token || member.passbookToken || null,
-                              });
-                              fetchMemberGroupsAndDues(member.id);
-                            }}
-                            className="w-full p-2.5 rounded-xl hover:bg-white border border-transparent hover:border-slate-200 text-left flex items-center justify-between transition-all cursor-pointer"
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center">
-                                {(member.full_name || member.fullName || 'U').charAt(0).toUpperCase()}
+                    ) : (
+                      <div className="space-y-2">
+                        {/* ── Did you mean? Suggestion Card ── */}
+                        {didYouMeanSuggestion && (
+                          <div className="p-3 bg-amber-50 border border-amber-200/90 rounded-2xl flex items-center justify-between gap-3 shadow-2xs animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                                <Sparkles size={16} />
                               </div>
-                              <div>
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-xs font-bold text-slate-900 block">{member.full_name || member.fullName || 'Subscriber'}</span>
-                                  {member.matchedAlias && (
-                                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
-                                      {member.matchedAlias}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
+                                    Did you mean?
+                                  </span>
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-200/70 text-amber-900 font-mono">
+                                    Close spelling
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className="text-xs font-black text-slate-900">
+                                    {didYouMeanSuggestion.full_name || didYouMeanSuggestion.fullName}
+                                  </span>
+                                  {(didYouMeanSuggestion.phone_number || didYouMeanSuggestion.phoneNumber) && (
+                                    <span className="text-[10px] text-slate-500 font-mono">
+                                      · {didYouMeanSuggestion.phone_number || didYouMeanSuggestion.phoneNumber}
                                     </span>
                                   )}
                                 </div>
-                                <span className="text-[11px] text-slate-500 font-mono">{member.phone_number || member.phoneNumber || 'No phone'}</span>
                               </div>
                             </div>
-                            <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                              Select
-                            </span>
-                          </button>
-                        ))}
+                            <button
+                              type="button"
+                              onClick={() => handleSelectMember(didYouMeanSuggestion)}
+                              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition-all shrink-0 cursor-pointer flex items-center gap-1"
+                            >
+                              <span>Select</span>
+                              <Check size={13} />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* ── Search Results List ── */}
+                        {searchResults.length > 0 ? (
+                          <div className="space-y-1.5 max-h-56 overflow-y-auto border border-slate-200 rounded-2xl p-1.5 bg-slate-50">
+                            {searchResults.map(member => (
+                              <button
+                                key={member.id}
+                                type="button"
+                                onClick={() => handleSelectMember(member)}
+                                className={`w-full p-2.5 rounded-xl hover:bg-white border text-left flex items-center justify-between transition-all cursor-pointer ${
+                                  member.isFuzzyMatch
+                                    ? 'border-amber-200/80 bg-amber-50/40 hover:border-amber-300'
+                                    : 'border-transparent hover:border-slate-200'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div
+                                    className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${
+                                      member.isFuzzyMatch
+                                        ? 'bg-amber-100 text-amber-800'
+                                        : 'bg-slate-200 text-slate-700'
+                                    }`}
+                                  >
+                                    {(member.full_name || member.fullName || 'U').charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-xs font-bold text-slate-900 truncate">
+                                        {member.full_name || member.fullName || 'Subscriber'}
+                                      </span>
+                                      {member.isFuzzyMatch && (
+                                        <span className="text-[9px] font-bold text-amber-700 bg-amber-100/90 border border-amber-200 px-1.5 py-0.2 rounded flex items-center gap-0.5">
+                                          <Sparkles size={9} />
+                                          Similar
+                                        </span>
+                                      )}
+                                      {member.matchedAlias && (
+                                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                                          {member.matchedAlias}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[11px] text-slate-500 font-mono">
+                                      {member.phone_number || member.phoneNumber || 'No phone'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span
+                                  className={`text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
+                                    member.isFuzzyMatch
+                                      ? 'text-amber-700 bg-amber-100/80 hover:bg-amber-200'
+                                      : 'text-emerald-600 bg-emerald-50'
+                                  }`}
+                                >
+                                  Select
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : searchQuery.trim().length > 1 ? (
+                          <div className="p-4 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                            <p>No subscriber found matching &quot;{searchQuery}&quot;</p>
+                            <p className="text-[10px] text-slate-400 font-medium">
+                              Try searching by phone number or ticket number
+                            </p>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : searchQuery.trim().length > 1 ? (
-                      <div className="p-4 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-slate-200">
-                        No subscriber found matching &quot;{searchQuery}&quot;
-                      </div>
-                    ) : null}
+                    )}
                   </div>
                 ) : (
                   /* ── Selected Member Card ── */
