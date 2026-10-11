@@ -564,6 +564,25 @@ export default function UniversalRecordPaymentModal({
     const nextMonth = Math.min(group.durationMonths, maxSelected + 1);
 
     if (!currentSelected.includes(nextMonth)) {
+      // If a single month was previously selected with an extra surplus, split it into the advance month
+      if (currentSelected.length === 1) {
+        const sm = currentSelected[0];
+        const mb = group.monthsBreakdown.find(x => x.month === sm);
+        const defaultDue = mb ? mb.remainingDue : group.effectiveInstallment;
+        const customVal = customAmountsMap[group.groupMemberId]?.[sm];
+        if (customVal !== undefined && Number(customVal) > defaultDue) {
+          const surplus = Number(customVal) - defaultDue;
+          setCustomAmountsMap(prev => ({
+            ...prev,
+            [group.groupMemberId]: {
+              ...(prev[group.groupMemberId] || {}),
+              [sm]: String(defaultDue),
+              [nextMonth]: String(surplus),
+            },
+          }));
+        }
+      }
+
       setSelectedMonthsMap(prev => ({
         ...prev,
         [group.groupMemberId]: [...(prev[group.groupMemberId] || []), nextMonth].sort((a, b) => a - b),
@@ -617,30 +636,91 @@ export default function UniversalRecordPaymentModal({
       if (months.length === 0) return;
 
       let grpTotal = 0;
-      months.forEach(m => {
-        const mb = grp.monthsBreakdown.find(x => x.month === m);
+
+      // Single month selected with potential extra surplus
+      if (months.length === 1) {
+        const sm = months[0];
+        const mb = grp.monthsBreakdown.find(x => x.month === sm);
         const defaultDue = mb ? mb.remainingDue : grp.effectiveInstallment;
-        const customAmt = customAmountsMap[grp.groupMemberId]?.[m];
-        
-        let amt = defaultDue;
+        const customAmt = customAmountsMap[grp.groupMemberId]?.[sm];
+
+        let enteredAmt = defaultDue;
         if (customAmt !== undefined && customAmt !== '') {
-          amt = Math.max(0, parseFloat(String(customAmt)) || 0);
+          enteredAmt = Math.max(0, parseFloat(String(customAmt)) || 0);
         } else if (customAmt === '') {
-          amt = 0;
+          enteredAmt = 0;
         }
 
-        grpTotal += amt;
-        total += amt;
+        grpTotal += enteredAmt;
+        total += enteredAmt;
 
-        itemsList.push({
-          group: grp,
-          month: m,
-          amount: amt,
-          isArrear: m < grp.currentMonth,
-          isCurrent: m === grp.currentMonth,
-          isAdvance: m > grp.currentMonth,
+        if (enteredAmt <= defaultDue) {
+          // Normal payment or partial payment
+          itemsList.push({
+            group: grp,
+            month: sm,
+            amount: enteredAmt,
+            isArrear: sm < grp.currentMonth,
+            isCurrent: sm === grp.currentMonth,
+            isAdvance: sm > grp.currentMonth,
+          });
+        } else {
+          // Extra payment! Full due clears sm, surplus rolls over to subsequent month(s) as advance
+          itemsList.push({
+            group: grp,
+            month: sm,
+            amount: defaultDue,
+            isArrear: sm < grp.currentMonth,
+            isCurrent: sm === grp.currentMonth,
+            isAdvance: sm > grp.currentMonth,
+          });
+
+          let surplus = enteredAmt - defaultDue;
+          let nextMonth = sm + 1;
+          while (surplus > 0 && nextMonth <= grp.durationMonths) {
+            const advChunk = Math.min(surplus, grp.effectiveInstallment);
+            itemsList.push({
+              group: grp,
+              month: nextMonth,
+              amount: advChunk,
+              isArrear: false,
+              isCurrent: false,
+              isAdvance: true,
+            });
+            surplus -= advChunk;
+            nextMonth++;
+          }
+          if (surplus > 0 && itemsList.length > 0) {
+            itemsList[itemsList.length - 1].amount += surplus;
+          }
+        }
+      } else {
+        // Multi-month selected
+        months.forEach(m => {
+          const mb = grp.monthsBreakdown.find(x => x.month === m);
+          const defaultDue = mb ? mb.remainingDue : grp.effectiveInstallment;
+          const customAmt = customAmountsMap[grp.groupMemberId]?.[m];
+
+          let amt = defaultDue;
+          if (customAmt !== undefined && customAmt !== '') {
+            amt = Math.max(0, parseFloat(String(customAmt)) || 0);
+          } else if (customAmt === '') {
+            amt = 0;
+          }
+
+          grpTotal += amt;
+          total += amt;
+
+          itemsList.push({
+            group: grp,
+            month: m,
+            amount: amt,
+            isArrear: m < grp.currentMonth,
+            isCurrent: m === grp.currentMonth,
+            isAdvance: m > grp.currentMonth,
+          });
         });
-      });
+      }
 
       summaries.push(`${grp.groupName} (#${grp.ticketNumber}): ₹${grpTotal.toLocaleString('en-IN')}`);
     });
@@ -1238,6 +1318,38 @@ export default function UniversalRecordPaymentModal({
                                         </button>
                                       ))}
 
+                                    {/* Auto-cascaded advance indicators when single month selected has extra surplus */}
+                                    {selectedMonths.length === 1 && (() => {
+                                      const sm = selectedMonths[0];
+                                      const mb = grp.monthsBreakdown.find(x => x.month === sm);
+                                      const defaultDue = mb ? mb.remainingDue : grp.effectiveInstallment;
+                                      const customVal = customAmountsMap[grp.groupMemberId]?.[sm];
+                                      const enteredAmt = customVal !== undefined && customVal !== '' ? parseFloat(String(customVal)) || 0 : defaultDue;
+                                      const surplus = Math.max(0, enteredAmt - defaultDue);
+                                      if (surplus <= 0) return null;
+
+                                      const autoAdvItems = calculatedItemsList.filter(
+                                        it => it.group.groupMemberId === grp.groupMemberId && it.isAdvance
+                                      );
+                                      if (autoAdvItems.length === 0) return null;
+
+                                      return autoAdvItems.map(adv => (
+                                        <button
+                                          key={`auto-adv-chip-${adv.month}`}
+                                          type="button"
+                                          onClick={() => handleAddAdvanceMonth(grp)}
+                                          className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 border bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 transition-all cursor-pointer shadow-2xs"
+                                          title="Auto-credited advance from surplus payment. Click to open separate custom month inputs."
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                                          <span>M{adv.month} Advance</span>
+                                          <span className="font-mono text-[10px] bg-blue-200/70 text-blue-900 px-1 py-0.5 rounded font-extrabold">
+                                            +₹{adv.amount.toLocaleString('en-IN')} ⚡
+                                          </span>
+                                        </button>
+                                      ));
+                                    })()}
+
                                     {/* 4. Add Next Advance Button */}
                                     <button
                                       type="button"
@@ -1256,56 +1368,104 @@ export default function UniversalRecordPaymentModal({
                                     const mb = grp.monthsBreakdown.find(x => x.month === sm);
                                     const defaultDue = mb ? mb.remainingDue : grp.effectiveInstallment;
                                     const customVal = customAmountsMap[grp.groupMemberId]?.[sm];
+                                    const enteredAmt = customVal !== undefined && customVal !== '' ? parseFloat(String(customVal)) || 0 : defaultDue;
                                     const isCustom = customVal !== undefined && customVal !== '' && Number(customVal) !== defaultDue;
+                                    const surplus = Math.max(0, enteredAmt - defaultDue);
+                                    const autoAdvItems = calculatedItemsList.filter(
+                                      it => it.group.groupMemberId === grp.groupMemberId && it.isAdvance
+                                    );
 
                                     return (
-                                      <div className="pt-2.5 mt-1 border-t border-slate-200/80 flex items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-2xs">
-                                        <div className="min-w-0">
-                                          <div className="flex items-center gap-1.5">
-                                            <Edit2 size={12} className="text-slate-500 shrink-0" />
-                                            <span className="text-xs font-bold text-slate-800">
-                                              Amount for M{sm}:
-                                            </span>
-                                            {isCustom && (
-                                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
-                                                Custom
+                                      <div className="pt-2.5 mt-1 border-t border-slate-200/80 space-y-2">
+                                        <div className="flex items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-2xs">
+                                          <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                              <Edit2 size={12} className="text-slate-500 shrink-0" />
+                                              <span className="text-xs font-bold text-slate-800">
+                                                Amount for M{sm}:
                                               </span>
+                                              {isCustom && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                                  Custom
+                                                </span>
+                                              )}
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 font-medium block">
+                                              Standard due: ₹{grp.effectiveInstallment.toLocaleString('en-IN')}
+                                              {mb && mb.remainingDue === 0
+                                                ? ' · Fully Paid (₹0 due)'
+                                                : mb && mb.alreadyPaid > 0
+                                                  ? ` · Paid: ₹${mb.alreadyPaid.toLocaleString('en-IN')}`
+                                                  : ''}
+                                            </span>
+                                          </div>
+
+                                          <div className="flex items-center gap-1.5 shrink-0">
+                                            <div className="relative flex items-center">
+                                              <span className="absolute left-2.5 text-xs font-bold text-slate-400 select-none">₹</span>
+                                              <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                value={customVal !== undefined ? customVal : defaultDue}
+                                                onChange={(e) => handleCustomAmountChange(grp.groupMemberId, sm, e.target.value)}
+                                                className="w-28 sm:w-32 pl-6 pr-2.5 py-1.5 bg-slate-50 focus:bg-white border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-900 text-right outline-hidden"
+                                                placeholder={String(defaultDue)}
+                                              />
+                                            </div>
+
+                                            {isCustom && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleResetCustomAmount(grp.groupMemberId, sm)}
+                                                className="text-[10px] font-bold text-slate-500 hover:text-slate-800 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                                                title="Reset to standard due"
+                                              >
+                                                Reset
+                                              </button>
                                             )}
                                           </div>
-                                          <span className="text-[10px] text-slate-400 font-medium block">
-                                            Standard due: ₹{grp.effectiveInstallment.toLocaleString('en-IN')}
-                                            {mb && mb.remainingDue === 0
-                                              ? ' · Fully Paid (₹0 due)'
-                                              : mb && mb.alreadyPaid > 0
-                                                ? ` · Paid: ₹${mb.alreadyPaid.toLocaleString('en-IN')}`
-                                                : ''}
-                                          </span>
                                         </div>
 
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                          <div className="relative flex items-center">
-                                            <span className="absolute left-2.5 text-xs font-bold text-slate-400 select-none">₹</span>
-                                            <input
-                                              type="number"
-                                              inputMode="numeric"
-                                              value={customVal !== undefined ? customVal : defaultDue}
-                                              onChange={(e) => handleCustomAmountChange(grp.groupMemberId, sm, e.target.value)}
-                                              className="w-28 sm:w-32 pl-6 pr-2.5 py-1.5 bg-slate-50 focus:bg-white border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-900 text-right outline-hidden"
-                                              placeholder={String(defaultDue)}
-                                            />
+                                        {/* Auto-advance accounted breakdown card when extra payment entered */}
+                                        {surplus > 0 && autoAdvItems.length > 0 && (
+                                          <div className="p-2.5 rounded-xl bg-blue-50/90 border border-blue-200 space-y-1.5 shadow-2xs">
+                                            <div className="flex items-center justify-between text-blue-900 font-bold text-[11px]">
+                                              <span className="flex items-center gap-1.5">
+                                                <Sparkles size={13} className="text-blue-600 shrink-0" />
+                                                <span>Extra ₹{surplus.toLocaleString('en-IN')} Accounted as Advance</span>
+                                              </span>
+                                              <span className="text-[10px] font-bold bg-blue-200/80 text-blue-800 px-2 py-0.5 rounded-full">
+                                                Auto-Advance Applied
+                                              </span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1 border-t border-blue-200/60">
+                                              <div className="bg-white/90 p-2 rounded-lg border border-blue-100 flex items-center justify-between">
+                                                <div>
+                                                  <span className="text-[10px] text-slate-500 font-medium block">
+                                                    M{sm} {sm < grp.currentMonth ? 'Arrear' : sm === grp.currentMonth ? 'Current' : 'Advance'}
+                                                  </span>
+                                                  <span className="text-[10px] text-emerald-600 font-bold">Cleared in full ✅</span>
+                                                </div>
+                                                <span className="font-mono font-black text-xs text-slate-900">
+                                                  ₹{defaultDue.toLocaleString('en-IN')}
+                                                </span>
+                                              </div>
+                                              {autoAdvItems.map(adv => (
+                                                <div key={`breakdown-${adv.month}`} className="bg-white/90 p-2 rounded-lg border border-blue-100 flex items-center justify-between">
+                                                  <div>
+                                                    <span className="text-[10px] text-blue-700 font-semibold block">
+                                                      M{adv.month} Advance
+                                                    </span>
+                                                    <span className="text-[10px] text-blue-600 font-medium">Credited to next cycle ⚡</span>
+                                                  </div>
+                                                  <span className="font-mono font-black text-xs text-blue-700">
+                                                    ₹{adv.amount.toLocaleString('en-IN')}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
                                           </div>
-
-                                          {isCustom && (
-                                            <button
-                                              type="button"
-                                              onClick={() => handleResetCustomAmount(grp.groupMemberId, sm)}
-                                              className="text-[10px] font-bold text-slate-500 hover:text-slate-800 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
-                                              title="Reset to standard due"
-                                            >
-                                              Reset
-                                            </button>
-                                          )}
-                                        </div>
+                                        )}
                                       </div>
                                     );
                                   })()}
