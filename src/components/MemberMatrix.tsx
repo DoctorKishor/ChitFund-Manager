@@ -1436,11 +1436,34 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         <Search size={14} className="text-slate-400 absolute left-2.5 top-2.5" />
                       </div>
 
+                      {/* Chit Group Scope Filter Selector */}
+                      <select
+                        value={groupFilter}
+                        onChange={(e) => setGroupFilter(e.target.value)}
+                        className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold text-slate-700 focus:bg-white focus:ring-brand-500 focus:border-brand-500 transition-all focus:outline-none cursor-pointer"
+                        title="Filter members by Chit Group"
+                      >
+                        <option value="all">All Groups ({members.length})</option>
+                        {allChitGroups.map((g) => {
+                          const enrolledCount = members.filter((m) => m.groups.some((gm) => gm.id === g.id)).length;
+                          return (
+                            <option key={g.id} value={g.id}>
+                              {g.name} ({enrolledCount})
+                            </option>
+                          );
+                        })}
+                      </select>
+
                       {/* Filter Pills */}
                       <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
                         <button
                           type="button"
-                          onClick={() => setTableFilter('all')}
+                          onClick={() => {
+                            setTableFilter('all');
+                            if (groupFilter !== 'all') {
+                              setGroupFilter('all');
+                            }
+                          }}
                           className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors cursor-pointer ${
                             tableFilter === 'all'
                               ? 'bg-white text-slate-900 shadow-2xs font-bold'
@@ -1519,6 +1542,31 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                       </button>
                     </div>
                   </div>
+
+                  {/* Active Group Filter Banner */}
+                  {groupFilter !== 'all' && (
+                    <div className="px-6 py-2.5 bg-indigo-50/80 border-b border-indigo-100 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 text-indigo-950 font-semibold">
+                        <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />
+                        <span>
+                          Showing members of: <strong>{allChitGroups.find((g) => g.id === groupFilter)?.name || 'Chit Pool'}</strong>
+                        </span>
+                        <span className="text-[10px] bg-indigo-200/80 text-indigo-900 px-1.5 py-0.2 rounded font-bold font-mono">
+                          {filteredMembers.length} of {members.length} members
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGroupFilter('all');
+                          setTableFilter('all');
+                        }}
+                        className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-100/70 px-2.5 py-1 rounded-lg border border-indigo-200 shadow-2xs transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>✕ Clear Group Filter (Show All {members.length})</span>
+                      </button>
+                    </div>
+                  )}
 
                   {/* Members List Table Stream */}
                   <div className="divide-y divide-slate-100 text-xs">
@@ -1678,7 +1726,25 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
                 {/* Pagination / Summary Footer */}
                 <div className="px-6 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span>Showing {filteredMembers.length} registered users</span>
+                  <div className="flex items-center gap-2">
+                    <span>
+                      Showing {filteredMembers.length} {groupFilter !== 'all' || roleFilter !== 'all' || searchQuery ? `of ${members.length}` : ''} registered users
+                    </span>
+                    {(groupFilter !== 'all' || roleFilter !== 'all' || searchQuery) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGroupFilter('all');
+                          setRoleFilter('all');
+                          setSearchQuery('');
+                          setTableFilter('all');
+                        }}
+                        className="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline cursor-pointer"
+                      >
+                        (Reset filters & show all {members.length})
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-slate-400">All data synchronized in real-time with Supabase</span>
                   </div>
@@ -1960,18 +2026,64 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
             {/* ── MOBILE MEMBER CARDS STREAM (md:hidden from Stitch) ── */}
             <div className="md:hidden space-y-3.5 pb-28">
-              {/* Search Input Bar */}
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search by name, ticket # or mobile..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full text-xs bg-white border border-slate-200/90 rounded-2xl pl-9 pr-4 py-3 text-slate-800 placeholder-slate-400 shadow-[0_4px_20px_-2px_rgba(15,23,42,0.05),0_2px_6px_-1px_rgba(15,23,42,0.02)] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-                <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                </svg>
+              {/* Search Input Bar & Mobile Chit Group Scope */}
+              <div className="space-y-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search by name, ticket # or mobile..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full text-xs bg-white border border-slate-200/90 rounded-2xl pl-9 pr-4 py-3 text-slate-800 placeholder-slate-400 shadow-[0_4px_20px_-2px_rgba(15,23,42,0.05),0_2px_6px_-1px_rgba(15,23,42,0.02)] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                  </svg>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={groupFilter}
+                    onChange={(e) => setGroupFilter(e.target.value)}
+                    className="w-full text-xs bg-white border border-slate-200/90 rounded-xl px-3 py-2 font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs cursor-pointer"
+                    title="Filter members by Chit Group"
+                  >
+                    <option value="all">All Groups ({members.length})</option>
+                    {allChitGroups.map((g) => {
+                      const enrolledCount = members.filter((m) => m.groups.some((gm) => gm.id === g.id)).length;
+                      return (
+                        <option key={g.id} value={g.id}>
+                          {g.name} ({enrolledCount})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Mobile Active Group Filter Banner */}
+                {groupFilter !== 'all' && (
+                  <div className="p-2.5 bg-indigo-50/90 border border-indigo-100 rounded-xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 text-indigo-950 font-semibold truncate pr-2">
+                      <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />
+                      <span className="truncate">
+                        {allChitGroups.find((g) => g.id === groupFilter)?.name || 'Chit Pool'}
+                      </span>
+                      <span className="text-[10px] bg-indigo-200/80 text-indigo-900 px-1.5 py-0.2 rounded font-bold font-mono shrink-0">
+                        {filteredMembers.length} of {members.length}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroupFilter('all');
+                        setTableFilter('all');
+                      }}
+                      className="text-[11px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-indigo-200 shadow-2xs whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Subscriber Cards Roster (Clean & Decongested) */}
@@ -2041,6 +2153,27 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   );
                 })
               )}
+
+              {/* Mobile Summary Footer */}
+              <div className="pt-2 text-center text-xs text-slate-500 flex flex-col items-center gap-1.5">
+                <span>
+                  Showing {filteredMembers.length} {groupFilter !== 'all' || roleFilter !== 'all' || searchQuery ? `of ${members.length}` : ''} registered users
+                </span>
+                {(groupFilter !== 'all' || roleFilter !== 'all' || searchQuery) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGroupFilter('all');
+                      setRoleFilter('all');
+                      setSearchQuery('');
+                      setTableFilter('all');
+                    }}
+                    className="text-[11px] text-indigo-600 font-bold hover:underline cursor-pointer"
+                  >
+                    Reset filters &amp; show all {members.length}
+                  </button>
+                )}
+              </div>
             </div>
 
           </div>
