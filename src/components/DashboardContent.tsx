@@ -250,7 +250,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [draggedTicketNum, setDraggedTicketNum] = useState<number | null>(null);
   const [dragOverTicketNum, setDragOverTicketNum] = useState<number | null>(null);
   const [printChecklistGroup, setPrintChecklistGroup] = useState<any | null>(null);
-  const [viewingReceiptTx, setViewingReceiptTx] = useState<{ tx: any; member: any; allocations?: any[]; totalCollectedAmount?: number } | null>(null);
+  const [viewingReceiptTx, setViewingReceiptTx] = useState<any | null>(null);
 
   // High-Security Delete Group Modal States
   const [deletingGroup, setDeletingGroup] = useState<any | null>(null);
@@ -9978,11 +9978,13 @@ Thank you for your prompt payment! 🙏`;
 
       {/* ── MODAL: RENDERED PAYMENT RECEIPT PNG SHARING ── */}
       {viewingReceiptTx && (() => {
+        const txObj = viewingReceiptTx.tx || viewingReceiptTx.transaction || viewingReceiptTx;
+        const targetGroupId = viewingReceiptTx?.tx?.group_id || viewingReceiptTx?.transaction?.group_id || viewingReceiptTx?.group?.id || viewingReceiptTx?.group_id || activeDashboardGroupId;
         const activeNonDraftGroups = localGroups.filter(g => g.status !== 'draft' && g.status !== 'deleted');
-        const receiptGroup = localGroups.find(g => g.id === (viewingReceiptTx?.tx?.group_id || activeDashboardGroupId)) || activeNonDraftGroups[0];
+        const receiptGroup = localGroups.find(g => g.id === targetGroupId) || activeNonDraftGroups[0] || viewingReceiptTx.group;
         if (!receiptGroup) return null;
-        const ticketMemberId = viewingReceiptTx.member?.id || viewingReceiptTx.tx?.group_member_id;
-        const profileId = viewingReceiptTx.member?.profileId || viewingReceiptTx.tx?.profile_id;
+        const ticketMemberId = viewingReceiptTx.member?.id || viewingReceiptTx.member?.profileId || txObj?.group_member_id;
+        const profileId = viewingReceiptTx.member?.profileId || viewingReceiptTx.member?.id || txObj?.profile_id;
         const isReceiptLaaba = (receiptGroup?.kaiIruppuPool || 0) >= (receiptGroup?.totalValue || 200000);
         const receiptTotalVal = receiptGroup?.totalValue || 200000;
         const receiptDuration = receiptGroup?.duration || receiptGroup?.memberCount || 20;
@@ -9990,7 +9992,8 @@ Thank you for your prompt payment! 🙏`;
         let pastPendingDues = 0;
         const pastPendingMonths: number[] = [];
 
-        for (let m = 0; m < selectedDashboardMonth; m++) {
+        const targetMonth = viewingReceiptTx.month !== undefined ? viewingReceiptTx.month : selectedDashboardMonth;
+        for (let m = 0; m < targetMonth; m++) {
           const mDue = isReceiptLaaba ? 0 : (viewingReceiptTx.member?.customInstallment || receiptBaseInstallment);
           const mPaid = getMemberPaidAmountForMonth(ticketMemberId || profileId, m, profileId);
           const mRemaining = Math.max(0, mDue - mPaid);
@@ -10004,11 +10007,11 @@ Thank you for your prompt payment! 🙏`;
           <PaymentReceiptModal
             isOpen={Boolean(viewingReceiptTx)}
             onClose={() => setViewingReceiptTx(null)}
-            transaction={viewingReceiptTx.tx}
+            transaction={txObj}
             member={viewingReceiptTx.member}
             group={receiptGroup}
-            month={selectedDashboardMonth}
-            totalDue={receiptBaseInstallment}
+            month={targetMonth}
+            totalDue={viewingReceiptTx.totalDue || receiptBaseInstallment}
             organizerCompanyName={organizationName}
             organizerInitials={organizationInitials}
             formatCurrency={formatCurrency}

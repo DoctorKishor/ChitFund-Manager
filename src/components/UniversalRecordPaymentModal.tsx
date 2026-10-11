@@ -6,6 +6,7 @@ import { useWallet, WalletType } from '@/context/WalletContext';
 import { useAuth } from '@/context/AuthContext';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import PassbookScannerModal from '@/components/PassbookScannerModal';
+import { PaymentReceiptModal } from '@/components/PaymentReceiptModal';
 import {
   X,
   Check,
@@ -46,6 +47,7 @@ export interface EnrolledGroupInfo {
   baseInstallment: number;
   effectiveInstallment: number;
   status: string;
+  startDate?: string | null;
   // Computed dues
   monthsBreakdown: {
     month: number;
@@ -127,6 +129,7 @@ export default function UniversalRecordPaymentModal({
 
   // ── 5. Submission & Success State ──
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [completedPaymentSummary, setCompletedPaymentSummary] = useState<{
     totalAmount: number;
     walletType: WalletType;
@@ -150,6 +153,7 @@ export default function UniversalRecordPaymentModal({
       setSearchQuery('');
       setSearchResults([]);
       setCompletedPaymentSummary(null);
+      setIsReceiptOpen(false);
       setPaymentMode('cash');
       setOnlineBank('kishor_bank');
       setShowAdvanced(false);
@@ -331,7 +335,8 @@ export default function UniversalRecordPaymentModal({
             duration_months,
             current_month,
             status,
-            kai_iruppu_pool
+            kai_iruppu_pool,
+            start_date
           )
         `)
         .eq('profile_id', profileId);
@@ -506,6 +511,7 @@ export default function UniversalRecordPaymentModal({
           baseInstallment: baseInst,
           effectiveInstallment: effectiveInst,
           status: cg.status,
+          startDate: cg.start_date || null,
           monthsBreakdown,
           totalArrearsDue,
           currentMonthDue,
@@ -753,26 +759,58 @@ export default function UniversalRecordPaymentModal({
 
       // 7. Prepare Receipt Payload for Optional Viewing
       const firstGroup = calculatedItemsList[0].group;
+      const baseTxObj = insertedTxs?.[0] || {
+        id: batchId,
+        amount: totalCollectionAmount,
+        wallet_type: effectiveWallet,
+        created_at: effectiveDateStr,
+        group_id: firstGroup.groupId,
+        group_member_id: firstGroup.groupMemberId,
+        profile_id: selectedMember.id,
+        notes: `Batch Payment: ${activeSelectionsSummary}`,
+      };
+
+      const unifiedTx = {
+        ...baseTxObj,
+        amount: totalCollectionAmount,
+        notes: baseTxObj.notes || `Batch Payment: ${activeSelectionsSummary}`,
+      };
+
       const receiptPayload = {
-        transaction: insertedTxs?.[0] || {
-          id: batchId,
-          amount: totalCollectionAmount,
-          wallet_type: effectiveWallet,
-          created_at: effectiveDateStr,
-          notes: `Batch Payment: ${activeSelectionsSummary}`,
-        },
+        // Direct flat transaction fields for direct consumers
+        ...unifiedTx,
+        id: unifiedTx.id,
+        amount: totalCollectionAmount,
+        wallet_type: effectiveWallet,
+        created_at: effectiveDateStr,
+        group_id: firstGroup.groupId,
+        group_member_id: firstGroup.groupMemberId,
+        profile_id: selectedMember.id,
+        notes: unifiedTx.notes,
+
+        // Aliased sub-objects for parent wrappers
+        tx: unifiedTx,
+        transaction: unifiedTx,
         member: {
           id: selectedMember.id,
+          profileId: selectedMember.id,
           name: firstGroup.aliasName || selectedMember.fullName,
           phone: selectedMember.phoneNumber,
           ticket: firstGroup.ticketNumber,
+          customInstallment: firstGroup.customInstallment,
         },
         group: {
           id: firstGroup.groupId,
           name: calculatedItemsList.length === 1 ? firstGroup.groupName : `${firstGroup.groupName} + ${calculatedItemsList.length - 1} more`,
           totalValue: firstGroup.totalValue,
+          total_value: firstGroup.totalValue,
+          monthly_installment: firstGroup.effectiveInstallment || firstGroup.baseInstallment,
+          start_date: firstGroup.startDate || null,
+          memberCount: firstGroup.memberCount,
+          durationMonths: firstGroup.durationMonths,
         },
         month: calculatedItemsList[0].month,
+        totalDue: firstGroup.effectiveInstallment || firstGroup.baseInstallment,
         totalCollectedAmount: totalCollectionAmount,
         allocations: calculatedItemsList.map(item => ({
           month: item.month,
@@ -869,14 +907,14 @@ export default function UniversalRecordPaymentModal({
                 </div>
 
                 <div className="space-y-2.5 pt-2">
-                  {/* OPTIONAL RECEIPT BUTTON (Only opens if clicked!) */}
+                  {/* OPTIONAL RECEIPT BUTTON (Opens rendered receipt modal immediately) */}
                   <button
                     type="button"
                     onClick={() => {
-                      if (onOpenReceiptModal) {
+                      setIsReceiptOpen(true);
+                      if (onOpenReceiptModal && completedPaymentSummary.receiptPayload) {
                         onOpenReceiptModal(completedPaymentSummary.receiptPayload);
                       }
-                      onClose();
                     }}
                     className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-2xl transition-all shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
                   >
@@ -1584,6 +1622,21 @@ export default function UniversalRecordPaymentModal({
         title="Scan Member Passbook QR"
         subtitle="Instantly loads subscriber details and all enrolled chits"
       />
+
+      {/* ── Embedded Rendered Payment Receipt Modal ── */}
+      {isReceiptOpen && completedPaymentSummary?.receiptPayload && (
+        <PaymentReceiptModal
+          isOpen={isReceiptOpen}
+          onClose={() => setIsReceiptOpen(false)}
+          transaction={completedPaymentSummary.receiptPayload.tx || completedPaymentSummary.receiptPayload.transaction}
+          member={completedPaymentSummary.receiptPayload.member}
+          group={completedPaymentSummary.receiptPayload.group}
+          month={completedPaymentSummary.receiptPayload.month}
+          totalDue={completedPaymentSummary.receiptPayload.totalDue}
+          allocations={completedPaymentSummary.receiptPayload.allocations}
+          totalCollectedAmount={completedPaymentSummary.receiptPayload.totalCollectedAmount}
+        />
+      )}
     </>
   );
 }

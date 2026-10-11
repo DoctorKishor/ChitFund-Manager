@@ -667,7 +667,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-xs z-[70] flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
       <div className="bg-[#1D1D41] border border-[#27264E] rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto flex flex-col max-h-[92vh] sm:max-h-[95vh]">
         
         {/* Top Actions Header (Dark Cyber Theme) */}

@@ -2270,12 +2270,15 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
       {/* ── Rendered PNG Payment Receipt Modal ── */}
       {viewingReceiptTx && (() => {
-        const matchedEnrollment = memberEnrollments.find(e => e.group_id === viewingReceiptTx.group_id) || memberEnrollments[0];
-        const matchedGroup = matchedEnrollment?.chit_groups;
-        const ticket = matchedEnrollment?.ticket_number ?? 1;
-        const txMonth = viewingReceiptTx.month ?? matchedGroup?.current_month ?? 1;
+        const txObj = viewingReceiptTx.transaction || viewingReceiptTx.tx || viewingReceiptTx;
+        const targetGroupId = viewingReceiptTx?.group_id || viewingReceiptTx?.group?.id || viewingReceiptTx?.transaction?.group_id || viewingReceiptTx?.tx?.group_id;
+        const matchedEnrollment = memberEnrollments.find(e => e.group_id === targetGroupId) || memberEnrollments[0];
+        const rawGroup = matchedEnrollment?.chit_groups;
+        const matchedGroup = Array.isArray(rawGroup) ? rawGroup[0] : rawGroup;
+        const ticket = matchedEnrollment?.ticket_number ?? viewingReceiptTx.member?.ticket ?? 1;
+        const txMonth = viewingReceiptTx.month ?? txObj?.cycle_month ?? matchedGroup?.current_month ?? 1;
 
-        const grpBreakdown = (groupDuesBreakdowns || []).find((b: any) => b?.groupId === viewingReceiptTx.group_id || b?.groupId === matchedGroup?.id);
+        const grpBreakdown = (groupDuesBreakdowns || []).find((b: any) => b?.groupId === targetGroupId || b?.groupId === matchedGroup?.id);
         let pastPendingDues = 0;
         const pastPendingMonths: number[] = [];
 
@@ -2288,19 +2291,25 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           });
         }
 
+        const effectiveGroup = matchedGroup || viewingReceiptTx.group || { 
+          id: targetGroupId, 
+          name: viewingReceiptTx.group?.name || 'Chit Group', 
+          monthly_installment: viewingReceiptTx.totalDue || 10000 
+        };
+
         return (
           <PaymentReceiptModal
             isOpen={Boolean(viewingReceiptTx)}
             onClose={() => setViewingReceiptTx(null)}
-            transaction={viewingReceiptTx.transaction || viewingReceiptTx}
+            transaction={txObj}
             member={viewingReceiptTx.member || {
               name: memberProfile?.full_name || 'Subscriber',
               ticket: ticket,
               phone: memberProfile?.phone_number || ''
             }}
-            group={viewingReceiptTx.group || matchedGroup || { name: 'Chit Group', monthly_installment: 10000 }}
-            month={viewingReceiptTx.month || txMonth}
-            totalDue={viewingReceiptTx.totalDue || matchedGroup?.monthly_installment}
+            group={effectiveGroup}
+            month={txMonth}
+            totalDue={viewingReceiptTx.totalDue || effectiveGroup?.monthly_installment || Math.round((Number(effectiveGroup?.total_value) || 200000) / 20)}
             allocations={viewingReceiptTx.allocations}
             totalCollectedAmount={viewingReceiptTx.totalCollectedAmount}
             organizerCompanyName={organizationName}
