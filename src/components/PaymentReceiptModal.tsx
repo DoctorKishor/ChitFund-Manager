@@ -118,9 +118,19 @@ function parseBatchMetadata(notes?: string | null): { batchId?: string; totalAmo
 function getReceiptMonthLabel(startDateStr: string | null | undefined, monthNumber: number, txDateStr?: string | null): string {
   try {
     if (startDateStr) {
-      const base = new Date(startDateStr);
-      if (!isNaN(base.getTime())) {
-        const targetDate = new Date(base.getFullYear(), base.getMonth() + monthNumber, 1);
+      let bYear: number;
+      let bMonth: number;
+      if (startDateStr.includes('-')) {
+        const parts = startDateStr.split('-');
+        bYear = parseInt(parts[0], 10);
+        bMonth = parseInt(parts[1], 10) - 1;
+      } else {
+        const base = new Date(startDateStr);
+        bYear = base.getFullYear();
+        bMonth = base.getMonth();
+      }
+      if (!isNaN(bYear) && !isNaN(bMonth)) {
+        const targetDate = new Date(bYear, bMonth + monthNumber, 1);
         const monthName = targetDate.toLocaleString('en-IN', { month: 'long' });
         const year = targetDate.getFullYear();
         return monthNumber === 0 ? `${monthName} ${year} · Month 0 (Launch)` : `${monthName} ${year} · Month ${monthNumber}`;

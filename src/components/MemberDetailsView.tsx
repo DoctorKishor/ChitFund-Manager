@@ -225,8 +225,18 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
     if (monthNum === 0) return 'Month 0 (Launch)';
     if (!startDateStr) return `Month ${monthNum}`;
     try {
-      const base = new Date(startDateStr);
-      const targetDate = new Date(base.getFullYear(), base.getMonth() + monthNum, base.getDate() || 1);
+      let year: number;
+      let month: number;
+      if (startDateStr.includes('-')) {
+        const parts = startDateStr.split('-');
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10) - 1;
+      } else {
+        const base = new Date(startDateStr);
+        year = base.getFullYear();
+        month = base.getMonth();
+      }
+      const targetDate = new Date(year, month + monthNum, 1);
       return `${targetDate.toLocaleString('en-IN', { month: 'short' })} (M${monthNum})`;
     } catch (e) {
       return `Month ${monthNum}`;
@@ -756,8 +766,8 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
 
       await supabase.from('transactions').delete().eq('id', tx.id);
       
-      // Determine if transaction was an outflow (payout / draw) or inflow (collection / transfer_in)
-      const isOutflow = tx.type === 'payout' || tx.type === 'personal_draw';
+      // Determine if transaction was an outflow (payout / draw / organizer profit) or inflow (collection / transfer_in)
+      const isOutflow = tx.type === 'payout' || tx.type === 'personal_draw' || tx.type === 'organizer_profit';
       const balanceDelta = isOutflow ? amt : -amt;
       await updateBalance(tx.wallet_type as any, balanceDelta);
 

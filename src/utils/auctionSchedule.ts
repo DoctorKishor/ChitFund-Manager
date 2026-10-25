@@ -96,11 +96,27 @@ export function computeNextAuctionDateTime(config?: AuctionScheduleConfig | null
 
   // 2. If start_date and current_month are specified for this group
   if (config?.start_date && config.current_month !== undefined && config.current_month !== null) {
-    const parsedStart = new Date(config.start_date);
-    if (!isNaN(parsedStart.getTime())) {
+    let startYear: number | undefined;
+    let startMonth: number | undefined;
+    if (config.start_date.includes('-')) {
+      const parts = config.start_date.split('-');
+      if (parts[0] && parts[1]) {
+        startYear = parseInt(parts[0], 10);
+        startMonth = parseInt(parts[1], 10) - 1;
+      }
+    }
+    if (startYear === undefined || isNaN(startYear) || startMonth === undefined || isNaN(startMonth)) {
+      const parsedStart = new Date(config.start_date);
+      if (!isNaN(parsedStart.getTime())) {
+        startYear = parsedStart.getFullYear();
+        startMonth = parsedStart.getMonth();
+      }
+    }
+
+    if (startYear !== undefined && !isNaN(startYear) && startMonth !== undefined && !isNaN(startMonth)) {
       // M0 is launch month (no auction), M1 is 1st live auction, M2 is 2nd live auction
       const monthNum = config.current_month === 0 ? 1 : Number(config.current_month);
-      const targetMonthDate = new Date(parsedStart.getFullYear(), parsedStart.getMonth() + monthNum, 1);
+      const targetMonthDate = new Date(startYear, startMonth + monthNum, 1);
       const canonicalSunday = getFirstSundayOnOrAfterDay(
         targetMonthDate.getFullYear(), 
         targetMonthDate.getMonth(), 

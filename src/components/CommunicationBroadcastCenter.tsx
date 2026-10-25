@@ -783,12 +783,10 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           const formattedTime = formatTime12h(g.next_auction_time || g.auction_time || '19:00');
           const formattedTimeTamil = formatTamilTime(g.next_auction_time || g.auction_time, calcAuctionDate);
 
-          // Compute Next Month's Date
-          const nextCycleDate = new Date(calcAuctionDate);
-          nextCycleDate.setMonth(nextCycleDate.getMonth() + 1);
+          // Compute Next Month's Date (pass month + 1 directly to avoid end-of-month rollover)
           const nextMonthSunday = getFirstSundayOnOrAfterDay(
-            nextCycleDate.getFullYear(),
-            nextCycleDate.getMonth(),
+            calcAuctionDate.getFullYear(),
+            calcAuctionDate.getMonth() + 1,
             g.auction_day_of_month || 10
           );
           const formattedNextDate = formatDatePretty(nextMonthSunday);

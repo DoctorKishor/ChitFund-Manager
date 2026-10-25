@@ -89,17 +89,30 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
 
   // Compute month label and default date for the selected cycles
   const computedMonthDetails = useMemo(() => {
-    let baseDate = new Date();
+    let baseYear: number = new Date().getFullYear();
+    let baseMonth: number = new Date().getMonth();
     if (group.startDate) {
-      const parsed = new Date(group.startDate);
-      if (!isNaN(parsed.getTime())) {
-        baseDate = parsed;
+      if (group.startDate.includes('-')) {
+        const parts = group.startDate.split('-');
+        baseYear = parseInt(parts[0], 10);
+        baseMonth = parseInt(parts[1], 10) - 1;
+      } else {
+        const parsed = new Date(group.startDate);
+        if (!isNaN(parsed.getTime())) {
+          baseYear = parsed.getFullYear();
+          baseMonth = parsed.getMonth();
+        }
       }
     }
 
     if (collectionMode === 'single') {
       // Target date for this specific month
-      const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + (selectedSingleMonth || 0), group.auctionDayOfMonth || 10);
+      const targetMonthOffset = selectedSingleMonth || 0;
+      const targetYear = baseYear + Math.floor((baseMonth + targetMonthOffset) / 12);
+      const targetMonth = ((baseMonth + targetMonthOffset) % 12 + 12) % 12;
+      const maxDays = new Date(targetYear, targetMonth + 1, 0).getDate();
+      const safeDay = Math.min(group.auctionDayOfMonth || 10, maxDays);
+      const targetDate = new Date(targetYear, targetMonth, safeDay);
       const monthName = targetDate.toLocaleString('en-US', { month: 'long' }).toUpperCase();
       
       const dd = String(targetDate.getDate()).padStart(2, '0');
@@ -118,13 +131,17 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
     } else {
       // Multi-Month Mode: Generate comma separated names (e.g. "OCTOBER, NOVEMBER")
       const monthNames = activeMonthsList.map(mNum => {
-        const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + mNum, 1);
+        const d = new Date(baseYear, baseMonth + mNum, 1);
         return d.toLocaleString('en-US', { month: 'long' }).toUpperCase();
       });
 
       // Latest scheduled date among the selected months
       const lastMonthNum = activeMonthsList[activeMonthsList.length - 1] ?? 1;
-      const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + lastMonthNum, group.auctionDayOfMonth || 10);
+      const targetYear = baseYear + Math.floor((baseMonth + lastMonthNum) / 12);
+      const targetMonth = ((baseMonth + lastMonthNum) % 12 + 12) % 12;
+      const maxDays = new Date(targetYear, targetMonth + 1, 0).getDate();
+      const safeDay = Math.min(group.auctionDayOfMonth || 10, maxDays);
+      const targetDate = new Date(targetYear, targetMonth, safeDay);
       const dd = String(targetDate.getDate()).padStart(2, '0');
       const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
       const yyyy = targetDate.getFullYear();
@@ -175,7 +192,8 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             .from('transactions')
             .select('*')
             .eq('group_id', group.id)
-            .eq('type', 'collection'),
+            .eq('type', 'collection')
+            .eq('status', 'completed'),
           supabase
             .from('auction_logs')
             .select('month, is_laaba_seetu')
@@ -230,8 +248,11 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
           const isThisMember = tx.group_member_id === memRow.id || (memRow.profile_id && tx.profile_id === memRow.profile_id);
           if (!isThisMember) return false;
 
-          if (!tx.notes) return true;
-          return activeMonthsList.some(mNum => new RegExp(`\\bMonth\\s+${mNum}\\b`, 'i').test(tx.notes));
+          if (tx.cycle_month !== null && tx.cycle_month !== undefined) {
+            return activeMonthsList.includes(Number(tx.cycle_month));
+          }
+          if (!tx.notes) return false;
+          return activeMonthsList.some(mNum => new RegExp(`\\bMonth\\s*[:#-]?\\s*${mNum}\\b|\\bM${mNum}\\b`, 'i').test(tx.notes));
         });
 
         const totalPaid = memberTxs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
@@ -273,11 +294,20 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
     }
 
     return rows;
-  }, [members, transactions, activeMonthsList, totalMembers, baseMonthlyInstallment, prefillPayments]);
+  }, [members, transactions, activeMonthsList, totalMembers, baseMonthlyInstallment, prefillPayments, auctions, group, currentGroupMonth]);
 
   const effectiveDuePerMember = useMemo(() => {
-    return baseMonthlyInstallment * activeMonthsList.length;
-  }, [baseMonthlyInstallment, activeMonthsList]);
+    let sum = 0;
+    activeMonthsList.forEach(mNum => {
+      const monthAuction = (auctions || []).find((a: any) => Number(a.month) === mNum);
+      const poolVal = Number(group.kaiIruppuPool || group.kai_iruppu_pool || 0);
+      const isLaaba = !!monthAuction?.is_laaba_seetu || (mNum === currentGroupMonth && mNum > 0 && poolVal >= Number(group.totalValue || 200000));
+      if (!isLaaba) {
+        sum += baseMonthlyInstallment;
+      }
+    });
+    return sum;
+  }, [baseMonthlyInstallment, activeMonthsList, auctions, group, currentGroupMonth]);
 
   // Format currency helper
   const formatINR = (val: number) => {

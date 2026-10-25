@@ -352,9 +352,19 @@ function getChitMonthName(
     return d.toLocaleString('en-IN', { month: format });
   }
   try {
-    const base = new Date(startDateStr);
-    // Month 0 = startDate month, Month 1 = startDate + 1 month, etc.
-    const targetDate = new Date(base.getFullYear(), base.getMonth() + monthNumber, base.getDate() || 1);
+    let year: number;
+    let month: number;
+    if (startDateStr.includes('-')) {
+      const parts = startDateStr.split('-');
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10) - 1;
+    } else {
+      const base = new Date(startDateStr);
+      year = base.getFullYear();
+      month = base.getMonth();
+    }
+    // Set day strictly to 1 so end-of-month dates (e.g. 31st) never overflow shorter months like February or April
+    const targetDate = new Date(year, month + monthNumber, 1);
     return targetDate.toLocaleString('en-IN', { month: format });
   } catch (e) {
     const d = new Date();
@@ -1371,8 +1381,25 @@ export default function SubscriberPortal() {
           const getMonthDateStr = (m: number) => {
             if (!activeGrp?.startDate) return `Month ${m}`;
             try {
-              const base = new Date(activeGrp.startDate);
-              const d = new Date(base.getFullYear(), base.getMonth() + m, base.getDate() || 15);
+              let year: number;
+              let month: number;
+              let day: number;
+              if (activeGrp.startDate.includes('-')) {
+                const parts = activeGrp.startDate.split('-');
+                year = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+                day = parseInt(parts[2], 10) || 15;
+              } else {
+                const base = new Date(activeGrp.startDate);
+                year = base.getFullYear();
+                month = base.getMonth();
+                day = base.getDate() || 15;
+              }
+              const targetYear = year + Math.floor((month + m) / 12);
+              const targetMonth = ((month + m) % 12 + 12) % 12;
+              const maxDays = new Date(targetYear, targetMonth + 1, 0).getDate();
+              const safeDay = Math.min(day, maxDays);
+              const d = new Date(targetYear, targetMonth, safeDay);
               return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
             } catch {
               return `Month ${m}`;
@@ -1382,8 +1409,25 @@ export default function SubscriberPortal() {
           const getMaturityDateStr = () => {
             if (!activeGrp?.startDate) return 'Upon completion of batch';
             try {
-              const base = new Date(activeGrp.startDate);
-              const d = new Date(base.getFullYear(), base.getMonth() + totalMonths, base.getDate() || 15);
+              let year: number;
+              let month: number;
+              let day: number;
+              if (activeGrp.startDate.includes('-')) {
+                const parts = activeGrp.startDate.split('-');
+                year = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+                day = parseInt(parts[2], 10) || 15;
+              } else {
+                const base = new Date(activeGrp.startDate);
+                year = base.getFullYear();
+                month = base.getMonth();
+                day = base.getDate() || 15;
+              }
+              const targetYear = year + Math.floor((month + totalMonths) / 12);
+              const targetMonth = ((month + totalMonths) % 12 + 12) % 12;
+              const maxDays = new Date(targetYear, targetMonth + 1, 0).getDate();
+              const safeDay = Math.min(day, maxDays);
+              const d = new Date(targetYear, targetMonth, safeDay);
               return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
             } catch {
               return 'Upon completion of batch';

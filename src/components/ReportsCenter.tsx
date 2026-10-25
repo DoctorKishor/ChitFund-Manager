@@ -323,27 +323,33 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
   const totalDuration = Number(selectedGroup?.duration_months) || 20;
   const monthList = useMemo(() => {
     const months = [];
-    let baseDate = new Date();
+    let baseYear = new Date().getFullYear();
+    let baseMonth = new Date().getMonth();
     if (selectedGroup?.start_date) {
-      const parsed = new Date(selectedGroup.start_date);
-      if (!isNaN(parsed.getTime())) {
-        baseDate = parsed;
+      if (typeof selectedGroup.start_date === 'string' && selectedGroup.start_date.includes('-')) {
+        const parts = selectedGroup.start_date.split('-');
+        baseYear = parseInt(parts[0], 10);
+        baseMonth = parseInt(parts[1], 10) - 1;
+      } else {
+        const parsed = new Date(selectedGroup.start_date);
+        if (!isNaN(parsed.getTime())) {
+          baseYear = parsed.getFullYear();
+          baseMonth = parsed.getMonth();
+        }
       }
     }
 
     for (let m = 0; m <= totalDuration; m++) {
+      const targetDate = new Date(baseYear, baseMonth + m, 1);
+      const monthName = targetDate.toLocaleDateString('en-US', { month: 'short' });
+      const yearShort = targetDate.getFullYear().toString().slice(-2);
       if (m === 0) {
-        const monthName = baseDate.toLocaleDateString('en-US', { month: 'short' });
-        const yearShort = baseDate.getFullYear().toString().slice(-2);
         months.push({
           num: 0,
           dateLabel: `${monthName} '${yearShort}`,
           code: `M0 Launch`,
         });
       } else {
-        const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + m, 1);
-        const monthName = targetDate.toLocaleDateString('en-US', { month: 'short' });
-        const yearShort = targetDate.getFullYear().toString().slice(-2);
         months.push({
           num: m,
           dateLabel: `${monthName} '${yearShort}`,

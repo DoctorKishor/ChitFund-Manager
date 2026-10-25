@@ -1829,21 +1829,27 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   // Helper: Month label formatting (e.g. "Aug '26 M0 Launch & Orientation" or "Sep '26 M1 (1st Auction)")
   const getDashboardMonthLabel = (group: any, monthNum: number) => {
-    let baseDate = new Date();
+    let baseYear = new Date().getFullYear();
+    let baseMonth = new Date().getMonth();
     if (group?.startDate) {
-      const parsed = new Date(group.startDate);
-      if (!isNaN(parsed.getTime())) {
-        baseDate = parsed;
+      if (typeof group.startDate === 'string' && group.startDate.includes('-')) {
+        const parts = group.startDate.split('-');
+        baseYear = parseInt(parts[0], 10);
+        baseMonth = parseInt(parts[1], 10) - 1;
+      } else {
+        const parsed = new Date(group.startDate);
+        if (!isNaN(parsed.getTime())) {
+          baseYear = parsed.getFullYear();
+          baseMonth = parsed.getMonth();
+        }
       }
     }
-    if (monthNum === 0) {
-      const monthName = baseDate.toLocaleDateString('en-US', { month: 'short' });
-      const yearShort = baseDate.getFullYear().toString().slice(-2);
-      return `${monthName} '${yearShort} M0 Launch`;
-    }
-    const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + monthNum, 1);
+    const d = new Date(baseYear, baseMonth + monthNum, 1);
     const monthName = d.toLocaleDateString('en-US', { month: 'short' });
     const yearShort = d.getFullYear().toString().slice(-2);
+    if (monthNum === 0) {
+      return `${monthName} '${yearShort} M0 Launch`;
+    }
     return `${monthName} '${yearShort} M${monthNum}${monthNum === 1 ? ' (1st Auction)' : ''}`;
   };
 
@@ -1887,7 +1893,13 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       const isArrear = m < activeCurrentCycleMonth;
       const isCurrent = m === activeCurrentCycleMonth;
       const isFuture = m > activeCurrentCycleMonth;
-      const expectedDue = memberInst;
+      const mAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(m));
+      const isCycleLaaba = !!mAuction?.is_laaba_seetu || (
+        m > 0 &&
+        m === activeCurrentCycleMonth &&
+        Number(activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal
+      );
+      const expectedDue = isCycleLaaba ? 0 : memberInst;
       const remainingDue = Math.max(0, expectedDue - alreadyPaid);
 
       monthsData.push({
@@ -10097,7 +10109,6 @@ Thank you for your prompt payment! 🙏`;
         if (!receiptGroup) return null;
         const ticketMemberId = viewingReceiptTx.member?.id || viewingReceiptTx.member?.profileId || txObj?.group_member_id;
         const profileId = viewingReceiptTx.member?.profileId || viewingReceiptTx.member?.id || txObj?.profile_id;
-        const isReceiptLaaba = (receiptGroup?.kaiIruppuPool || 0) >= (receiptGroup?.totalValue || 200000);
         const receiptTotalVal = receiptGroup?.totalValue || 200000;
         const receiptDuration = receiptGroup?.duration || receiptGroup?.memberCount || 20;
         const receiptBaseInstallment = Math.round(receiptTotalVal / (receiptGroup?.memberCount || receiptDuration || 1));
@@ -10106,7 +10117,13 @@ Thank you for your prompt payment! 🙏`;
 
         const targetMonth = viewingReceiptTx.month !== undefined ? viewingReceiptTx.month : selectedDashboardMonth;
         for (let m = 0; m < targetMonth; m++) {
-          const mDue = isReceiptLaaba ? 0 : (viewingReceiptTx.member?.customInstallment || receiptBaseInstallment);
+          const mAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(m));
+          const isMonthLaaba = !!mAuction?.is_laaba_seetu || (
+            m > 0 &&
+            m === Number(receiptGroup?.currentMonth ?? 0) &&
+            Number(receiptGroup?.kaiIruppuPool || receiptGroup?.kai_iruppu_pool || 0) >= receiptTotalVal
+          );
+          const mDue = isMonthLaaba ? 0 : (viewingReceiptTx.member?.customInstallment || receiptBaseInstallment);
           const mPaid = getMemberPaidAmountForMonth(ticketMemberId || profileId, m, profileId);
           const mRemaining = Math.max(0, mDue - mPaid);
           if (mRemaining > 0) {
@@ -10114,6 +10131,16 @@ Thank you for your prompt payment! 🙏`;
             pastPendingMonths.push(m);
           }
         }
+
+        const targetMonthAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(targetMonth));
+        const isTargetMonthLaaba = !!targetMonthAuction?.is_laaba_seetu || (
+          targetMonth > 0 &&
+          targetMonth === Number(receiptGroup?.currentMonth ?? 0) &&
+          Number(receiptGroup?.kaiIruppuPool || receiptGroup?.kai_iruppu_pool || 0) >= receiptTotalVal
+        );
+        const resolvedTotalDue = viewingReceiptTx.totalDue !== undefined
+          ? viewingReceiptTx.totalDue
+          : (isTargetMonthLaaba ? 0 : (viewingReceiptTx.member?.customInstallment || receiptBaseInstallment));
 
         return (
           <PaymentReceiptModal
@@ -10123,7 +10150,7 @@ Thank you for your prompt payment! 🙏`;
             member={viewingReceiptTx.member}
             group={receiptGroup}
             month={targetMonth}
-            totalDue={viewingReceiptTx.totalDue || receiptBaseInstallment}
+            totalDue={resolvedTotalDue}
             organizerCompanyName={organizationName}
             organizerInitials={organizationInitials}
             formatCurrency={formatCurrency}
