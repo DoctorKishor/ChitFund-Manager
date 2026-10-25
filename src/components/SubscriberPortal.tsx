@@ -783,15 +783,27 @@ export default function SubscriberPortal() {
         },
       };
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ reschedule_acknowledgments: updatedAcks })
-        .eq('id', profile.id);
+      // Call RPC first to allow security definer update for anon/subscriber sessions
+      const { data: rpcData, error: rpcError } = await supabase.rpc('acknowledge_auction_reschedule', {
+        p_profile_id: profile.id,
+        p_group_id: groupId,
+        p_rescheduled_at: lastRescheduledAt,
+      });
 
-      if (error) {
-        console.error('Failed to persist reschedule acknowledgment:', error);
+      if (!rpcError && rpcData?.success) {
+        setRescheduleAcknowledgments(rpcData.reschedule_acknowledgments || updatedAcks);
       } else {
-        setRescheduleAcknowledgments(updatedAcks);
+        // Fallback to direct update if caller has admin/manager privileges
+        const { error } = await supabase
+          .from('profiles')
+          .update({ reschedule_acknowledgments: updatedAcks })
+          .eq('id', profile.id);
+
+        if (error) {
+          console.error('Failed to persist reschedule acknowledgment:', error);
+        } else {
+          setRescheduleAcknowledgments(updatedAcks);
+        }
       }
     } catch (err) {
       console.error('Error saving reschedule acknowledgment:', err);

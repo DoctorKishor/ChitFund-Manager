@@ -933,20 +933,53 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           );
         }
       } else {
-        const { error } = await supabase
+        // Check if a profile with this phone number already exists (including soft-deleted)
+        const { data: existingProfile } = await supabase
           .from('profiles')
-          .insert({
-            full_name: cleanName,
-            phone_number: cleanPhone,
-            role: newRole,
-          });
+          .select('id, full_name, is_deleted')
+          .eq('phone_number', cleanPhone)
+          .maybeSingle();
 
-        if (error) throw error;
+        if (existingProfile) {
+          if (existingProfile.is_deleted) {
+            // Restore archived profile with updated details
+            const { error: unarchiveError } = await supabase
+              .from('profiles')
+              .update({
+                full_name: cleanName,
+                role: newRole,
+                is_deleted: false,
+                is_blocked: false,
+              })
+              .eq('id', existingProfile.id);
 
-        if (onAddAuditLog) {
-          onAddAuditLog(
-            `REGISTER new profile: Created ${cleanName} (${cleanPhone}) [Role: ${newRole}]`
-          );
+            if (unarchiveError) throw unarchiveError;
+
+            if (onAddAuditLog) {
+              onAddAuditLog(
+                `RESTORE archived profile: Unarchived ${cleanName} (${cleanPhone}) [Role: ${newRole}]`
+              );
+            }
+          } else {
+            alert(`A member with phone number "${cleanPhone}" already exists (${existingProfile.full_name}). Please search or edit their existing profile.`);
+            return;
+          }
+        } else {
+          const { error } = await supabase
+            .from('profiles')
+            .insert({
+              full_name: cleanName,
+              phone_number: cleanPhone,
+              role: newRole,
+            });
+
+          if (error) throw error;
+
+          if (onAddAuditLog) {
+            onAddAuditLog(
+              `REGISTER new profile: Created ${cleanName} (${cleanPhone}) [Role: ${newRole}]`
+            );
+          }
         }
       }
 

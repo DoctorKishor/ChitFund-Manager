@@ -167,6 +167,7 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
       // Clear subscriber session keys in localStorage before admin login
       if (typeof window !== 'undefined') {
         localStorage.removeItem('cf_passbook_token_session');
+        localStorage.removeItem('cf_phone_subscriber_session');
         localStorage.removeItem('cf_subscriber_session_id');
 
         // Persist / Clear Admin email in localStorage

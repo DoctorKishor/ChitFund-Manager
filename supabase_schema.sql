@@ -1249,7 +1249,13 @@ begin
     p_is_laaba_seetu,
     now()
   )
-  on conflict (group_id, month) do nothing;
+  on conflict (group_id, month) do update set
+    bid_stream = excluded.bid_stream,
+    winning_bidder_id = excluded.winning_bidder_id,
+    winning_member_id = excluded.winning_member_id,
+    winning_discount = excluded.winning_discount,
+    is_laaba_seetu = excluded.is_laaba_seetu,
+    created_at = excluded.created_at;
 
   insert into public.security_audit_logs (
     admin_id,
@@ -1614,6 +1620,48 @@ $$;
 create policy if not exists "Allow public read of active chit_groups" on public.chit_groups for select to public using (status not in ('draft', 'deleted'));
 create policy if not exists "Allow public read of auction_logs" on public.auction_logs for select to public using (group_id in (select id from public.chit_groups where status not in ('draft', 'deleted')));
 create policy if not exists "Allow public read of completed collections" on public.transactions for select to public using (type in ('collection', 'payout') and status = 'completed');
+
+-- Function to allow subscribers (including anon passbook/phone sessions) to acknowledge auction reschedules
+create or replace function public.acknowledge_auction_reschedule(
+  p_profile_id uuid,
+  p_group_id uuid,
+  p_rescheduled_at text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_current_acks jsonb;
+  v_updated_acks jsonb;
+begin
+  select coalesce(reschedule_acknowledgments, '{}'::jsonb)
+  into v_current_acks
+  from public.profiles
+  where id = p_profile_id;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'Profile not found.');
+  end if;
+
+  v_updated_acks := v_current_acks || jsonb_build_object(
+    p_group_id::text, jsonb_build_object(
+      'acknowledgedAt', to_char(timezone('utc', now()), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+      'lastRescheduledAt', p_rescheduled_at
+    )
+  );
+
+  update public.profiles
+  set reschedule_acknowledgments = v_updated_acks
+  where id = p_profile_id;
+
+  return jsonb_build_object('success', true, 'reschedule_acknowledgments', v_updated_acks);
+end;
+$$;
+
+grant execute on function public.acknowledge_auction_reschedule(uuid, uuid, text) to authenticated, anon;
+
 
 
 

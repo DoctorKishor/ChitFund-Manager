@@ -341,6 +341,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Clear any stale subscriber tokens from localStorage
           if (typeof window !== 'undefined') {
             localStorage.removeItem(PASSBOOK_SESSION_KEY);
+            localStorage.removeItem(PHONE_SESSION_KEY);
           }
           setUser(session.user);
           await fetchProfile(session.user.id, session.user.email);
@@ -413,6 +414,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session?.user) {
         if (typeof window !== 'undefined') {
           localStorage.removeItem(PASSBOOK_SESSION_KEY);
+          localStorage.removeItem(PHONE_SESSION_KEY);
         }
         setProfile(null);
         setUser(session.user);

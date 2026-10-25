@@ -41,9 +41,18 @@ function PassbookResolverContent() {
               router.replace(`/?tab=members&memberId=${prof.id}`);
             }, 800);
             return;
+          } else if (isMounted) {
+            setStatus('error');
+            setErrorMessage('This passbook QR token is unassigned or not paired to any subscriber yet. Go to the Members Directory to pair it with a subscriber.');
+            return;
           }
         } catch (e) {
           console.warn('Admin passbook resolve note:', e);
+          if (isMounted) {
+            setStatus('error');
+            setErrorMessage('Error checking passbook token.');
+            return;
+          }
         }
       }
 

@@ -675,13 +675,31 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
           return;
         }
 
-        // Adjust balance deltas
+        // Adjust balance deltas with outflow awareness
+        const isOutflow = editingTransaction.type === 'payout' || editingTransaction.type === 'personal_draw' || editingTransaction.type === 'organizer_profit' || editingTransaction.type === 'atm_withdrawal';
+
         if (oldWallet === newWallet) {
-          const delta = amt - oldAmt;
-          if (delta !== 0) await updateBalance(newWallet as any, delta);
+          const delta = isOutflow ? -(amt - oldAmt) : (amt - oldAmt);
+          if (delta !== 0) {
+            const balRes = await updateBalance(newWallet as any, delta);
+            if (balRes && !balRes.success) {
+              alert('Treasury balance update failed: ' + (balRes.error || 'Unknown error'));
+            }
+          }
         } else {
-          await updateBalance(oldWallet as any, -oldAmt);
-          await updateBalance(newWallet as any, amt);
+          // Revert old wallet and apply to new wallet
+          const refundOld = isOutflow ? oldAmt : -oldAmt;
+          const applyNew = isOutflow ? -amt : amt;
+          const oldRes = await updateBalance(oldWallet as any, refundOld);
+          if (oldRes && !oldRes.success) {
+            alert('Treasury balance update on previous wallet failed: ' + (oldRes.error || 'Unknown error'));
+          } else {
+            const newRes = await updateBalance(newWallet as any, applyNew);
+            if (newRes && !newRes.success) {
+              await updateBalance(oldWallet as any, -refundOld);
+              alert('Treasury balance update on new wallet failed: ' + (newRes.error || 'Unknown error'));
+            }
+          }
         }
       } else {
         // Record new payment
@@ -736,7 +754,10 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
           return;
         }
 
-        await updateBalance(paymentWalletType as any, amt);
+        const balRes = await updateBalance(paymentWalletType as any, amt);
+        if (balRes && !balRes.success) {
+          alert('Note: Payment recorded but treasury warning: ' + (balRes.error || ''));
+        }
       }
 
       setIsPaymentModalOpen(false);
@@ -756,6 +777,24 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
     if (!window.confirm(`Are you sure you want to void this payment of ₹${amt.toLocaleString('en-IN')}?`)) return;
 
     try {
+      // Determine if transaction was an outflow (payout / draw / organizer profit) or inflow (collection / transfer_in)
+      const isOutflow = tx.type === 'payout' || tx.type === 'personal_draw' || tx.type === 'organizer_profit' || tx.type === 'atm_withdrawal';
+      const balanceDelta = isOutflow ? amt : -amt;
+
+      const balRes = await updateBalance(tx.wallet_type as any, balanceDelta);
+      if (balRes && !balRes.success) {
+        alert('Cannot void transaction: Treasury balance update failed (' + (balRes.error || 'Unknown error') + ')');
+        return;
+      }
+
+      const { error: delErr } = await supabase.from('transactions').delete().eq('id', tx.id);
+      if (delErr) {
+        // Roll back the wallet balance update if delete failed
+        await updateBalance(tx.wallet_type as any, -balanceDelta);
+        alert('Failed to delete transaction: ' + delErr.message);
+        return;
+      }
+
       if (tx.verification_proof_url?.includes('/storage/v1/object/public/receipts/')) {
         try {
           const path = tx.verification_proof_url.split('/storage/v1/object/public/receipts/')[1];
@@ -765,13 +804,6 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         }
       }
 
-      await supabase.from('transactions').delete().eq('id', tx.id);
-      
-      // Determine if transaction was an outflow (payout / draw / organizer profit) or inflow (collection / transfer_in)
-      const isOutflow = tx.type === 'payout' || tx.type === 'personal_draw' || tx.type === 'organizer_profit';
-      const balanceDelta = isOutflow ? amt : -amt;
-      await updateBalance(tx.wallet_type as any, balanceDelta);
-
       if (editingTransaction?.id === tx.id) {
         setIsPaymentModalOpen(false);
         setEditingTransaction(null);
@@ -780,6 +812,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       await fetchMemberData();
     } catch (err) {
       console.error('Error deleting payment:', err);
+      alert('Error deleting transaction.');
     }
   };
 

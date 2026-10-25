@@ -785,7 +785,7 @@ export default function CashVaultLedger() {
       const fullNote = `[Floating Deposit - ${depositTag}] ${desc} | Deposited By: ${effectiveDepositor} | Status: Active Float`;
 
       // 1. Insert transaction record FIRST — if this fails, treasury stays unchanged
-      const { error: txErr } = await supabase.from('transactions').insert([
+      const { data: insertedTx, error: txErr } = await supabase.from('transactions').insert([
         {
           wallet_type: depositDest,
           type: 'transfer',
@@ -794,7 +794,7 @@ export default function CashVaultLedger() {
           notes: fullNote,
           created_by: profile?.id || null,
         }
-      ]);
+      ]).select('id').single();
 
       if (txErr) {
         alert('Failed to record deposit transaction: ' + txErr.message);
@@ -804,7 +804,10 @@ export default function CashVaultLedger() {
       // 2. Only credit the treasury after the transaction record is safely saved
       const balRes = await updateBalance(depositDest, amount);
       if (!balRes.success) {
-        alert('Transaction recorded but failed to update wallet balance: ' + (balRes.error || 'Unknown error'));
+        if (insertedTx?.id) {
+          await supabase.from('transactions').delete().eq('id', insertedTx.id);
+        }
+        alert('Failed to update wallet balance: ' + (balRes.error || 'Unknown error'));
         return;
       }
 
