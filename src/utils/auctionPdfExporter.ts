@@ -226,7 +226,7 @@ export async function shareAuctionReportToWhatsApp({
     if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
       try {
         await navigator.share({
-          title: `${groupName} — Month ${month} Auction Certificate`,
+          title: `${groupName} — Month ${month} Auction Certificate (${organizerName})`,
           text: messageText,
           files: [imageFile],
         });

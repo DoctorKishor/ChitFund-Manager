@@ -148,6 +148,7 @@ interface RoleManagerPanelProps {
   isCreateModalOpen?: boolean;
   setIsCreateModalOpen?: (open: boolean) => void;
   onExportPolicy?: () => void;
+  onOpenAuditLogs?: () => void;
 }
 
 export default function RoleManagerPanel({
@@ -155,6 +156,7 @@ export default function RoleManagerPanel({
   isCreateModalOpen: externalIsCreateModalOpen,
   setIsCreateModalOpen: externalSetIsCreateModalOpen,
   onExportPolicy,
+  onOpenAuditLogs,
 }: RoleManagerPanelProps) {
   const { profile: currentAdminProfile } = useAuth();
   const [roles, setRoles] = useState<CustomRoleRecord[]>([]);
@@ -418,6 +420,36 @@ export default function RoleManagerPanel({
     }
   };
 
+  // Export Active Role Policy Helper
+  const handleExportActivePolicy = () => {
+    if (onExportPolicy) {
+      onExportPolicy();
+      return;
+    }
+    const policyData = {
+      system: 'ChitFunds.io Role Policy',
+      exportedAt: new Date().toISOString(),
+      role: activeRole ? {
+        id: activeRole.id,
+        name: editName || activeRole.name,
+        color: editColor,
+        isSystem: activeRole.is_system,
+        description: activeRole.description,
+        allowedTabs,
+        allowedActions,
+      } : null,
+    };
+    const blob = new Blob([JSON.stringify(policyData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `role_policy_${activeRole?.id || 'role'}_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // Create New Custom Role
   const handleCreateNewRole = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -556,7 +588,12 @@ export default function RoleManagerPanel({
               </div>
               <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
                 <span>Granular module gating</span>
-                <span className="text-brand-600 font-semibold cursor-pointer hover:underline text-[11px]">Audit Logs</span>
+                <span 
+                  onClick={onOpenAuditLogs}
+                  className="text-brand-600 font-semibold cursor-pointer hover:underline text-[11px]"
+                >
+                  Audit Logs
+                </span>
               </div>
             </div>
 
@@ -892,6 +929,15 @@ export default function RoleManagerPanel({
 
                 {/* Role Control Actions */}
                 <div className="flex items-center gap-2.5 shrink-0 self-end md:self-auto">
+                  <button
+                    type="button"
+                    onClick={handleExportActivePolicy}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                    title="Export role permission policy to JSON"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export Policy</span>
+                  </button>
                   <button
                     type="button"
                     onClick={handleResetDefaults}

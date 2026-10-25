@@ -130,7 +130,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
               setOrganizationInitials(val.initials || computeInitials(val.name));
 
               if (typeof window !== 'undefined') {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(val));
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...val, cached_at: Date.now() }));
               }
             }
           }

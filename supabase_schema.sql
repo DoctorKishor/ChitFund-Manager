@@ -220,7 +220,9 @@ create or replace trigger on_auth_user_created
 create or replace function public.update_treasury_last_updated()
 returns trigger as $$
 begin
-  new.last_updated_by = auth.uid();
+  if auth.uid() is not null then
+    new.last_updated_by := (select id from public.profiles where id = auth.uid());
+  end if;
   return new;
 end;
 $$ language plpgsql security definer set search_path = public;
@@ -246,7 +248,7 @@ begin
 
   insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
   values (
-    auth.uid(),
+    (select id from public.profiles where id = auth.uid()),
     log_description,
     TG_TABLE_NAME,
     now()
@@ -692,8 +694,8 @@ begin
   from public.group_members gm
   join public.chit_groups cg on cg.id = gm.group_id
   where (gm.profile_id = p_profile_id or gm.profile_id in (
-    select id from public.profiles where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = (
-      select right(regexp_replace(phone_number, '\D', '', 'g'), 10) from public.profiles where id = p_profile_id
+    select id from public.profiles where right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) = (
+      select right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) from public.profiles where id = p_profile_id
     )
   ))
     and cg.status not in ('draft', 'deleted');
@@ -718,16 +720,16 @@ begin
   where (
     t.profile_id = p_profile_id
     or t.profile_id in (
-      select id from public.profiles where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = (
-        select right(regexp_replace(phone_number, '\D', '', 'g'), 10) from public.profiles where id = p_profile_id
+      select id from public.profiles where right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) = (
+        select right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) from public.profiles where id = p_profile_id
       )
     )
     or t.group_member_id in (
       select id from public.group_members 
       where profile_id = p_profile_id 
          or profile_id in (
-           select id from public.profiles where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = (
-             select right(regexp_replace(phone_number, '\D', '', 'g'), 10) from public.profiles where id = p_profile_id
+           select id from public.profiles where right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) = (
+             select right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) from public.profiles where id = p_profile_id
            )
          )
     )
@@ -742,29 +744,35 @@ begin
     'month', al.month,
     'winningDiscount', al.winning_discount,
     'winnerId', al.winning_bidder_id,
-    'winnerName', p.full_name,
+    'winnerName', coalesce(gm.alias_name, p.full_name, 'Ticket #' || gm.ticket_number, 'Subscriber'),
     'isLaabaSeetu', al.is_laaba_seetu,
     'createdAt', al.created_at,
     'netPayout', (cg.total_value - al.winning_discount),
     'isCurrentSubscriberWinner', (
-      al.winning_bidder_id = p_profile_id
-      or al.winning_bidder_id in (
-        select id from public.profiles where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = (
-          select right(regexp_replace(phone_number, '\D', '', 'g'), 10) from public.profiles where id = p_profile_id
+      (al.winning_bidder_id is not null and (
+        al.winning_bidder_id = p_profile_id
+        or al.winning_bidder_id in (
+          select id from public.profiles where right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) = (
+            select right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) from public.profiles where id = p_profile_id
+          )
         )
-      )
+      ))
+      or (al.winning_member_id is not null and al.winning_member_id in (
+        select id from public.group_members where profile_id = p_profile_id
+      ))
     )
   ) order by al.created_at desc), '[]'::jsonb)
   into v_auctions
   from public.auction_logs al
   join public.chit_groups cg on cg.id = al.group_id
-  join public.profiles p on p.id = al.winning_bidder_id
+  left join public.profiles p on p.id = al.winning_bidder_id
+  left join public.group_members gm on gm.id = al.winning_member_id
   where al.group_id in (
     select group_id from public.group_members 
     where profile_id = p_profile_id
        or profile_id in (
-         select id from public.profiles where right(regexp_replace(phone_number, '\D', '', 'g'), 10) = (
-           select right(regexp_replace(phone_number, '\D', '', 'g'), 10) from public.profiles where id = p_profile_id
+         select id from public.profiles where right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) = (
+           select right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) from public.profiles where id = p_profile_id
          )
        )
   ) and cg.status not in ('draft', 'deleted');
@@ -896,103 +904,7 @@ $$;
 -- 10. Atomic Mutation RPC Functions
 -- ==========================================
 
--- Atomic confirm_month0_launch RPC
-create or replace function public.confirm_month0_launch(
-  p_group_id uuid,
-  p_wallet text,
-  p_admin_id uuid default auth.uid()
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_group record;
-  v_current_bal numeric;
-  v_new_bal numeric;
-  v_payout_note text;
-begin
-  select id, name, total_value, current_month
-  into v_group
-  from public.chit_groups
-  where id = p_group_id
-  for update;
-
-  if not found then
-    return jsonb_build_object('success', false, 'error', 'Chit group not found.');
-  end if;
-
-  if v_group.current_month <> 0 then
-    return jsonb_build_object('success', false, 'error', 'Group is already advanced past Month 0.');
-  end if;
-
-  insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
-  values (p_wallet, 0, 0, p_admin_id)
-  on conflict (wallet_type) do nothing;
-
-  select current_balance into v_current_bal
-  from public.global_treasury
-  where wallet_type = p_wallet
-  for update;
-
-  if v_current_bal < v_group.total_value then
-    return jsonb_build_object(
-      'success', false,
-      'error', 'Insufficient balance in ' || p_wallet || '. Available: ₹' || v_current_bal || ', Required: ₹' || v_group.total_value
-    );
-  end if;
-
-  v_new_bal := v_current_bal - v_group.total_value;
-  update public.global_treasury
-  set current_balance = v_new_bal,
-      last_updated_by = p_admin_id
-  where wallet_type = p_wallet;
-
-  update public.chit_groups
-  set current_month = 1,
-      updated_at = now()
-  where id = p_group_id;
-
-  v_payout_note := '[Organizer Profit] Month 0 Launch — Full chit value ₹' || v_group.total_value || ' collected and allocated as Organizer Profit for "' || v_group.name || '".';
-  insert into public.transactions (
-    group_id,
-    wallet_type,
-    from_wallet,
-    type,
-    status,
-    amount,
-    notes,
-    cycle_month,
-    created_by
-  ) values (
-    p_group_id,
-    p_wallet,
-    p_wallet,
-    'organizer_profit',
-    'completed',
-    v_group.total_value,
-    v_payout_note,
-    0,
-    p_admin_id
-  );
-
-  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
-  values (
-    p_admin_id,
-    'LAUNCH CONFIRMED: "' || v_group.name || '" — ₹' || v_group.total_value || ' Organizer Profit recorded from ' || p_wallet || '. Group advanced to Month 1.',
-    'chit_groups',
-    now()
-  );
-
-  return jsonb_build_object(
-    'success', true,
-    'new_month', 1,
-    'wallet', p_wallet,
-    'new_balance', v_new_bal
-  );
-end;
-$$;
+-- (confirm_month0_launch is defined further below in the consolidated RPC section)
 
 -- Atomic log_personal_draw RPC
 create or replace function public.log_personal_draw(
@@ -1556,8 +1468,7 @@ begin
 
   return jsonb_build_object(
     'success', true,
-    'message', 'Member PIN successfully updated to ' || v_clean_new,
-    'new_mpin', v_clean_new
+    'message', 'Member PIN successfully updated.'
   );
 end;
 $$;
@@ -1628,7 +1539,7 @@ declare
   v_recent_attempts int;
   v_cleanup_sql text;
 begin
-  v_raw_digits := regexp_replace(p_phone, '\D', '', 'g');
+  v_raw_digits := regexp_replace(p_phone, '[^0-9]', '', 'g');
   v_clean_phone := right(v_raw_digits, 10);
 
   if length(v_clean_phone) = 0 then
@@ -1651,8 +1562,8 @@ begin
   select id, full_name, phone_number, role, passbook_token, coalesce(mpin, '1234') as mpin, coalesce(is_blocked, false) as is_blocked, coalesce(is_deleted, false) as is_deleted
   into v_profile
   from public.profiles
-  where (right(regexp_replace(phone_number, '\D', '', 'g'), 10) = v_clean_phone
-     or regexp_replace(phone_number, '\D', '', 'g') = v_raw_digits)
+  where (right(regexp_replace(phone_number, '[^0-9]', '', 'g'), 10) = v_clean_phone
+     or regexp_replace(phone_number, '[^0-9]', '', 'g') = v_raw_digits)
      and coalesce(is_deleted, false) = false
   limit 1;
 

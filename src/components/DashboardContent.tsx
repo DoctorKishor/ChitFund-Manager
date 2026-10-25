@@ -25,6 +25,7 @@ import {
   Users, 
   Briefcase, 
   Calendar, 
+  Crown,
   Printer, 
   Send, 
   ShieldAlert, 
@@ -286,7 +287,11 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
       const amount = Number(tx.amount || 0);
       // 1. Credit Cash in Hand
-      await updateBalance('cash_in_hand', amount);
+      const res = await updateBalance('cash_in_hand', amount);
+      if (!res.success) {
+        alert('Failed to credit Cash Box: ' + (res.error || 'Network error'));
+        return;
+      }
 
       // 2. Update transaction status in Supabase to 'completed'
       const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -302,7 +307,11 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         })
         .eq('id', tx.id);
 
-      if (error) throw error;
+      if (error) {
+        // Rollback cash box credit on update failure
+        await updateBalance('cash_in_hand', -amount);
+        throw error;
+      }
 
       // 3. Security Audit Log
       await supabase.from('security_audit_logs').insert({
@@ -1423,6 +1432,11 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [disburseDeductArrearMonths, setDisburseDeductArrearMonths] = useState<number[]>([]);
   const [disburseDeductAdvanceMonths, setDisburseDeductAdvanceMonths] = useState<number[]>([]);
 
+  // Month 0 Launch Confirmation & Organizer Profit Modal States
+  const [month0LaunchModalGroup, setMonth0LaunchModalGroup] = useState<any | null>(null);
+  const [month0LaunchWallet, setMonth0LaunchWallet] = useState<WalletType>('dad_bank');
+  const [isConfirmingMonth0, setIsConfirmingMonth0] = useState<boolean>(false);
+
   // Smooth Auto-Centering Refs & Effects for Selected Month & Active Chit Group Sliders
   const monthButtonsRef = useRef<Map<number, HTMLButtonElement>>(new Map());
   const chitGroupButtonsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -2294,8 +2308,10 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         return;
       }
 
-      // 2. Revert wallet balance
-      await updateBalance(tx.wallet_type as any, -amt);
+      // 2. Revert wallet balance (outflows credit back, inflows debit)
+      const isOutflow = tx.type === 'payout' || tx.type === 'personal_draw' || tx.type === 'organizer_profit';
+      const balanceDelta = isOutflow ? amt : -amt;
+      await updateBalance(tx.wallet_type as any, balanceDelta);
 
       // 3. Audit log
       const now = new Date();
@@ -2559,7 +2575,12 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
     if (!activeGroup || dashboardGroupMembers.length === 0) return;
 
     const standardInstallment = Math.round(activeGroup.totalValue / (activeGroup.memberCount || activeGroup.duration || 1));
-    const isLaaba = (activeGroup.kaiIruppuPool || 0) >= activeGroup.totalValue;
+    const selectedMonthAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(selectedDashboardMonth));
+    const isLaaba = !!selectedMonthAuction?.is_laaba_seetu || (
+      selectedDashboardMonth > 0 &&
+      selectedDashboardMonth === (activeGroup.currentMonth ?? 0) &&
+      (activeGroup.kaiIruppuPool || 0) >= activeGroup.totalValue
+    );
     const monthDue = isLaaba ? 0 : standardInstallment;
 
     if (monthDue === 0) {
@@ -2634,6 +2655,43 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
     }
   };
 
+  // Month 0 Launch Execution via Atomic confirm_month0_launch RPC
+  const handleExecuteMonth0Launch = async () => {
+    if (!month0LaunchModalGroup) return;
+    try {
+      setIsConfirmingMonth0(true);
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('confirm_month0_launch', {
+        p_group_id: month0LaunchModalGroup.id,
+        p_wallet: month0LaunchWallet,
+        p_admin_id: profile?.id || null,
+      });
+
+      if (rpcErr || !rpcData?.success) {
+        alert('Failed to launch Month 0: ' + (rpcData?.error || rpcErr?.message));
+        return;
+      }
+
+      const walletLabel = month0LaunchWallet === 'dad_bank' ? "Dad's Bank" : month0LaunchWallet === 'kishor_bank' ? "Kishor UPI" : month0LaunchWallet === 'mom_bank' ? "Mom's Bank" : "Cash Box";
+      
+      setLocalGroups(prev => prev.map(g => g.id === month0LaunchModalGroup.id ? { ...g, currentMonth: 1 } : g));
+      setSelectedDashboardMonth(1);
+      const grpName = month0LaunchModalGroup.name;
+      const grpTotal = month0LaunchModalGroup.totalValue;
+      setMonth0LaunchModalGroup(null);
+      await fetchGroups();
+      if (activeDashboardGroupId) {
+        await fetchDashboardData(activeDashboardGroupId);
+      }
+      triggerHapticFeedback('success');
+      alert(`✓ Month 0 Launch Confirmed! ₹${grpTotal.toLocaleString('en-IN')} Organizer Profit recorded from ${walletLabel}. Group "${grpName}" advanced to Month 1.`);
+    } catch (err: any) {
+      console.error('Error confirming Month 0 launch:', err);
+      alert('Error confirming launch: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsConfirmingMonth0(false);
+    }
+  };
+
   // Close Month Cycle Handler / Confirm Launch
   const handleCloseMonth = async () => {
     const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId);
@@ -2648,42 +2706,8 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
     }
 
     if (currentMonth === 0) {
-      const confirmLaunch = window.confirm(
-        `CONFIRM LAUNCH (Month 0)?\n\nAll launch collections (₹${activeGroup.totalValue?.toLocaleString('en-IN')}) are allocated to the Organizer as Organizer Profit.\n\nAdvance "${activeGroup.name}" to Month 1 (Live Auctions Phase)?`
-      );
-      if (!confirmLaunch) return;
-
-      try {
-        setIsClosingMonth(true);
-        const { error } = await supabase
-          .from('chit_groups')
-          .update({ current_month: 1 })
-          .eq('id', activeDashboardGroupId);
-
-        if (error) {
-          alert('Error advancing to Month 1: ' + error.message);
-          return;
-        }
-
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-        setAuditLogs(prev => [
-          {
-            timestamp: `Today, ${timeStr}`,
-            table: 'chit_groups',
-            desc: `LAUNCH CONFIRMED: "${activeGroup.name}" — ₹${activeGroup.totalValue?.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group advanced to Month 1.`,
-            executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-          },
-          ...prev,
-        ]);
-
-        await fetchGroups();
-        setSelectedDashboardMonth(1);
-      } catch (err: any) {
-        console.error('Error confirming launch:', err);
-      } finally {
-        setIsClosingMonth(false);
-      }
+      // Open Month 0 Launch Modal to select Payout Vault and record Organizer Profit atomically
+      setMonth0LaunchModalGroup(activeGroup);
       return;
     }
 
@@ -3242,7 +3266,7 @@ Thank you for your prompt payment! 🙏`;
     }
   };
 
-  const handleRecordPaymentSubmit = (e: React.FormEvent) => {
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const amountNum = Number(paymentAmount);
     if (isNaN(amountNum) || amountNum <= 0) {
@@ -3270,33 +3294,60 @@ Thank you for your prompt payment! 🙏`;
       return { ...entry, paid: entry.paid + applying };
     });
 
-    setFifoMembers(prev => prev.map(m =>
-      m.id === selectedMemberId ? { ...m, ledger: updatedLedger } : m
-    ));
-
-    setActualCollections(prev => prev + amountNum);
-
     let targetWallet: 'cash_in_hand' | 'kishor_bank' | 'dad_bank' | 'mom_bank' = 'cash_in_hand';
     if (paymentMode === 'UPI') targetWallet = 'kishor_bank';
     if (paymentMode === 'Bank') targetWallet = 'dad_bank';
     if (paymentMode === 'Cheque') targetWallet = 'mom_bank';
-    updateBalance(targetWallet, amountNum);
 
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-    setAuditLogs(prev => [
-      {
-        timestamp: `Today, ${timeStr}`,
-        table: 'transactions',
-        desc: `FIFO CREDIT ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} — oldest arrears cleared first`,
-        executor: 'Kishor (Admin)'
-      },
-      ...prev
-    ]);
+    try {
+      // 1. Insert a permanent Supabase transaction record so payment survives refresh
+      // Determine the earliest unpaid month from the ledger for cycle_month
+      const earliestUnpaidMonth = member.ledger.find(e => e.original - e.paid > 0)?.month ?? selectedDashboardMonth ?? 1;
+      const fifoNote = `[FIFO] ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} — oldest arrears cleared first`;
+      const { error: txErr } = await supabase.from('transactions').insert({
+        profile_id: member.id || null,
+        wallet_type: targetWallet,
+        type: 'collection',
+        status: 'completed',
+        amount: amountNum,
+        cycle_month: earliestUnpaidMonth,
+        notes: fifoNote,
+        created_by: profile?.id || null,
+      });
 
-    setSelectedMemberId(null);
-    setPaymentAmount('');
-    alert(`FIFO credit of ₹${amountNum.toLocaleString('en-IN')} applied. Oldest overdue balances cleared first.`);
+      if (txErr) {
+        alert('Failed to record FIFO payment in database: ' + txErr.message);
+        return;
+      }
+
+      // 2. Update treasury balance (after DB insert succeeds)
+      await updateBalance(targetWallet, amountNum);
+
+      // 3. Update local in-memory ledger state
+      setFifoMembers(prev => prev.map(m =>
+        m.id === selectedMemberId ? { ...m, ledger: updatedLedger } : m
+      ));
+      setActualCollections(prev => prev + amountNum);
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      setAuditLogs(prev => [
+        {
+          timestamp: `Today, ${timeStr}`,
+          table: 'transactions',
+          desc: `FIFO CREDIT ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} — oldest arrears cleared first`,
+          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
+        },
+        ...prev,
+      ]);
+
+      setSelectedMemberId(null);
+      setPaymentAmount('');
+      alert(`FIFO credit of ₹${amountNum.toLocaleString('en-IN')} applied. Oldest overdue balances cleared first.`);
+    } catch (err: any) {
+      console.error('Error recording FIFO payment:', err);
+      alert('Error recording FIFO payment: ' + (err.message || 'Unknown error'));
+    }
   };
 
   const isUserAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
@@ -3318,15 +3369,23 @@ Thank you for your prompt payment! 🙏`;
         const totalDuration = activeGroup?.duration || activeGroup?.memberCount || 20;
         const totalChitVal = activeGroup?.totalValue || 200000;
         const baseInstallment = Math.round(totalChitVal / (activeGroup?.memberCount || totalDuration || 1));
-        const isLaaba = (activeGroup?.kaiIruppuPool || 0) >= totalChitVal;
-        const defaultDue = isLaaba ? 0 : baseInstallment;
         const activeCycle = (activeGroup?.currentMonth !== undefined && activeGroup?.currentMonth !== null)
           ? Number(activeGroup.currentMonth)
           : 0;
 
+        // Auction log for selected month
+        const currentMonthAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(selectedDashboardMonth));
+        const isSelectedMonthLaaba = !!currentMonthAuction?.is_laaba_seetu || (
+          Number(selectedDashboardMonth) > 0 &&
+          Number(selectedDashboardMonth) === activeCycle &&
+          Number(activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal
+        );
+        const isLaaba = isSelectedMonthLaaba;
+        const defaultDue = isSelectedMonthLaaba ? 0 : baseInstallment;
+
         // Compute dues, paid, status for each member
         const memberStats = dashboardGroupMembers.map(member => {
-          const effectiveDue = isLaaba ? 0 : (member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : defaultDue);
+          const effectiveDue = isSelectedMonthLaaba ? 0 : (member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : defaultDue);
           const paid = getMemberPaidAmountForMonth(member.id || member.profileId, selectedDashboardMonth, member.profileId);
           const remaining = Math.max(0, effectiveDue - paid);
           const status = remaining === 0 ? 'paid' : paid > 0 ? 'partial' : 'unpaid';
@@ -3335,7 +3394,13 @@ Thank you for your prompt payment! 🙏`;
           let totalDueUpToActiveCycle = 0;
           let totalPaidUpToActiveCycle = 0;
           for (let m = 0; m <= activeCycle; m++) {
-            const mDue = isLaaba ? 0 : (member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : defaultDue);
+            const mAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(m));
+            const isCycleLaaba = !!mAuction?.is_laaba_seetu || (
+              m > 0 &&
+              m === activeCycle &&
+              Number(activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal
+            );
+            const mDue = isCycleLaaba ? 0 : (member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : baseInstallment);
             totalDueUpToActiveCycle += mDue;
             totalPaidUpToActiveCycle += getMemberPaidAmountForMonth(member.id || member.profileId, m, member.profileId);
           }
@@ -3360,9 +3425,6 @@ Thank you for your prompt payment! 🙏`;
         const actualCollectionsTotal = memberStats.reduce((sum, m) => sum + m.paid, 0);
         const pendingCollectionsTotal = Math.max(0, targetCollectionsTotal - actualCollectionsTotal);
         const completionPct = targetCollectionsTotal > 0 ? Math.min(100, Math.round((actualCollectionsTotal / targetCollectionsTotal) * 100)) : 100;
-
-        // Auction log for selected month
-        const currentMonthAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(selectedDashboardMonth));
 
         // Month range generator for carousel (starts at Month 0 Launch Month)
         const monthsRange = [0, ...Array.from({ length: totalDuration }, (_, i) => i + 1)];
@@ -5127,6 +5189,10 @@ Thank you for your prompt payment! 🙏`;
     case 'members':
       return (
         <MemberMatrix 
+          onOpenAuditLogs={() => {
+            setReportsInitialSubtab('system_log');
+            if (setActiveTab) setActiveTab('reports');
+          }}
           onAddAuditLog={(desc) => {
             const now = new Date();
             const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -5174,6 +5240,10 @@ Thank you for your prompt payment! 🙏`;
       return (
         <MemberMatrix 
           defaultSubtab="roles"
+          onOpenAuditLogs={() => {
+            setReportsInitialSubtab('system_log');
+            if (setActiveTab) setActiveTab('reports');
+          }}
           onAddAuditLog={(desc) => {
             const now = new Date();
             const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -5356,7 +5426,7 @@ Thank you for your prompt payment! 🙏`;
                   <div>
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Monthly Installment</span>
                     <span className="text-xl sm:text-2xl font-black text-brand-700 mt-1 block font-mono tracking-tight truncate">
-                      {formatCurrency(selectedWorkspaceGroup.totalValue / selectedWorkspaceGroup.duration)}
+                      {formatCurrency(selectedWorkspaceGroup.totalValue / (selectedWorkspaceGroup.duration || 1))}
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-500 mt-2 block font-medium">
@@ -5412,44 +5482,7 @@ Thank you for your prompt payment! 🙏`;
                   </div>
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        const { error } = await supabase
-                          .from('chit_groups')
-                          .update({ current_month: 1 })
-                          .eq('id', selectedWorkspaceGroup.id);
-
-                        if (error) {
-                          alert('Error advancing to Month 1: ' + error.message);
-                          return;
-                        }
-
-                        await supabase.from('security_audit_logs').insert({
-                          action_description: `LAUNCH CONFIRMED: "${selectedWorkspaceGroup.name}" — ₹${selectedWorkspaceGroup.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group advanced to Month 1.`,
-                          target_table: 'chit_groups'
-                        });
-
-                        setLocalGroups(prev => prev.map(grp =>
-                          grp.id === selectedWorkspaceGroup.id ? { ...grp, currentMonth: 1 } : grp
-                        ));
-
-                        const now = new Date();
-                        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                        setAuditLogs(prev => [
-                          {
-                            timestamp: `Today, ${timeStr}`,
-                            table: 'chit_groups',
-                            desc: `LAUNCH CONFIRMED for "${selectedWorkspaceGroup.name}" — ₹${selectedWorkspaceGroup.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit. Group advanced to Month 1.`,
-                            executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
-                          },
-                          ...prev
-                        ]);
-
-                        alert(`✅ Launch confirmed! ₹${selectedWorkspaceGroup.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
-                      } catch (err: any) {
-                        alert('Error updating group: ' + err.message);
-                      }
-                    }}
+                    onClick={() => setMonth0LaunchModalGroup(selectedWorkspaceGroup)}
                     className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0 active:scale-95 w-full sm:w-auto cursor-pointer"
                   >
                     <Rocket size={14} />
@@ -6106,7 +6139,7 @@ Thank you for your prompt payment! 🙏`;
                     </div>
                   ) : (
                     filteredGroups.map((g) => {
-                      const progressPercent = Math.min(100, Math.round((g.currentMonth / g.duration) * 100));
+                      const progressPercent = Math.min(100, Math.round((g.currentMonth / (g.duration || 1)) * 100));
 
                       return (
                         <div 
@@ -6197,7 +6230,7 @@ Thank you for your prompt payment! 🙏`;
                               <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 min-w-0">
                                 <span className="text-[9.5px] sm:text-[10px] font-bold uppercase text-slate-400 block whitespace-nowrap">Monthly Due</span>
                                 <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm block mt-0.5 whitespace-nowrap truncate">
-                                  {formatCurrency(g.totalValue / g.duration)}
+                                  {formatCurrency(g.totalValue / (g.duration || 1))}
                                 </span>
                               </div>
 
@@ -6234,44 +6267,7 @@ Thank you for your prompt payment! 🙏`;
                           {g.currentMonth === 0 ? (
                             <div className="pt-3 border-t border-slate-100">
                               <button
-                                onClick={async () => {
-                                  try {
-                                    const { error } = await supabase
-                                      .from('chit_groups')
-                                      .update({ current_month: 1 })
-                                      .eq('id', g.id);
-
-                                    if (error) {
-                                      alert('Error advancing to Month 1: ' + error.message);
-                                      return;
-                                    }
-
-                                    await supabase.from('security_audit_logs').insert({
-                                      action_description: `LAUNCH CONFIRMED: "${g.name}" — ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group advanced to Month 1.`,
-                                      target_table: 'chit_groups'
-                                    });
-
-                                    setLocalGroups(prev => prev.map(grp =>
-                                      grp.id === g.id ? { ...grp, currentMonth: 1 } : grp
-                                    ));
-
-                                    const now = new Date();
-                                    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                                    setAuditLogs(prev => [
-                                      {
-                                        timestamp: `Today, ${timeStr}`,
-                                        table: 'chit_groups',
-                                        desc: `LAUNCH CONFIRMED for "${g.name}" — ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit. Group advanced to Month 1.`,
-                                        executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
-                                      },
-                                      ...prev
-                                    ]);
-
-                                    alert(`✅ Launch confirmed! ₹${g.totalValue.toLocaleString('en-IN')} allocated as Organizer Profit for Month 0. Group now advances to Month 1.`);
-                                  } catch (err: any) {
-                                    alert('Error updating group: ' + err.message);
-                                  }
-                                }}
+                                onClick={() => setMonth0LaunchModalGroup(g)}
                                 className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
                               >
                                 <Rocket size={14} className="shrink-0" />
@@ -9001,6 +8997,100 @@ Thank you for your prompt payment! 🙏`;
         </div>
       )}
 
+      {/* ── MODAL: MONTH 0 ORGANIZER PROFIT WALLET SELECTION ── */}
+      {month0LaunchModalGroup && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto no-scrollbar">
+          <div className="bg-white border-t sm:border border-slate-200/90 text-slate-900 rounded-t-3xl sm:rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in slide-in-from-bottom-6 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-150 max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto no-scrollbar my-0 sm:my-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center font-bold">
+                  <Crown size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold font-display text-slate-900">Confirm Launch (Month 0)</h3>
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Organizer Profit Payout</span>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setMonth0LaunchModalGroup(null)} 
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-3.5 bg-amber-50/60 rounded-2xl border border-amber-200 text-slate-900 text-xs space-y-1">
+                <div className="flex justify-between font-bold">
+                  <span className="text-slate-600">Chit Group:</span>
+                  <span className="text-slate-900">{month0LaunchModalGroup.name}</span>
+                </div>
+                <div className="flex justify-between font-black text-sm text-amber-700 font-mono">
+                  <span>Organizer Profit:</span>
+                  <span>₹{month0LaunchModalGroup.totalValue?.toLocaleString('en-IN')}</span>
+                </div>
+                <p className="text-[11px] text-slate-600 pt-1 leading-snug">
+                  All 1st-month collections are taken by the Organizer. Please select the vault/account from which this payout is recorded.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Payout Source Vault</label>
+                <div className="space-y-1.5">
+                  {[
+                    { id: 'dad_bank' as WalletType, name: "Dad's Bank", bal: balances.dad_bank },
+                    { id: 'cash_in_hand' as WalletType, name: "Physical Cash Box", bal: balances.cash_in_hand },
+                    { id: 'kishor_bank' as WalletType, name: "Kishor UPI", bal: balances.kishor_bank },
+                    { id: 'mom_bank' as WalletType, name: "Mom's Bank", bal: balances.mom_bank },
+                  ].map((w) => {
+                    const isSelected = month0LaunchWallet === w.id;
+                    const bal = w.bal || 0;
+                    return (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => setMonth0LaunchWallet(w.id)}
+                        className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                          isSelected 
+                            ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/30' 
+                            : 'bg-slate-50/50 hover:bg-slate-100/70 border-slate-200'
+                        }`}
+                      >
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 block">{w.name}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">Available: ₹{bal.toLocaleString('en-IN')}</span>
+                        </div>
+                        {isSelected && <CheckCircle2 size={16} className="text-amber-600 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMonth0LaunchModalGroup(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteMonth0Launch}
+                  disabled={isConfirmingMonth0}
+                  className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isConfirmingMonth0 ? 'Processing...' : 'Confirm Launch & Advance'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Disburse Winner Prize Payout Modal ────────────────────────────────────── */}
       {showDisbursePayoutModal && (() => {
         const activeNonDraftGroups = localGroups.filter(g => g.status !== 'draft' && g.status !== 'deleted');
@@ -9040,7 +9130,11 @@ Thank you for your prompt payment! 🙏`;
             .reduce((sum, t) => sum + Number(t.amount || 0), 0);
         };
 
-        const isLaabaMonth = (activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && selectedDashboardMonth > 0;
+        const isLaabaMonth = !!currentMonthAuction?.is_laaba_seetu || (
+          Number(selectedDashboardMonth) > 0 &&
+          Number(selectedDashboardMonth) === Number(activeGroup?.currentMonth || 0) &&
+          (activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal
+        );
         const currentExpectedDue = isLaabaMonth ? 0 : winnerInst;
         const currentMonthPaid = getWinnerPaidForMonth(selectedDashboardMonth);
         const currentMonthUnpaid = Math.max(0, currentExpectedDue - currentMonthPaid);
@@ -9049,7 +9143,13 @@ Thank you for your prompt payment! 🙏`;
         const arrearCandidates: { month: number; unpaid: number; expected: number; paid: number }[] = [];
         for (let m = 0; m < selectedDashboardMonth; m++) {
           const paid = getWinnerPaidForMonth(m);
-          const exp = (activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && m > 0 ? 0 : winnerInst;
+          const mAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(m));
+          const isCycleLaaba = !!mAuction?.is_laaba_seetu || (
+            m > 0 &&
+            m === Number(activeGroup?.currentMonth || 0) &&
+            (activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal
+          );
+          const exp = isCycleLaaba ? 0 : winnerInst;
           const unpaid = Math.max(0, exp - paid);
           arrearCandidates.push({ month: m, unpaid, expected: exp, paid });
         }
@@ -9072,7 +9172,13 @@ Thank you for your prompt payment! 🙏`;
         }
         disburseDeductArrearMonths.forEach(m => {
           const paid = getWinnerPaidForMonth(m);
-          const exp = (activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal && m > 0 ? 0 : winnerInst;
+          const mAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(m));
+          const isCycleLaaba = !!mAuction?.is_laaba_seetu || (
+            m > 0 &&
+            m === Number(activeGroup?.currentMonth || 0) &&
+            (activeGroup?.kaiIruppuPool || activeGroup?.kai_iruppu_pool || 0) >= totalChitVal
+          );
+          const exp = isCycleLaaba ? 0 : winnerInst;
           const unpaid = Math.max(0, exp - paid);
           if (unpaid > 0) {
             activeDeductionsList.push({
@@ -9584,7 +9690,12 @@ Thank you for your prompt payment! 🙏`;
       {showRemindModal && (() => {
         const activeNonDraftGroups = localGroups.filter(g => g.status !== 'draft' && g.status !== 'deleted');
         const activeGroup = activeNonDraftGroups.find(g => g.id === activeDashboardGroupId) || activeNonDraftGroups[0];
-        const isLaaba = (activeGroup?.kaiIruppuPool || 0) >= (activeGroup?.totalValue || 200000);
+        const selectedMonthAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(selectedDashboardMonth));
+        const isLaaba = !!selectedMonthAuction?.is_laaba_seetu || (
+          Number(selectedDashboardMonth) > 0 &&
+          Number(selectedDashboardMonth) === (activeGroup?.currentMonth ?? 0) &&
+          (activeGroup?.kaiIruppuPool || 0) >= (activeGroup?.totalValue || 200000)
+        );
         const totalChitVal = activeGroup?.totalValue || 200000;
         const totalDuration = activeGroup?.duration || activeGroup?.memberCount || 20;
         const baseInstallment = Math.round(totalChitVal / (activeGroup?.memberCount || totalDuration || 1));

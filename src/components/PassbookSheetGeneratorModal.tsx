@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import jsPDF from 'jspdf';
 import { generateQrDataUrl, getPassbookScanUrl } from '@/utils/qrCodeGenerator';
-import { supabase } from '@/utils/supabase/client';
-import { X, Printer, Download, Sliders, CheckCircle2, RefreshCw, FileText, QrCode } from 'lucide-react';
+import { X, Printer, Download, RefreshCw, FileText } from 'lucide-react';
 
 export interface StickerItem {
   token: string;

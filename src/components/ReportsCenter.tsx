@@ -1983,41 +1983,41 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
 
   // ── Executive High-Level KPI Bento Stats ──
   const portfolioStats = useMemo(() => {
-    const totalAUM = chitGroups.reduce((sum, g) => sum + (Number(g.total_value) || 0), 0) || 5000000;
+    const totalAUM = chitGroups.reduce((sum, g) => sum + (Number(g.total_value) || 0), 0);
     const monthlyRunRate = chitGroups.reduce((sum, g) => {
       const dur = Number(g.duration_months) || 20;
-      const val = Number(g.total_value) || 200000;
+      const val = Number(g.total_value) || 0;
       return sum + Math.round(val / dur);
-    }, 0) || 100000;
+    }, 0);
 
-    const totalTicketsCount = groupMembers.length > 0 ? groupMembers.length : (chitGroups.length * 25 || 50);
-    const groupNamesSummary = chitGroups.map(g => g.name).join(' & ') || 'Sri Laxmi & Vasantham';
+    const totalTicketsCount = groupMembers.length > 0 ? groupMembers.length : chitGroups.reduce((sum, g) => sum + (Number(g.member_count) || 0), 0);
+    const groupNamesSummary = chitGroups.map(g => g.name).join(' & ');
     
     // Velocity calculation for active month
-    const velocityPercent = monthlyStats.expected > 0 ? monthlyStats.collectionPercent : overviewStats.overallEfficiency || 91.8;
-    const arrearsAmount = monthlyStats.pending > 0 ? monthlyStats.pending : (overviewStats.totalStillToCollect || 16400);
-    const collectedAmount = monthlyStats.collected > 0 ? monthlyStats.collected : (overviewStats.totalCollectedThisMonth || 183600);
-    const expectedAmount = monthlyStats.expected > 0 ? monthlyStats.expected : (overviewStats.totalExpectedThisMonth || 200000);
-    const paidMembers = monthlyStats.paidCount > 0 ? monthlyStats.paidCount : Math.max(1, totalTicketsCount - (monthlyStats.pendingCount || 4));
+    const velocityPercent = monthlyStats.expected > 0 ? monthlyStats.collectionPercent : (overviewStats.overallEfficiency || 0);
+    const arrearsAmount = monthlyStats.pending > 0 ? monthlyStats.pending : (overviewStats.totalStillToCollect || 0);
+    const collectedAmount = monthlyStats.collected > 0 ? monthlyStats.collected : (overviewStats.totalCollectedThisMonth || 0);
+    const expectedAmount = monthlyStats.expected > 0 ? monthlyStats.expected : (overviewStats.totalExpectedThisMonth || 0);
+    const paidMembers = monthlyStats.paidCount > 0 ? monthlyStats.paidCount : Math.max(0, totalTicketsCount - (monthlyStats.pendingCount || 0));
     const totalMembers = monthlyStats.memberRows.length > 0 ? monthlyStats.memberRows.length : totalTicketsCount;
 
     // Disbursed net prize
     const settledDisbursed = transactions
       .filter(t => t.type === 'payout')
-      .reduce((sum, t) => sum + Number(t.amount || 0), 0) || 76000;
-    const activeDue = overviewStats.totalPayoutsStillOwed || 83500;
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const activeDue = overviewStats.totalPayoutsStillOwed || 0;
     const totalDisbursedAndDue = settledDisbursed + activeDue;
-    const latestWinner = monthlyStats.winnerRecord?.winnerName || 'R. Selvakumar (#12)';
+    const latestWinner = monthlyStats.winnerRecord?.winnerName || null;
 
     // Kai Iruppu pool
-    const totalPool = chitGroups.reduce((sum, g) => sum + (Number(g.kai_iruppu_pool) || 0), 0) || 65000;
-    const targetPool = Number(selectedGroup?.total_value) || (chitGroups[0]?.total_value || 100000);
-    const poolPercent = Math.min(100, Math.round((totalPool / targetPool) * 100));
+    const totalPool = chitGroups.reduce((sum, g) => sum + (Number(g.kai_iruppu_pool) || 0), 0);
+    const targetPool = Number(selectedGroup?.total_value) || (chitGroups[0]?.total_value || 0);
+    const poolPercent = targetPool > 0 ? Math.min(100, Math.round((totalPool / targetPool) * 100)) : 0;
 
     return {
       totalAUM,
       monthlyRunRate,
-      activeGroupsCount: chitGroups.length || 2,
+      activeGroupsCount: chitGroups.length,
       totalTicketsCount,
       groupNamesSummary,
       velocityPercent,
@@ -2026,7 +2026,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       expectedAmount,
       paidMembers,
       totalMembers,
-      pendingCount: monthlyStats.pendingCount || (totalMembers - paidMembers),
+      pendingCount: monthlyStats.pendingCount || Math.max(0, totalMembers - paidMembers),
       totalDisbursedAndDue,
       settledDisbursed,
       activeDue,
@@ -2059,9 +2059,9 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         rows.push({
           cycleNum: 0,
           cycleTitle: `Cycle M0 (${monthInfo.dateLabel} Launch)`,
-          badgeText: 'Foreman Launch Pot',
+          badgeText: 'Organizer Launch Pot',
           badgeColor: 'bg-slate-100 text-slate-600 border-slate-200/60',
-          subLabel: 'Organizer Commission Initial Pot',
+          subLabel: 'Organizer Profit Initial Pot',
           dotColor: 'bg-slate-400',
           expected: totalVal,
           collected: totalVal,
@@ -2069,7 +2069,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
           shortfall: 0,
           shortfallSubtext: 'Zero overdue',
           velocity: 100.0,
-          statusPill: 'Foreman Commission Sealed',
+          statusPill: 'Organizer Profit Sealed',
           statusPillStyle: 'bg-slate-100 text-slate-700 border-slate-200',
           actionType: 'voucher',
           isLive: false,
@@ -2077,11 +2077,11 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       } else if (m === currentM) {
         // Active Live Cycle
         const expected = monthlyStats.expected > 0 ? monthlyStats.expected : totalVal;
-        const collected = monthlyStats.collected > 0 ? monthlyStats.collected : 183600;
-        const shortfall = monthlyStats.pending > 0 ? monthlyStats.pending : 16400;
-        const velocity = monthlyStats.expected > 0 ? monthlyStats.collectionPercent : 91.8;
-        const paidCount = monthlyStats.paidCount > 0 ? monthlyStats.paidCount : (totalMembers - 4);
-        const overdueCount = monthlyStats.pendingCount > 0 ? monthlyStats.pendingCount : 4;
+        const collected = monthlyStats.collected > 0 ? monthlyStats.collected : 0;
+        const shortfall = monthlyStats.pending > 0 ? monthlyStats.pending : 0;
+        const velocity = monthlyStats.expected > 0 ? monthlyStats.collectionPercent : 0;
+        const paidCount = monthlyStats.paidCount > 0 ? monthlyStats.paidCount : 0;
+        const overdueCount = monthlyStats.pendingCount > 0 ? monthlyStats.pendingCount : 0;
 
         rows.push({
           cycleNum: m,
@@ -2215,7 +2215,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                   const isCurrent = m.num === (selectedGroup?.current_month !== undefined ? Number(selectedGroup.current_month) : 0);
                   return (
                     <option key={m.num} value={m.num}>
-                      Cycle: Month {m.num} {isCurrent ? '(Active Current)' : m.num === 0 ? '(Commission Launch)' : '(Settled)'}
+                      Cycle: Month {m.num} {isCurrent ? '(Active Current)' : m.num === 0 ? '(Organizer Profit Launch)' : '(Settled)'}
                     </option>
                   );
                 })}
@@ -3407,7 +3407,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                         ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                         : 'text-slate-600 bg-slate-100 border-slate-200'
                     }`}>
-                      {row.isLive ? `${row.velocity}% Done` : row.cycleNum === 0 ? 'Foreman Sealed' : '100% Reconciled'}
+                      {row.isLive ? `${row.velocity}% Done` : row.cycleNum === 0 ? 'Organizer Sealed' : '100% Reconciled'}
                     </span>
                   </div>
 
@@ -3919,7 +3919,7 @@ function PDFDocumentView({
             <tr>
               <th className="py-2 px-3.5 font-semibold">Winner</th>
               <th className="py-2 px-3 font-semibold text-right">Prize</th>
-              <th className="py-2 px-3 font-semibold text-right">Commission</th>
+              <th className="py-2 px-3 font-semibold text-right">Winning Discount</th>
               <th className="py-2 px-3 font-semibold text-right">Net payout</th>
               <th className="py-2 px-3.5 font-semibold text-right">Payout</th>
             </tr>

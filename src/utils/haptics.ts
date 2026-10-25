@@ -23,7 +23,7 @@ export function triggerHapticFeedback(type: 'success' | 'warning' | 'error' | 'l
         navigator.vibrate(40);
       }
     }
-  } catch (err) {
+  } catch {
     // Graceful fallback if device permissions restrict vibration
   }
 }

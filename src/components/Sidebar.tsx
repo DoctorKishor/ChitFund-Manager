@@ -13,10 +13,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   LogOut,
-  User,
   Lock,
   MessageSquare,
-  ShieldCheck,
   Settings
 } from 'lucide-react';
 

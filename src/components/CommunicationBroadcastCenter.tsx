@@ -255,45 +255,45 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
   },
   {
     key: 'discount_pool_balance',
-    label: 'Discount Pool (₹40,500)',
+    label: 'Discount Pool Balance',
     category: 'financials',
     description: 'Accumulated Kai Iruppu pool with ₹',
-    getValue: (m) => formatINR(m?.kaiIruppuPool ?? 40500),
+    getValue: (m) => formatINR(m?.kaiIruppuPool ?? 0),
   },
   {
     key: 'pool_balance',
     label: 'Pool Balance (Alias)',
     category: 'financials',
     description: 'Accumulated Kai Iruppu pool with ₹',
-    getValue: (m) => formatINR(m?.kaiIruppuPool ?? 40500),
+    getValue: (m) => formatINR(m?.kaiIruppuPool ?? 0),
   },
   {
     key: 'kai_iruppu_pool',
     label: 'Discount Pool (Alias)',
     category: 'financials',
     description: 'Current accumulated discount pool with ₹',
-    getValue: (m) => formatINR(m?.kaiIruppuPool ?? 40500),
+    getValue: (m) => formatINR(m?.kaiIruppuPool ?? 0),
   },
   {
     key: 'kai_iruppu_pool_raw',
     label: 'Discount Pool Plain',
     category: 'financials',
     description: 'Plain current accumulated discount pool',
-    getValue: (m) => String(m?.kaiIruppuPool ?? 40500),
+    getValue: (m) => String(m?.kaiIruppuPool ?? 0),
   },
   {
     key: 'previous_pool',
-    label: 'Previous Pool (₹35,000)',
+    label: 'Previous Pool Balance',
     category: 'financials',
     description: 'Discount pool before this auction with ₹',
-    getValue: (m) => formatINR(m?.previousPool ?? 35000),
+    getValue: (m) => formatINR(m?.previousPool ?? 0),
   },
   {
     key: 'previous_pool_raw',
     label: 'Previous Pool Plain',
     category: 'financials',
     description: 'Plain discount pool before this auction',
-    getValue: (m) => String(m?.previousPool ?? 35000),
+    getValue: (m) => String(m?.previousPool ?? 0),
   },
   {
     key: 'laaba_seetu_status',
@@ -756,12 +756,12 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
         // Fetch group memberships
         const { data: membersData } = await supabase
           .from('group_members')
-          .select('group_id, profile_id, ticket_number, alias_name');
+          .select('id, group_id, profile_id, ticket_number, alias_name');
 
         // Fetch collections to count unpaid subscribers
         const { data: collectionsData } = await supabase
           .from('transactions')
-          .select('chit_group_id, member_id, month, type')
+          .select('group_id, profile_id, group_member_id, cycle_month, type, status')
           .eq('type', 'collection');
 
         groupsData.forEach((g: any) => {
@@ -807,13 +807,27 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
               (Array.isArray(latestLog.bid_stream) && latestLog.bid_stream[0]?.memberName) ||
               'Winner Confirmed';
 
-            const matchedMember = (membersData || []).find(
-              (m: any) => m.group_id === g.id && m.profile_id === latestLog.winning_bidder_id
-            );
-            if (matchedMember) {
-              winnerTicket = matchedMember.ticket_number;
-              if (matchedMember.alias_name) {
-                winnerName = matchedMember.alias_name;
+            if (latestLog.winning_member_id) {
+              const matchedMember = (membersData || []).find(
+                (m: any) => m.id === latestLog.winning_member_id
+              );
+              if (matchedMember) {
+                winnerTicket = matchedMember.ticket_number;
+                if (matchedMember.alias_name) {
+                  winnerName = matchedMember.alias_name;
+                } else if (!latestLog.profiles?.full_name) {
+                  winnerName = `Ticket #${matchedMember.ticket_number}`;
+                }
+              }
+            } else if (latestLog.winning_bidder_id) {
+              const matchedMember = (membersData || []).find(
+                (m: any) => m.group_id === g.id && m.profile_id === latestLog.winning_bidder_id
+              );
+              if (matchedMember) {
+                winnerTicket = matchedMember.ticket_number;
+                if (matchedMember.alias_name) {
+                  winnerName = matchedMember.alias_name;
+                }
               }
             }
           }
@@ -826,10 +840,14 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           const groupMembersList = (membersData || []).filter((m: any) => m.group_id === g.id);
           const paidMemberIds = new Set(
             (collectionsData || [])
-              .filter((t: any) => t.chit_group_id === g.id && Number(t.month) === currentM)
-              .map((t: any) => t.member_id)
+              .filter((t: any) => t.group_id === g.id && Number(t.cycle_month) === currentM && t.status === 'completed')
+              .map((t: any) => t.group_member_id || t.profile_id)
+              .filter(Boolean)
           );
-          const unpaidCount = Math.max(0, groupMembersList.length - paidMemberIds.size);
+          const unpaidCount = Math.max(
+            0,
+            groupMembersList.filter((m: any) => !paidMemberIds.has(m.id) && (!m.profile_id || !paidMemberIds.has(m.profile_id))).length
+          );
 
           metaMap[g.id] = {
             id: g.id,
@@ -1117,10 +1135,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                 );
               })}
               {Object.keys(groupsMetadata).length === 0 && (
-                <button type="button" className="flex-shrink-0 px-2.5 py-1 bg-brand-500 text-white font-bold rounded-lg shadow-xs flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>Sample Test (₹1L)</span>
-                </button>
+                <span className="text-xs text-slate-400 py-1">No chit groups found</span>
               )}
             </div>
           </div>
@@ -1133,12 +1148,12 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-card flex items-center justify-between text-xs">
             <div>
               <h4 className="font-bold text-slate-900 leading-tight">
-                {selectedMeta?.name || 'Sample Test'} · Month {selectedMeta?.currentMonth ?? 2} of {selectedMeta?.durationMonths ?? 5}
+                {selectedMeta?.name || 'Chit Group'} · Month {selectedMeta?.currentMonth ?? 0} of {selectedMeta?.durationMonths ?? 20}
               </h4>
             </div>
             <div className="text-right">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-mono">
-                🎉 Kai Iruppu: {formatCompactINR(selectedMeta?.kaiIruppuPool || 40500)}
+                🎉 Kai Iruppu: {formatCompactINR(selectedMeta?.kaiIruppuPool ?? 0)}
               </span>
             </div>
           </div>
@@ -1534,7 +1549,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                         </option>
                       ))}
                       {Object.keys(groupsMetadata).length === 0 && (
-                        <option value="">Sample Test Group — ₹1,00,000 (5 Slots • Month 2 of 5)</option>
+                        <option value="" disabled>No active chit groups found</option>
                       )}
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
@@ -1557,7 +1572,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   {/* Laaba Seetu Special Badge */}
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-50 to-emerald-50 text-amber-800 rounded-xl border border-amber-200/80 font-bold shadow-2xs">
                     <span>🎉</span>
-                    <span>Kai Iruppu: <strong>{formatINR(selectedMeta?.kaiIruppuPool || 40500)}</strong></span>
+                    <span>Kai Iruppu: <strong>{formatINR(selectedMeta?.kaiIruppuPool ?? 0)}</strong></span>
                     <span className="text-[10px] bg-amber-200/60 text-amber-900 px-1.5 py-0.5 rounded font-semibold">
                       {laabaSeetuPercentage.toFixed(1)}% to Laaba Seetu
                     </span>

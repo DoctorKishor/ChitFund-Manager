@@ -371,7 +371,7 @@ export default function AuctionReportDocument({
             </div>
 
             <p className="mt-2.5 text-[10px] text-slate-400 italic">
-              * Statutory Foreman fee settled in Month 0 initialization. 100% of the {formatCurrency(data.winningDiscount)} auction discount is retained in trust for members.
+              * Statutory Organizer Profit settled in Month 0 initialization. 100% of the {formatCurrency(data.winningDiscount)} auction discount is retained in trust for members.
             </p>
           </div>
 
@@ -541,7 +541,7 @@ export default function AuctionReportDocument({
                 attendingList.map((m, idx) => {
                   const role = getMemberRole(m, idx);
                   const isWinner = data.winnerTicket ? m.ticketNumber === data.winnerTicket : false;
-                  const isAdmin = role.includes('Admin') || role.includes('Foreman');
+                  const isAdmin = role.includes('Admin') || role.includes('Organizer') || role.includes('Foreman');
 
                   if (isWinner) {
                     return (

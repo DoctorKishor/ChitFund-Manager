@@ -2523,7 +2523,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                                       )}
                                     </div>
                                     <p className="text-xs text-slate-500">
-                                      {log.month === 1 && log.winningDiscount === 0 ? 'Foreman Admin · Launch Pot' : 'Subscriber · Winner'}
+                                      {(log.month === 0 || (log.month === 1 && log.winningDiscount === 0)) ? 'Organizer Admin · Launch Profit' : 'Subscriber · Winner'}
                                     </p>
                                   </div>
                                 </div>
@@ -2870,7 +2870,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                       <div>
                         <span className="font-bold text-slate-900">Month 0 (Launch / Orientation Phase) Protocol</span>
                         <p className="text-slate-500 text-[11px] mt-0.5">
-                          By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool is reserved as Organizer Commission. Once launch collections are secured, advance to Month 1 to begin live auctions.
+                          By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool is reserved as Organizer Profit. Once launch collections are secured, advance to Month 1 to begin live auctions.
                         </p>
                       </div>
                     </div>
@@ -2893,7 +2893,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                       <div>
                         <span className="font-bold text-slate-900">Month 0 (Launch / Orientation Phase) Protocol</span>
                         <p className="text-slate-500 text-[11px] mt-0.5">
-                          By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool was reserved as Organizer Commission. Group advanced to M1 on launch verification.
+                          By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool was reserved as Organizer Profit. Group advanced to M1 on launch verification.
                         </p>
                       </div>
                     </div>
@@ -3030,12 +3030,11 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                               </div>
                               <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-[11px]">
                                 <span className="text-slate-500 text-[10px]">Standby Contender</span>
-                                <button 
-                                  disabled 
+                                <span 
                                   className="px-2.5 py-1 bg-slate-100 text-slate-400 font-bold rounded-lg text-[10px] border border-slate-200 cursor-not-allowed select-none flex items-center gap-1"
                                 >
                                   <span>🔒 Floor Locked</span>
-                                </button>
+                                </span>
                               </div>
                             </div>
                           );
@@ -3652,7 +3651,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                                       )}
                                     </div>
                                     <p className="text-[10px] text-slate-500 truncate">
-                                      {log.month === 1 && log.winningDiscount === 0 ? 'Foreman Admin · Mandatory First Pot' : 'Subscriber · Verified Winner'}
+                                      {(log.month === 0 || (log.month === 1 && log.winningDiscount === 0)) ? 'Organizer Admin · Launch Profit Pot' : 'Subscriber · Verified Winner'}
                                     </p>
                                   </div>
                                 </div>
@@ -3981,14 +3980,12 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                                 {isEligible ? 'Eligible' : 'Spectator'}
                               </span>
                             </div>
-                            <button 
-                              type="button"
-                              className="mt-2.5 w-full py-1.5 bg-slate-100 text-slate-400 border border-slate-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-not-allowed" 
-                              disabled
+                            <div 
+                              className="mt-2.5 w-full py-1.5 bg-slate-100 text-slate-400 border border-slate-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1 select-none" 
                             >
                               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path clipRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" fillRule="evenodd"></path></svg>
                               <span>{isEligible ? 'Locked' : 'Already Won'}</span>
-                            </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -4275,7 +4272,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                 )}
                 <button
                   type="button"
-                  onClick={() => alert(`Chit Fund Statutory Rules:\n- Total Chit Value: ${formatCurrency(group.totalValue)}\n- Monthly Base: ${formatCurrency(group.totalValue / group.memberCount)}\n- Winner Net Payout = Total Chit Value - Winning Discount Bid.\n- Winning Discount accumulates into Kai Iruppu pool.\n- When Kai Iruppu >= Total Chit Value, Laaba Seetu is triggered (₹0 member dues).`)}
+                  onClick={() => alert(`Chit Fund Statutory Rules:\n- Total Chit Value: ${formatCurrency(group.totalValue)}\n- Monthly Base: ${formatCurrency(group.totalValue / (group.memberCount || 1))}\n- Winner Net Payout = Total Chit Value - Winning Discount Bid.\n- Winning Discount accumulates into Kai Iruppu pool.\n- When Kai Iruppu >= Total Chit Value, Laaba Seetu is triggered (₹0 member dues).`)}
                   className="text-xs font-semibold text-brand-600 hover:underline cursor-pointer"
                 >
                   Rules Info
@@ -4293,7 +4290,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               <div>
                 <span className="font-bold text-slate-900">Month 0 (Launch / Orientation Phase) Protocol</span>
                 <p className="text-slate-500 text-[11px] mt-0.5">
-                  By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool is reserved as Organizer Commission.
+                  By chit fund statutory rules, Month 0 has no auction discount bidding. The {formatCurrency(group.totalValue)} pool is reserved as Organizer Profit.
                   {group.currentMonth > 0 ? ` Group advanced to M1 on ${group.startDate || '01 Oct 2026'}.` : ' Ready to confirm launch collections.'}
                 </p>
               </div>
@@ -4854,12 +4851,11 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                         <span className="text-[10px] text-slate-400">Status</span>
                         <span className="text-[11px] font-bold text-slate-400 font-mono">Spectator</span>
                       </div>
-                      <button 
-                        disabled
-                        className="mt-2 w-full py-1.5 bg-slate-100 text-slate-400 text-[11px] font-bold rounded-lg flex items-center justify-center cursor-not-allowed"
+                      <div 
+                        className="mt-2 w-full py-1.5 bg-slate-100 text-slate-400 text-[11px] font-bold rounded-lg flex items-center justify-center select-none"
                       >
                         <span>Already Won</span>
-                      </button>
+                      </div>
                     </div>
                   );
                 }
@@ -5997,7 +5993,7 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
                   <span>₹{group.totalValue.toLocaleString('en-IN')}</span>
                 </div>
                 <p className="text-[11px] text-slate-600 pt-1 leading-snug">
-                  All 1st-month collections ({group.memberCount} × ₹{(group.totalValue / group.memberCount).toLocaleString('en-IN')}) are taken by the Organizer. Please select the vault/account from which this payout is recorded.
+                  All 1st-month collections ({group.memberCount || 20} × ₹{(group.totalValue / (group.memberCount || 1)).toLocaleString('en-IN')}) are taken by the Organizer. Please select the vault/account from which this payout is recorded.
                 </p>
               </div>
 

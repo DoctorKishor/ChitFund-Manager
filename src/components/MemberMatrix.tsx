@@ -58,6 +58,7 @@ interface MemberGroupInfo {
   totalValue?: number;
   duration?: number;
   currentMonth?: number;
+  kaiIruppuPool?: number;
 }
 
 export interface MemberRecord {
@@ -76,9 +77,10 @@ export interface MemberRecord {
 interface MemberMatrixProps {
   onAddAuditLog?: (desc: string) => void;
   defaultSubtab?: 'directory' | 'roles';
+  onOpenAuditLogs?: () => void;
 }
 
-export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory' }: MemberMatrixProps) {
+export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory', onOpenAuditLogs }: MemberMatrixProps) {
   const { profile: currentAdminProfile } = useAuth();
   const { isMaintenanceMode, toggleMaintenanceMode } = useMaintenance();
 
@@ -241,6 +243,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
             total_value,
             duration_months,
             current_month,
+            kai_iruppu_pool,
             status
           )
         `);
@@ -252,7 +255,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       // 3. Fetch chit groups list for filter (excluding drafts)
       const { data: groupsData } = await supabase
         .from('chit_groups')
-        .select('id, name, total_value, duration_months, current_month, status')
+        .select('id, name, total_value, duration_months, current_month, kai_iruppu_pool, status')
         .neq('status', 'draft')
         .order('name', { ascending: true });
 
@@ -298,6 +301,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
                 totalValue: groupObj?.total_value,
                 duration: groupObj?.duration_months || groupObj?.duration,
                 currentMonth: groupObj?.current_month,
+                kaiIruppuPool: Number(groupObj?.kai_iruppu_pool) || 0,
               };
             });
 
@@ -404,7 +408,17 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       const duration = Number(g.duration || 20);
       const currentMonth = Number(g.currentMonth ?? 1);
       const inst = duration > 0 ? totalVal / duration : 10000;
-      totalExpected += inst * Math.max(1, currentMonth + 1);
+      for (let m = 0; m <= currentMonth; m++) {
+        const monthAuction = allAuctionLogs.find((a: any) => a.group_id === g.id && Number(a.month) === m);
+        const isLaaba = !!monthAuction?.is_laaba_seetu || (
+          m > 0 &&
+          m === currentMonth &&
+          Number(g.kaiIruppuPool || 0) >= totalVal
+        );
+        if (!isLaaba) {
+          totalExpected += inst;
+        }
+      }
     });
     const outstandingDue = Math.max(0, totalExpected - totalPaid);
 
@@ -557,14 +571,24 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
     );
     const totalPaid = memberTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-    // 3. Expected dues
+    // 3. Expected dues (respects Laaba Seetu free installment months)
     let totalExpected = 0;
     activeDrawerMember.groups.forEach((g) => {
       const totalVal = Number(g.totalValue || 100000);
       const duration = Number(g.duration || 20);
       const currentMonth = Number(g.currentMonth ?? 1);
       const inst = duration > 0 ? totalVal / duration : 10000;
-      totalExpected += inst * Math.max(1, currentMonth + 1);
+      for (let m = 0; m <= currentMonth; m++) {
+        const monthAuction = allAuctionLogs.find((a: any) => a.group_id === g.id && Number(a.month) === m);
+        const isLaaba = !!monthAuction?.is_laaba_seetu || (
+          m > 0 &&
+          m === currentMonth &&
+          Number(g.kaiIruppuPool || 0) >= totalVal
+        );
+        if (!isLaaba) {
+          totalExpected += inst;
+        }
+      }
     });
 
     const outstandingDue = Math.max(0, totalExpected - totalPaid);
@@ -574,8 +598,12 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
     let prizeWon = 'None Yet';
     let prizeWonSub = 'Eligible to Bid';
     if (wonLog) {
+      const matchingGrp = activeDrawerMember.groups.find((g) => g.id === wonLog.group_id);
+      const grpTotal = Number(matchingGrp?.totalValue || 200000);
+      const discount = Number(wonLog.winning_discount || 0);
+      const netPayout = Math.max(0, grpTotal - discount);
       prizeWon = `Month ${wonLog.month} Winner`;
-      prizeWonSub = `Disbursed ₹${Number(wonLog.winning_discount || 0).toLocaleString('en-IN')}`;
+      prizeWonSub = `Net Disbursed: ₹${netPayout.toLocaleString('en-IN')} (Discount: ₹${discount.toLocaleString('en-IN')})`;
     }
 
     return { totalPaid, outstandingDue, enrolledValue, prizeWon, prizeWonSub };
@@ -1290,6 +1318,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           isCreateModalOpen={isCreateRoleModalOpen}
           setIsCreateModalOpen={setIsCreateRoleModalOpen}
           onExportPolicy={handleExportRolesPolicy}
+          onOpenAuditLogs={onOpenAuditLogs}
         />
       )}
 

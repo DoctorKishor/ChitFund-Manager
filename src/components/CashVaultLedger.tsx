@@ -590,8 +590,15 @@ export default function CashVaultLedger() {
       ]);
 
       if (error) {
+        // Rollback debit so bank account balance is not orphaned
+        await supabase.rpc('mutate_wallet_balance', {
+          p_wallet: relocateSource,
+          p_delta: amount,
+          p_user_id: profile?.id || null,
+        });
+
         await supabase.from('security_audit_logs').insert({
-          action_description: `ATM TX RECORD FAILURE: ₹${amount} debited from ${sourceName} but transaction record failed: ${error.message}. MANUAL RECONCILIATION REQUIRED.`,
+          action_description: `ATM TX RECORD FAILURE: Transaction insert failed (${error.message}). Auto-reversed debit of ₹${amount} back to ${sourceName}.`,
           target_table: 'transactions',
         });
         throw error;
@@ -645,7 +652,15 @@ export default function CashVaultLedger() {
         })
         .eq('id', txId);
 
-      if (error) throw error;
+      if (error) {
+        // Rollback cash box credit on update failure
+        await supabase.rpc('mutate_wallet_balance', {
+          p_wallet: 'cash_in_hand',
+          p_delta: -amount,
+          p_user_id: profile?.id || null,
+        });
+        throw error;
+      }
 
       await supabase.from('security_audit_logs').insert({
         action_description: `ATM RELOCATION CONFIRMED: ₹${amount.toLocaleString('en-IN')} verified & credited into Physical Cash Box (Source: ${sourceName}).`,
@@ -764,12 +779,12 @@ export default function CashVaultLedger() {
 
     try {
       setIsProcessingDeposit(true);
-      await updateBalance(depositDest, amount);
 
       const desc = depositNotes.trim() || `${depositTag} deposited by ${effectiveDepositor}`;
       const fullNote = `[Floating Deposit - ${depositTag}] ${desc} | Deposited By: ${effectiveDepositor} | Status: Active Float`;
 
-      await supabase.from('transactions').insert([
+      // 1. Insert transaction record FIRST — if this fails, treasury stays unchanged
+      const { error: txErr } = await supabase.from('transactions').insert([
         {
           wallet_type: depositDest,
           type: 'transfer',
@@ -779,6 +794,18 @@ export default function CashVaultLedger() {
           created_by: profile?.id || null,
         }
       ]);
+
+      if (txErr) {
+        alert('Failed to record deposit transaction: ' + txErr.message);
+        return;
+      }
+
+      // 2. Only credit the treasury after the transaction record is safely saved
+      const balRes = await updateBalance(depositDest, amount);
+      if (!balRes.success) {
+        alert('Transaction recorded but failed to update wallet balance: ' + (balRes.error || 'Unknown error'));
+        return;
+      }
 
       setDepositAmount('');
       setDepositNotes('');
@@ -1048,39 +1075,43 @@ export default function CashVaultLedger() {
           </button>
         </div>
 
-        {/* 2. Mobile Pending ATM Relocation Card (if any) */}
+        {/* 2. Mobile Pending ATM Relocation Cards (if any) */}
         {pendingRelocations.length > 0 && (
-          <section className="p-3 bg-amber-50 rounded-2xl border border-amber-200/90 shadow-card flex flex-col gap-2.5">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-base shadow-xs">
-                  🏧
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-900">ATM Relocation</span>
+          <div className="space-y-2">
+            {pendingRelocations.map((reloc) => (
+              <section key={reloc.id} className="p-3 bg-amber-50 rounded-2xl border border-amber-200/90 shadow-card flex flex-col gap-2.5">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-base shadow-xs">
+                      🏧
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-900">ATM Relocation</span>
+                      </div>
+                      <p className="text-[11px] text-amber-800 font-mono font-bold mt-0.5">
+                        {formatCurrency(reloc.amount)} Withdrawn
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-amber-800 font-mono font-bold mt-0.5">
-                    {formatCurrency(pendingRelocations[0].amount)} Withdrawn
-                  </p>
+                  <span className="text-[10px] text-amber-700 font-semibold bg-amber-100/70 px-2 py-0.5 rounded-full">
+                    In-Transit
+                  </span>
                 </div>
-              </div>
-              <span className="text-[10px] text-amber-700 font-semibold bg-amber-100/70 px-2 py-0.5 rounded-full">
-                In-Transit
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-600 leading-snug">
-              Withdrawn from {WALLET_META[pendingRelocations[0].source]?.name}. Needs physical counting before adding to Cash Box balance.
-            </p>
-            <button 
-              onClick={() => handleVerifyATM(pendingRelocations[0].id, pendingRelocations[0].amount, pendingRelocations[0].source, pendingRelocations[0].notes)}
-              disabled={isVerifyingAtmId === pendingRelocations[0].id}
-              className="w-full py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>Verify &amp; Confirm Notes in Safe</span>
-            </button>
-          </section>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  Withdrawn from {WALLET_META[reloc.source]?.name}. Needs physical counting before adding to Cash Box balance.
+                </p>
+                <button 
+                  onClick={() => handleVerifyATM(reloc.id, reloc.amount, reloc.source, reloc.notes)}
+                  disabled={isVerifyingAtmId === reloc.id}
+                  className="w-full py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Verify &amp; Confirm Notes in Safe</span>
+                </button>
+              </section>
+            ))}
+          </div>
         )}
 
         {/* 3. APPLE WALLET STYLE STACKED CARDS CONTAINER WITH BUTTERY SMOOTH SCROLL & TAP EXPANSION */}
@@ -1619,31 +1650,33 @@ export default function CashVaultLedger() {
               </p>
             </div>
 
-            {/* In-Transit ATM Cash Banner & Quick Actions */}
-            <div className="flex items-center gap-3">
+            {/* In-Transit ATM Cash Banners & Quick Actions */}
+            <div className="flex flex-col gap-2.5">
               {pendingRelocations.length > 0 ? (
-                <div className="p-3.5 bg-amber-500/20 border border-amber-400/40 rounded-2xl backdrop-blur-md flex items-center gap-3.5 shadow-lg shadow-amber-950/20">
-                  <div className="w-10 h-10 rounded-xl bg-amber-400/25 border border-amber-400/50 text-amber-300 flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-inner">
-                    🏧
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded bg-amber-400 text-slate-950">IN-TRANSIT</span>
-                      <span className="text-xs font-bold text-white tabular-nums">{formatCurrency(pendingRelocations[0].amount)} ATM Relocation</span>
+                pendingRelocations.map((reloc) => (
+                  <div key={reloc.id} className="p-3.5 bg-amber-500/20 border border-amber-400/40 rounded-2xl backdrop-blur-md flex items-center gap-3.5 shadow-lg shadow-amber-950/20">
+                    <div className="w-10 h-10 rounded-xl bg-amber-400/25 border border-amber-400/50 text-amber-300 flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-inner">
+                      🏧
                     </div>
-                    <p className="text-[11px] text-amber-200 mt-0.5 font-medium">
-                      Withdrawn from <strong className="text-white font-semibold">{WALLET_META[pendingRelocations[0].source]?.name}</strong> ➔ Pending count in <strong className="text-white font-semibold">Physical Cash Box</strong>
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded bg-amber-400 text-slate-950">IN-TRANSIT</span>
+                        <span className="text-xs font-bold text-white tabular-nums">{formatCurrency(reloc.amount)} ATM Relocation</span>
+                      </div>
+                      <p className="text-[11px] text-amber-200 mt-0.5 font-medium">
+                        Withdrawn from <strong className="text-white font-semibold">{WALLET_META[reloc.source]?.name}</strong> ➔ Pending count in <strong className="text-white font-semibold">Physical Cash Box</strong>
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => handleVerifyATM(reloc.id, reloc.amount, reloc.source, reloc.notes)}
+                      disabled={isVerifyingAtmId === reloc.id}
+                      className="ml-2 px-3.5 py-2 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition-all whitespace-nowrap active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <Check className="w-3.5 h-3.5 text-slate-950" />
+                      <span>Confirm Cash Count &amp; Deposit into Cash Box</span>
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => handleVerifyATM(pendingRelocations[0].id, pendingRelocations[0].amount, pendingRelocations[0].source, pendingRelocations[0].notes)}
-                    disabled={isVerifyingAtmId === pendingRelocations[0].id}
-                    className="ml-2 px-3.5 py-2 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition-all whitespace-nowrap active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <Check className="w-3.5 h-3.5 text-slate-950" />
-                    <span>Confirm Cash Count &amp; Deposit into Cash Box</span>
-                  </button>
-                </div>
+                ))
               ) : (
                 <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 flex items-center justify-center font-bold text-lg flex-shrink-0">
@@ -2248,7 +2281,7 @@ export default function CashVaultLedger() {
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-slate-400">Cryptographically sealed into PostgreSQL Local-First Node</span>
               <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-2xs">
-                <button className="px-2.5 py-1 text-slate-400 font-semibold cursor-default">1</button>
+                <span className="px-2.5 py-1 text-slate-400 font-semibold cursor-default">1</span>
               </div>
             </div>
           </div>

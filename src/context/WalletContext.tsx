@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from './AuthContext';
 
@@ -39,7 +39,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const isPrivileged = profile?.role === 'admin' || profile?.role === 'manager';
 
   // Fetch balances from Supabase & seed if empty (Admin/Manager only)
-  const fetchTreasury = async () => {
+  const fetchTreasury = useCallback(async () => {
     if (!isPrivileged) {
       setLoading(false);
       return;
@@ -79,7 +79,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isPrivileged]);
 
   // Helper to reset all balances in Supabase to 0
   const resetTreasuryToZero = async () => {
@@ -119,7 +119,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, profile?.role]);
+  }, [user, profile?.role, isPrivileged, fetchTreasury]);
 
   // Flash indicator reset
   useEffect(() => {

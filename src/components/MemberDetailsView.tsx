@@ -398,7 +398,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
 
       for (let m = 0; m <= effectiveCurrentMonth; m++) {
         const monthAuction = groupAuctions.find((a: any) => a.month === m);
-        const isLaaba = !!monthAuction?.is_laaba_seetu || (m > 0 && (g.kai_iruppu_pool || 0) >= totalVal);
+        const isLaaba = !!monthAuction?.is_laaba_seetu || (m > 0 && m === effectiveCurrentMonth && (g.kai_iruppu_pool || 0) >= totalVal);
         const expectedDue = isLaaba ? 0 : memberInst;
 
         // Month tag pattern e.g. "Month 0", "Month 1"
@@ -989,17 +989,19 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
   // Toggle Account Access Standing (Active / Suspended)
   const handleToggleStatus = async (active: boolean) => {
     try {
+      const isBlocked = !active;
       const { error } = await supabase
         .from('profiles')
-        .update({ is_active: active })
+        .update({ is_blocked: isBlocked })
         .eq('id', memberId);
       if (error) {
-        console.warn('is_active column update note:', error.message);
+        console.warn('is_blocked column update note:', error.message);
+        throw error;
       }
-      setMemberProfile((prev: any) => prev ? { ...prev, is_active: active } : prev);
+      setMemberProfile((prev: any) => prev ? { ...prev, is_blocked: isBlocked } : prev);
       if (onAddAuditLog) onAddAuditLog(`${active ? 'ACTIVATED' : 'SUSPENDED'} account standing for ${memberName}`);
     } catch (err: any) {
-      console.warn('Status toggle error:', err);
+      alert('Failed to update status: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -1259,7 +1261,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         type="button"
                         onClick={() => handleToggleStatus(true)}
                         className={`py-1.5 px-3 font-bold rounded-lg shadow-xs flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer ${
-                          memberProfile?.is_active !== false 
+                          !memberProfile?.is_blocked 
                             ? 'bg-emerald-600 text-white' 
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
@@ -1271,7 +1273,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         type="button"
                         onClick={() => handleToggleStatus(false)}
                         className={`py-1.5 px-3 font-semibold rounded-lg flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer ${
-                          memberProfile?.is_active === false 
+                          memberProfile?.is_blocked === true 
                             ? 'bg-rose-600 text-white' 
                             : 'text-slate-600 hover:text-rose-700'
                         }`}
@@ -1848,11 +1850,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-bold text-slate-900 truncate">{memberName}</h2>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    memberProfile?.is_active !== false 
+                    !memberProfile?.is_blocked 
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200/70' 
                       : 'bg-rose-50 text-rose-700 border-rose-200/70'
                   }`}>
-                    {memberProfile?.is_active !== false ? 'Active' : 'Suspended'}
+                    {!memberProfile?.is_blocked ? 'Active' : 'Suspended'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 font-mono mt-0.5">
@@ -2036,7 +2038,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   type="button"
                   onClick={() => handleToggleStatus(true)}
                   className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
-                    memberProfile?.is_active !== false ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600'
+                    !memberProfile?.is_blocked ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600'
                   }`}
                 >
                   Active
@@ -2045,7 +2047,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   type="button"
                   onClick={() => handleToggleStatus(false)}
                   className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
-                    memberProfile?.is_active === false ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:text-rose-600'
+                    memberProfile?.is_blocked === true ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:text-rose-600'
                   }`}
                 >
                   Suspend

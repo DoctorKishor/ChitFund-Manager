@@ -2,31 +2,22 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/utils/supabase/client';
-import { useAuth } from '@/context/AuthContext';
 import {
   ShieldCheck,
   Search,
-  Filter,
   RefreshCw,
-  Download,
   Copy,
   Check,
-  Calendar,
   ChevronLeft,
   ChevronRight,
-  Coins,
-  ArrowUpRight,
   User,
   X,
   FileSpreadsheet,
   FileCode,
-  Activity,
-  Layers,
   ArrowLeft,
   Eye,
   CheckCircle2,
   Clock,
-  Sparkles,
 } from 'lucide-react';
 
 export interface AuditLogItem {
@@ -58,7 +49,6 @@ export interface SystemAuditLogViewerProps {
 }
 
 export default function SystemAuditLogViewer({ onBack, className = '' }: SystemAuditLogViewerProps) {
-  const { profile: currentAdminProfile } = useAuth();
 
   // Core Data States
   const [logs, setLogs] = useState<AuditLogItem[]>([]);

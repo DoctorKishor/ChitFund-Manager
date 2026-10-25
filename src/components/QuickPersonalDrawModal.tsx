@@ -25,9 +25,8 @@ export default function QuickPersonalDrawModal({
   onClose,
   onSuccess,
 }: QuickPersonalDrawModalProps) {
-  const { balances, updateBalance } = useWallet();
+  const { balances } = useWallet();
   const { profile } = useAuth();
-  const activeAdminName = profile?.fullName || 'Admin';
 
   const [spendAmount, setSpendAmount] = useState<string>('');
   const [spendTag, setSpendTag] = useState<string>('Personal Expense');
@@ -65,28 +64,21 @@ export default function QuickPersonalDrawModal({
       setIsSubmittingSpend(true);
       triggerHapticFeedback('light');
 
-      await updateBalance(spendWallet, -amount);
-
       const desc = spendDesc.trim() || `${spendTag} by ${effectiveTakenBy}`;
-      const fullNote = `[${spendTag}] ${desc} | Admin Logged: ${activeAdminName} | Taken By: ${effectiveTakenBy} | Status: Outstanding`;
 
-      const { error } = await supabase.from('transactions').insert([
-        {
-          wallet_type: spendWallet,
-          type: 'personal_draw',
-          status: 'completed',
-          amount: amount,
-          notes: fullNote,
-          created_by: profile?.id || null,
-        },
-      ]);
-
-      if (error) throw error;
-
-      await supabase.from('security_audit_logs').insert({
-        action_description: `PERSONAL DRAW: ₹${amount.toLocaleString('en-IN')} taken by ${effectiveTakenBy} for ${spendTag} from ${WALLET_NAMES[spendWallet]}.`,
-        target_table: 'transactions',
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('log_personal_draw', {
+        p_wallet: spendWallet,
+        p_amount: amount,
+        p_tag: spendTag,
+        p_desc: desc,
+        p_taken_by: effectiveTakenBy,
+        p_admin_id: profile?.id || null,
       });
+
+      if (rpcErr || !rpcData?.success) {
+        alert('Failed to record personal draw: ' + (rpcData?.error || rpcErr?.message));
+        return;
+      }
 
       setSpendAmount('');
       setSpendDesc('');

@@ -11,7 +11,6 @@ import {
   Sparkles, 
   Trash2, 
   Calendar,
-  CheckCircle2,
   PackageCheck
 } from 'lucide-react';
 import PassbookSheetGeneratorModal, { StickerItem } from './PassbookSheetGeneratorModal';

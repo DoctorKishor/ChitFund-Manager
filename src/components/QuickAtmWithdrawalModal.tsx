@@ -92,14 +92,10 @@ export default function QuickAtmWithdrawalModal({
       setIsProcessingTransfer(true);
       triggerHapticFeedback('light');
 
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('mutate_wallet_balance', {
-        p_wallet: relocateSource,
-        p_delta: -amount,
-        p_user_id: profile?.id || null,
-      });
+      const res = await updateBalance(relocateSource, -amount);
 
-      if (rpcErr || !rpcData?.success) {
-        alert('Failed to debit bank account: ' + (rpcData?.error || rpcErr?.message));
+      if (!res.success) {
+        alert('Failed to debit bank account: ' + (res.error || 'Insufficient funds or network error'));
         return;
       }
 
@@ -119,8 +115,11 @@ export default function QuickAtmWithdrawalModal({
       ]);
 
       if (error) {
+        // Rollback debit so bank account balance is not orphaned
+        await updateBalance(relocateSource, amount);
+
         await supabase.from('security_audit_logs').insert({
-          action_description: `ATM TX RECORD FAILURE: ₹${amount} debited from ${sourceName} but transaction record failed: ${error.message}. MANUAL RECONCILIATION REQUIRED.`,
+          action_description: `ATM TX RECORD FAILURE: Transaction insert failed (${error.message}). Auto-reversed debit of ₹${amount} back to ${sourceName}.`,
           target_table: 'transactions',
         });
         throw error;
