@@ -1269,8 +1269,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     fetchProfiles();
     fetchPendingAtmRelocations();
 
+    const channelName = `realtime_atm_dashboard_channel_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel('realtime_atm_dashboard_channel')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
         fetchPendingAtmRelocations();
       })

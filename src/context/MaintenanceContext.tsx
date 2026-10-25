@@ -58,8 +58,9 @@ export const MaintenanceProvider = ({ children }: { children: ReactNode }) => {
     fetchMaintenanceSetting();
 
     // Supabase Realtime channel for instant global sync
+    const channelName = `system_settings_maintenance_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel('system_settings_maintenance')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {

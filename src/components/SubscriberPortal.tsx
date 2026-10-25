@@ -608,8 +608,9 @@ export default function SubscriberPortal() {
     if (!profile?.id) return;
 
     // Multi-table real-time listener for instant synchronization
+    const channelName = `subscriber_portal_realtime_${profile.id}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`subscriber_portal_realtime_${profile.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'transactions' },

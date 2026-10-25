@@ -111,8 +111,9 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     fetchOrganizationSettings();
 
     // Supabase Realtime channel for instant global propagation across all users & tabs
+    const channelName = `system_settings_organization_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel('system_settings_organization')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {

@@ -121,12 +121,13 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
   useEffect(() => {
     fetchAuditLogs();
 
+    const channelName = `audit_log_viewer_stream_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel('audit_log_viewer_stream')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'security_audit_logs' },
-        (payload) => {
+        () => {
           // Instantly refresh when a new audit log is inserted
           fetchAuditLogs(true);
         }

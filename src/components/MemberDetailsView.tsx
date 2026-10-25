@@ -190,8 +190,9 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
     fetchMemberData();
 
     // Realtime channel listener for live synchronization
+    const channelName = `member_details_${memberId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`member-details-${memberId}`)
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
         fetchMemberData();
       })

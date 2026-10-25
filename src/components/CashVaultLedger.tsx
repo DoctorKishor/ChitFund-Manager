@@ -201,8 +201,9 @@ export default function CashVaultLedger() {
   useEffect(() => {
     fetchData();
 
+    const channelName = `realtime_treasury_ledger_changes_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel('realtime_treasury_ledger_changes')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
         fetchData();
       })

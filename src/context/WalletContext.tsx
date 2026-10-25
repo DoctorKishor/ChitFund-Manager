@@ -100,8 +100,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     if (!isPrivileged) return;
 
     // Subscribe to Supabase Realtime changes
+    const channelName = `realtime_treasury_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel('realtime_treasury')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'global_treasury' },

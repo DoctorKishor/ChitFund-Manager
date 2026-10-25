@@ -180,8 +180,9 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
   useEffect(() => {
     fetchSystemAuditLogs();
 
+    const channelName = `reports_security_audit_channel_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel('reports_security_audit_channel')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'security_audit_logs' },
