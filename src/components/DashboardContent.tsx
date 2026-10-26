@@ -9133,6 +9133,9 @@ Thank you for your prompt payment! 🙏`;
                 (currentMonthAuction?.winner_name && t.notes && t.notes.toLowerCase().includes(currentMonthAuction.winner_name.toLowerCase()))
               );
               if (!matchesMember) return false;
+              if (t.cycle_month !== null && t.cycle_month !== undefined) {
+                return Number(t.cycle_month) === Number(mNum);
+              }
               if (!t.notes) return Number(mNum) === Number(activeGroup?.currentMonth || 0);
               const match = t.notes.match(/\bMonth\s+(\d+)\b/i);
               if (match) {

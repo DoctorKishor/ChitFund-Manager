@@ -284,22 +284,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Admin/manager: fetch profile silently
       await fetchProfile(user.id, user.email);
     } else if (profile?.id && !profile?.passbookToken) {
-      // Phone+MPIN subscriber: re-fetch profile row directly by ID
+      // Phone+MPIN subscriber: re-fetch profile safely using security definer RPC
       try {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', profile.id)
-          .maybeSingle();
-        if (data) {
+        const { data, error } = await supabase.rpc('get_subscriber_portal_data', {
+          p_profile_id: profile.id,
+        });
+        if (!error && data?.success && data?.profile) {
+          const p = data.profile;
           setProfile(prev => prev ? {
             ...prev,
-            fullName: data.full_name || prev.fullName,
-            phoneNumber: data.phone_number || prev.phoneNumber,
-            role: (data.role as UserRole) || prev.role,
-            mpin: data.mpin || '1234',
-            isDefaultPin: (data.mpin || '1234') === '1234',
-            isBlocked: data.is_blocked || false,
+            fullName: p.fullName || prev.fullName,
+            phoneNumber: p.phoneNumber || prev.phoneNumber,
+            role: (p.role as UserRole) || prev.role,
+            mpin: p.mpin || '1234',
+            isDefaultPin: p.isDefaultPin ?? ((p.mpin || '1234') === '1234'),
+            isBlocked: p.isBlocked ?? prev.isBlocked,
           } : null);
         }
       } catch (err) {

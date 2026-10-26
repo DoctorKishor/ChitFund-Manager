@@ -761,7 +761,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
         // Fetch collections to count unpaid subscribers
         const { data: collectionsData } = await supabase
           .from('transactions')
-          .select('group_id, profile_id, group_member_id, cycle_month, type, status')
+          .select('group_id, profile_id, group_member_id, cycle_month, type, status, notes')
           .eq('type', 'collection');
 
         groupsData.forEach((g: any) => {
@@ -838,7 +838,14 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           const groupMembersList = (membersData || []).filter((m: any) => m.group_id === g.id);
           const paidMemberIds = new Set(
             (collectionsData || [])
-              .filter((t: any) => t.group_id === g.id && Number(t.cycle_month) === currentM && t.status === 'completed')
+              .filter((t: any) => {
+                if (t.group_id !== g.id || t.status !== 'completed') return false;
+                if (t.cycle_month !== null && t.cycle_month !== undefined) {
+                  return Number(t.cycle_month) === currentM;
+                }
+                const match = t.notes?.match(/\bMonth\s+(\d+)\b/i);
+                return match ? Number(match[1]) === currentM : false;
+              })
               .map((t: any) => t.group_member_id || t.profile_id)
               .filter(Boolean)
           );

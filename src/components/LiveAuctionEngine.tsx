@@ -1149,7 +1149,8 @@ export default function LiveAuctionEngine() {
       const recordedMonth = group.currentMonth;
       const nextMonth = Math.min(group.durationMonths, group.currentMonth + 1);
       const isCompleting = group.currentMonth >= group.durationMonths;
-      const nextPool = isFreshLaabaActive 
+      const effectiveIsLaaba = isFreshLaabaActive || isLaabaSeetuActive;
+      const nextPool = effectiveIsLaaba 
         ? Math.max(0, freshPool - group.totalValue) + highestBid 
         : freshPool + highestBid;
 
@@ -1162,7 +1163,7 @@ export default function LiveAuctionEngine() {
       netPayout: netPayout,
       groupName: group.name,
       totalValue: group.totalValue,
-      isLaaba: isLaabaSeetuActive,
+      isLaaba: effectiveIsLaaba,
     };
     setRecordedWinnerSummary(summaryData);
 
@@ -1183,7 +1184,7 @@ export default function LiveAuctionEngine() {
       remainingPrizeDue: netPayout,
       previousPool: group.kai_iruppu_pool,
       newPool: nextPool,
-      isLaabaSeetuThisMonth: isLaabaSeetuActive,
+      isLaabaSeetuThisMonth: effectiveIsLaaba,
       isNextMonthLaabaSeetu: nextPool >= group.totalValue,
       concludedAt: new Date().toISOString(),
       auctionDuration: finalSessionDuration,
@@ -1210,7 +1211,7 @@ export default function LiveAuctionEngine() {
           p_winner_profile_id: winningMember?.profileId || null,
           p_winning_discount: highestBid,
           p_is_completing: isCompleting,
-          p_is_laaba_seetu: isLaabaSeetuActive,
+          p_is_laaba_seetu: effectiveIsLaaba,
           p_next_pool: nextPool,
           p_bid_stream: bids,
           p_admin_id: profile?.id || null,
@@ -1241,7 +1242,7 @@ export default function LiveAuctionEngine() {
             winning_bidder_id: winningMember?.profileId || null,
             winning_member_id: (winnerId && !winnerId.startsWith('slot-')) ? winnerId : null,
             winning_discount: highestBid,
-            is_laaba_seetu: isLaabaSeetuActive,
+            is_laaba_seetu: effectiveIsLaaba,
           });
 
           await supabase.from('security_audit_logs').insert({

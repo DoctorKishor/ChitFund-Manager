@@ -105,6 +105,26 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
   // Selected member drilldown
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
+  // Read memberId query parameter on mount (e.g. redirected from passbook QR scan)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlMemberId = params.get('memberId');
+      if (urlMemberId) {
+        setSelectedMemberId(urlMemberId);
+      }
+    }
+  }, []);
+
+  const handleBackFromMemberDetails = () => {
+    setSelectedMemberId(null);
+    if (typeof window !== 'undefined' && window.location.search.includes('memberId')) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('memberId');
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
   // Selected member in desktop inspection drawer
   const [drawerMemberId, setDrawerMemberId] = useState<string | null>(null);
 
@@ -1047,7 +1067,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
     return (
       <MemberDetailsView
         memberId={selectedMemberId}
-        onBack={() => setSelectedMemberId(null)}
+        onBack={handleBackFromMemberDetails}
         onAddAuditLog={onAddAuditLog}
       />
     );

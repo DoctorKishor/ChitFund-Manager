@@ -833,7 +833,7 @@ create policy "Allow admin manage system_settings" on public.system_settings
 -- ==========================================
 -- 9. Secure Test Database Reset / Purge RPC
 -- ==========================================
-create or replace function public.reset_test_database()
+create or replace function public.reset_test_database(p_confirm_phrase text default 'WIPE_ALL_DATA')
 returns jsonb
 language plpgsql
 security definer
@@ -844,7 +844,12 @@ declare
   caller_role text;
   result jsonb;
 begin
-  -- 1. Security Check: Only authenticated admins can invoke this database reset
+  -- 1. Confirmation phrase validation
+  if p_confirm_phrase is distinct from 'WIPE_ALL_DATA' then
+    raise exception 'Unauthorized: Invalid confirmation phrase.';
+  end if;
+
+  -- 2. Security Check: Only authenticated admins can invoke this database reset
   v_caller_id := auth.uid();
   if v_caller_id is null then
     raise exception 'Unauthorized: Authentication session required.';
