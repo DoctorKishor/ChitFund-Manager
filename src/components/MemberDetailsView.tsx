@@ -67,7 +67,6 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
   const [activeSubtab, setActiveSubtab] = useState<'chits' | 'payments' | 'prizes' | 'activity'>('chits');
   const [loading, setLoading] = useState<boolean>(true);
   const [memberProfile, setMemberProfile] = useState<any>(null);
-  const [customRoles, setCustomRoles] = useState<any[]>([]);
   const [memberEnrollments, setMemberEnrollments] = useState<any[]>([]);
   const [memberTransactions, setMemberTransactions] = useState<any[]>([]);
   const [allChitGroups, setAllChitGroups] = useState<any[]>([]);
@@ -231,25 +230,6 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
 
       if (logsData) {
         setAuctionLogs(logsData);
-      }
-
-      // Fetch available custom roles for role assignment
-      const { data: rolesData } = await supabase
-        .from('custom_roles')
-        .select('*')
-        .order('is_system', { ascending: false });
-
-      if (rolesData && rolesData.length > 0) {
-        setCustomRoles(rolesData);
-      } else {
-        setCustomRoles([
-          { id: 'subscriber', name: 'Subscriber' },
-          { id: 'collections_agent', name: 'Collections Agent' },
-          { id: 'manager', name: 'Manager' },
-          { id: 'auction_clerk', name: 'Auction Clerk' },
-          { id: 'auditor', name: 'Auditor / CA' },
-          { id: 'admin', name: 'Administrator' },
-        ]);
       }
     } catch (err) {
       console.error('Error fetching member details:', err);
@@ -1087,21 +1067,6 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
     }
   };
 
-  // Update System Privilege / Role
-  const handleUpdateRole = async (newRole: string) => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', memberId);
-      if (error) throw error;
-      setMemberProfile((prev: any) => prev ? { ...prev, role: newRole } : prev);
-      if (onAddAuditLog) onAddAuditLog(`UPDATED role for ${memberName} to ${newRole}`);
-    } catch (err: any) {
-      alert('Error updating role: ' + err.message);
-    }
-  };
-
   // Toggle Account Access Standing (Active / Suspended)
   const handleToggleStatus = async (active: boolean) => {
     try {
@@ -1335,8 +1300,8 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">Member since {memberSince}</p>
                     <div className="mt-2.5 flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-semibold border border-slate-200/60 capitalize">
-                        {memberProfile?.role || 'Subscriber'}
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-200/60 font-mono">
+                        Subscriber
                       </span>
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> In Good Standing
@@ -1345,27 +1310,19 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   </div>
                 </div>
 
-                {/* Administrative Controls & Role Selection */}
+                {/* Passbook Portal Access & Standing */}
                 <div className="mt-6 pt-5 border-t border-slate-100 space-y-4">
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Access &amp; Role Management</h3>
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Passbook Portal Access</h3>
                   
-                  {/* Role Assignment Select */}
+                  {/* Account Classification */}
                   <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <div>
-                      <span className="text-xs font-semibold text-slate-800 block">System Privilege</span>
-                      <span className="text-[10px] text-slate-400">Controls dashboard capabilities</span>
+                      <span className="text-xs font-semibold text-slate-800 block">Account Classification</span>
+                      <span className="text-[10px] text-slate-400">Chit Fund Member &amp; Ticket Holder</span>
                     </div>
-                    <select 
-                      value={memberProfile?.role || 'subscriber'}
-                      onChange={(e) => handleUpdateRole(e.target.value)}
-                      className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-brand-500 focus:border-brand-500 cursor-pointer"
-                    >
-                      {customRoles.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name || r.id}
-                        </option>
-                      ))}
-                    </select>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
+                      Chit Subscriber
+                    </span>
                   </div>
 
                   {/* Account Status Cutoff Segmented Control */}
@@ -1979,8 +1936,8 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   {memberProfile?.phone_number ? `+91 ${memberProfile.phone_number}` : 'No phone recorded'}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md capitalize">
-                    {memberProfile?.role || 'Subscriber'}
+                  <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded-md font-mono">
+                    Subscriber
                   </span>
                   <span className="text-[10px] text-slate-400">Member since {memberSince}</span>
                 </div>
@@ -2173,23 +2130,15 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               </div>
             </div>
 
-            {/* Role Selector */}
+            {/* Account Classification */}
             <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
               <div>
-                <span className="font-bold text-slate-900 block">Assigned Role</span>
-                <span className="text-[10px] text-slate-400">System privilege tier</span>
+                <span className="font-bold text-slate-900 block">Account Classification</span>
+                <span className="text-[10px] text-slate-400">Chit Fund Member</span>
               </div>
-              <select 
-                value={memberProfile?.role || 'subscriber'}
-                onChange={(e) => handleUpdateRole(e.target.value)}
-                className="text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-brand-500 cursor-pointer"
-              >
-                {customRoles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name || r.id}
-                  </option>
-                ))}
-              </select>
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
+                Subscriber
+              </span>
             </div>
 
             {/* Quick Login MPIN Management */}
