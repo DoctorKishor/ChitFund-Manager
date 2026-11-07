@@ -113,8 +113,8 @@ export default function Home() {
       case 'users':
         return (
           <>
-            <span className="sm:hidden">Members</span>
-            <span className="hidden sm:inline">Members &amp; Access Control</span>
+            <span className="sm:hidden">Staff</span>
+            <span className="hidden sm:inline">Roles &amp; Staff Access</span>
           </>
         );
       case 'settings':

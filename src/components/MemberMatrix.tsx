@@ -6,7 +6,6 @@ import { useAuth, UserRole } from '@/context/AuthContext';
 import { useMaintenance } from '@/context/MaintenanceContext';
 import { CustomRoleRecord } from '@/utils/rbac';
 import MemberDetailsView from './MemberDetailsView';
-import RoleManagerPanel from './RoleManagerPanel';
 import PassbookScannerModal from './PassbookScannerModal';
 import PassbookSheetGeneratorModal, { StickerItem } from './PassbookSheetGeneratorModal';
 import PassbookInventoryModal from './PassbookInventoryModal';
@@ -83,9 +82,6 @@ interface MemberMatrixProps {
 export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory', onOpenAuditLogs }: MemberMatrixProps) {
   const { profile: currentAdminProfile } = useAuth();
   const { isMaintenanceMode, toggleMaintenanceMode } = useMaintenance();
-
-  // Subtab navigation: Directory vs Roles & Permissions
-  const [currentSubtab, setCurrentSubtab] = useState<'directory' | 'roles'>(defaultSubtab);
 
   // Core data states
   const [members, setMembers] = useState<MemberRecord[]>([]);
@@ -1205,225 +1201,86 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
       
       {/* ── DESKTOP HEADER (hidden md:flex) ── */}
       <header className="hidden md:flex min-h-16 bg-white border-b border-slate-200/80 px-4 sm:px-8 py-3 items-center justify-between gap-4 flex-shrink-0 z-20">
-        {/* Header Left: Clean Title, Badge & Subtabs */}
+        {/* Header Left: Clean Title & Badge */}
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold font-display text-slate-900 tracking-tight whitespace-nowrap">
-              Members Directory &amp; Access Control
+              Subscribers Directory &amp; Passbooks
             </h1>
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60 whitespace-nowrap">
-              {currentSubtab === 'roles'
-                ? `${customRoles.filter((r) => r.is_system).length || 3} System Roles · ${customRoles.filter((r) => !r.is_system).length || 3} Custom`
-                : `${stats.total} Registered`}
+              {stats.total} Enrolled Subscribers
             </span>
-          </div>
-
-          <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
-
-          {/* Clean Subtab Switcher */}
-          <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/70 text-xs">
-            <button
-              type="button"
-              onClick={() => setCurrentSubtab('directory')}
-              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                currentSubtab === 'directory'
-                  ? 'bg-white font-bold text-brand-700 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
-            >
-              Members Directory
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentSubtab('roles')}
-              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
-                currentSubtab === 'roles'
-                  ? 'bg-white font-bold text-brand-700 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
-            >
-              <span>Roles &amp; Staff</span>
-              {currentSubtab === 'roles' && (
-                <span className="text-[9px] bg-brand-100 text-brand-700 font-bold px-1.5 py-0.2 rounded-full">
-                  Active
-                </span>
-              )}
-            </button>
           </div>
         </div>
 
         {/* Header Right */}
-        {currentSubtab === 'roles' ? (
-          <div className="flex items-center gap-3">
-            {/* Maintenance Mode Switch */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs">
-              <span className={`w-2 h-2 rounded-full ${isMaintenanceMode ? 'bg-amber-500 ring-2 ring-amber-200 animate-pulse' : 'bg-emerald-500'}`}></span>
-              <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">Maintenance</span>
-              <div className="h-3 w-px bg-slate-200"></div>
-              <button
-                type="button"
-                disabled={isTogglingMaintenance}
-                onClick={handleToggleMaintenance}
-                className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors uppercase cursor-pointer ${
-                  isMaintenanceMode ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
-                }`}
-              >
-                {isMaintenanceMode ? 'ON' : 'OFF'}
-              </button>
-            </div>
-
-            {/* Export Roles Policy */}
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Chit Group Filter Pills */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
             <button
               type="button"
-              onClick={handleExportRolesPolicy}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors whitespace-nowrap cursor-pointer"
+              onClick={() => setGroupFilter('all')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all whitespace-nowrap cursor-pointer ${
+                groupFilter === 'all'
+                  ? 'bg-white text-xs font-bold text-slate-900 shadow-xs border border-slate-200/60'
+                  : 'text-xs font-medium text-slate-600 hover:text-slate-900'
+              }`}
             >
-              <Download className="w-3.5 h-3.5 text-slate-500" />
-              <span>Export Policy</span>
+              <span>All Groups</span>
+              <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">
+                {allChitGroups.length} Pools
+              </span>
             </button>
-
-            {/* Create Custom Role CTA */}
-            <button
-              type="button"
-              onClick={() => setIsCreateRoleModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all whitespace-nowrap cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-              <span>+ Create Custom Role</span>
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Chit Group Filter Pills */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto max-w-full">
+            {allChitGroups.map((g, idx) => (
               <button
+                key={g.id}
                 type="button"
-                onClick={() => setGroupFilter('all')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all whitespace-nowrap cursor-pointer ${
-                  groupFilter === 'all'
+                onClick={() => setGroupFilter(g.id)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap cursor-pointer ${
+                  groupFilter === g.id
                     ? 'bg-white text-xs font-bold text-slate-900 shadow-xs border border-slate-200/60'
                     : 'text-xs font-medium text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <span>All Groups</span>
-                <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">
-                  {allChitGroups.length} Pools
-                </span>
+                <span className={`w-2 h-2 rounded-full ${idx % 2 === 0 ? 'bg-indigo-500' : 'bg-amber-400'}`}></span>
+                <span>{g.name}</span>
               </button>
-              {allChitGroups.map((g, idx) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setGroupFilter(g.id)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap cursor-pointer ${
-                    groupFilter === g.id
-                      ? 'bg-white text-xs font-bold text-slate-900 shadow-xs border border-slate-200/60'
-                      : 'text-xs font-medium text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${idx % 2 === 0 ? 'bg-indigo-500' : 'bg-amber-400'}`}></span>
-                  <span>{g.name}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Clean Enroll Member CTA */}
-            <button
-              type="button"
-              onClick={handleOpenAddModal}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all whitespace-nowrap cursor-pointer"
-            >
-              <UserPlus size={14} />
-              <span>Enroll Member</span>
-            </button>
+            ))}
           </div>
-        )}
+
+          {/* Clean Enroll Member CTA */}
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all whitespace-nowrap cursor-pointer"
+          >
+            <UserPlus size={14} />
+            <span>Enroll Member</span>
+          </button>
+        </div>
       </header>
 
       {/* ── MOBILE TOP BAR & QUICK FILTERS (md:hidden from Stitch) ── */}
       <header className="md:hidden bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 safe-top">
-        {/* App Title & Sub-header */}
-        <div className="px-5 pt-3 pb-3 flex flex-col gap-3.5 border-b border-slate-100/80">
-          <div className="flex items-center justify-between">
-            {currentSubtab === 'roles' ? (
-              <div>
-                <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Roles &amp; Permissions</h1>
-                <p className="text-[11px] text-slate-400 font-medium mt-0.5">Role-based Access Control (RBAC)</p>
-              </div>
-            ) : (
-              <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Members &amp; Passbooks</h1>
-            )}
-
-            {currentSubtab === 'roles' ? (
-              <button
-                type="button"
-                onClick={() => setIsCreateRoleModalOpen(true)}
-                className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
-              >
-                <Plus size={14} strokeWidth={2.5} />
-                <span>New Role</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleOpenAddModal}
-                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Plus size={14} strokeWidth={2.5} />
-                <span>Add Member</span>
-              </button>
-            )}
+        {/* App Title & Enroll Button */}
+        <div className="px-4 pt-3 pb-3 flex items-center justify-between border-b border-slate-100/80">
+          <div>
+            <h1 className="text-base font-extrabold text-slate-900 tracking-tight">Subscribers Directory</h1>
+            <p className="text-[11px] text-slate-500 font-medium">{stats.total} Registered Subscribers</p>
           </div>
 
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold flex-1">
-              <button
-                type="button"
-                onClick={() => setCurrentSubtab('directory')}
-                className={`px-3.5 py-1.5 rounded-lg transition-all flex-1 text-center cursor-pointer ${
-                  currentSubtab === 'directory'
-                    ? 'bg-white text-slate-900 shadow-xs font-bold'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Members Directory
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentSubtab('roles')}
-                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 flex-1 text-center cursor-pointer ${
-                  currentSubtab === 'roles'
-                    ? 'bg-white text-brand-600 shadow-xs font-bold'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <span>Roles &amp; Staff</span>
-                <span className="px-1.5 py-0.2 bg-brand-50 text-brand-700 rounded-full text-[9px] font-bold">
-                  {customRoles.filter((r) => !r.is_system).length} Custom
-                </span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-xl shadow-xs">
-              <span className={`w-2 h-2 rounded-full ${isMaintenanceMode ? 'bg-amber-500 ring-2 ring-amber-200 animate-pulse' : 'bg-emerald-500 ring-2 ring-emerald-200'}`}></span>
-              <span className="text-[10px] font-bold text-slate-600">{currentSubtab === 'roles' ? 'Lock:' : 'Portal:'}</span>
-              <button
-                type="button"
-                disabled={isTogglingMaintenance}
-                onClick={handleToggleMaintenance}
-                className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
-                  isMaintenanceMode ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 text-slate-700 hover:bg-amber-100'
-                }`}
-              >
-                {isMaintenanceMode ? 'ON' : 'OFF'}
-              </button>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Plus size={14} strokeWidth={2.5} />
+            <span>Add Member</span>
+          </button>
         </div>
 
         {/* Quick Filter Tabs (Directory only) */}
-        {currentSubtab === 'directory' && (
-          <div className="px-5 pb-3">
+        <div className="px-4 pb-3 pt-2">
             <div 
               className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -1474,26 +1331,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               </button>
             </div>
           </div>
-        )}
-      </header>
+        </header>
 
-      {/* ── SUBTAB 1: ROLES & PERMISSIONS VIEW ── */}
-      {currentSubtab === 'roles' && (
-        <RoleManagerPanel
-          onRoleUpdated={() => {
-            fetchCustomRoles();
-            fetchData();
-          }}
-          isCreateModalOpen={isCreateRoleModalOpen}
-          setIsCreateModalOpen={setIsCreateRoleModalOpen}
-          onExportPolicy={handleExportRolesPolicy}
-          onOpenAuditLogs={onOpenAuditLogs}
-        />
-      )}
-
-      {/* ── SUBTAB 2: MEMBERS DIRECTORY VIEW ── */}
-      {currentSubtab === 'directory' && (
-        <main className="flex-1 overflow-y-auto p-4 sm:p-7">
+      {/* ── MEMBERS DIRECTORY VIEW ── */}
+      <main className="flex-1 overflow-y-auto p-4 sm:p-7">
           <div className="w-full max-w-[1550px] mx-auto space-y-6">
 
             {/* Top Stat KPI Strip with Contextual Actions Relocated from Header */}
@@ -2384,7 +2225,6 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
           </div>
         </main>
-      )}
 
       {/* ── ADD / EDIT MEMBER MODAL ── */}
       {isAddModalOpen && (

@@ -15,6 +15,7 @@ import {
   BarChart3,
   MessageSquare,
   Settings,
+  ShieldCheck,
   X,
   Coins,
   Check,
@@ -153,6 +154,14 @@ export default function MobileBottomNav({
       icon: Vault,
       iconColor: 'text-amber-600',
       bgColor: 'bg-amber-50 border-amber-100',
+    },
+    {
+      id: 'users',
+      name: 'Staff & Roles',
+      desc: 'Team Credentials & Access',
+      icon: ShieldCheck,
+      iconColor: 'text-purple-600',
+      bgColor: 'bg-purple-50 border-purple-100',
     },
     {
       id: 'settings',

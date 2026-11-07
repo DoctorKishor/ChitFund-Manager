@@ -9,6 +9,7 @@ import MemberMatrix from './MemberMatrix';
 import CommunicationBroadcastCenter from './CommunicationBroadcastCenter';
 import ReportsCenter, { ReportSubtab } from './ReportsCenter';
 import SettingsManager from './SettingsManager';
+import UserAccessManager from './UserAccessManager';
 import AuctionCountdownBanner from './AuctionCountdownBanner';
 import AuctionScheduleModal from './AuctionScheduleModal';
 import UniversalRecordPaymentModal from './UniversalRecordPaymentModal';
@@ -5395,8 +5396,7 @@ Thank you for your prompt payment! 🙏`;
 
     case 'users':
       return (
-        <MemberMatrix 
-          defaultSubtab="roles"
+        <UserAccessManager 
           onOpenAuditLogs={() => {
             setReportsInitialSubtab('system_log');
             if (setActiveTab) setActiveTab('reports');

@@ -15,7 +15,8 @@ import {
   LogOut,
   Lock,
   MessageSquare,
-  Settings
+  Settings,
+  ShieldCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -39,6 +40,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
     { id: 'auctions', name: 'Auctions', icon: Gavel },
     { id: 'reports', name: 'Reports', icon: BarChart3 },
     { id: 'cash', name: 'Treasury', icon: Vault },
+    { id: 'users', name: 'Roles & Staff', icon: ShieldCheck },
     { id: 'settings', name: 'Settings', icon: Settings },
   ];
 
@@ -284,6 +286,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
             {/* 3. System */}
             {[
               { id: 'communication' as MainTabId, name: 'Communication', icon: MessageSquare },
+              { id: 'users' as MainTabId, name: 'Roles & Staff', icon: ShieldCheck },
               { id: 'settings' as MainTabId, name: 'Portal Settings', icon: Settings },
             ].filter((item) => canAccessTab(item.id)).length > 0 && (
               <div>
@@ -293,6 +296,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
                 <nav className="space-y-1">
                   {[
                     { id: 'communication' as MainTabId, name: 'Communication', icon: MessageSquare },
+                    { id: 'users' as MainTabId, name: 'Roles & Staff', icon: ShieldCheck },
                     { id: 'settings' as MainTabId, name: 'Portal Settings', icon: Settings },
                   ]
                     .filter((item) => canAccessTab(item.id))
