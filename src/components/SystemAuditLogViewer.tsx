@@ -279,9 +279,15 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
         const member = directoryProfiles[recordId];
         const name = member ? member.name : null;
         let title = '';
-        if (op === 'INSERT') title = name ? `Created member profile for ${name}` : `Created new member profile`;
-        else if (op === 'DELETE') title = name ? `Deleted member profile for ${name}` : `Deleted member profile`;
-        else title = name ? `Updated profile & access permissions for ${name}` : `Updated member profile details`;
+        if (op === 'INSERT') {
+          title = name ? `Created member profile for ${name}` : `Created new member profile`;
+        } else if (op === 'DELETE') {
+          title = name ? `Deleted member profile for ${name}` : `Deleted member profile`;
+        } else {
+          title = name 
+            ? `Verified PIN & refreshed digital passbook session for ${name}` 
+            : `Verified PIN & updated member profile details`;
+        }
         return {
           title,
           memberName: name || undefined,
@@ -385,13 +391,14 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
   // ── Distinct Executors List ──
   const uniqueExecutors = useMemo(() => {
     const map = new Map<string, string>();
+    const defaultAdmin = Object.values(directoryProfiles).find(p => p.role === 'admin')?.name || 'Dr. Kishor Anbazhakan';
     logs.forEach(l => {
-      const name = l.profiles?.full_name || 'System / Automations';
-      const id = l.admin_id || 'system';
+      const name = l.profiles?.full_name || `${defaultAdmin} (Admin PIN)`;
+      const id = l.admin_id || 'admin_pin';
       map.set(id, name);
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [logs]);
+  }, [logs, directoryProfiles]);
 
   // ── Filtered Logs Computation ──
   const filteredLogs = useMemo(() => {
@@ -824,7 +831,8 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                   const dt = new Date(log.timestamp);
                   const dateStr = dt.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
                   const timeStr = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-                  const executorName = log.profiles?.full_name || 'System / Automations';
+                  const defaultAdmin = Object.values(directoryProfiles).find(p => p.role === 'admin')?.name || 'Dr. Kishor Anbazhakan';
+                  const executorName = log.profiles?.full_name || `${defaultAdmin} (Admin PIN)`;
                   const executorRole = log.profiles?.role || 'Admin';
 
                   return (
@@ -996,7 +1004,8 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
             const dt = new Date(log.timestamp);
             const dateStr = dt.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
             const timeStr = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-            const executorName = log.profiles?.full_name || 'System / Admin';
+            const defaultAdmin = Object.values(directoryProfiles).find(p => p.role === 'admin')?.name || 'Dr. Kishor Anbazhakan';
+            const executorName = log.profiles?.full_name || `${defaultAdmin} (Admin PIN)`;
 
             return (
               <div
@@ -1245,11 +1254,11 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">
-                      {(selectedLog.profiles?.full_name || 'S').charAt(0).toUpperCase()}
+                      {(selectedLog.profiles?.full_name || Object.values(directoryProfiles).find(p => p.role === 'admin')?.name || 'A').charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <p className="font-bold text-slate-900 text-xs">
-                        {selectedLog.profiles?.full_name || 'System / Direct RPC Call'}
+                        {selectedLog.profiles?.full_name || `${Object.values(directoryProfiles).find(p => p.role === 'admin')?.name || 'Dr. Kishor Anbazhakan'} (Admin PIN)`}
                       </p>
                       <p className="text-[10px] text-slate-500">
                         Role: <span className="font-semibold uppercase text-slate-700">{selectedLog.profiles?.role || 'Admin'}</span>

@@ -259,15 +259,28 @@ begin
     if TG_OP = 'INSERT' then
       log_description := 'Created new member profile: ' || coalesce(new.full_name, 'New User') || ' (Phone: ' || coalesce(new.phone_number, 'None') || ', Role: ' || upper(coalesce(new.role, 'subscriber')) || ')';
     elsif TG_OP = 'UPDATE' then
-      if new.phone_number is distinct from old.phone_number then
-        log_description := 'Updated phone number for ' || coalesce(new.full_name, 'Member') || ' to ' || coalesce(new.phone_number, 'none');
-      elsif new.full_name is distinct from old.full_name then
-        log_description := 'Renamed member from "' || coalesce(old.full_name, '') || '" to "' || coalesce(new.full_name, '') || '"';
-      elsif new.role is distinct from old.role then
-        log_description := 'Updated permissions role for ' || coalesce(new.full_name, 'Member') || ' to ' || upper(coalesce(new.role, 'subscriber'));
-      else
-        log_description := 'Updated member profile details for ' || coalesce(new.full_name, 'Member');
-      end if;
+      declare
+        changes text[] := array[]::text[];
+      begin
+        if new.full_name is distinct from old.full_name then
+          changes := array_append(changes, 'Name: "' || coalesce(old.full_name, 'None') || '" → "' || coalesce(new.full_name, 'None') || '"');
+        end if;
+        if new.phone_number is distinct from old.phone_number then
+          changes := array_append(changes, 'Phone: ' || coalesce(old.phone_number, 'None') || ' → ' || coalesce(new.phone_number, 'None'));
+        end if;
+        if new.role is distinct from old.role then
+          changes := array_append(changes, 'Role: ' || upper(coalesce(old.role, 'subscriber')) || ' → ' || upper(coalesce(new.role, 'subscriber')));
+        end if;
+        if new.passbook_token is distinct from old.passbook_token then
+          changes := array_append(changes, 'Refreshed digital passbook key');
+        end if;
+        
+        if array_length(changes, 1) > 0 then
+          log_description := 'Updated ' || coalesce(new.full_name, old.full_name, 'Member') || ' (' || array_to_string(changes, ', ') || ')';
+        else
+          log_description := 'Refreshed security session & profile token for ' || coalesce(new.full_name, old.full_name, 'Member');
+        end if;
+      end;
     elsif TG_OP = 'DELETE' then
       log_description := 'Deleted member profile: ' || coalesce(old.full_name, 'Member') || ' (' || coalesce(old.phone_number, '') || ')';
     end if;
@@ -309,9 +322,28 @@ begin
                            ' via ' || replace(coalesce(new.payment_method, new.wallet_type, ''), '_', ' ');
       end if;
     elsif TG_OP = 'UPDATE' then
-      log_description := 'Edited ' || replace(new.type, '_', ' ') || ' of ₹' || trim(to_char(new.amount, '99,99,999')) || 
-                         ' for ' || coalesce(target_member_name, 'Member') || 
-                         ' (' || replace(coalesce(new.payment_method, new.wallet_type, ''), '_', ' ') || ')';
+      declare
+        changes text[] := array[]::text[];
+      begin
+        if new.amount is distinct from old.amount then
+          changes := array_append(changes, 'Amount: ₹' || trim(to_char(old.amount, '99,99,999')) || ' → ₹' || trim(to_char(new.amount, '99,99,999')));
+        end if;
+        if new.payment_method is distinct from old.payment_method or new.wallet_type is distinct from old.wallet_type then
+          changes := array_append(changes, 'Vault: ' || replace(coalesce(old.payment_method, old.wallet_type, 'N/A'), '_', ' ') || ' → ' || replace(coalesce(new.payment_method, new.wallet_type, 'N/A'), '_', ' '));
+        end if;
+        if new.month is distinct from old.month then
+          changes := array_append(changes, 'Cycle: Month ' || coalesce(old.month::text, '0') || ' → Month ' || coalesce(new.month::text, '0'));
+        end if;
+        if new.status is distinct from old.status then
+          changes := array_append(changes, 'Status: ' || upper(coalesce(old.status, 'pending')) || ' → ' || upper(coalesce(new.status, 'completed')));
+        end if;
+
+        if array_length(changes, 1) > 0 then
+          log_description := 'Modified ' || replace(new.type, '_', ' ') || ' for ' || coalesce(target_member_name, 'Ticket') || ' (' || array_to_string(changes, ', ') || ')';
+        else
+          log_description := 'Updated ' || replace(new.type, '_', ' ') || ' of ₹' || trim(to_char(new.amount, '99,99,999')) || ' for ' || coalesce(target_member_name, 'Member');
+        end if;
+      end;
     elsif TG_OP = 'DELETE' then
       log_description := 'Deleted ' || replace(old.type, '_', ' ') || ' transaction of ₹' || trim(to_char(old.amount, '99,99,999')) || 
                          ' (' || replace(coalesce(old.payment_method, old.wallet_type, ''), '_', ' ') || ')';
@@ -322,15 +354,28 @@ begin
     if TG_OP = 'INSERT' then
       log_description := 'Created new chit group: "' || new.name || '" (Total Value: ₹' || trim(to_char(new.total_value, '99,99,999')) || ', Duration: ' || new.duration_months::text || ' months)';
     elsif TG_OP = 'UPDATE' then
-      if new.current_month is distinct from old.current_month then
-        log_description := 'Advanced chit group "' || new.name || '" to Month ' || new.current_month::text || ' (Launch/Cycle progression)';
-      elsif new.status is distinct from old.status then
-        log_description := 'Changed status of "' || new.name || '" to ' || upper(new.status);
-      elsif new.kai_iruppu_pool is distinct from old.kai_iruppu_pool then
-        log_description := 'Updated Kai Iruppu discount pool for "' || new.name || '" to ₹' || trim(to_char(new.kai_iruppu_pool, '99,99,999'));
-      else
-        log_description := 'Updated configuration & parameters for chit group "' || new.name || '"';
-      end if;
+      declare
+        changes text[] := array[]::text[];
+      begin
+        if new.current_month is distinct from old.current_month then
+          changes := array_append(changes, 'Cycle: Month ' || coalesce(old.current_month::text, '0') || ' → Month ' || coalesce(new.current_month::text, '0'));
+        end if;
+        if new.status is distinct from old.status then
+          changes := array_append(changes, 'Status: ' || upper(coalesce(old.status, 'draft')) || ' → ' || upper(coalesce(new.status, 'active')));
+        end if;
+        if new.kai_iruppu_pool is distinct from old.kai_iruppu_pool then
+          changes := array_append(changes, 'Kai Iruppu: ₹' || trim(to_char(old.kai_iruppu_pool, '99,99,999')) || ' → ₹' || trim(to_char(new.kai_iruppu_pool, '99,99,999')));
+        end if;
+        if new.name is distinct from old.name then
+          changes := array_append(changes, 'Name: "' || old.name || '" → "' || new.name || '"');
+        end if;
+
+        if array_length(changes, 1) > 0 then
+          log_description := 'Updated chit group "' || new.name || '" (' || array_to_string(changes, ', ') || ')';
+        else
+          log_description := 'Updated settings for chit group "' || new.name || '"';
+        end if;
+      end;
     elsif TG_OP = 'DELETE' then
       log_description := 'Deleted chit group: "' || coalesce(old.name, 'Group') || '"';
     end if;
@@ -350,13 +395,24 @@ begin
                          ' into Ticket #' || new.ticket_number::text || 
                          coalesce(' of "' || target_group_name || '"', '');
     elsif TG_OP = 'UPDATE' then
-      if new.has_won is true and old.has_won is not true then
-        log_description := 'Marked Ticket #' || new.ticket_number::text || ' (' || coalesce(target_member_name, 'Member') || ') as Auction Winner';
-      elsif new.ticket_number is distinct from old.ticket_number then
-        log_description := 'Reassigned ticket for ' || coalesce(target_member_name, 'Member') || ' from #' || old.ticket_number::text || ' to #' || new.ticket_number::text;
-      else
-        log_description := 'Updated enrollment details for ' || coalesce(target_member_name, 'Member') || ' (Ticket #' || new.ticket_number::text || ')';
-      end if;
+      declare
+        changes text[] := array[]::text[];
+      begin
+        if new.has_won is true and (old.has_won is not true or old.has_won is null) then
+          changes := array_append(changes, 'Marked as Winner (Win Month: ' || coalesce(new.win_month::text, '1') || ')');
+        elsif new.has_won is false and old.has_won is true then
+          changes := array_append(changes, 'Winner status revoked');
+        end if;
+        if new.ticket_number is distinct from old.ticket_number then
+          changes := array_append(changes, 'Ticket: #' || old.ticket_number::text || ' → #' || new.ticket_number::text);
+        end if;
+
+        if array_length(changes, 1) > 0 then
+          log_description := 'Updated ' || coalesce(target_member_name, 'Member') || ' in "' || coalesce(target_group_name, 'Group') || '" (' || array_to_string(changes, ', ') || ')';
+        else
+          log_description := 'Updated enrollment details for ' || coalesce(target_member_name, 'Member') || ' (Ticket #' || new.ticket_number::text || ')';
+        end if;
+      end;
     elsif TG_OP = 'DELETE' then
       log_description := 'Removed ' || coalesce(target_member_name, 'Member') || ' from Ticket #' || old.ticket_number::text;
     end if;
