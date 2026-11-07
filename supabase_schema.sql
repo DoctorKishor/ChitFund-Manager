@@ -237,18 +237,166 @@ returns trigger as $$
 declare
   log_description text;
   record_id uuid;
+  target_member_name text;
+  target_group_name text;
+  caller_admin_id uuid;
 begin
+  -- Resolve primary record ID
   if TG_OP = 'DELETE' then
     record_id = old.id;
   else
     record_id = new.id;
   end if;
 
-  log_description = TG_OP || ' action on record ID: ' || record_id::text;
+  -- Resolve the acting admin ID (safely falling back for unauthenticated/offline PIN sessions)
+  caller_admin_id := auth.uid();
+  if caller_admin_id is null then
+    select id into caller_admin_id from public.profiles where role = 'admin' order by created_at asc limit 1;
+  end if;
 
+  -- 1. PROFILES TABLE
+  if TG_TABLE_NAME = 'profiles' then
+    if TG_OP = 'INSERT' then
+      log_description := 'Created new member profile: ' || coalesce(new.full_name, 'New User') || ' (Phone: ' || coalesce(new.phone_number, 'None') || ', Role: ' || upper(coalesce(new.role, 'subscriber')) || ')';
+    elsif TG_OP = 'UPDATE' then
+      if new.phone_number is distinct from old.phone_number then
+        log_description := 'Updated phone number for ' || coalesce(new.full_name, 'Member') || ' to ' || coalesce(new.phone_number, 'none');
+      elsif new.full_name is distinct from old.full_name then
+        log_description := 'Renamed member from "' || coalesce(old.full_name, '') || '" to "' || coalesce(new.full_name, '') || '"';
+      elsif new.role is distinct from old.role then
+        log_description := 'Updated permissions role for ' || coalesce(new.full_name, 'Member') || ' to ' || upper(coalesce(new.role, 'subscriber'));
+      else
+        log_description := 'Updated member profile details for ' || coalesce(new.full_name, 'Member');
+      end if;
+    elsif TG_OP = 'DELETE' then
+      log_description := 'Deleted member profile: ' || coalesce(old.full_name, 'Member') || ' (' || coalesce(old.phone_number, '') || ')';
+    end if;
+
+  -- 2. TRANSACTIONS TABLE
+  elsif TG_TABLE_NAME = 'transactions' then
+    if TG_OP = 'DELETE' then
+      select p.full_name into target_member_name 
+      from public.profiles p 
+      where p.id = old.profile_id or p.id = (select gm.profile_id from public.group_members gm where gm.id = old.group_member_id);
+    else
+      select p.full_name into target_member_name 
+      from public.profiles p 
+      where p.id = new.profile_id or p.id = (select gm.profile_id from public.group_members gm where gm.id = new.group_member_id);
+    end if;
+
+    if TG_OP = 'INSERT' then
+      if new.type = 'collection' then
+        log_description := 'Recorded collection of ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                           ' for ' || coalesce(target_member_name, 'Member') || 
+                           ' (' || replace(coalesce(new.payment_method, new.wallet_type, 'cash'), '_', ' ') || 
+                           ', Month ' || coalesce(new.month::text, '0') || ')';
+      elsif new.type = 'payout' then
+        log_description := 'Disbursed auction prize payout of ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                           ' to ' || coalesce(target_member_name, 'Winner') || 
+                           ' from ' || replace(coalesce(new.payment_method, new.wallet_type, 'bank'), '_', ' ');
+      elsif new.type = 'personal_draw' then
+        log_description := 'Logged personal draw of ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                           ' from ' || replace(coalesce(new.payment_method, new.wallet_type, 'cash'), '_', ' ') || 
+                           coalesce(' (' || nullif(new.notes, '') || ')', '');
+      elsif new.type = 'atm_withdrawal' then
+        log_description := 'Logged ATM cash withdrawal of ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                           ' from ' || replace(coalesce(new.payment_method, new.wallet_type, 'bank'), '_', ' ');
+      elsif new.type = 'transfer' then
+        log_description := 'Transferred ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                           ' from ' || replace(coalesce(new.payment_method, new.wallet_type, 'account'), '_', ' ');
+      else
+        log_description := 'Recorded ' || replace(new.type, '_', ' ') || ' of ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                           ' via ' || replace(coalesce(new.payment_method, new.wallet_type, ''), '_', ' ');
+      end if;
+    elsif TG_OP = 'UPDATE' then
+      log_description := 'Edited ' || replace(new.type, '_', ' ') || ' of ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                         ' for ' || coalesce(target_member_name, 'Member') || 
+                         ' (' || replace(coalesce(new.payment_method, new.wallet_type, ''), '_', ' ') || ')';
+    elsif TG_OP = 'DELETE' then
+      log_description := 'Deleted ' || replace(old.type, '_', ' ') || ' transaction of ₹' || trim(to_char(old.amount, '99,99,999')) || 
+                         ' (' || replace(coalesce(old.payment_method, old.wallet_type, ''), '_', ' ') || ')';
+    end if;
+
+  -- 3. CHIT GROUPS TABLE
+  elsif TG_TABLE_NAME = 'chit_groups' then
+    if TG_OP = 'INSERT' then
+      log_description := 'Created new chit group: "' || new.name || '" (Total Value: ₹' || trim(to_char(new.total_value, '99,99,999')) || ', Duration: ' || new.duration_months::text || ' months)';
+    elsif TG_OP = 'UPDATE' then
+      if new.current_month is distinct from old.current_month then
+        log_description := 'Advanced chit group "' || new.name || '" to Month ' || new.current_month::text || ' (Launch/Cycle progression)';
+      elsif new.status is distinct from old.status then
+        log_description := 'Changed status of "' || new.name || '" to ' || upper(new.status);
+      elsif new.kai_iruppu_pool is distinct from old.kai_iruppu_pool then
+        log_description := 'Updated Kai Iruppu discount pool for "' || new.name || '" to ₹' || trim(to_char(new.kai_iruppu_pool, '99,99,999'));
+      else
+        log_description := 'Updated configuration & parameters for chit group "' || new.name || '"';
+      end if;
+    elsif TG_OP = 'DELETE' then
+      log_description := 'Deleted chit group: "' || coalesce(old.name, 'Group') || '"';
+    end if;
+
+  -- 4. GROUP MEMBERS TABLE
+  elsif TG_TABLE_NAME = 'group_members' then
+    if TG_OP = 'DELETE' then
+      select p.full_name into target_member_name from public.profiles p where p.id = old.profile_id;
+      select cg.name into target_group_name from public.chit_groups cg where cg.id = old.chit_group_id;
+    else
+      select p.full_name into target_member_name from public.profiles p where p.id = new.profile_id;
+      select cg.name into target_group_name from public.chit_groups cg where cg.id = new.chit_group_id;
+    end if;
+
+    if TG_OP = 'INSERT' then
+      log_description := 'Enrolled ' || coalesce(target_member_name, 'Member') || 
+                         ' into Ticket #' || new.ticket_number::text || 
+                         coalesce(' of "' || target_group_name || '"', '');
+    elsif TG_OP = 'UPDATE' then
+      if new.has_won is true and old.has_won is not true then
+        log_description := 'Marked Ticket #' || new.ticket_number::text || ' (' || coalesce(target_member_name, 'Member') || ') as Auction Winner';
+      elsif new.ticket_number is distinct from old.ticket_number then
+        log_description := 'Reassigned ticket for ' || coalesce(target_member_name, 'Member') || ' from #' || old.ticket_number::text || ' to #' || new.ticket_number::text;
+      else
+        log_description := 'Updated enrollment details for ' || coalesce(target_member_name, 'Member') || ' (Ticket #' || new.ticket_number::text || ')';
+      end if;
+    elsif TG_OP = 'DELETE' then
+      log_description := 'Removed ' || coalesce(target_member_name, 'Member') || ' from Ticket #' || old.ticket_number::text;
+    end if;
+
+  -- 5. AUCTION LOGS TABLE
+  elsif TG_TABLE_NAME = 'auction_logs' then
+    if TG_OP = 'DELETE' then
+      select cg.name into target_group_name from public.chit_groups cg where cg.id = old.chit_group_id;
+    else
+      select cg.name into target_group_name from public.chit_groups cg where cg.id = new.chit_group_id;
+    end if;
+
+    if TG_OP = 'INSERT' then
+      log_description := 'Conducted Month ' || new.month::text || ' live auction' || 
+                         coalesce(' for "' || target_group_name || '"', '') || 
+                         ' — Winning Bid: ₹' || trim(to_char(new.winning_bid, '99,99,999')) || 
+                         ', Net Payout: ₹' || trim(to_char(coalesce(new.net_payout, 0), '99,99,999'));
+    elsif TG_OP = 'UPDATE' then
+      log_description := 'Updated Month ' || new.month::text || ' auction record' || coalesce(' for "' || target_group_name || '"', '');
+    elsif TG_OP = 'DELETE' then
+      log_description := 'Reverted/Deleted Month ' || old.month::text || ' auction log' || coalesce(' for "' || target_group_name || '"', '');
+    end if;
+
+  -- 6. GLOBAL TREASURY TABLE
+  elsif TG_TABLE_NAME = 'global_treasury' then
+    if TG_OP = 'UPDATE' then
+      log_description := 'Updated ' || replace(new.wallet_type, '_', ' ') || ' balance to ₹' || trim(to_char(new.balance, '99,99,999'));
+    else
+      log_description := TG_OP || ' on treasury wallet: ' || replace(new.wallet_type, '_', ' ');
+    end if;
+
+  -- FALLBACK FOR ANY OTHER TABLE
+  else
+    log_description := TG_OP || ' action on ' || TG_TABLE_NAME || ' record #' || substr(record_id::text, 1, 8);
+  end if;
+
+  -- Insert into security audit logs
   insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
   values (
-    (select id from public.profiles where id = auth.uid()),
+    caller_admin_id,
     log_description,
     TG_TABLE_NAME,
     now()
@@ -269,6 +417,10 @@ create or replace trigger audit_profiles_changes
 
 create or replace trigger audit_chit_groups_changes
   after insert or update or delete on public.chit_groups
+  for each row execute procedure public.process_audit_log();
+
+create or replace trigger audit_group_members_changes
+  after insert or update or delete on public.group_members
   for each row execute procedure public.process_audit_log();
 
 create or replace trigger audit_global_treasury_changes

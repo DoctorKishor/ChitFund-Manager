@@ -18,7 +18,25 @@ import {
   Eye,
   CheckCircle2,
   Clock,
+  Coins,
+  Building2,
+  Wallet,
+  Layers,
+  ChevronDown,
+  ChevronUp,
+  Tag,
 } from 'lucide-react';
+
+export interface FormattedAuditAction {
+  title: string;
+  categoryLabel?: string;
+  memberName?: string;
+  groupName?: string;
+  amount?: string;
+  wallet?: string;
+  rawRecordId?: string;
+  isLegacyRaw: boolean;
+}
 
 export interface AuditLogItem {
   id: string;
@@ -70,8 +88,13 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
   // Detail Modal State
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showTechDetails, setShowTechDetails] = useState<boolean>(false);
 
-  // ── Fetch Audit Logs from Supabase ──
+  // Metadata Caches for resolving historical logs
+  const [directoryProfiles, setDirectoryProfiles] = useState<Record<string, { name: string; phone?: string; role?: string }>>({});
+  const [directoryGroups, setDirectoryGroups] = useState<Record<string, string>>({});
+
+  // ── Fetch Audit Logs & Directory Metadata from Supabase ──
   const fetchAuditLogs = useCallback(async (isBackground = false) => {
     if (!isBackground) setIsRefreshing(true);
     try {
@@ -108,6 +131,30 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
       } else if (data) {
         setLogs(data as unknown as AuditLogItem[]);
         setLastSyncedTime(new Date());
+      }
+
+      // 3. Fetch directory of profiles and chit_groups to enrich & translate any raw database IDs
+      try {
+        const [profilesRes, groupsRes] = await Promise.all([
+          supabase.from('profiles').select('id, full_name, phone_number, role'),
+          supabase.from('chit_groups').select('id, name')
+        ]);
+        if (profilesRes.data) {
+          const pMap: Record<string, { name: string; phone?: string; role?: string }> = {};
+          profilesRes.data.forEach((p: any) => {
+            pMap[p.id] = { name: p.full_name || 'Member', phone: p.phone_number, role: p.role };
+          });
+          setDirectoryProfiles(pMap);
+        }
+        if (groupsRes.data) {
+          const gMap: Record<string, string> = {};
+          groupsRes.data.forEach((g: any) => {
+            gMap[g.id] = g.name;
+          });
+          setDirectoryGroups(gMap);
+        }
+      } catch {
+        // Non-blocking metadata enrichment
       }
     } catch (err) {
       console.error('Audit log fetch exception:', err);
@@ -216,6 +263,125 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
     };
   }, []);
 
+  // ── Human-Readable Audit Action Formatter & Context Parser ──
+  const formatHumanAuditAction = useCallback((log: AuditLogItem): FormattedAuditAction => {
+    const rawDesc = log.action_description || '';
+    const table = (log.target_table || '').toLowerCase();
+    
+    // 1. Detect legacy raw database trigger pattern: "(INSERT|UPDATE|DELETE) action on record ID: <uuid>"
+    const rawMatch = rawDesc.match(/^(INSERT|UPDATE|DELETE)\s+action on record ID:\s*([0-9a-f-]{36})/i);
+    
+    if (rawMatch) {
+      const op = rawMatch[1].toUpperCase();
+      const recordId = rawMatch[2].toLowerCase();
+      
+      if (table === 'profiles') {
+        const member = directoryProfiles[recordId];
+        const name = member ? member.name : null;
+        let title = '';
+        if (op === 'INSERT') title = name ? `Created member profile for ${name}` : `Created new member profile`;
+        else if (op === 'DELETE') title = name ? `Deleted member profile for ${name}` : `Deleted member profile`;
+        else title = name ? `Updated profile & access permissions for ${name}` : `Updated member profile details`;
+        return {
+          title,
+          memberName: name || undefined,
+          rawRecordId: recordId,
+          isLegacyRaw: true
+        };
+      }
+      
+      if (table === 'chit_groups') {
+        const groupName = directoryGroups[recordId];
+        let title = '';
+        if (op === 'INSERT') title = groupName ? `Created new chit group "${groupName}"` : `Created new chit group`;
+        else if (op === 'DELETE') title = groupName ? `Deleted chit group "${groupName}"` : `Deleted chit group`;
+        else title = groupName ? `Updated configuration for "${groupName}"` : `Updated chit group configuration`;
+        return {
+          title,
+          groupName: groupName || undefined,
+          rawRecordId: recordId,
+          isLegacyRaw: true
+        };
+      }
+
+      if (table === 'group_members') {
+        return {
+          title: op === 'INSERT' ? 'Enrolled member into chit ticket' : op === 'DELETE' ? 'Removed member ticket enrollment' : 'Updated member ticket allocation & win status',
+          rawRecordId: recordId,
+          isLegacyRaw: true
+        };
+      }
+
+      if (table === 'transactions') {
+        return {
+          title: op === 'INSERT' ? 'Recorded financial payment transaction' : op === 'DELETE' ? 'Deleted payment ledger entry' : 'Updated payment transaction record',
+          rawRecordId: recordId,
+          isLegacyRaw: true
+        };
+      }
+
+      if (table === 'global_treasury') {
+        return {
+          title: 'Synchronized multi-vault treasury balance',
+          rawRecordId: recordId,
+          isLegacyRaw: true
+        };
+      }
+
+      if (table === 'auction_logs') {
+        return {
+          title: op === 'INSERT' ? 'Logged live auction round result' : op === 'DELETE' ? 'Reverted monthly live auction log' : 'Updated live auction record',
+          rawRecordId: recordId,
+          isLegacyRaw: true
+        };
+      }
+
+      return {
+        title: `${op} action on ${table}`,
+        rawRecordId: recordId,
+        isLegacyRaw: true
+      };
+    }
+
+    // 2. For modern human-readable descriptions, extract smart context pills
+    // Extract amount: e.g. ₹25,000 or ₹ 25,000
+    const amountMatch = rawDesc.match(/₹\s*([\d,]+(?:\.\d+)?)/);
+    const amount = amountMatch ? `₹${amountMatch[1]}` : undefined;
+
+    // Extract group name: e.g. "Test run Group"
+    const groupMatch = rawDesc.match(/"([^"]+)"/);
+    const groupName = groupMatch ? groupMatch[1] : undefined;
+
+    // Extract member name: e.g. "for Savithiri", "from Savithiri", "to Savithiri"
+    let memberName: string | undefined;
+    const memberMatch = rawDesc.match(/(?:for|from|to|profile:?)\s+([A-Za-z0-9\s.]+?)(?=\s+(?:\(|via|\[|\-|,|at|\bTicket\b|\bin\b|$))/i);
+    if (memberMatch && memberMatch[1]) {
+      const cand = memberMatch[1].trim();
+      const lower = cand.toLowerCase();
+      if (!['the', 'a', 'each', 'all', 'member', 'ticket', 'chit', 'cash', 'bank'].includes(lower)) {
+        memberName = cand;
+      }
+    }
+
+    // Extract wallet / account
+    let wallet: string | undefined;
+    if (/cash in hand|cash_in_hand|cash box/i.test(rawDesc)) wallet = 'Cash in Hand';
+    else if (/kishor bank|kishor_bank/i.test(rawDesc)) wallet = 'Kishor Bank';
+    else if (/dad bank|dad_bank/i.test(rawDesc)) wallet = 'Dad Bank';
+    else if (/mom bank|mom_bank/i.test(rawDesc)) wallet = 'Mom Bank';
+    else if (/upi/i.test(rawDesc)) wallet = 'UPI';
+    else if (/netbanking|net banking/i.test(rawDesc)) wallet = 'NetBanking';
+
+    return {
+      title: rawDesc,
+      amount,
+      groupName,
+      memberName,
+      wallet,
+      isLegacyRaw: false
+    };
+  }, [directoryProfiles, directoryGroups]);
+
   // ── Distinct Executors List ──
   const uniqueExecutors = useMemo(() => {
     const map = new Map<string, string>();
@@ -253,19 +419,33 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
         if (executorId !== executorFilter) return false;
       }
 
-      // 4. Search Query
+      // 4. Search Query (searches raw action, formatted human title, member, group, amount, table, executor, and UUID)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const desc = (log.action_description || '').toLowerCase();
+        const formatted = formatHumanAuditAction(log);
+        const title = formatted.title.toLowerCase();
+        const member = (formatted.memberName || '').toLowerCase();
+        const group = (formatted.groupName || '').toLowerCase();
+        const amt = (formatted.amount || '').toLowerCase();
         const target = (log.target_table || '').toLowerCase();
         const executorName = (log.profiles?.full_name || '').toLowerCase();
         const id = log.id.toLowerCase();
-        return desc.includes(q) || target.includes(q) || executorName.includes(q) || id.includes(q);
+        return (
+          desc.includes(q) ||
+          title.includes(q) ||
+          member.includes(q) ||
+          group.includes(q) ||
+          amt.includes(q) ||
+          target.includes(q) ||
+          executorName.includes(q) ||
+          id.includes(q)
+        );
       }
 
       return true;
     });
-  }, [logs, categoryFilter, dateFilter, executorFilter, searchQuery, classifyLog]);
+  }, [logs, categoryFilter, dateFilter, executorFilter, searchQuery, classifyLog, formatHumanAuditAction]);
 
   // ── Category Counts for Filter Tabs ──
   const categoryCounts = useMemo(() => {
@@ -640,6 +820,7 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
               ) : (
                 paginatedLogs.map((log) => {
                   const cls = classifyLog(log);
+                  const formatted = formatHumanAuditAction(log);
                   const dt = new Date(log.timestamp);
                   const dateStr = dt.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
                   const timeStr = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
@@ -674,11 +855,44 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                         </span>
                       </td>
 
-                      {/* Action Description */}
+                      {/* Action Description & Smart Context Badges */}
                       <td className="py-3.5 px-4 max-w-lg">
-                        <span className="text-slate-900 font-semibold leading-relaxed block text-xs group-hover:text-indigo-950">
-                          {log.action_description}
-                        </span>
+                        <div className="space-y-1.5">
+                          <span className="text-slate-900 font-bold leading-relaxed block text-xs group-hover:text-indigo-950">
+                            {formatted.title}
+                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {formatted.memberName && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                                <User size={10} className="text-slate-400" />
+                                {formatted.memberName}
+                              </span>
+                            )}
+                            {formatted.groupName && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
+                                <Building2 size={10} className="text-indigo-400" />
+                                {formatted.groupName}
+                              </span>
+                            )}
+                            {formatted.amount && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-mono">
+                                <Coins size={10} className="text-emerald-500" />
+                                {formatted.amount}
+                              </span>
+                            )}
+                            {formatted.wallet && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md">
+                                <Wallet size={10} className="text-amber-500" />
+                                {formatted.wallet}
+                              </span>
+                            )}
+                            {formatted.isLegacyRaw && formatted.rawRecordId && (
+                              <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                                Ref #{formatted.rawRecordId.slice(0, 8)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       {/* Executor Profile */}
@@ -778,6 +992,7 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
         ) : (
           paginatedLogs.map((log) => {
             const cls = classifyLog(log);
+            const formatted = formatHumanAuditAction(log);
             const dt = new Date(log.timestamp);
             const dateStr = dt.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
             const timeStr = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -801,10 +1016,38 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                   </div>
                 </div>
 
-                {/* Primary Action Description */}
-                <p className="text-xs font-bold text-slate-900 leading-snug">
-                  {log.action_description}
-                </p>
+                {/* Primary Action Description & Badges */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-bold text-slate-900 leading-snug">
+                    {formatted.title}
+                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {formatted.memberName && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                        <User size={10} className="text-slate-400" />
+                        {formatted.memberName}
+                      </span>
+                    )}
+                    {formatted.groupName && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
+                        <Building2 size={10} className="text-indigo-400" />
+                        {formatted.groupName}
+                      </span>
+                    )}
+                    {formatted.amount && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-mono">
+                        <Coins size={10} className="text-emerald-500" />
+                        {formatted.amount}
+                      </span>
+                    )}
+                    {formatted.wallet && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md">
+                        <Wallet size={10} className="text-amber-500" />
+                        {formatted.wallet}
+                      </span>
+                    )}
+                  </div>
+                </div>
 
                 {/* Footer: Executor & Hash ID */}
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
@@ -890,22 +1133,89 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Target PostgreSQL Table</span>
-                  <span className="font-mono text-xs font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200 mt-1 inline-block uppercase">
-                    {selectedLog.target_table}
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Target Area</span>
+                  <span className="font-semibold text-xs text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200 mt-1 inline-block capitalize">
+                    {selectedLog.target_table.replace(/_/g, ' ')}
                   </span>
                 </div>
               </div>
 
               {/* Action Description */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                  Action Description &amp; Event Payload
-                </label>
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-900 leading-relaxed font-sans">
-                  {selectedLog.action_description}
-                </div>
-              </div>
+              {(() => {
+                const formatted = formatHumanAuditAction(selectedLog);
+                return (
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                      Event Summary
+                    </label>
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                      <p className="text-xs font-bold text-slate-900 leading-relaxed font-sans">
+                        {formatted.title}
+                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-200/60">
+                        {formatted.memberName && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                            <User size={10} className="text-slate-400" />
+                            {formatted.memberName}
+                          </span>
+                        )}
+                        {formatted.groupName && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50/70 px-2 py-0.5 rounded-md border border-indigo-200">
+                            <Building2 size={10} className="text-indigo-400" />
+                            {formatted.groupName}
+                          </span>
+                        )}
+                        {formatted.amount && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 font-mono">
+                            <Coins size={10} className="text-emerald-500" />
+                            {formatted.amount}
+                          </span>
+                        )}
+                        {formatted.wallet && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                            <Wallet size={10} className="text-amber-500" />
+                            {formatted.wallet}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Collapsible Technical Details */}
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowTechDetails(prev => !prev)}
+                        className="flex items-center justify-between w-full px-3 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 text-[11px] font-semibold text-slate-600 transition-colors cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Layers size={12} className="text-slate-400" />
+                          <span>Technical Database Specifications</span>
+                        </span>
+                        {showTechDetails ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+
+                      {showTechDetails && (
+                        <div className="mt-2 p-3 bg-slate-900 text-slate-200 rounded-xl font-mono text-[11px] space-y-1.5 animate-in fade-in duration-150">
+                          <div className="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-1">
+                            <span>Table:</span>
+                            <span className="text-emerald-400">{selectedLog.target_table}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-1">
+                            <span>Event UUID:</span>
+                            <span className="text-indigo-300">#{selectedLog.id}</span>
+                          </div>
+                          <div className="pt-1">
+                            <span className="text-slate-400 block text-[10px] uppercase">Raw Log Payload:</span>
+                            <span className="text-slate-300 break-all leading-tight block mt-0.5">
+                              {selectedLog.action_description}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Timestamp Breakdown */}
               <div className="grid grid-cols-2 gap-2.5">
