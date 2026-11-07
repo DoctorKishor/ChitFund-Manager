@@ -129,7 +129,6 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
   const [editingMember, setEditingMember] = useState<MemberRecord | null>(null);
   const [newFullName, setNewFullName] = useState<string>('');
   const [newPhoneNumber, setNewPhoneNumber] = useState<string>('');
-  const [newRole, setNewRole] = useState<string>('subscriber');
   const [editIsBlocked, setEditIsBlocked] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -768,33 +767,6 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
     window.open(`https://wa.me/91${cleanPhone}?text=${text}`, '_blank');
   };
 
-  // ── Quick Role Change ──
-  const handleQuickRoleChange = async (userId: string, newTargetRole: string, userName: string) => {
-    if (userId === currentAdminProfile?.id) {
-      alert('Security Warning: You cannot modify your own administrator role to prevent lockouts.');
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newTargetRole })
-        .eq('id', userId);
-
-      if (error) throw error;
-
-      setMembers((prev) =>
-        prev.map((p) => (p.id === userId ? { ...p, role: newTargetRole } : p))
-      );
-
-      if (onAddAuditLog) {
-        onAddAuditLog(`ROLE CHANGE: Assigned role [${newTargetRole}] to ${userName}`);
-      }
-    } catch (err: any) {
-      alert(`Failed to update role: ${err.message}`);
-    }
-  };
-
   // ── Quick Block / Unblock Portal Access ──
   const handleToggleBlock = async (m: MemberRecord) => {
     if (m.id === currentAdminProfile?.id) {
@@ -1006,7 +978,6 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
     setEditingMember(null);
     setNewFullName('');
     setNewPhoneNumber('');
-    setNewRole('subscriber');
     setEditIsBlocked(false);
     setIsAddModalOpen(true);
   };
@@ -1017,7 +988,6 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
     setEditingMember(member);
     setNewFullName(member.fullName);
     setNewPhoneNumber(member.phoneNumber);
-    setNewRole(member.role);
     setEditIsBlocked(member.isBlocked || false);
     setIsAddModalOpen(true);
   };
@@ -1052,7 +1022,6 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           .update({
             full_name: cleanName,
             phone_number: cleanPhone,
-            role: newRole,
             is_blocked: finalBlockedStatus,
           })
           .eq('id', editingMember.id);
@@ -1061,7 +1030,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
         if (onAddAuditLog) {
           onAddAuditLog(
-            `EDIT profile: Updated details for ${cleanName} (${cleanPhone}) [Role: ${newRole}]`
+            `EDIT subscriber: Updated details for ${cleanName} (${cleanPhone})`
           );
         }
       } else {
@@ -1074,12 +1043,12 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
         if (existingProfile) {
           if (existingProfile.is_deleted) {
-            // Restore archived profile with updated details
+            // Restore archived profile as subscriber
             const { error: unarchiveError } = await supabase
               .from('profiles')
               .update({
                 full_name: cleanName,
-                role: newRole,
+                role: 'subscriber',
                 is_deleted: false,
                 is_blocked: false,
               })
@@ -1089,7 +1058,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
             if (onAddAuditLog) {
               onAddAuditLog(
-                `RESTORE archived profile: Unarchived ${cleanName} (${cleanPhone}) [Role: ${newRole}]`
+                `RESTORE archived subscriber: Unarchived ${cleanName} (${cleanPhone})`
               );
             }
           } else {
@@ -1102,14 +1071,14 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             .insert({
               full_name: cleanName,
               phone_number: cleanPhone,
-              role: newRole,
+              role: 'subscriber',
             });
 
           if (error) throw error;
 
           if (onAddAuditLog) {
             onAddAuditLog(
-              `REGISTER new profile: Created ${cleanName} (${cleanPhone}) [Role: ${newRole}]`
+              `REGISTER new subscriber: Created ${cleanName} (${cleanPhone})`
             );
           }
         }
@@ -1640,14 +1609,8 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                   <span className={`font-bold text-slate-900 truncate ${member.isBlocked ? 'line-through text-slate-400' : ''}`}>
                                     {member.fullName}
                                   </span>
-                                  <span className={`text-[10px] uppercase font-bold py-0.5 px-1.5 rounded leading-tight ${
-                                    member.role === 'admin'
-                                      ? 'bg-brand-100 text-brand-700'
-                                      : member.role === 'manager'
-                                      ? 'bg-sky-100 text-sky-700'
-                                      : 'bg-slate-100 text-slate-600'
-                                  }`}>
-                                    {member.role === 'admin' ? 'Admin' : member.role === 'manager' ? 'Manager' : 'Subscriber'}
+                                  <span className="text-[10px] uppercase font-bold py-0.5 px-1.5 rounded leading-tight bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-mono">
+                                    Subscriber
                                   </span>
                                 </div>
                                 <p className="text-slate-500 font-mono text-[11px] mt-0.5">
@@ -1823,32 +1786,13 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           </div>
                         </div>
 
-                        {/* Role Assignment Dropdown */}
+                        {/* Member Standing Badge */}
                         <div className="text-right shrink-0">
-                          <label className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Assigned Role</label>
-                          <select
-                            value={activeDrawerMember.role}
-                            onChange={(e) => handleQuickRoleChange(activeDrawerMember.id, e.target.value, activeDrawerMember.fullName)}
-                            disabled={activeDrawerMember.id === currentAdminProfile?.id}
-                            className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:ring-brand-500 focus:border-brand-500 cursor-pointer disabled:opacity-50"
-                          >
-                            {customRoles.length > 0 ? (
-                              customRoles.map((r) => (
-                                <option key={r.id} value={r.id}>
-                                  {r.name || r.id}
-                                </option>
-                              ))
-                            ) : (
-                              <>
-                                <option value="subscriber">Subscriber</option>
-                                <option value="collections_agent">Collections Agent</option>
-                                <option value="manager">Manager</option>
-                                <option value="auction_clerk">Auction Clerk</option>
-                                <option value="auditor">Auditor / CA</option>
-                                <option value="admin">Administrator</option>
-                              </>
-                            )}
-                          </select>
+                          <label className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Account Standing</label>
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Subscriber
+                          </span>
                         </div>
                       </div>
 
@@ -2382,39 +2326,6 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* System Role */}
-              <div>
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1.5">
-                  System Role <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  disabled={editingMember?.id === currentAdminProfile?.id}
-                  className={`w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-bold focus:outline-none ${
-                    editingMember?.id === currentAdminProfile?.id ? 'opacity-60 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {customRoles.length > 0 ? (
-                    customRoles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.id === 'admin' ? '👑 ' : r.id === 'manager' ? '💼 ' : r.id === 'collections_agent' ? '💳 ' : r.id === 'subscriber' ? '👤 ' : '🛡️ '}
-                        {r.name || r.id}
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="subscriber">👤 Subscriber (Passbook &amp; Auctions)</option>
-                      <option value="collections_agent">💳 Collections Agent (Field Collections)</option>
-                      <option value="manager">💼 Manager (Operations &amp; Live Auctions)</option>
-                      <option value="auction_clerk">🔨 Auction Clerk (Floor Bidding)</option>
-                      <option value="auditor">📊 Auditor / CA (Ledger &amp; Reports)</option>
-                      <option value="admin">👑 Administrator (Full System Control)</option>
-                    </>
-                  )}
-                </select>
               </div>
 
               {/* Block Portal Access Toggle in Edit Mode */}

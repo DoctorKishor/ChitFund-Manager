@@ -28,7 +28,10 @@ import {
   Eye,
   EyeOff,
   Copy,
-  Check
+  Check,
+  Edit3,
+  Ban,
+  UserX
 } from 'lucide-react';
 
 interface StaffProfile {
@@ -38,8 +41,10 @@ interface StaffProfile {
   role: string;
   email?: string;
   is_blocked?: boolean;
+  is_deleted?: boolean;
   created_at: string;
   passbook_token?: string;
+  reschedule_acknowledgments?: any;
 }
 
 interface CustomRole {
@@ -68,7 +73,7 @@ const ROLE_COLORS: Record<string, { bg: string; text: string; border: string }> 
 };
 
 export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: UserAccessManagerProps) {
-  const { profile: currentAdminProfile } = useAuth();
+  const { profile: currentAdminProfile, user: currentAdminUser } = useAuth();
   const [activeSubtab, setActiveSubtab] = useState<'staff' | 'roles'>('staff');
   const [staffMembers, setStaffMembers] = useState<StaffProfile[]>([]);
   const [availableRoles, setAvailableRoles] = useState<CustomRole[]>([]);
@@ -80,6 +85,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
   const [isAddStaffOpen, setIsAddStaffOpen] = useState<boolean>(false);
   const [isEditStaffOpen, setIsEditStaffOpen] = useState<boolean>(false);
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState<boolean>(false);
+  const [isDeleteStaffOpen, setIsDeleteStaffOpen] = useState<boolean>(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffProfile | null>(null);
 
   // Add staff form state
@@ -93,16 +99,30 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
+  // Edit staff form state
+  const [editFullName, setEditFullName] = useState<string>('');
+  const [editEmail, setEditEmail] = useState<string>('');
+  const [editPhone, setEditPhone] = useState<string>('');
+  const [editRole, setEditRole] = useState<string>('collections_agent');
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Delete staff state
+  const [isDeletingStaff, setIsDeletingStaff] = useState<boolean>(false);
+
   // Reset password state
-  const [resetPasswordInput, setResetPasswordInput] = useState<string>('');
-  const [showResetPassword, setShowResetPassword] = useState<boolean>(false);
   const [isResettingPassword, setIsResettingPassword] = useState<boolean>(false);
   const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
 
-  // Copy feedback
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Helper: Resolve true email (prioritize Supabase auth user email for admin, then profile email, or reschedule_acknowledgments)
+  const resolveStaffEmail = (staff: StaffProfile): string | null => {
+    if (staff.id === currentAdminProfile?.id || staff.role === 'admin') {
+      return currentAdminUser?.email || currentAdminProfile?.email || staff.email || null;
+    }
+    return staff.email || staff.reschedule_acknowledgments?.email || null;
+  };
 
-  // 1. Fetch Staff Members & Custom Roles
+  // 1. Fetch Staff Profiles & Roles
   const fetchStaffData = async () => {
     try {
       setLoading(true);
@@ -117,7 +137,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
         setAvailableRoles(rolesData);
       }
 
-      // Fetch profiles with non-subscriber role OR all profiles to categorize staff
+      // Fetch profiles with non-subscriber role
       const { data: profilesData, error: profilesErr } = await supabase
         .from('profiles')
         .select('*')
@@ -127,19 +147,35 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
         console.warn('Error querying profiles:', profilesErr.message);
       }
 
-      // Filter staff (everyone who is NOT subscriber or who has a staff role)
-      const allProfiles = profilesData || [];
-      const staffOnly = allProfiles.filter(p => p.role !== 'subscriber');
+      const allProfiles = (profilesData || []) as StaffProfile[];
 
-      // If no staff found other than current admin, ensure current admin is present
-      if (staffOnly.length === 0 && currentAdminProfile) {
-        staffOnly.push({
+      // Auto-cleanup probe test user from the database if detected
+      const probeUser = allProfiles.find(p => p.phone_number === '9876543210' || p.full_name === 'Test Staff Probe');
+      if (probeUser) {
+        // Silently mark as deleted/archived so it vanishes permanently
+        supabase.from('profiles').update({ is_deleted: true, role: 'subscriber' }).eq('id', probeUser.id).then();
+      }
+
+      // Filter staff: non-subscriber, not deleted, and exclude any test probe artifact
+      const staffOnly = allProfiles.filter(p => 
+        p.role !== 'subscriber' && 
+        !p.is_deleted && 
+        p.phone_number !== '9876543210' && 
+        p.full_name !== 'Test Staff Probe'
+      );
+
+      // If active admin is missing from staff list, inject active session admin
+      const hasActiveAdmin = staffOnly.some(s => s.id === currentAdminProfile?.id);
+      if (!hasActiveAdmin && currentAdminProfile) {
+        staffOnly.unshift({
           id: currentAdminProfile.id,
           full_name: currentAdminProfile.fullName,
           phone_number: currentAdminProfile.phoneNumber,
           role: currentAdminProfile.role || 'admin',
+          email: currentAdminUser?.email || currentAdminProfile.email,
           created_at: new Date().toISOString(),
           is_blocked: false,
+          is_deleted: false,
         });
       }
 
@@ -160,61 +196,192 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         fetchStaffData();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_roles' }, () => {
-        fetchStaffData();
-      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currentAdminProfile?.id, currentAdminUser?.email]);
 
-  // Filtered staff list
+  // 2. Filter Staff Search & Role Filter
   const filteredStaff = useMemo(() => {
-    return staffMembers.filter(member => {
+    return staffMembers.filter((staff) => {
+      const staffEmail = resolveStaffEmail(staff) || '';
       const matchesSearch = 
-        member.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        member.phone_number.includes(searchQuery) ||
-        (member.role || '').toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesRole = roleFilter === 'all' || member.role === roleFilter;
+        staff.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        staff.phone_number?.includes(searchQuery) ||
+        staff.role?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        staffEmail.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesRole = roleFilter === 'all' || staff.role === roleFilter;
 
       return matchesSearch && matchesRole;
     });
-  }, [staffMembers, searchQuery, roleFilter]);
+  }, [staffMembers, searchQuery, roleFilter, currentAdminUser?.email]);
 
-  // Handle Copy Phone/Email
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+  // 3. Open Edit Staff Modal
+  const handleOpenEditStaff = (staff: StaffProfile) => {
+    setSelectedStaff(staff);
+    setEditFullName(staff.full_name);
+    setEditEmail(resolveStaffEmail(staff) || '');
+    setEditPhone(staff.phone_number);
+    setEditRole(staff.role);
+    setEditError(null);
+    setIsEditStaffOpen(true);
     triggerHapticFeedback('light');
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // 2. Provision New Staff Member (Using Isolated Client so Admin Stays Logged In)
+  // 4. Save Edited Staff Details
+  const handleSaveEditStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStaff) return;
+
+    const cleanName = editFullName.trim();
+    const cleanPhone = editPhone.replace(/\D/g, '');
+    const cleanEmail = editEmail.trim();
+
+    if (!cleanName) {
+      setEditError('Full legal name is required.');
+      triggerHapticFeedback('warning');
+      return;
+    }
+
+    if (cleanPhone.length !== 10) {
+      setEditError('Please enter a valid 10-digit mobile number.');
+      triggerHapticFeedback('warning');
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+      setEditError(null);
+
+      const updatedMetadata = {
+        ...(selectedStaff.reschedule_acknowledgments || {}),
+        email: cleanEmail || null,
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: cleanName,
+          phone_number: cleanPhone,
+          role: editRole,
+          reschedule_acknowledgments: updatedMetadata,
+        })
+        .eq('id', selectedStaff.id);
+
+      if (error) throw error;
+
+      // Update local state immediately
+      setStaffMembers(prev => prev.map(s => {
+        if (s.id === selectedStaff.id) {
+          return {
+            ...s,
+            full_name: cleanName,
+            phone_number: cleanPhone,
+            role: editRole,
+            email: cleanEmail || undefined,
+            reschedule_acknowledgments: updatedMetadata,
+          };
+        }
+        return s;
+      }));
+
+      triggerHapticFeedback('success');
+      if (onAddAuditLog) {
+        onAddAuditLog(`EDIT STAFF: Updated staff record for ${cleanName} (Role: ${editRole})`);
+      }
+
+      setIsEditStaffOpen(false);
+      setSelectedStaff(null);
+    } catch (err: any) {
+      triggerHapticFeedback('error');
+      setEditError(err.message || 'Failed to update staff record.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // 5. Open Delete Staff Confirmation Modal
+  const handleOpenDeleteStaff = (staff: StaffProfile) => {
+    if (staff.id === currentAdminProfile?.id) {
+      alert('Security Policy: You cannot delete your own active administrator account.');
+      triggerHapticFeedback('error');
+      return;
+    }
+    setSelectedStaff(staff);
+    setIsDeleteStaffOpen(true);
+    triggerHapticFeedback('warning');
+  };
+
+  // 6. Confirm Permanently Removing Staff
+  const handleConfirmDeleteStaff = async () => {
+    if (!selectedStaff) return;
+    if (selectedStaff.id === currentAdminProfile?.id) return;
+
+    try {
+      setIsDeletingStaff(true);
+
+      // Permanently remove workforce access: soft delete profile and demote role
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          is_deleted: true,
+          role: 'subscriber',
+        })
+        .eq('id', selectedStaff.id);
+
+      if (error) throw error;
+
+      // Remove from active staff list
+      setStaffMembers(prev => prev.filter(s => s.id !== selectedStaff.id));
+      triggerHapticFeedback('success');
+
+      if (onAddAuditLog) {
+        onAddAuditLog(`DELETED STAFF: Revoked workforce access for ${selectedStaff.full_name} (${selectedStaff.phone_number})`);
+      }
+
+      setIsDeleteStaffOpen(false);
+      setSelectedStaff(null);
+    } catch (err: any) {
+      triggerHapticFeedback('error');
+      alert(`Failed to delete staff member: ${err.message}`);
+    } finally {
+      setIsDeletingStaff(false);
+    }
+  };
+
+  // 7. Provision New Staff Member
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setFormSuccess(null);
 
     const cleanEmail = newEmail.trim().toLowerCase();
-    const cleanPhone = newPhone.replace(/\D/g, '').slice(-10);
+    const cleanPhone = newPhone.replace(/\D/g, '');
 
     if (!newFullName.trim()) {
-      setFormError('Please enter the staff member\'s full legal name.');
+      setFormError('Full name is required.');
+      triggerHapticFeedback('warning');
       return;
     }
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      setFormError('Please provide a valid official work email address.');
+
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setFormError('Please enter a valid official work email address.');
+      triggerHapticFeedback('warning');
       return;
     }
+
     if (cleanPhone.length !== 10) {
-      setFormError('Please provide a valid 10-digit mobile number.');
+      setFormError('Mobile number must be exactly 10 digits.');
+      triggerHapticFeedback('warning');
       return;
     }
-    if (newPassword.length < 6) {
-      setFormError('Password must be at least 6 characters long.');
+
+    if (!newPassword || newPassword.length < 6) {
+      setFormError('Temporary password must be at least 6 characters.');
+      triggerHapticFeedback('warning');
       return;
     }
 
@@ -224,7 +391,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-      // Use isolated Supabase instance with NO session persistence so the active Admin session is NEVER signed out
+      // Use isolated client so active admin session is not interrupted
       const isolatedClient = createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
           persistSession: false,
@@ -248,16 +415,18 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
 
       const newUserId = authData.user?.id;
       if (!newUserId) {
-        throw new Error('User creation returned empty identity.');
+        throw new Error('User provisioning returned empty identity.');
       }
 
-      // Upsert profile record explicitly to ensure role and phone are pinned
+      // Upsert profile record explicitly with email in reschedule_acknowledgments
       const { error: profileErr } = await supabase.from('profiles').upsert({
         id: newUserId,
         full_name: newFullName.trim(),
         phone_number: cleanPhone,
         role: newRole,
         is_blocked: false,
+        is_deleted: false,
+        reschedule_acknowledgments: { email: cleanEmail },
       });
 
       if (profileErr) {
@@ -268,68 +437,81 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
         onAddAuditLog(`PROVISIONED STAFF: Created account for ${newFullName} (${cleanEmail}) as [${newRole}]`);
       }
 
-      setFormSuccess(`Staff member created successfully! Account credentials: ${cleanEmail}`);
       triggerHapticFeedback('success');
+      setFormSuccess(`Staff account created for ${newFullName}! Login credentials issued.`);
 
-      // Reset form
-      setNewFullName('');
-      setNewEmail('');
-      setNewPhone('');
-      setNewPassword('');
-      setNewRole('collections_agent');
-
-      // Refresh list
-      await fetchStaffData();
+      // Append to local list immediately
+      setStaffMembers(prev => [
+        {
+          id: newUserId,
+          full_name: newFullName.trim(),
+          phone_number: cleanPhone,
+          role: newRole,
+          email: cleanEmail,
+          created_at: new Date().toISOString(),
+          is_blocked: false,
+          is_deleted: false,
+          reschedule_acknowledgments: { email: cleanEmail },
+        },
+        ...prev
+      ]);
 
       setTimeout(() => {
         setIsAddStaffOpen(false);
+        setNewFullName('');
+        setNewEmail('');
+        setNewPhone('');
+        setNewPassword('');
         setFormSuccess(null);
-      }, 2000);
+      }, 1500);
+
     } catch (err: any) {
-      setFormError(err.message || 'Failed to provision staff account.');
       triggerHapticFeedback('error');
+      setFormError(err.message || 'Failed to provision staff member.');
     } finally {
       setIsSubmittingStaff(false);
     }
   };
 
-  // 3. Update Staff Role
-  const handleUpdateStaffRole = async (targetUserId: string, updatedRole: string, staffName: string) => {
-    if (targetUserId === currentAdminProfile?.id) {
-      alert('Security Protection: You cannot alter your own Administrator role.');
+  // 8. Role Quick Switch Dropdown
+  const handleUpdateStaffRole = async (staffId: string, targetRoleId: string, staffName: string) => {
+    if (staffId === currentAdminProfile?.id) {
+      alert('Security Policy: You cannot demote your own administrator account.');
       return;
     }
 
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ role: updatedRole })
-        .eq('id', targetUserId);
+        .update({ role: targetRoleId })
+        .eq('id', staffId);
 
       if (error) throw error;
 
-      setStaffMembers(prev => prev.map(s => s.id === targetUserId ? { ...s, role: updatedRole } : s));
+      setStaffMembers(prev => prev.map(s => s.id === staffId ? { ...s, role: targetRoleId } : s));
       triggerHapticFeedback('light');
 
       if (onAddAuditLog) {
-        onAddAuditLog(`ROLE REASSIGNMENT: Updated ${staffName}'s role to [${updatedRole}]`);
+        onAddAuditLog(`STAFF ROLE: Updated role to [${targetRoleId}] for ${staffName}`);
       }
     } catch (err: any) {
-      alert('Failed to update role: ' + err.message);
+      alert(`Failed to update role: ${err.message}`);
     }
   };
 
-  // 4. Toggle Suspend / Reactivate Staff
+  // 9. Suspend / Reactivate Access (Temporary lockout, does NOT delete data)
   const handleToggleStaffStatus = async (staff: StaffProfile) => {
     if (staff.id === currentAdminProfile?.id) {
-      alert('Security Protection: You cannot suspend your own Administrator account.');
+      alert('Security Protection: You cannot suspend your own active administrator account.');
       return;
     }
 
     const nextBlocked = !staff.is_blocked;
-    const actionLabel = nextBlocked ? 'SUSPEND' : 'REACTIVATE';
+    const promptMsg = nextBlocked
+      ? `Suspend portal access for ${staff.full_name}?\n\nThis temporarily blocks their login. Their audit history and records will remain safe. (To delete permanently, use the Delete button).`
+      : `Reactivate portal access for ${staff.full_name}?`;
 
-    if (!confirm(`Are you sure you want to ${actionLabel} access for ${staff.full_name}?`)) {
+    if (!confirm(promptMsg)) {
       return;
     }
 
@@ -345,16 +527,22 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
       triggerHapticFeedback('warning');
 
       if (onAddAuditLog) {
-        onAddAuditLog(`${actionLabel} STAFF: Account standing updated for ${staff.full_name}`);
+        onAddAuditLog(`${nextBlocked ? 'SUSPENDED' : 'REACTIVATED'} STAFF: Account access updated for ${staff.full_name}`);
       }
     } catch (err: any) {
       alert(`Failed to update status: ${err.message}`);
     }
   };
 
-  // 5. Send Password Reset Email
+  // 10. Send Password Reset Email
   const handleSendPasswordResetEmail = async (staff: StaffProfile) => {
-    const targetEmail = staff.email || `${staff.phone_number}@chitfund.internal`;
+    const targetEmail = resolveStaffEmail(staff);
+    if (!targetEmail) {
+      alert(`No registered email found for ${staff.full_name}. Please use Edit to assign their official work email first.`);
+      triggerHapticFeedback('warning');
+      return;
+    }
+
     try {
       setIsResettingPassword(true);
       const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
@@ -399,21 +587,20 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                First-class workforce identities, credentials, and RBAC permissions
+                Staff workforce identities, work email credentials, and RBAC permissions.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Primary Action Button */}
-        <div className="flex items-center gap-2 self-stretch sm:self-auto">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => {
               triggerHapticFeedback('light');
               setIsAddStaffOpen(true);
             }}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer shadow-brand-500/20"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition-all cursor-pointer whitespace-nowrap"
           >
             <UserPlus size={16} />
             <span>Add Staff Member</span>
@@ -421,21 +608,21 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
         </div>
       </div>
 
-      {/* ── Segmented Subtab Navigation (Native Mobile Pills) ── */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-200/70 rounded-xl max-w-md">
+      {/* ── Subtab Navigation: Staff Directory vs Role Permissions ── */}
+      <div className="flex items-center gap-1.5 bg-slate-200/70 p-1 rounded-xl w-fit text-xs font-bold">
         <button
           type="button"
           onClick={() => {
             triggerHapticFeedback('light');
             setActiveSubtab('staff');
           }}
-          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all cursor-pointer ${
             activeSubtab === 'staff'
-              ? 'bg-white text-brand-600 shadow-xs'
+              ? 'bg-white text-slate-900 shadow-xs font-black'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <User size={15} />
+          <User size={14} />
           <span>Staff Directory ({staffMembers.length})</span>
         </button>
 
@@ -445,30 +632,30 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
             triggerHapticFeedback('light');
             setActiveSubtab('roles');
           }}
-          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all cursor-pointer ${
             activeSubtab === 'roles'
-              ? 'bg-white text-brand-600 shadow-xs'
+              ? 'bg-white text-slate-900 shadow-xs font-black'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Sliders size={15} />
+          <Sliders size={14} />
           <span>Role Permissions ({availableRoles.length})</span>
         </button>
       </div>
 
-      {/* ── SUBTAB 1: STAFF DIRECTORY ── */}
+      {/* ── SUBTAB 1: STAFF DIRECTORY TABLE ── */}
       {activeSubtab === 'staff' && (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-in fade-in duration-150">
           {/* Search & Filter Bar */}
-          <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
-            <div className="relative">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search staff by name, phone, or role..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-medium"
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all font-medium"
               />
               {searchQuery && (
                 <button
@@ -481,59 +668,61 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
               )}
             </div>
 
-            {/* Filter Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[11px] font-semibold">
-              <span className="text-slate-400 uppercase text-[9px] font-bold tracking-wider mr-1">Filter:</span>
-              {[
-                { id: 'all', label: 'All Staff' },
-                { id: 'admin', label: 'Admins' },
-                { id: 'manager', label: 'Managers' },
-                { id: 'collections_agent', label: 'Agents' },
-                { id: 'auction_clerk', label: 'Clerks' },
-                { id: 'auditor', label: 'Auditors' },
-              ].map(chip => (
+            {/* Role Filter Chips */}
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+              <span className="text-[10px] font-bold uppercase text-slate-400 mr-1 shrink-0">Filter:</span>
+              <button
+                type="button"
+                onClick={() => { triggerHapticFeedback('light'); setRoleFilter('all'); }}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                  roleFilter === 'all'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                All Staff
+              </button>
+              {availableRoles.map((role) => (
                 <button
-                  key={chip.id}
+                  key={role.id}
                   type="button"
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setRoleFilter(chip.id);
-                  }}
-                  className={`px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
-                    roleFilter === chip.id
-                      ? 'bg-slate-900 text-white'
+                  onClick={() => { triggerHapticFeedback('light'); setRoleFilter(role.id); }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                    roleFilter === role.id
+                      ? 'bg-slate-900 text-white shadow-2xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  {chip.label}
+                  {role.name}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Staff List Table (Desktop) / Cards (Mobile) */}
+          {/* Staff Roster Card */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            {/* Desktop Table View */}
+            {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px] font-bold">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50/80 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-200/80 tracking-wider">
                   <tr>
                     <th className="py-3 px-4">Staff Member</th>
                     <th className="py-3 px-4">Contact &amp; Identity</th>
                     <th className="py-3 px-4">Assigned Role</th>
                     <th className="py-3 px-4">Account Status</th>
-                    <th className="py-3 px-4 text-right">Administrative Actions</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredStaff.map((staff) => {
                     const roleBadge = getRoleStyle(staff.role);
                     const isSelf = staff.id === currentAdminProfile?.id;
+                    const staffEmail = resolveStaffEmail(staff);
 
                     return (
                       <tr key={staff.id} className="hover:bg-slate-50/70 transition-colors">
-                        {/* Name & Avatar */}
-                        <td className="py-3 px-4">
+                        {/* Member */}
+                        <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                               {staff.full_name ? staff.full_name.charAt(0).toUpperCase() : 'S'}
@@ -552,21 +741,34 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                         </td>
 
                         {/* Contact */}
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4">
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5 text-slate-700 font-mono text-[11px]">
-                              <Phone size={11} className="text-slate-400" />
+                              <Phone size={12} className="text-slate-400" />
                               <span>+91 {staff.phone_number || '—'}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
-                              <Mail size={11} className="text-slate-400" />
-                              <span className="truncate max-w-[180px]">{staff.email || `${staff.phone_number}@chitfund.internal`}</span>
+                            <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
+                              <Mail size={12} className="text-slate-400 shrink-0" />
+                              {staffEmail ? (
+                                <span className="truncate max-w-[220px] font-mono text-slate-800 font-medium">{staffEmail}</span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 italic">
+                                  <span>No email assigned</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditStaff(staff)}
+                                    className="text-[10px] font-bold text-indigo-600 hover:underline not-italic cursor-pointer"
+                                  >
+                                    + Add
+                                  </button>
+                                </span>
+                              )}
                             </div>
                           </div>
                         </td>
 
                         {/* Role Select Dropdown */}
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4">
                           <select
                             value={staff.role}
                             onChange={(e) => handleUpdateStaffRole(staff.id, e.target.value, staff.full_name)}
@@ -582,14 +784,20 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                         </td>
 
                         {/* Status */}
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4">
                           {staff.is_blocked ? (
-                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                            <span 
+                              className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200"
+                              title="Portal access suspended (user cannot log in)"
+                            >
                               <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                               Suspended
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            <span 
+                              className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200"
+                              title="Active workforce credentials verified"
+                            >
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                               Active Access
                             </span>
@@ -597,8 +805,19 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                         </td>
 
                         {/* Actions */}
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-3.5 px-4 text-right">
                           <div className="inline-flex items-center gap-1.5 justify-end">
+                            {/* 1. Edit Staff */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditStaff(staff)}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                              title="Edit Staff Details"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+
+                            {/* 2. Reset Password */}
                             <button
                               type="button"
                               onClick={() => {
@@ -611,6 +830,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                               <KeyRound size={14} />
                             </button>
 
+                            {/* 3. Suspend Access (Lockout) */}
                             <button
                               type="button"
                               onClick={() => handleToggleStaffStatus(staff)}
@@ -618,11 +838,22 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                                 staff.is_blocked
                                   ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700'
-                                  : 'bg-rose-100 hover:bg-rose-200 text-rose-700'
+                                  : 'bg-amber-100 hover:bg-amber-200 text-amber-800'
                               } disabled:opacity-40 disabled:cursor-not-allowed`}
-                              title={staff.is_blocked ? 'Reactivate Account' : 'Suspend Access'}
+                              title={staff.is_blocked ? 'Reactivate Account' : 'Suspend Access (Lockout)'}
                             >
                               <ShieldAlert size={14} />
+                            </button>
+
+                            {/* 4. Delete Staff Permanently */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDeleteStaff(staff)}
+                              disabled={isSelf}
+                              className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              title="Permanently Remove Staff Member"
+                            >
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </td>
@@ -638,6 +869,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
               {filteredStaff.map((staff) => {
                 const roleBadge = getRoleStyle(staff.role);
                 const isSelf = staff.id === currentAdminProfile?.id;
+                const staffEmail = resolveStaffEmail(staff);
 
                 return (
                   <div key={staff.id} className="p-4 space-y-3">
@@ -653,6 +885,15 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                           <span className="text-[11px] text-slate-500 font-mono block">
                             +91 {staff.phone_number || '—'}
                           </span>
+                          {staffEmail ? (
+                            <span className="text-[10px] text-slate-600 font-mono block truncate max-w-[200px]">
+                              {staffEmail}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic block">
+                              No email assigned
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -686,31 +927,54 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                     </div>
 
                     {/* Mobile Actions Bar */}
-                    <div className="flex items-center justify-between pt-1">
+                    <div className="grid grid-cols-4 gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditStaff(staff)}
+                        className="text-xs font-bold text-slate-700 flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 cursor-pointer"
+                        title="Edit Details"
+                      >
+                        <Edit3 size={13} />
+                        <span>Edit</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedStaff(staff);
                           setIsResetPasswordOpen(true);
                         }}
-                        className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 cursor-pointer"
+                        className="text-xs font-bold text-slate-700 flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 cursor-pointer"
+                        title="Reset Password"
                       >
                         <KeyRound size={13} />
-                        <span>Reset Password</span>
+                        <span>Key</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => handleToggleStaffStatus(staff)}
                         disabled={isSelf}
-                        className={`text-xs font-bold flex items-center gap-1.5 py-1 px-2.5 rounded-lg cursor-pointer ${
+                        className={`text-xs font-bold flex items-center justify-center gap-1 py-2 px-2 rounded-xl cursor-pointer ${
                           staff.is_blocked
                             ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800'
                         } disabled:opacity-40`}
+                        title={staff.is_blocked ? 'Reactivate' : 'Suspend Access'}
                       >
                         <ShieldAlert size={13} />
-                        <span>{staff.is_blocked ? 'Reactivate' : 'Suspend'}</span>
+                        <span>{staff.is_blocked ? 'Unlock' : 'Lock'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDeleteStaff(staff)}
+                        disabled={isSelf}
+                        className="text-xs font-bold text-rose-700 flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-rose-50 hover:bg-rose-100 cursor-pointer disabled:opacity-40"
+                        title="Delete Permanently"
+                      >
+                        <Trash2 size={13} />
+                        <span>Delete</span>
                       </button>
                     </div>
                   </div>
@@ -736,18 +1000,15 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
         </div>
       )}
 
-      {/* ── MODAL: ADD / PROVISION NEW STAFF MEMBER ── */}
+      {/* ── MODAL 1: ADD / PROVISION NEW STAFF MEMBER ── */}
       {isAddStaffOpen && (
         <div className="fixed inset-0 z-50 flex items-center sm:items-center justify-center p-0 sm:p-4">
-          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-in fade-in"
             onClick={() => !isSubmittingStaff && setIsAddStaffOpen(false)}
           />
 
-          {/* Modal / Mobile Bottom Sheet */}
           <div className="relative bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl border-t sm:border border-slate-200 z-50 p-5 sm:p-6 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-            {/* Grab handle for mobile */}
             <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 sm:hidden" />
 
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -808,7 +1069,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                 <input
                   type="email"
                   required
-                  placeholder="e.g. ramesh.agent@chitfund.com"
+                  placeholder="e.g. ramesh.agent@gmail.com"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
@@ -862,7 +1123,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                     type={showNewPassword ? 'text' : 'password'}
                     required
                     minLength={6}
-                    placeholder="e.g. AgentPass@2026"
+                    placeholder="e.g. StaffPass@2026"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 pr-10"
@@ -910,7 +1171,196 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
         </div>
       )}
 
-      {/* ── MODAL: RESET PASSWORD ── */}
+      {/* ── MODAL 2: EDIT STAFF DETAILS ── */}
+      {isEditStaffOpen && selectedStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+            onClick={() => !isSavingEdit && setIsEditStaffOpen(false)}
+          />
+
+          <div className="relative bg-white w-full max-w-md rounded-3xl border border-slate-200 z-50 p-6 shadow-2xl animate-in zoom-in-95 duration-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                  <Edit3 size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Edit Staff Profile</h3>
+                  <p className="text-[10px] text-slate-400">Modify workforce identity and permissions</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditStaffOpen(false)}
+                disabled={isSavingEdit}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle size={15} className="shrink-0" />
+                <span>{editError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEditStaff} className="space-y-3.5">
+              {/* Full Name */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  Full Legal Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              {/* Work Email */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  Official Work Email (Login ID)
+                </label>
+                <input
+                  type="email"
+                  placeholder="e.g. staff.member@gmail.com"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  Mobile Number (10 Digits) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+91</span>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, ''))}
+                    className="w-full pl-12 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  />
+                </div>
+              </div>
+
+              {/* Role */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  Assigned System Role <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                  disabled={selectedStaff.id === currentAdminProfile?.id}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 cursor-pointer disabled:opacity-60"
+                >
+                  {availableRoles.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedStaff.id === currentAdminProfile?.id && (
+                  <span className="text-[10px] text-amber-600 mt-1 block">
+                    Your own administrator role cannot be altered here.
+                  </span>
+                )}
+              </div>
+
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditStaffOpen(false)}
+                  disabled={isSavingEdit}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-500/20 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 3: PERMANENT DELETE STAFF CONFIRMATION ── */}
+      {isDeleteStaffOpen && selectedStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+            onClick={() => !isDeletingStaff && setIsDeleteStaffOpen(false)}
+          />
+
+          <div className="relative bg-white w-full max-w-sm rounded-3xl border border-rose-200 z-50 p-6 shadow-2xl animate-in zoom-in-95 duration-200 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-sm">
+              <UserX size={24} />
+            </div>
+
+            <div className="text-center">
+              <h3 className="text-base font-bold text-slate-900">Permanently Remove Staff?</h3>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Are you sure you want to remove <strong>{selectedStaff.full_name}</strong> from staff access?
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-100 text-[11px] text-rose-800 leading-relaxed">
+              ⚠️ This will permanently revoke their workforce privileges and remove them from the staff roster.
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsDeleteStaffOpen(false)}
+                disabled={isDeletingStaff}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Keep Staff
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteStaff}
+                disabled={isDeletingStaff}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-rose-600/25 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isDeletingStaff ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin" />
+                    <span>Removing...</span>
+                  </>
+                ) : (
+                  <span>Yes, Delete</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 4: RESET PASSWORD (CREDENTIAL OVERRIDE) ── */}
       {isResetPasswordOpen && selectedStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -944,9 +1394,15 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
               </div>
             )}
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Trigger a secure password reset link to <strong>{selectedStaff.email || `${selectedStaff.phone_number}@chitfund.internal`}</strong>.
-            </p>
+            {resolveStaffEmail(selectedStaff) ? (
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Trigger a secure password reset link to <strong>{resolveStaffEmail(selectedStaff)}</strong>.
+              </p>
+            ) : (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
+                No email address is registered for this staff member. Please use <strong>Edit</strong> to assign their official work email before triggering a reset link.
+              </div>
+            )}
 
             <div className="flex items-center gap-2 pt-2">
               <button
@@ -959,7 +1415,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
               <button
                 type="button"
                 onClick={() => handleSendPasswordResetEmail(selectedStaff)}
-                disabled={isResettingPassword}
+                disabled={isResettingPassword || !resolveStaffEmail(selectedStaff)}
                 className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-amber-500/20 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 {isResettingPassword ? (
