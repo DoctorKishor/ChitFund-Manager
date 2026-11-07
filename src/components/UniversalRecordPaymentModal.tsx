@@ -923,6 +923,7 @@ export default function UniversalRecordPaymentModal({
           action_description: `TREASURY UPDATE NOTE: Collection ₹${totalCollectionAmount.toLocaleString('en-IN')} recorded in batch [${batchId}], but automated treasury wallet credit had a note: ${balRes.error}`,
           target_table: 'global_treasury',
         });
+        alert(`Note: Payment transaction recorded successfully, but treasury balance sync reported: ${balRes.error}`);
       }
 
       // 6. Security Audit Log

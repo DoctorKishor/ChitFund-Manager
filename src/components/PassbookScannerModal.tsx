@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import jsQR from 'jsqr';
-import { X, Camera, RefreshCw, AlertTriangle, ShieldCheck, Zap, ZapOff, Check, Sparkles, SwitchCamera } from 'lucide-react';
+import { X, Camera, RefreshCw, AlertTriangle, ShieldCheck, Zap, ZapOff, Check, SwitchCamera } from 'lucide-react';
 import { triggerHapticFeedback } from '@/utils/haptics';
 
 interface PassbookScannerModalProps {
@@ -71,7 +71,6 @@ export default function PassbookScannerModal({
 }: PassbookScannerModalProps) {
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [scannerWarning, setScannerWarning] = useState<string | null>(null);
-  const [testPayload, setTestPayload] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [hasTorch, setHasTorch] = useState<boolean>(false);
@@ -159,7 +158,6 @@ export default function PassbookScannerModal({
     if (!validation.isValid || !validation.token) {
       triggerHapticFeedback('warning');
       setScannerWarning(validation.error || 'Unrecognized QR code format.');
-      setTestPayload(decodedText);
 
       if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
       warningTimeoutRef.current = setTimeout(() => {
@@ -211,7 +209,6 @@ export default function PassbookScannerModal({
     isProcessingRef.current = false;
     setScannerError(null);
     setScannerWarning(null);
-    setTestPayload(null);
     setIsLocked(false);
     setIsProcessing(false);
     setTargetBox({ centerX: 0, centerY: 0, width: 240, height: 240, angle: 0, isTracking: false });
@@ -401,7 +398,6 @@ export default function PassbookScannerModal({
     isProcessingRef.current = false;
     setScannerError(null);
     setScannerWarning(null);
-    setTestPayload(null);
     setIsProcessing(false);
     setIsLocked(false);
     setTargetBox({ centerX: 0, centerY: 0, width: 240, height: 240, angle: 0, isTracking: false });
@@ -416,27 +412,6 @@ export default function PassbookScannerModal({
     stopCurrentStream();
     if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
     onClose();
-  };
-
-  // Helper to simulate valid passbook token if testing with external QR code
-  const handleSimulateTestScan = async () => {
-    if (!testPayload) return;
-    triggerHapticFeedback('success');
-    setIsLocked(true);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    setIsProcessing(true);
-    stopCurrentStream();
-
-    const fallbackUuid = '00000000-0000-0000-0000-' + Math.random().toString(16).slice(2, 14).padEnd(12, '0');
-    try {
-      await onScanSuccess(fallbackUuid);
-    } catch (err: any) {
-      setScannerError(err.message || 'Error processing test token.');
-      setIsProcessing(false);
-      setIsLocked(false);
-      isLockedRef.current = false;
-      isProcessingRef.current = false;
-    }
   };
 
   return (
@@ -613,17 +588,6 @@ export default function PassbookScannerModal({
                 <AlertTriangle size={15} className="shrink-0" />
                 <span>{scannerWarning}</span>
               </div>
-              {/* Testing helper: allow simulating passbook with any scanned code */}
-              {testPayload && (
-                <button
-                  type="button"
-                  onClick={handleSimulateTestScan}
-                  className="px-3 py-1 rounded-full bg-white/90 text-slate-900 font-bold text-[10px] shadow-md border border-white/80 hover:bg-white active:scale-95 transition-transform flex items-center gap-1 cursor-pointer pointer-events-auto"
-                >
-                  <Sparkles size={11} className="text-brand-600" />
-                  <span>Test Pair With This Code</span>
-                </button>
-              )}
             </div>
           ) : scannerError ? (
             <div className="p-3 rounded-2xl bg-white/95 text-rose-900 text-xs shadow-lg backdrop-blur-md flex flex-col items-center gap-2 border border-rose-200 max-w-xs text-center animate-in fade-in">

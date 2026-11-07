@@ -2401,15 +2401,18 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         return;
       }
 
-      // 3. Adjust treasury balances accurately
+      // 3. Adjust treasury balances accurately with outflow awareness
+      const isOutflow = editingTransaction.type === 'payout' || editingTransaction.type === 'personal_draw' || editingTransaction.type === 'organizer_profit' || editingTransaction.type === 'atm_withdrawal';
       if (oldWallet === newWallet) {
-        const delta = newAmt - oldAmt;
+        const delta = isOutflow ? -(newAmt - oldAmt) : (newAmt - oldAmt);
         if (delta !== 0) {
           await updateBalance(newWallet as any, delta);
         }
       } else {
-        await updateBalance(oldWallet as any, -oldAmt);
-        await updateBalance(newWallet as any, newAmt);
+        const refundOld = isOutflow ? oldAmt : -oldAmt;
+        const applyNew = isOutflow ? -newAmt : newAmt;
+        await updateBalance(oldWallet as any, refundOld);
+        await updateBalance(newWallet as any, applyNew);
       }
 
       // 4. Audit log
@@ -2472,7 +2475,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       }
 
       // 2. Revert wallet balance (outflows credit back, inflows debit)
-      const isOutflow = tx.type === 'payout' || tx.type === 'personal_draw' || tx.type === 'organizer_profit';
+      const isOutflow = tx.type === 'payout' || tx.type === 'personal_draw' || tx.type === 'organizer_profit' || tx.type === 'atm_withdrawal';
       const balanceDelta = isOutflow ? amt : -amt;
       await updateBalance(tx.wallet_type as any, balanceDelta);
 

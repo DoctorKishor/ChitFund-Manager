@@ -331,25 +331,25 @@ begin
       if new.type = 'collection' then
         log_description := 'Recorded collection of ₹' || trim(to_char(new.amount, '99,99,999')) || 
                            ' for ' || coalesce(target_member_name, 'Member') || 
-                           ' (' || replace(coalesce(new.payment_method, new.wallet_type, 'cash'), '_', ' ') || 
-                           ', Month ' || coalesce(new.month::text, '0') || ')';
+                           ' (' || replace(coalesce(new.wallet_type, 'cash'), '_', ' ') || 
+                           ', Month ' || coalesce(new.cycle_month::text, '0') || ')';
       elsif new.type = 'payout' then
         log_description := 'Disbursed auction prize payout of ₹' || trim(to_char(new.amount, '99,99,999')) || 
                            ' to ' || coalesce(target_member_name, 'Winner') || 
-                           ' from ' || replace(coalesce(new.payment_method, new.wallet_type, 'bank'), '_', ' ');
+                           ' from ' || replace(coalesce(new.wallet_type, 'bank'), '_', ' ');
       elsif new.type = 'personal_draw' then
         log_description := 'Logged personal draw of ₹' || trim(to_char(new.amount, '99,99,999')) || 
-                           ' from ' || replace(coalesce(new.payment_method, new.wallet_type, 'cash'), '_', ' ') || 
+                           ' from ' || replace(coalesce(new.wallet_type, 'cash'), '_', ' ') || 
                            coalesce(' (' || nullif(new.notes, '') || ')', '');
       elsif new.type = 'atm_withdrawal' then
         log_description := 'Logged ATM cash withdrawal of ₹' || trim(to_char(new.amount, '99,99,999')) || 
-                           ' from ' || replace(coalesce(new.payment_method, new.wallet_type, 'bank'), '_', ' ');
+                           ' from ' || replace(coalesce(new.wallet_type, 'bank'), '_', ' ');
       elsif new.type = 'transfer' then
         log_description := 'Transferred ₹' || trim(to_char(new.amount, '99,99,999')) || 
-                           ' from ' || replace(coalesce(new.payment_method, new.wallet_type, 'account'), '_', ' ');
+                           ' from ' || replace(coalesce(new.wallet_type, 'account'), '_', ' ');
       else
         log_description := 'Recorded ' || replace(new.type, '_', ' ') || ' of ₹' || trim(to_char(new.amount, '99,99,999')) || 
-                           ' via ' || replace(coalesce(new.payment_method, new.wallet_type, ''), '_', ' ');
+                           ' via ' || replace(coalesce(new.wallet_type, ''), '_', ' ');
       end if;
     elsif TG_OP = 'UPDATE' then
       declare
@@ -358,11 +358,11 @@ begin
         if new.amount is distinct from old.amount then
           changes := array_append(changes, 'Amount: ₹' || trim(to_char(old.amount, '99,99,999')) || ' → ₹' || trim(to_char(new.amount, '99,99,999')));
         end if;
-        if new.payment_method is distinct from old.payment_method or new.wallet_type is distinct from old.wallet_type then
-          changes := array_append(changes, 'Vault: ' || replace(coalesce(old.payment_method, old.wallet_type, 'N/A'), '_', ' ') || ' → ' || replace(coalesce(new.payment_method, new.wallet_type, 'N/A'), '_', ' '));
+        if new.wallet_type is distinct from old.wallet_type then
+          changes := array_append(changes, 'Vault: ' || replace(coalesce(old.wallet_type, 'N/A'), '_', ' ') || ' → ' || replace(coalesce(new.wallet_type, 'N/A'), '_', ' '));
         end if;
-        if new.month is distinct from old.month then
-          changes := array_append(changes, 'Cycle: Month ' || coalesce(old.month::text, '0') || ' → Month ' || coalesce(new.month::text, '0'));
+        if new.cycle_month is distinct from old.cycle_month then
+          changes := array_append(changes, 'Cycle: Month ' || coalesce(old.cycle_month::text, '0') || ' → Month ' || coalesce(new.cycle_month::text, '0'));
         end if;
         if new.status is distinct from old.status then
           changes := array_append(changes, 'Status: ' || upper(coalesce(old.status, 'pending')) || ' → ' || upper(coalesce(new.status, 'completed')));
@@ -376,7 +376,7 @@ begin
       end;
     elsif TG_OP = 'DELETE' then
       log_description := 'Deleted ' || replace(old.type, '_', ' ') || ' transaction of ₹' || trim(to_char(old.amount, '99,99,999')) || 
-                         ' (' || replace(coalesce(old.payment_method, old.wallet_type, ''), '_', ' ') || ')';
+                         ' (' || replace(coalesce(old.wallet_type, ''), '_', ' ') || ')';
     end if;
 
   -- 3. CHIT GROUPS TABLE
@@ -414,10 +414,10 @@ begin
   elsif TG_TABLE_NAME = 'group_members' then
     if TG_OP = 'DELETE' then
       select p.full_name into target_member_name from public.profiles p where p.id = old.profile_id;
-      select cg.name into target_group_name from public.chit_groups cg where cg.id = old.chit_group_id;
+      select cg.name into target_group_name from public.chit_groups cg where cg.id = old.group_id;
     else
       select p.full_name into target_member_name from public.profiles p where p.id = new.profile_id;
-      select cg.name into target_group_name from public.chit_groups cg where cg.id = new.chit_group_id;
+      select cg.name into target_group_name from public.chit_groups cg where cg.id = new.group_id;
     end if;
 
     if TG_OP = 'INSERT' then
@@ -428,9 +428,9 @@ begin
       declare
         changes text[] := array[]::text[];
       begin
-        if new.has_won is true and (old.has_won is not true or old.has_won is null) then
-          changes := array_append(changes, 'Marked as Winner (Win Month: ' || coalesce(new.win_month::text, '1') || ')');
-        elsif new.has_won is false and old.has_won is true then
+        if new.has_won_regular is true and (old.has_won_regular is not true or old.has_won_regular is null) then
+          changes := array_append(changes, 'Marked as Winner');
+        elsif new.has_won_regular is false and old.has_won_regular is true then
           changes := array_append(changes, 'Winner status revoked');
         end if;
         if new.ticket_number is distinct from old.ticket_number then
@@ -450,16 +450,15 @@ begin
   -- 5. AUCTION LOGS TABLE
   elsif TG_TABLE_NAME = 'auction_logs' then
     if TG_OP = 'DELETE' then
-      select cg.name into target_group_name from public.chit_groups cg where cg.id = old.chit_group_id;
+      select cg.name into target_group_name from public.chit_groups cg where cg.id = old.group_id;
     else
-      select cg.name into target_group_name from public.chit_groups cg where cg.id = new.chit_group_id;
+      select cg.name into target_group_name from public.chit_groups cg where cg.id = new.group_id;
     end if;
 
     if TG_OP = 'INSERT' then
       log_description := 'Conducted Month ' || new.month::text || ' live auction' || 
                          coalesce(' for "' || target_group_name || '"', '') || 
-                         ' — Winning Bid: ₹' || trim(to_char(new.winning_bid, '99,99,999')) || 
-                         ', Net Payout: ₹' || trim(to_char(coalesce(new.net_payout, 0), '99,99,999'));
+                         ' — Winning Discount: ₹' || trim(to_char(new.winning_discount, '99,99,999'));
     elsif TG_OP = 'UPDATE' then
       log_description := 'Updated Month ' || new.month::text || ' auction record' || coalesce(' for "' || target_group_name || '"', '');
     elsif TG_OP = 'DELETE' then
@@ -469,7 +468,7 @@ begin
   -- 6. GLOBAL TREASURY TABLE
   elsif TG_TABLE_NAME = 'global_treasury' then
     if TG_OP = 'UPDATE' then
-      log_description := 'Updated ' || replace(new.wallet_type, '_', ' ') || ' balance to ₹' || trim(to_char(new.balance, '99,99,999'));
+      log_description := 'Updated ' || replace(new.wallet_type, '_', ' ') || ' balance to ₹' || trim(to_char(new.current_balance, '99,99,999'));
     else
       log_description := TG_OP || ' on treasury wallet: ' || replace(new.wallet_type, '_', ' ');
     end if;
