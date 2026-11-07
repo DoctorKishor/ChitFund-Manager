@@ -311,7 +311,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
         setAllAuctionLogs(logsData);
       }
 
-      let resolvedProfiles = profilesData || [];
+      let resolvedProfiles = (profilesData || []).filter((p: any) => p.role === 'subscriber' || !p.role);
       let resolvedMemberGroups = memberGroupsData || [];
 
       // Fallback for Phone+PIN Admin Login (when direct table queries return empty due to anon RLS)

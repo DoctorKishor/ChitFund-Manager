@@ -36,7 +36,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [lastChangedWallet, setLastChangedWallet] = useState<WalletType | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const isPrivileged = profile?.role === 'admin' || profile?.role === 'manager';
+  const isPrivileged = Boolean(profile && profile.role !== 'subscriber');
 
   // Fetch balances from Supabase & seed if empty (Admin/Manager only)
   const fetchTreasury = useCallback(async () => {
