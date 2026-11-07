@@ -1067,16 +1067,16 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
       {/* ═══════════════════════════════════════════════════════════════════
           MOBILE VIEW (Full width touch-first — block lg:hidden)
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="block lg:hidden w-full -m-4 bg-[#F8FAFC] min-h-screen flex flex-col pb-20">
+      <div className="block lg:hidden w-full bg-[#F8FAFC] min-h-screen flex flex-col pb-20">
         
         {/* Mobile Top Bar */}
-        <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 safe-top">
+        <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100">
           {/* App Title & Quick Language Toggle */}
-          <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-100/80">
+          <div className="px-4 py-3.5 flex items-center justify-between border-b border-slate-100/80">
             <div className="flex items-center gap-2">
               <div>
-                <h1 className="text-sm font-extrabold text-slate-900 leading-tight">WhatsApp Broadcast</h1>
-                <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                <h1 className="text-base font-extrabold text-slate-900 leading-tight">WhatsApp Broadcast</h1>
+                <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                   Direct Group Dispatch
                 </p>

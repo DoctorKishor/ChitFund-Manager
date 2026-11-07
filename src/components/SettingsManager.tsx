@@ -359,20 +359,20 @@ export default function SettingsManager() {
           MOBILE VIEW (Full width touch-first — block lg:hidden)
           Spacious, Clean, Touch-First UI with Zero Unnecessary Clutter
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="block lg:hidden w-full -m-4 bg-[#F8FAFC] min-h-screen flex flex-col pb-24">
+      <div className="block lg:hidden w-full bg-[#F8FAFC] min-h-screen flex flex-col pb-24">
         
         {/* Top App Bar */}
-        <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 safe-top">
+        <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100">
           {/* App Header */}
-          <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-100/80">
+          <div className="px-4 py-3.5 flex items-center justify-between border-b border-slate-100/80">
             <div>
-              <h1 className="text-sm font-extrabold text-slate-900 leading-tight">Portal Settings</h1>
-              <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+              <h1 className="text-base font-extrabold text-slate-900 leading-tight">Portal Settings</h1>
+              <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 System Controls &amp; Branding
               </p>
             </div>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-brand-50 text-brand-700 border border-brand-200">
+            <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 border border-brand-200">
               Admin
             </span>
           </div>
