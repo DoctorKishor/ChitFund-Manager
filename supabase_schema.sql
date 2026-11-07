@@ -24,6 +24,36 @@ create table public.custom_roles (
   updated_at timestamp with time zone not null default timezone('utc'::text, now())
 );
 
+-- Seed default system & operational roles
+insert into public.custom_roles (id, name, description, color, is_system, is_privileged, allowed_tabs, allowed_actions)
+values
+  ('admin', 'Administrator', 'Full unrestricted system control, treasury vaults, role assignment & audit logs', '#9333ea', true, true, 
+   array['dashboard', 'chits', 'members', 'auctions', 'cash', 'reports', 'communication', 'users', 'settings'], 
+   array['chits:create', 'chits:edit', 'chits:delete', 'chits:view', 'members:enroll', 'members:edit', 'members:delete', 'members:view', 'members:collect', 'auctions:bid', 'auctions:conduct', 'auctions:disburse', 'auctions:view', 'treasury:view', 'treasury:move_money', 'treasury:deposit', 'treasury:personal_draw', 'treasury:recover_float', 'treasury:reconcile', 'treasury:collect_cash', 'communication:broadcast', 'communication:view', 'reports:export', 'reports:view', 'system:manage_users']),
+  ('manager', 'Manager', 'Operational management, member enrollment, live bidding arena & WhatsApp dispatch', '#2563eb', true, true, 
+   array['dashboard', 'chits', 'members', 'auctions', 'communication'], 
+   array['chits:view', 'chits:edit', 'members:view', 'members:enroll', 'members:edit', 'members:collect', 'auctions:view', 'auctions:bid', 'auctions:conduct', 'auctions:disburse', 'communication:view', 'communication:broadcast']),
+  ('collections_agent', 'Collections Agent', 'Ground field agent: offline collections, booklet QR scanner pairing & payment broadcast', '#f59e0b', false, false, 
+   array['dashboard', 'members', 'communication'], 
+   array['members:view', 'members:collect', 'members:pair_qr', 'communication:view', 'communication:broadcast', 'treasury:collect_cash']),
+  ('auction_clerk', 'Auction Clerk', 'Assists organizer during monthly live bidding sessions by recording shouted proxy discounts', '#a855f7', false, false, 
+   array['dashboard', 'chits', 'members', 'auctions'], 
+   array['chits:view', 'auctions:view', 'auctions:bid']),
+  ('auditor', 'Auditor / CA', 'Read-only financial auditor access for balance sheets, ledger downloads & dividend statements', '#0d9488', false, false, 
+   array['dashboard', 'chits', 'members', 'cash', 'reports'], 
+   array['reports:export', 'reports:view', 'treasury:view']),
+  ('subscriber', 'Subscriber', 'Member portal: personal enrolled chits, ledger & live auction bidding room', '#10b981', true, false, 
+   array['dashboard', 'chits', 'members', 'auctions'], 
+   array['chits:view', 'members:view', 'auctions:bid', 'auctions:view'])
+on conflict (id) do update 
+set name = excluded.name,
+    description = excluded.description,
+    color = excluded.color,
+    is_system = excluded.is_system,
+    is_privileged = excluded.is_privileged,
+    allowed_tabs = excluded.allowed_tabs,
+    allowed_actions = excluded.allowed_actions;
+
 -- profiles: User profiles extending Supabase auth.users
 create table public.profiles (
   id uuid primary key default gen_random_uuid(),

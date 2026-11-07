@@ -47,14 +47,21 @@ export default function MobileBottomNav({
   onOpenDrawer,
   onQuickRecord 
 }: MobileBottomNavProps) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, canAccessTab, canPerformAction } = useAuth();
   const activeUserRole = profile?.role || 'subscriber';
   const isSubscriber = activeUserRole === 'subscriber';
+
+  // Permission checks for Center "+" Quick Actions
+  const canCollect = canPerformAction('members:collect') || canPerformAction('treasury:collect_cash');
+  const canAtm = canPerformAction('treasury:move_money');
+  const canPersonalDraw = canPerformAction('treasury:personal_draw');
+  const canBroadcast = canPerformAction('communication:broadcast');
+  const hasAnyQuickAction = !isSubscriber && (canCollect || canAtm || canPersonalDraw || canBroadcast);
 
   // Bottom Sheet State for "More" Navigation
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
 
-  // Stack of 4 Cards State for Center "+" Button
+  // Stack of Cards State for Center "+" Button
   const [isActionStackOpen, setIsActionStackOpen] = useState(false);
 
   const handleToggleActionStack = () => {
@@ -89,23 +96,47 @@ export default function MobileBottomNav({
     setIsActionStackOpen(false);
   };
 
-  // Full list of secondary tabs available inside the "More" bottom sheet
-  const moreOptions: MoreNavOption[] = [
+  // Full list of potential workspaces in priority order
+  const allNavOptions: MoreNavOption[] = [
+    {
+      id: 'dashboard',
+      name: 'Overview',
+      desc: 'Summary & Velocity',
+      icon: LayoutDashboard,
+      iconColor: 'text-indigo-600',
+      bgColor: 'bg-indigo-50 border-indigo-100',
+    },
+    {
+      id: 'chits',
+      name: 'Chits',
+      desc: 'Schemes & Pool Roster',
+      icon: Briefcase,
+      iconColor: 'text-blue-600',
+      bgColor: 'bg-blue-50 border-blue-100',
+    },
     {
       id: 'members',
       name: 'Members',
       desc: 'Directory & Passbooks',
       icon: Users,
-      iconColor: 'text-indigo-600',
-      bgColor: 'bg-indigo-50 border-indigo-100',
+      iconColor: 'text-violet-600',
+      bgColor: 'bg-violet-50 border-violet-100',
     },
     {
-      id: 'cash',
-      name: 'Treasury',
-      desc: 'Cash Box & 3 Banks',
-      icon: Vault,
+      id: 'auctions',
+      name: 'Auctions',
+      desc: 'Bidding Arena & Pot',
+      icon: Gavel,
       iconColor: 'text-amber-600',
       bgColor: 'bg-amber-50 border-amber-100',
+    },
+    {
+      id: 'communication',
+      name: 'Broadcast',
+      desc: 'WhatsApp & SMS Alerts',
+      icon: MessageSquare,
+      iconColor: 'text-sky-600',
+      bgColor: 'bg-sky-50 border-sky-100',
     },
     {
       id: 'reports',
@@ -116,12 +147,12 @@ export default function MobileBottomNav({
       bgColor: 'bg-emerald-50 border-emerald-100',
     },
     {
-      id: 'communication',
-      name: 'Broadcast',
-      desc: 'WhatsApp & SMS Alerts',
-      icon: MessageSquare,
-      iconColor: 'text-sky-600',
-      bgColor: 'bg-sky-50 border-sky-100',
+      id: 'cash',
+      name: 'Treasury',
+      desc: 'Cash Box & 3 Banks',
+      icon: Vault,
+      iconColor: 'text-amber-600',
+      bgColor: 'bg-amber-50 border-amber-100',
     },
     {
       id: 'settings',
@@ -133,16 +164,25 @@ export default function MobileBottomNav({
     },
   ];
 
-  // Filter based on user RBAC permissions
-  const accessibleMoreOptions = moreOptions.filter(opt => canAccessTab(activeUserRole, opt.id));
+  // Strictly filter options by active role and custom permissions
+  const accessibleOptions = allNavOptions.filter(opt => canAccessTab(opt.id));
 
-  // Determine which icon and label to show on the 5th tab button
+  // Determine bottom bar split
+  const needsMoreTab = accessibleOptions.length > 4;
+  const primaryBarTabs = needsMoreTab ? accessibleOptions.slice(0, 3) : accessibleOptions;
+  const sheetTabs = needsMoreTab ? accessibleOptions.slice(3) : [];
+
+  const mid = needsMoreTab ? 2 : Math.ceil(primaryBarTabs.length / 2);
+  const leftTabs = primaryBarTabs.slice(0, mid);
+  const rightTabs = primaryBarTabs.slice(mid);
+
+  // Determine 5th tab indicator when secondary tab is active
   const getFifthTabInfo = () => {
-    const activeMoreOption = moreOptions.find(opt => opt.id === activeTab);
-    if (activeMoreOption) {
+    const activeSheetOption = sheetTabs.find(opt => opt.id === activeTab);
+    if (activeSheetOption) {
       return {
-        label: activeMoreOption.name,
-        icon: activeMoreOption.icon,
+        label: activeSheetOption.name,
+        icon: activeSheetOption.icon,
         isActive: true,
       };
     }
@@ -166,8 +206,8 @@ export default function MobileBottomNav({
         />
       )}
 
-      {/* ── Quick Actions Stack of 4 Cards ── */}
-      {isActionStackOpen && (
+      {/* ── Quick Actions Stack of Authorized Cards ── */}
+      {isActionStackOpen && hasAnyQuickAction && (
         <div 
           className="fixed bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+4.25rem))] inset-x-3 sm:inset-x-6 max-w-sm mx-auto z-50 flex flex-col gap-2 animate-in slide-in-from-bottom-5 fade-in duration-200 md:hidden select-none"
         >
@@ -188,112 +228,120 @@ export default function MobileBottomNav({
           </div>
 
           {/* Card 1: Quick Collect Payment */}
-          <button
-            type="button"
-            onClick={() => handleActionClick('collect')}
-            className="w-full bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-slate-200/90 shadow-xl shadow-slate-950/20 flex items-center justify-between gap-3 text-left active:scale-[0.98] transition-all cursor-pointer hover:bg-white hover:border-emerald-300 group"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/25 shrink-0 group-hover:scale-105 transition-transform">
-                <Coins size={20} className="stroke-[2.5]" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-slate-900 truncate">
-                    Quick Collect Payment
-                  </span>
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
-                    Collect
-                  </span>
+          {canCollect && (
+            <button
+              type="button"
+              onClick={() => handleActionClick('collect')}
+              className="w-full bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-slate-200/90 shadow-xl shadow-slate-950/20 flex items-center justify-between gap-3 text-left active:scale-[0.98] transition-all cursor-pointer hover:bg-white hover:border-emerald-300 group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/25 shrink-0 group-hover:scale-105 transition-transform">
+                  <Coins size={20} className="stroke-[2.5]" />
                 </div>
-                <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                  Record subscriber cash or bank installment
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900 truncate">
+                      Quick Collect Payment
+                    </span>
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                      Collect
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                    Record subscriber cash or bank installment
+                  </p>
+                </div>
               </div>
-            </div>
-            <ChevronRight size={18} className="text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
-          </button>
+              <ChevronRight size={18} className="text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </button>
+          )}
 
           {/* Card 2: ATM Withdrawal */}
-          <button
-            type="button"
-            onClick={() => handleActionClick('atm')}
-            className="w-full bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-slate-200/90 shadow-xl shadow-slate-950/20 flex items-center justify-between gap-3 text-left active:scale-[0.98] transition-all cursor-pointer hover:bg-white hover:border-sky-300 group"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center shadow-md shadow-sky-500/25 shrink-0 group-hover:scale-105 transition-transform">
-                <Landmark size={20} className="stroke-[2.5]" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-slate-900 truncate">
-                    ATM Withdrawal
-                  </span>
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded">
-                    Relocate
-                  </span>
+          {canAtm && (
+            <button
+              type="button"
+              onClick={() => handleActionClick('atm')}
+              className="w-full bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-slate-200/90 shadow-xl shadow-slate-950/20 flex items-center justify-between gap-3 text-left active:scale-[0.98] transition-all cursor-pointer hover:bg-white hover:border-sky-300 group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center shadow-md shadow-sky-500/25 shrink-0 group-hover:scale-105 transition-transform">
+                  <Landmark size={20} className="stroke-[2.5]" />
                 </div>
-                <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                  Debit bank account to Physical Cash Box
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900 truncate">
+                      ATM Withdrawal
+                    </span>
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded">
+                      Relocate
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                    Debit bank account to Physical Cash Box
+                  </p>
+                </div>
               </div>
-            </div>
-            <ChevronRight size={18} className="text-slate-400 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all shrink-0" />
-          </button>
+              <ChevronRight size={18} className="text-slate-400 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </button>
+          )}
 
           {/* Card 3: Personal Expense */}
-          <button
-            type="button"
-            onClick={() => handleActionClick('personal_draw')}
-            className="w-full bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-slate-200/90 shadow-xl shadow-slate-950/20 flex items-center justify-between gap-3 text-left active:scale-[0.98] transition-all cursor-pointer hover:bg-white hover:border-rose-300 group"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-md shadow-rose-500/25 shrink-0 group-hover:scale-105 transition-transform">
-                <MinusCircle size={20} className="stroke-[2.5]" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-slate-900 truncate">
-                    Personal Expense
-                  </span>
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded">
-                    Spend
-                  </span>
+          {canPersonalDraw && (
+            <button
+              type="button"
+              onClick={() => handleActionClick('personal_draw')}
+              className="w-full bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-slate-200/90 shadow-xl shadow-slate-950/20 flex items-center justify-between gap-3 text-left active:scale-[0.98] transition-all cursor-pointer hover:bg-white hover:border-rose-300 group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-md shadow-rose-500/25 shrink-0 group-hover:scale-105 transition-transform">
+                  <MinusCircle size={20} className="stroke-[2.5]" />
                 </div>
-                <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                  Log petrol, office or organizer cash draw
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900 truncate">
+                      Personal Expense
+                    </span>
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded">
+                      Spend
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                    Log petrol, office or organizer cash draw
+                  </p>
+                </div>
               </div>
-            </div>
-            <ChevronRight size={18} className="text-slate-400 group-hover:text-rose-600 group-hover:translate-x-0.5 transition-all shrink-0" />
-          </button>
+              <ChevronRight size={18} className="text-slate-400 group-hover:text-rose-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </button>
+          )}
 
           {/* Card 4: Send Reminders */}
-          <button
-            type="button"
-            onClick={() => handleActionClick('remind')}
-            className="w-full bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-slate-200/90 shadow-xl shadow-slate-950/20 flex items-center justify-between gap-3 text-left active:scale-[0.98] transition-all cursor-pointer hover:bg-white hover:border-indigo-300 group"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-md shadow-indigo-500/25 shrink-0 group-hover:scale-105 transition-transform">
-                <Bell size={20} className="stroke-[2.5]" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-slate-900 truncate">
-                    Send Reminders
-                  </span>
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
-                    WhatsApp
-                  </span>
+          {canBroadcast && (
+            <button
+              type="button"
+              onClick={() => handleActionClick('remind')}
+              className="w-full bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-slate-200/90 shadow-xl shadow-slate-950/20 flex items-center justify-between gap-3 text-left active:scale-[0.98] transition-all cursor-pointer hover:bg-white hover:border-indigo-300 group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-md shadow-indigo-500/25 shrink-0 group-hover:scale-105 transition-transform">
+                  <Bell size={20} className="stroke-[2.5]" />
                 </div>
-                <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                  Send 1-click WhatsApp alerts to pending dues
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900 truncate">
+                      Send Reminders
+                    </span>
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
+                      WhatsApp
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                    Send 1-click WhatsApp alerts to pending dues
+                  </p>
+                </div>
               </div>
-            </div>
-            <ChevronRight size={18} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0" />
-          </button>
+              <ChevronRight size={18} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </button>
+          )}
         </div>
       )}
 
@@ -303,44 +351,31 @@ export default function MobileBottomNav({
         data-purpose="tab-bar-navigation"
       >
         <div className="flex items-center justify-between relative max-w-md mx-auto">
-          {/* Tab 1: Overview Dashboard */}
-          <button
-            type="button"
-            onClick={() => handleSelectTab('dashboard')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
-              activeTab === 'dashboard' ? 'text-brand-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
-            }`}
-          >
-            <div className="w-6 h-6 flex items-center justify-center">
-              <LayoutDashboard 
-                size={20} 
-                strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} 
-                className={activeTab === 'dashboard' ? 'fill-current' : ''} 
-              />
-            </div>
-            <span className="text-[10px] mt-1 tracking-tight">
-              Overview
-            </span>
-          </button>
-
-          {/* Tab 2: Chits */}
-          <button
-            type="button"
-            onClick={() => handleSelectTab('chits')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
-              activeTab === 'chits' ? 'text-brand-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
-            }`}
-          >
-            <div className="w-6 h-6 flex items-center justify-center">
-              <Briefcase size={20} strokeWidth={activeTab === 'chits' ? 2.5 : 2} />
-            </div>
-            <span className="text-[10px] mt-1 tracking-tight">
-              Chits
-            </span>
-          </button>
+          {/* First Half of Permitted Tabs */}
+          {leftTabs.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleSelectTab(item.id)}
+                className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+                  isActive ? 'text-brand-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+                }`}
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-brand-600' : 'text-slate-400'} />
+                </div>
+                <span className="text-[10px] mt-1 tracking-tight truncate max-w-[54px]">
+                  {item.name}
+                </span>
+              </button>
+            );
+          })}
 
           {/* Center Elevated Floating Action Button (Quick Actions Trigger) */}
-          {!isSubscriber && (
+          {hasAnyQuickAction && (
             <div className="relative -top-5 flex justify-center flex-1">
               <button
                 onClick={handleToggleActionStack}
@@ -357,45 +392,53 @@ export default function MobileBottomNav({
             </div>
           )}
 
-          {/* Tab 3: Auctions */}
-          <button
-            type="button"
-            onClick={() => handleSelectTab('auctions')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
-              activeTab === 'auctions' ? 'text-brand-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
-            }`}
-          >
-            <div className="w-6 h-6 flex items-center justify-center">
-              <Gavel size={20} strokeWidth={activeTab === 'auctions' ? 2.5 : 2} />
-            </div>
-            <span className="text-[10px] mt-1 tracking-tight">
-              Auctions
-            </span>
-          </button>
+          {/* Second Half of Permitted Tabs */}
+          {rightTabs.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleSelectTab(item.id)}
+                className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+                  isActive ? 'text-brand-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+                }`}
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-brand-600' : 'text-slate-400'} />
+                </div>
+                <span className="text-[10px] mt-1 tracking-tight truncate max-w-[54px]">
+                  {item.name}
+                </span>
+              </button>
+            );
+          })}
 
-          {/* Tab 4: More / Dynamic Active Secondary Tab */}
-          <button
-            type="button"
-            onClick={() => {
-              triggerHapticFeedback('light');
-              setIsActionStackOpen(false);
-              setIsMoreSheetOpen(true);
-            }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer relative ${
-              fifthTab.isActive ? 'text-brand-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
-            }`}
-          >
-            <div className="w-6 h-6 flex items-center justify-center relative">
-              <FifthTabIcon size={20} strokeWidth={fifthTab.isActive ? 2.5 : 2} />
-              {/* Subtle indicator dot if a secondary tab is active */}
-              {fifthTab.isActive && (
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-600 absolute -top-0.5 -right-0.5" />
-              )}
-            </div>
-            <span className="text-[10px] mt-1 tracking-tight truncate max-w-[54px]">
-              {fifthTab.label}
-            </span>
-          </button>
+          {/* More Sheet Tab Trigger (Only when user has > 4 permitted tabs) */}
+          {needsMoreTab && (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHapticFeedback('light');
+                setIsActionStackOpen(false);
+                setIsMoreSheetOpen(true);
+              }}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer relative ${
+                fifthTab.isActive ? 'text-brand-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+              }`}
+            >
+              <div className="w-6 h-6 flex items-center justify-center relative">
+                <FifthTabIcon size={20} strokeWidth={fifthTab.isActive ? 2.5 : 2} />
+                {fifthTab.isActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-600 absolute -top-0.5 -right-0.5" />
+                )}
+              </div>
+              <span className="text-[10px] mt-1 tracking-tight truncate max-w-[54px]">
+                {fifthTab.label}
+              </span>
+            </button>
+          )}
         </div>
       </nav>
 
@@ -438,7 +481,7 @@ export default function MobileBottomNav({
 
             {/* Grid of Workspaces */}
             <div className="grid grid-cols-2 gap-2.5">
-              {accessibleMoreOptions.map((opt) => {
+              {sheetTabs.map((opt) => {
                 const Icon = opt.icon;
                 const isCurrent = activeTab === opt.id;
 
@@ -477,7 +520,7 @@ export default function MobileBottomNav({
               })}
 
               {/* Quick Collection Shortcut Tile */}
-              {!isSubscriber && (
+              {!isSubscriber && canCollect && (
                 <button
                   type="button"
                   onClick={() => {

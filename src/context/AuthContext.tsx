@@ -3,6 +3,13 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { User } from '@supabase/supabase-js';
+import { 
+  CustomRoleRecord, 
+  canAccessTab as checkCanAccessTab, 
+  hasPermission as checkHasPermission, 
+  MainTabId, 
+  PermissionAction 
+} from '@/utils/rbac';
 
 export type UserRole = 'admin' | 'manager' | 'subscriber' | string;
 
@@ -21,12 +28,17 @@ export interface UserProfile {
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
+  customRole: CustomRoleRecord | null;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateMpin: (oldPin: string, newPin: string) => Promise<{ success: boolean; error?: string }>;
   loginWithPassbookToken: (token: string) => Promise<{ success: boolean; error?: string }>;
   loginWithPhoneAndMpin: (phone: string, mpin: string) => Promise<{ success: boolean; error?: string }>;
+  canAccessTab: (tab: MainTabId) => boolean;
+  canPerformAction: (action: PermissionAction) => boolean;
+  allowedTabs: MainTabId[];
+  allowedActions: PermissionAction[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,7 +76,31 @@ const decodePhoneSession = (raw: string): { phone: string; mpin: string } | null
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [customRole, setCustomRole] = useState<CustomRoleRecord | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const fetchCustomRole = async (roleName?: string) => {
+    if (!roleName) {
+      setCustomRole(null);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('custom_roles')
+        .select('*')
+        .ilike('id', roleName)
+        .maybeSingle();
+
+      if (!error && data) {
+        setCustomRole(data as CustomRoleRecord);
+      } else {
+        setCustomRole(null);
+      }
+    } catch (err) {
+      console.warn('Failed to load custom role permissions:', err);
+      setCustomRole(null);
+    }
+  };
 
   const fetchProfile = async (userId: string, email?: string) => {
     try {
@@ -83,22 +119,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await supabase.auth.signOut();
           setUser(null);
           setProfile(null);
+          setCustomRole(null);
           alert('Your account portal access has been suspended by an Administrator.');
           return;
         }
 
         const userPin = data.mpin || '1234';
+        const assignedRole = (data.role as UserRole) || 'subscriber';
         setProfile({
           id: data.id,
           fullName: data.full_name || 'User',
           phoneNumber: data.phone_number || '',
-          role: (data.role as UserRole) || 'subscriber',
+          role: assignedRole,
           email: email || '',
           passbookToken: data.passbook_token || undefined,
           isBlocked: data.is_blocked || false,
           mpin: userPin,
           isDefaultPin: userPin === '1234',
         });
+        await fetchCustomRole(assignedRole);
       } else {
         // Fallback: If auth user exists in Supabase Auth but profile row is delayed or missing,
         // create or construct a fallback profile object from user metadata
@@ -117,6 +156,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           mpin: '1234',
           isDefaultPin: true,
         });
+        await fetchCustomRole(fallbackRole);
 
         // Ensure profile exists in profiles table
         await supabase.from('profiles').upsert({
@@ -203,6 +243,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setProfile(subscriberProfile);
       setUser(null); // Passbook token login is a direct subscriber profile session
+      await fetchCustomRole(subscriberProfile.role);
 
       // Persist in localStorage for refresh persistence
       if (typeof window !== 'undefined') {
@@ -259,6 +300,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setProfile(subscriberProfile);
       setUser(null);
+      await fetchCustomRole(subscriberProfile.role);
 
       if (typeof window !== 'undefined') {
         if (userData.passbookToken) {
@@ -300,6 +342,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isDefaultPin: p.isDefaultPin ?? ((p.mpin || '1234') === '1234'),
             isBlocked: p.isBlocked ?? prev.isBlocked,
           } : null);
+          if (p.role) {
+            await fetchCustomRole(p.role);
+          }
         }
       } catch (err) {
         console.warn('Silent profile refresh failed:', err);
@@ -319,6 +364,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             mpin: data.user.mpin || '1234',
             isDefaultPin: data.user.isDefaultPin ?? false,
           } : null);
+          if (data.user.role) {
+            await fetchCustomRole(data.user.role);
+          }
         }
       } catch (err) {
         console.warn('Silent passbook refresh failed:', err);
@@ -438,6 +486,85 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // Real-time synchronization of Profile & Custom Role permissions
+  // When an admin changes a member's role or status, this listener updates the session instantly without page refresh
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const profileChannel = supabase
+      .channel(`realtime-profile-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${profile.id}`,
+        },
+        async (payload: any) => {
+          const updated = payload.new;
+          if (!updated) return;
+
+          // If blocked and not admin, immediately terminate session
+          if (updated.is_blocked && updated.role !== 'admin') {
+            await supabase.auth.signOut();
+            setUser(null);
+            setProfile(null);
+            setCustomRole(null);
+            alert('Your account portal access has been suspended by an Administrator.');
+            return;
+          }
+
+          // Instant state update for role & details
+          setProfile((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  fullName: updated.full_name || prev.fullName,
+                  phoneNumber: updated.phone_number || prev.phoneNumber,
+                  role: (updated.role as UserRole) || prev.role,
+                  isBlocked: updated.is_blocked ?? prev.isBlocked,
+                  mpin: updated.mpin || prev.mpin,
+                  isDefaultPin: (updated.mpin || '1234') === '1234',
+                }
+              : null
+          );
+
+          if (updated.role) {
+            await fetchCustomRole(updated.role);
+          }
+        }
+      )
+      .subscribe();
+
+    const roleChannel = supabase
+      .channel('realtime-custom-roles')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'custom_roles',
+        },
+        async (payload: any) => {
+          const changed = payload.new || payload.old;
+          if (profile?.role && changed?.id && changed.id.toLowerCase() === profile.role.toLowerCase()) {
+            if (payload.eventType === 'DELETE') {
+              setCustomRole(null);
+            } else {
+              setCustomRole(payload.new as CustomRoleRecord);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(profileChannel);
+      supabase.removeChannel(roleChannel);
+    };
+  }, [profile?.id, profile?.role]);
+
   const signOut = async () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(PASSBOOK_SESSION_KEY);
@@ -446,19 +573,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
+    setCustomRole(null);
   };
+
+  const canAccessTab = (tab: MainTabId): boolean => {
+    return checkCanAccessTab(profile?.role, tab, customRole);
+  };
+
+  const canPerformAction = (action: PermissionAction): boolean => {
+    return checkHasPermission(profile?.role, action, customRole);
+  };
+
+  const allowedTabs: MainTabId[] = React.useMemo(() => {
+    const allTabs: MainTabId[] = [
+      'dashboard', 'chits', 'members', 'communication',
+      'auctions', 'reports', 'cash', 'users', 'settings'
+    ];
+    return allTabs.filter(tab => checkCanAccessTab(profile?.role, tab, customRole));
+  }, [profile?.role, customRole]);
+
+  const allowedActions: PermissionAction[] = React.useMemo(() => {
+    if (customRole?.allowed_actions && Array.isArray(customRole.allowed_actions)) {
+      return customRole.allowed_actions as PermissionAction[];
+    }
+    return [];
+  }, [customRole]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         profile,
+        customRole,
         loading,
         signOut,
         refreshProfile,
         updateMpin,
         loginWithPassbookToken,
         loginWithPhoneAndMpin,
+        canAccessTab,
+        canPerformAction,
+        allowedTabs,
+        allowedActions,
       }}
     >
       {children}

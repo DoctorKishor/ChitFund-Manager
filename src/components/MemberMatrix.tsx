@@ -1991,14 +1991,22 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             disabled={activeDrawerMember.id === currentAdminProfile?.id}
                             className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:ring-brand-500 focus:border-brand-500 cursor-pointer disabled:opacity-50"
                           >
-                            <option value="subscriber">Subscriber</option>
-                            <option value="manager">Manager</option>
-                            <option value="admin">Admin</option>
-                            {customRoles.filter((r) => !r.is_system).map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {r.name}
-                              </option>
-                            ))}
+                            {customRoles.length > 0 ? (
+                              customRoles.map((r) => (
+                                <option key={r.id} value={r.id}>
+                                  {r.name || r.id}
+                                </option>
+                              ))
+                            ) : (
+                              <>
+                                <option value="subscriber">Subscriber</option>
+                                <option value="collections_agent">Collections Agent</option>
+                                <option value="manager">Manager</option>
+                                <option value="auction_clerk">Auction Clerk</option>
+                                <option value="auditor">Auditor / CA</option>
+                                <option value="admin">Administrator</option>
+                              </>
+                            )}
                           </select>
                         </div>
                       </div>
@@ -2549,14 +2557,23 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     editingMember?.id === currentAdminProfile?.id ? 'opacity-60 cursor-not-allowed' : ''
                   }`}
                 >
-                  <option value="subscriber">👤 Subscriber (Passbook &amp; Auctions)</option>
-                  <option value="manager">👔 Manager (Operations &amp; Collections)</option>
-                  <option value="admin">👑 Admin (Full Workspace Access)</option>
-                  {customRoles.filter((r) => !r.is_system).map((r) => (
-                    <option key={r.id} value={r.id}>
-                      🛡️ {r.name}
-                    </option>
-                  ))}
+                  {customRoles.length > 0 ? (
+                    customRoles.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.id === 'admin' ? '👑 ' : r.id === 'manager' ? '💼 ' : r.id === 'collections_agent' ? '💳 ' : r.id === 'subscriber' ? '👤 ' : '🛡️ '}
+                        {r.name || r.id}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="subscriber">👤 Subscriber (Passbook &amp; Auctions)</option>
+                      <option value="collections_agent">💳 Collections Agent (Field Collections)</option>
+                      <option value="manager">💼 Manager (Operations &amp; Live Auctions)</option>
+                      <option value="auction_clerk">🔨 Auction Clerk (Floor Bidding)</option>
+                      <option value="auditor">📊 Auditor / CA (Ledger &amp; Reports)</option>
+                      <option value="admin">👑 Administrator (Full System Control)</option>
+                    </>
+                  )}
                 </select>
               </div>
 

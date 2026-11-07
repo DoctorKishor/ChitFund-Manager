@@ -36,6 +36,7 @@ export type PermissionAction =
   | 'treasury:personal_draw'
   | 'treasury:recover_float'
   | 'treasury:reconcile'
+  | 'treasury:collect_cash'
   // Communication
   | 'communication:broadcast'
   | 'communication:view'
@@ -62,27 +63,28 @@ export interface CustomRoleRecord {
  * Tab Accessibility Matrix by Default System Role
  */
 export const TAB_PERMISSIONS: Record<MainTabId, string[]> = {
-  dashboard: ['admin', 'manager', 'subscriber'],
-  chits: ['admin', 'manager', 'subscriber'],
-  members: ['admin', 'manager', 'subscriber'],
-  communication: ['admin', 'manager'],
-  auctions: ['admin', 'manager', 'subscriber'],
-  reports: ['admin', 'manager'],
-  cash: ['admin', 'manager'],
+  dashboard: ['admin', 'manager', 'collections_agent', 'auction_clerk', 'auditor', 'subscriber'],
+  chits: ['admin', 'manager', 'auction_clerk', 'auditor', 'subscriber'],
+  members: ['admin', 'manager', 'collections_agent', 'subscriber'],
+  communication: ['admin', 'manager', 'collections_agent'],
+  auctions: ['admin', 'manager', 'auction_clerk', 'subscriber'],
+  reports: ['admin', 'auditor'],
+  cash: ['admin'],
   users: ['admin'],
-  settings: ['admin', 'manager'],
+  settings: ['admin'],
 };
 
 /**
  * Treasury Subtab Accessibility Matrix by Default System Role
+ * Private bank accounts and vault ledger are restricted to business owner/admin.
  */
 export const TREASURY_SUBTAB_PERMISSIONS: Record<CashHandlingSubtab, string[]> = {
-  overview: ['admin', 'manager'],
-  wallets: ['admin', 'manager'],
-  transfers: ['admin', 'manager'],
-  spends: ['admin', 'manager'],
-  denominations: ['admin', 'manager'],
-  ledger: ['admin', 'manager'],
+  overview: ['admin'],
+  wallets: ['admin'],
+  transfers: ['admin'],
+  spends: ['admin'],
+  denominations: ['admin'],
+  ledger: ['admin'],
 };
 
 /**
@@ -93,36 +95,37 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
   'chits:create': ['admin'],
   'chits:edit': ['admin', 'manager'],
   'chits:delete': ['admin'],
-  'chits:view': ['admin', 'manager', 'subscriber'],
+  'chits:view': ['admin', 'manager', 'auction_clerk', 'auditor', 'subscriber'],
 
   // Member Controls
   'members:enroll': ['admin', 'manager'],
   'members:edit': ['admin', 'manager'],
   'members:delete': ['admin'],
-  'members:view': ['admin', 'manager', 'subscriber'],
-  'members:collect': ['admin', 'manager'],
+  'members:view': ['admin', 'manager', 'collections_agent', 'subscriber'],
+  'members:collect': ['admin', 'manager', 'collections_agent'],
 
   // Live Auctions & Payouts
-  'auctions:bid': ['admin', 'manager', 'subscriber'],
+  'auctions:bid': ['admin', 'manager', 'auction_clerk', 'subscriber'],
   'auctions:conduct': ['admin', 'manager'],
   'auctions:disburse': ['admin', 'manager'],
-  'auctions:view': ['admin', 'manager', 'subscriber'],
+  'auctions:view': ['admin', 'manager', 'auction_clerk', 'subscriber'],
 
-  // Treasury & Cash Operations
-  'treasury:view': ['admin', 'manager'],
-  'treasury:move_money': ['admin', 'manager'],
-  'treasury:deposit': ['admin', 'manager'],
-  'treasury:personal_draw': ['admin', 'manager'],
-  'treasury:recover_float': ['admin', 'manager'],
-  'treasury:reconcile': ['admin', 'manager'],
+  // Treasury & Cash Operations (High-Risk Admin Only)
+  'treasury:view': ['admin'],
+  'treasury:move_money': ['admin'],
+  'treasury:deposit': ['admin'],
+  'treasury:personal_draw': ['admin'],
+  'treasury:recover_float': ['admin'],
+  'treasury:reconcile': ['admin'],
+  'treasury:collect_cash': ['admin', 'manager', 'collections_agent'],
 
   // Communication Center
-  'communication:broadcast': ['admin', 'manager'],
-  'communication:view': ['admin', 'manager'],
+  'communication:broadcast': ['admin', 'manager', 'collections_agent'],
+  'communication:view': ['admin', 'manager', 'collections_agent'],
 
   // Reports
-  'reports:export': ['admin', 'manager'],
-  'reports:view': ['admin', 'manager'],
+  'reports:export': ['admin', 'auditor'],
+  'reports:view': ['admin', 'auditor'],
 
   // System Administration
   'system:manage_users': ['admin'],
@@ -134,8 +137,10 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
 export function canAccessTab(role: UserRole | undefined, tab: MainTabId, customRole?: CustomRoleRecord | null): boolean {
   if (!role) return false;
   if (role === 'admin') return true;
-  if (customRole && customRole.id === role) {
-    return customRole.allowed_tabs ? customRole.allowed_tabs.includes(tab) : false;
+  if (customRole && (customRole.id === role || customRole.id === role.toLowerCase())) {
+    if (customRole.allowed_tabs && Array.isArray(customRole.allowed_tabs)) {
+      return customRole.allowed_tabs.includes(tab);
+    }
   }
   const allowed = TAB_PERMISSIONS[tab];
   return allowed ? allowed.includes(role) : false;
@@ -157,8 +162,10 @@ export function canAccessTreasurySubtab(role: UserRole | undefined, subtab: Cash
 export function hasPermission(role: UserRole | undefined, action: PermissionAction, customRole?: CustomRoleRecord | null): boolean {
   if (!role) return false;
   if (role === 'admin') return true;
-  if (customRole && customRole.id === role) {
-    return customRole.allowed_actions ? customRole.allowed_actions.includes(action) : false;
+  if (customRole && (customRole.id === role || customRole.id === role.toLowerCase())) {
+    if (customRole.allowed_actions && Array.isArray(customRole.allowed_actions)) {
+      return customRole.allowed_actions.includes(action);
+    }
   }
   const allowed = ACTION_PERMISSIONS[action];
   return allowed ? allowed.includes(role) : false;

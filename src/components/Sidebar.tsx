@@ -27,7 +27,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, setMobileOpen }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, canAccessTab } = useAuth();
 
   const activeUserRole = profile?.role || 'subscriber';
 
@@ -42,8 +42,10 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
     { id: 'settings', name: 'Settings', icon: Settings },
   ];
 
+  const visibleNavItems = navItems.filter((item) => canAccessTab(item.id));
+
   const handleTabClick = (tabId: MainTabId) => {
-    if (!canAccessTab(activeUserRole, tabId)) {
+    if (!canAccessTab(tabId)) {
       return; // Block restricted roles from accessing tab
     }
     setActiveTab(tabId);
@@ -90,31 +92,24 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
 
               {/* Navigation Links */}
               <nav className="mt-6 px-4 space-y-1.5">
-                {navItems.map((item) => {
+                {visibleNavItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
-                  const isRestricted = !canAccessTab(activeUserRole, item.id);
 
                   return (
                     <button
                       key={item.id}
                       onClick={() => handleTabClick(item.id)}
-                      disabled={isRestricted}
-                      className={`w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.98] ${
-                        isRestricted 
-                          ? 'opacity-30 cursor-not-allowed text-gray-500 bg-[#27264E]/30' 
-                          : isActive
-                            ? 'bg-[#6359E9] text-white shadow-lg shadow-[#6359E9]/30'
-                            : 'hover:bg-[#27264E] text-[#AEABD8] hover:text-white active:bg-[#3A3A5A]'
+                      className={`w-full flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.98] cursor-pointer ${
+                        isActive
+                          ? 'bg-[#6359E9] text-white shadow-lg shadow-[#6359E9]/30'
+                          : 'hover:bg-[#27264E] text-[#AEABD8] hover:text-white active:bg-[#3A3A5A]'
                       }`}
                     >
                       <div className="flex items-center space-x-3.5">
                         <Icon size={20} className={isActive ? 'text-white' : 'text-[#AEABD8]'} />
                         <span>{item.name}</span>
                       </div>
-                      {isRestricted && (
-                        <Lock size={14} className="text-gray-500 shrink-0" />
-                      )}
                     </button>
                   );
                 })}
@@ -189,137 +184,145 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
           {/* Navigation Groups */}
           <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
             {/* 1. Main Management */}
-            <div>
-              {!isCollapsed && (
-                <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Main Management</p>
-              )}
-              <nav className="space-y-1">
-                {[
-                  { id: 'dashboard' as MainTabId, name: 'Overview', icon: LayoutDashboard },
-                  { id: 'chits' as MainTabId, name: 'Chits / Groups', icon: Briefcase, badge: 'Active' },
-                  { id: 'members' as MainTabId, name: 'Members Directory', icon: Users },
-                  { id: 'auctions' as MainTabId, name: 'Auctions & Bidding', icon: Gavel, dot: 'amber' },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  const isRestricted = !canAccessTab(activeUserRole, item.id);
+            {[
+              { id: 'dashboard' as MainTabId, name: 'Overview', icon: LayoutDashboard },
+              { id: 'chits' as MainTabId, name: 'Chits / Groups', icon: Briefcase, badge: 'Active' },
+              { id: 'members' as MainTabId, name: 'Members Directory', icon: Users },
+              { id: 'auctions' as MainTabId, name: 'Auctions & Bidding', icon: Gavel, dot: 'amber' },
+            ].filter((item) => canAccessTab(item.id)).length > 0 && (
+              <div>
+                {!isCollapsed && (
+                  <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Main Management</p>
+                )}
+                <nav className="space-y-1">
+                  {[
+                    { id: 'dashboard' as MainTabId, name: 'Overview', icon: LayoutDashboard },
+                    { id: 'chits' as MainTabId, name: 'Chits / Groups', icon: Briefcase, badge: 'Active' },
+                    { id: 'members' as MainTabId, name: 'Members Directory', icon: Users },
+                    { id: 'auctions' as MainTabId, name: 'Auctions & Bidding', icon: Gavel, dot: 'amber' },
+                  ]
+                    .filter((item) => canAccessTab(item.id))
+                    .map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
 
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleTabClick(item.id)}
-                      disabled={isRestricted}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all group relative cursor-pointer ${
-                        isRestricted
-                          ? 'opacity-30 cursor-not-allowed text-slate-400'
-                          : isActive
-                          ? 'bg-brand-50 text-brand-700 font-semibold shadow-xs shadow-brand-100'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                      }`}
-                    >
-                      <Icon size={17} className={isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'} />
-                      {!isCollapsed && (
-                        <>
-                          <span className="truncate">{item.name}</span>
-                          {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-600 shrink-0" />}
-                          {item.badge && !isActive && (
-                            <span className="ml-auto text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
-                              {item.badge}
-                            </span>
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleTabClick(item.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all group relative cursor-pointer ${
+                            isActive
+                              ? 'bg-brand-50 text-brand-700 font-semibold shadow-xs shadow-brand-100'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <Icon size={17} className={isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'} />
+                          {!isCollapsed && (
+                            <>
+                              <span className="truncate">{item.name}</span>
+                              {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-600 shrink-0" />}
+                              {item.badge && !isActive && (
+                                <span className="ml-auto text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                                  {item.badge}
+                                </span>
+                              )}
+                              {item.dot && !isActive && (
+                                <span className="ml-auto w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                              )}
+                            </>
                           )}
-                          {item.dot && !isActive && (
-                            <span className="ml-auto w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                          )}
-                        </>
-                      )}
-                      {isRestricted && !isCollapsed && <Lock size={13} className="text-slate-400 ml-auto" />}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
+                        </button>
+                      );
+                    })}
+                </nav>
+              </div>
+            )}
 
             {/* 2. Financials */}
-            <div>
-              {!isCollapsed && (
-                <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Financials</p>
-              )}
-              <nav className="space-y-1">
-                {[
-                  { id: 'cash' as MainTabId, name: 'Treasury', icon: Vault },
-                  { id: 'reports' as MainTabId, name: 'Reports & Analytics', icon: BarChart3 },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  const isRestricted = !canAccessTab(activeUserRole, item.id);
+            {[
+              { id: 'cash' as MainTabId, name: 'Treasury', icon: Vault },
+              { id: 'reports' as MainTabId, name: 'Reports & Analytics', icon: BarChart3 },
+            ].filter((item) => canAccessTab(item.id)).length > 0 && (
+              <div>
+                {!isCollapsed && (
+                  <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Financials</p>
+                )}
+                <nav className="space-y-1">
+                  {[
+                    { id: 'cash' as MainTabId, name: 'Treasury', icon: Vault },
+                    { id: 'reports' as MainTabId, name: 'Reports & Analytics', icon: BarChart3 },
+                  ]
+                    .filter((item) => canAccessTab(item.id))
+                    .map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
 
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleTabClick(item.id)}
-                      disabled={isRestricted}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all group relative cursor-pointer ${
-                        isRestricted
-                          ? 'opacity-30 cursor-not-allowed text-slate-400'
-                          : isActive
-                          ? 'bg-brand-50 text-brand-700 font-semibold shadow-xs shadow-brand-100'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                      }`}
-                    >
-                      <Icon size={17} className={isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'} />
-                      {!isCollapsed && (
-                        <>
-                          <span className="truncate">{item.name}</span>
-                          {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-600 shrink-0" />}
-                        </>
-                      )}
-                      {isRestricted && !isCollapsed && <Lock size={13} className="text-slate-400 ml-auto" />}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleTabClick(item.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all group relative cursor-pointer ${
+                            isActive
+                              ? 'bg-brand-50 text-brand-700 font-semibold shadow-xs shadow-brand-100'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <Icon size={17} className={isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'} />
+                          {!isCollapsed && (
+                            <>
+                              <span className="truncate">{item.name}</span>
+                              {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-600 shrink-0" />}
+                            </>
+                          )}
+                        </button>
+                      );
+                    })}
+                </nav>
+              </div>
+            )}
 
             {/* 3. System */}
-            <div>
-              {!isCollapsed && (
-                <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">System</p>
-              )}
-              <nav className="space-y-1">
-                {[
-                  { id: 'communication' as MainTabId, name: 'Communication', icon: MessageSquare },
-                  { id: 'settings' as MainTabId, name: 'Portal Settings', icon: Settings },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  const isRestricted = !canAccessTab(activeUserRole, item.id);
+            {[
+              { id: 'communication' as MainTabId, name: 'Communication', icon: MessageSquare },
+              { id: 'settings' as MainTabId, name: 'Portal Settings', icon: Settings },
+            ].filter((item) => canAccessTab(item.id)).length > 0 && (
+              <div>
+                {!isCollapsed && (
+                  <p className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">System</p>
+                )}
+                <nav className="space-y-1">
+                  {[
+                    { id: 'communication' as MainTabId, name: 'Communication', icon: MessageSquare },
+                    { id: 'settings' as MainTabId, name: 'Portal Settings', icon: Settings },
+                  ]
+                    .filter((item) => canAccessTab(item.id))
+                    .map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
 
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleTabClick(item.id)}
-                      disabled={isRestricted}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all group relative cursor-pointer ${
-                        isRestricted
-                          ? 'opacity-30 cursor-not-allowed text-slate-400'
-                          : isActive
-                          ? 'bg-brand-50 text-brand-700 font-semibold shadow-xs shadow-brand-100'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                      }`}
-                    >
-                      <Icon size={17} className={isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'} />
-                      {!isCollapsed && (
-                        <>
-                          <span className="truncate">{item.name}</span>
-                          {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-600 shrink-0" />}
-                        </>
-                      )}
-                      {isRestricted && !isCollapsed && <Lock size={13} className="text-slate-400 ml-auto" />}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleTabClick(item.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all group relative cursor-pointer ${
+                            isActive
+                              ? 'bg-brand-50 text-brand-700 font-semibold shadow-xs shadow-brand-100'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <Icon size={17} className={isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600'} />
+                          {!isCollapsed && (
+                            <>
+                              <span className="truncate">{item.name}</span>
+                              {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-600 shrink-0" />}
+                            </>
+                          )}
+                        </button>
+                      );
+                    })}
+                </nav>
+              </div>
+            )}
           </div>
         </div>
 

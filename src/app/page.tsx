@@ -14,7 +14,7 @@ import { useMaintenance } from '@/context/MaintenanceContext';
 import { AlertTriangle, Wrench, Menu } from 'lucide-react';
 
 export default function Home() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, canAccessTab, allowedTabs } = useAuth();
   const { isMaintenanceMode } = useMaintenance();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -28,6 +28,16 @@ export default function Home() {
       }
     }
   }, []);
+
+  // Route guard: If the active tab is not accessible by the current user's role, auto-switch to their first allowed tab
+  React.useEffect(() => {
+    if (!loading && profile?.role) {
+      if (!canAccessTab(activeTab as any)) {
+        const fallback = allowedTabs.length > 0 ? allowedTabs[0] : 'dashboard';
+        setActiveTab(fallback);
+      }
+    }
+  }, [profile?.role, activeTab, loading, canAccessTab, allowedTabs]);
 
   if (loading) {
     return (

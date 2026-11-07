@@ -10,12 +10,26 @@ export default function UserProfileBadge() {
   const getRoleBadgeStyle = (role?: string) => {
     switch (role) {
       case 'admin':
-        return 'bg-rose-50 text-rose-700 border border-rose-200/60';
+        return 'bg-purple-50 text-purple-700 border border-purple-200/60';
       case 'manager':
+        return 'bg-blue-50 text-blue-700 border border-blue-200/60';
+      case 'collections_agent':
         return 'bg-amber-50 text-amber-700 border border-amber-200/60';
+      case 'auction_clerk':
+        return 'bg-violet-50 text-violet-700 border border-violet-200/60';
+      case 'auditor':
+        return 'bg-teal-50 text-teal-700 border border-teal-200/60';
       default:
         return 'bg-emerald-50 text-emerald-700 border border-emerald-200/60';
     }
+  };
+
+  const formatRoleLabel = (role?: string) => {
+    if (!role) return 'Subscriber';
+    if (role === 'collections_agent') return 'Agent';
+    if (role === 'auction_clerk') return 'Clerk';
+    if (role === 'auditor') return 'Auditor';
+    return role;
   };
 
   return (
@@ -32,7 +46,7 @@ export default function UserProfileBadge() {
         </span>
       </div>
       <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${getRoleBadgeStyle(profile?.role)}`}>
-        {profile?.role || 'Subscriber'}
+        {formatRoleLabel(profile?.role)}
       </span>
     </div>
   );

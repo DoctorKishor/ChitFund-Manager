@@ -67,6 +67,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
   const [activeSubtab, setActiveSubtab] = useState<'chits' | 'payments' | 'prizes' | 'activity'>('chits');
   const [loading, setLoading] = useState<boolean>(true);
   const [memberProfile, setMemberProfile] = useState<any>(null);
+  const [customRoles, setCustomRoles] = useState<any[]>([]);
   const [memberEnrollments, setMemberEnrollments] = useState<any[]>([]);
   const [memberTransactions, setMemberTransactions] = useState<any[]>([]);
   const [allChitGroups, setAllChitGroups] = useState<any[]>([]);
@@ -230,6 +231,25 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
 
       if (logsData) {
         setAuctionLogs(logsData);
+      }
+
+      // Fetch available custom roles for role assignment
+      const { data: rolesData } = await supabase
+        .from('custom_roles')
+        .select('*')
+        .order('is_system', { ascending: false });
+
+      if (rolesData && rolesData.length > 0) {
+        setCustomRoles(rolesData);
+      } else {
+        setCustomRoles([
+          { id: 'subscriber', name: 'Subscriber' },
+          { id: 'collections_agent', name: 'Collections Agent' },
+          { id: 'manager', name: 'Manager' },
+          { id: 'auction_clerk', name: 'Auction Clerk' },
+          { id: 'auditor', name: 'Auditor / CA' },
+          { id: 'admin', name: 'Administrator' },
+        ]);
       }
     } catch (err) {
       console.error('Error fetching member details:', err);
@@ -1340,9 +1360,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                       onChange={(e) => handleUpdateRole(e.target.value)}
                       className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-brand-500 focus:border-brand-500 cursor-pointer"
                     >
-                      <option value="subscriber">Subscriber</option>
-                      <option value="manager">Manager / Collector</option>
-                      <option value="admin">System Admin</option>
+                      {customRoles.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name || r.id}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -2162,9 +2184,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 onChange={(e) => handleUpdateRole(e.target.value)}
                 className="text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-brand-500 cursor-pointer"
               >
-                <option value="subscriber">Subscriber</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
+                {customRoles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name || r.id}
+                  </option>
+                ))}
               </select>
             </div>
 
