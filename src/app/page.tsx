@@ -137,20 +137,12 @@ export default function Home() {
       {/* Main Layout Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-slate-50">
         
-        {/* Top Header Bar matching Stitch top-navigation */}
-        <header className="h-14 sm:h-16 border-b border-slate-200/80 bg-white flex items-center justify-between px-3.5 sm:px-8 sticky top-0 z-20 shadow-xs" data-purpose="top-navigation">
-          {/* Left: Mobile Drawer Trigger + Page Heading */}
-          <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
-            <button 
-              onClick={() => setMobileDrawerOpen(true)}
-              className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors md:hidden cursor-pointer"
-              aria-label="Open navigation drawer"
-            >
-              <Menu size={18} />
-            </button>
-
-            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-              <h1 className="font-display font-bold text-sm sm:text-lg text-slate-900 tracking-tight flex items-center gap-2 truncate">
+        {/* Top Header Bar matching Stitch top-navigation (Hidden on mobile and smaller tablets for native app experience) */}
+        <header className="h-16 border-b border-slate-200/80 bg-white hidden md:flex items-center justify-between px-6 lg:px-8 sticky top-0 z-20 shadow-xs" data-purpose="top-navigation">
+          {/* Left: Page Heading */}
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <h1 className="font-display font-bold text-base sm:text-lg text-slate-900 tracking-tight flex items-center gap-2 truncate">
                 {getTabTitle(activeTab)}
                 {activeTab === 'dashboard' && (
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 hidden sm:inline-flex">
@@ -167,28 +159,15 @@ export default function Home() {
           </div>
 
           {/* Right Header Actions: Font Size Switcher + Profile Badge */}
-          <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
+          <div className="flex items-center space-x-3 sm:space-x-4 shrink-0">
             <FontSizeSwitcher />
-
-            <div className="hidden sm:block">
-              <UserProfileBadge />
-            </div>
-
-            {/* Mobile Profile Avatar */}
-            <button
-              type="button"
-              onClick={() => setMobileDrawerOpen(true)}
-              className="sm:hidden w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-xs shadow-xs cursor-pointer active:scale-95 transition-transform"
-              aria-label="Open profile menu"
-            >
-              {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'U'}
-            </button>
+            <UserProfileBadge />
           </div>
         </header>
 
         {/* Maintenance Alert Ribbon for Admin */}
         {isMaintenanceMode && (
-          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-between shadow-xs sticky top-14 sm:top-16 z-20">
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-between shadow-xs sticky top-0 md:top-16 z-20">
             <div className="flex items-center gap-2">
               <AlertTriangle size={15} className="shrink-0 animate-bounce" />
               <span>
