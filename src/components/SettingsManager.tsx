@@ -51,7 +51,10 @@ interface DatabaseStats {
 }
 
 export default function SettingsManager() {
-  const { user, profile, refreshProfile, signOut } = useAuth();
+  const { user, profile, refreshProfile, signOut, canPerformAction } = useAuth();
+  const canMaintenanceMode = canPerformAction('system:maintenance_mode');
+  const canBranding = canPerformAction('system:branding');
+  const canResetDatabase = canPerformAction('system:reset_database');
   const {
     organizationName: globalOrgName,
     organizationTagline: globalOrgTagline,
@@ -170,6 +173,12 @@ export default function SettingsManager() {
     e.preventDefault();
     setOrgSuccessMsg(null);
     setOrgErrorMsg(null);
+
+    if (!canBranding) {
+      setOrgErrorMsg('Permission Restricted: Modifying organization branding requires authorization.');
+      triggerHapticFeedback('error');
+      return;
+    }
 
     const cleanName = orgNameInput.trim();
     if (!cleanName) {
@@ -302,6 +311,11 @@ export default function SettingsManager() {
 
   // Execute Complete Test Database Reset / Purge
   const handleExecuteDatabaseReset = async () => {
+    if (!canResetDatabase) {
+      setResetErrorMsg('Permission Restricted: Database reset is restricted to authorized Administrators.');
+      triggerHapticFeedback('error');
+      return;
+    }
     if (confirmKeyword.trim().toUpperCase() !== 'RESET') {
       setResetErrorMsg('Please type RESET in capital letters to confirm database purge.');
       triggerHapticFeedback('warning');
@@ -1490,19 +1504,21 @@ export default function SettingsManager() {
                       ⚠️ This operation cannot be undone. Always verify you are ready to wipe test records.
                     </span>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirmKeyword('');
-                        setResetErrorMsg(null);
-                        setShowResetModal(true);
-                        triggerHapticFeedback('warning');
-                      }}
-                      className="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
-                    >
-                      <Trash2 size={15} />
-                      <span>Delete Test Database &amp; Reset</span>
-                    </button>
+                    {canResetDatabase && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmKeyword('');
+                          setResetErrorMsg(null);
+                          setShowResetModal(true);
+                          triggerHapticFeedback('warning');
+                        }}
+                        className="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+                      >
+                        <Trash2 size={15} />
+                        <span>Delete Test Database &amp; Reset</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 

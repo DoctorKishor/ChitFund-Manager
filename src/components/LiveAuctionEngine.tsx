@@ -147,7 +147,13 @@ function formatBidTimestamp(timestamp?: string | number | null): string {
 }
 
 export default function LiveAuctionEngine() {
-  const { profile } = useAuth();
+  const { profile, canPerformAction } = useAuth();
+  const canConductAuction = canPerformAction('auctions:conduct');
+  const canBid = canPerformAction('auctions:bid');
+  const canConcludeAuction = canPerformAction('auctions:conclude');
+  const canOverrideFloor = canPerformAction('auctions:override_floor');
+  const canDisbursePayout = canPerformAction('auctions:disburse');
+  const canIssueReceipt = canPerformAction('auctions:issue_receipt');
   const { organizationName, organizationTagline, organizationInitials } = useOrganization();
 
   // 1. Initial State Data (Loaded from Supabase)
@@ -794,6 +800,10 @@ export default function LiveAuctionEngine() {
 
   // Open Pop-up Bidding Modal for a Member
   const handleOpenBidModal = (memberId: string) => {
+    if (!canBid) {
+      alert("Permission Restricted: You do not have permission to place proxy bids in live auctions.");
+      return;
+    }
     if (group?.currentMonth === 0) {
       alert("No live auction takes place in Month 0 (Launch Phase). Advance to Month 1 to begin live auctions.");
       return;
@@ -813,6 +823,10 @@ export default function LiveAuctionEngine() {
 
   // Core Bid Logger
   const recordBid = (amount: number, targetMemberId?: string) => {
+    if (!canBid) {
+      alert("Permission Restricted: You do not have permission to place proxy bids in live auctions.");
+      return;
+    }
     if (group?.currentMonth === 0) {
       alert("No live auction takes place in Month 0 (Launch Phase). Advance to Month 1 to begin live auctions.");
       return;
@@ -1032,6 +1046,10 @@ export default function LiveAuctionEngine() {
   };
 
   const handleDownloadAuctionPdf = async (containerEl: HTMLElement | null, groupName: string, month: number) => {
+    if (!canIssueReceipt) {
+      alert("Permission Restricted: You do not have permission to issue receipts or export auction vouchers.");
+      return;
+    }
     if (!containerEl) {
       console.error('Printable container element not found.');
       return;
@@ -1115,6 +1133,10 @@ export default function LiveAuctionEngine() {
   }, [selectedHistoricalLog, group, profile, organizationName, organizationTagline, organizationInitials]);
 
   const handlePromptCloseAuction = async () => {
+    if (!canConcludeAuction) {
+      alert("Permission Restricted: You do not have permission to conclude live auction cycles.");
+      return;
+    }
     if (!group) return;
     if (bids.length === 0 && group.currentMonth > 0) {
       alert("Cannot conclude auction without any bids recorded.");
@@ -1325,6 +1347,10 @@ export default function LiveAuctionEngine() {
   };
 
   const handleBeginLiveAuction = async () => {
+    if (!canConductAuction) {
+      alert("Permission Restricted: You do not have permission to conduct live auction cycles.");
+      return;
+    }
     if (!group) return;
     if (group.currentMonth === 0) {
       alert("Month 0 is the launch phase (Organizer Profit). No live bidding takes place in Month 0.");
@@ -1489,12 +1515,20 @@ export default function LiveAuctionEngine() {
   };
 
   const handleEnterStudio = () => {
+    if (!canConductAuction) {
+      alert("Permission Restricted: You do not have permission to enter live auction studio.");
+      return;
+    }
     triggerHapticFeedback('light');
     setStage('studio');
   };
 
   // Prompt confirmation modal before opening auction floor
   const promptBeginAuctionFloor = () => {
+    if (!canConductAuction) {
+      alert("Permission Restricted: You do not have permission to conduct live auction cycles.");
+      return;
+    }
     triggerHapticFeedback('light');
     setCountdownTarget('floor');
     setShowStartConfirmModal(true);

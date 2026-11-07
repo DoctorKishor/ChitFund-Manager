@@ -57,12 +57,23 @@ interface MemberDetailsViewProps {
 }
 
 export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: MemberDetailsViewProps) {
-  const { profile } = useAuth();
+  const { profile, canPerformAction } = useAuth();
   const { organizationName, organizationInitials, organizationTagline } = useOrganization();
   const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printItems, setPrintItems] = useState<StickerItem[]>([]);
   const { updateBalance } = useWallet();
+
+  // Permission guards
+  const canCollect = canPerformAction('members:collect');
+  const canEdit = canPerformAction('members:edit');
+  const canSuspend = canPerformAction('members:suspend');
+  const canPairQr = canPerformAction('members:pair_qr');
+  const canRevokeQr = canPerformAction('members:revoke_qr');
+  const canResetMpin = canPerformAction('members:reset_mpin');
+  const canEnroll = canPerformAction('members:enroll');
+  const canDelete = canPerformAction('members:delete');
+  const canExport = canPerformAction('members:export');
 
   const [activeSubtab, setActiveSubtab] = useState<'chits' | 'payments' | 'prizes' | 'activity'>('chits');
   const [loading, setLoading] = useState<boolean>(true);
@@ -1149,16 +1160,18 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             <span>Call Phone</span>
           </a>
           {/* Primary Action */}
-          <button 
-            type="button"
-            onClick={() => handleOpenRecordPayment()} 
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all cursor-pointer"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
-            </svg>
-            <span>+ Record New Payment</span>
-          </button>
+          {canCollect && (
+            <button 
+              type="button"
+              onClick={() => handleOpenRecordPayment()} 
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all cursor-pointer"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
+              </svg>
+              <span>+ Record New Payment</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -1281,19 +1294,21 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <h2 className="text-lg font-bold font-display text-slate-900 truncate">{memberName}</h2>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          setCustomPinInput(memberProfile?.mpin || '1234');
-                          setIsEditingPinModal(true);
-                        }} 
-                        className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer" 
-                        title="Edit Member PIN / Information"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                        </svg>
-                      </button>
+                      {(canResetMpin || canEdit) && (
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setCustomPinInput(memberProfile?.mpin || '1234');
+                            setIsEditingPinModal(true);
+                          }} 
+                          className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer" 
+                          title="Edit Member PIN / Information"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                          </svg>
+                        </button>
+                      )}
                     </div>
                     <p className="text-xs text-slate-500 font-mono mt-0.5">
                       {memberProfile?.phone_number ? `+91 ${memberProfile.phone_number}` : 'No phone recorded'}
@@ -1334,24 +1349,26 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/70 rounded-xl">
                       <button 
                         type="button"
+                        disabled={!canSuspend}
                         onClick={() => handleToggleStatus(true)}
-                        className={`py-1.5 px-3 font-bold rounded-lg shadow-xs flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer ${
+                        className={`py-1.5 px-3 font-bold rounded-lg shadow-xs flex items-center justify-center gap-1.5 text-xs transition-colors ${
                           !memberProfile?.is_blocked 
                             ? 'bg-emerald-600 text-white' 
                             : 'text-slate-600 hover:text-slate-900'
-                        }`}
+                        } ${!canSuspend ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
                       >
                         <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
                         <span>Active</span>
                       </button>
                       <button 
                         type="button"
+                        disabled={!canSuspend}
                         onClick={() => handleToggleStatus(false)}
-                        className={`py-1.5 px-3 font-semibold rounded-lg flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer ${
+                        className={`py-1.5 px-3 font-semibold rounded-lg flex items-center justify-center gap-1.5 text-xs transition-colors ${
                           memberProfile?.is_blocked === true 
                             ? 'bg-rose-600 text-white' 
                             : 'text-slate-600 hover:text-rose-700'
-                        }`}
+                        } ${!canSuspend ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
                       >
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                         <span>Suspended</span>
@@ -1381,13 +1398,15 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                       >
                         {showMemberPin ? 'Hide' : 'Reveal'}
                       </button>
-                      <button 
-                        type="button"
-                        onClick={handleResetPinToDefault}
-                        className="px-2.5 py-1 text-brand-700 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
-                      >
-                        Reset MPIN
-                      </button>
+                      {canResetMpin && (
+                        <button 
+                          type="button"
+                          onClick={handleResetPinToDefault}
+                          className="px-2.5 py-1 text-brand-700 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                        >
+                          Reset MPIN
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1436,8 +1455,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 <div className="grid grid-cols-3 gap-2 pt-1 text-center">
                   <button 
                     type="button"
+                    disabled={!canPairQr}
                     onClick={() => setIsPairingModalOpen(true)}
-                    className="px-2 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors flex flex-col items-center gap-1 cursor-pointer"
+                    className={`px-2 py-2 border rounded-xl text-xs font-semibold transition-colors flex flex-col items-center gap-1 ${
+                      canPairQr ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 cursor-pointer' : 'bg-slate-50 text-slate-400 border-slate-200/60 cursor-not-allowed opacity-60'
+                    }`}
                   >
                     <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
@@ -1446,8 +1468,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   </button>
                   <button 
                     type="button"
+                    disabled={!canRevokeQr || !memberProfile?.passbook_token}
                     onClick={handleRevokePassbook}
-                    className="px-2 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold transition-colors flex flex-col items-center gap-1 cursor-pointer" 
+                    className={`px-2 py-2 border rounded-xl text-xs font-semibold transition-colors flex flex-col items-center gap-1 ${
+                      canRevokeQr && memberProfile?.passbook_token ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 cursor-pointer' : 'bg-slate-50 text-slate-400 border-slate-200/60 cursor-not-allowed opacity-60'
+                    }`}
                     title="Unlink for lost booklet"
                   >
                     <svg className="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1457,8 +1482,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   </button>
                   <button 
                     type="button"
+                    disabled={!canExport}
                     onClick={handlePrintMemberStickers}
-                    className="px-2 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 rounded-xl text-xs font-bold transition-colors flex flex-col items-center gap-1 cursor-pointer"
+                    className={`px-2 py-2 border rounded-xl text-xs font-bold transition-colors flex flex-col items-center gap-1 ${
+                      canExport ? 'bg-brand-50 hover:bg-brand-100 text-brand-700 border-brand-200 cursor-pointer' : 'bg-slate-50 text-slate-400 border-slate-200/60 cursor-not-allowed opacity-60'
+                    }`}
                   >
                     <svg className="w-3.5 h-3.5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
@@ -1515,16 +1543,18 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     <h3 className="font-display font-bold text-sm text-slate-900">Enrolled Chit Schemes</h3>
                     <p className="text-xs text-slate-500 mt-0.5">Subscriptions, ticket allocation, and monthly collection commitments</p>
                   </div>
-                  <button 
-                    type="button"
-                    onClick={() => handleOpenRecordPayment()}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-xl border border-brand-200/60 transition-colors cursor-pointer"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-                    </svg>
-                    <span>Enroll in Another Group</span>
-                  </button>
+                  {canEnroll && (
+                    <button 
+                      type="button"
+                      onClick={() => handleOpenRecordPayment()}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-xl border border-brand-200/60 transition-colors cursor-pointer"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                      </svg>
+                      <span>Enroll in Another Group</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Scheme Card Items */}
@@ -1568,16 +1598,18 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                               </div>
                             </div>
                             {/* Quick action on scheme */}
-                            <button 
-                              type="button"
-                              onClick={() => handleOpenRecordPayment(grpDues.groupId, firstUnpaid?.month, firstUnpaid?.remainingDue)}
-                              className="inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:text-brand-700 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
-                            >
-                              <svg className="w-3.5 h-3.5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
-                              </svg>
-                              <span>Pay for This Ticket</span>
-                            </button>
+                            {canCollect && (
+                              <button 
+                                type="button"
+                                onClick={() => handleOpenRecordPayment(grpDues.groupId, firstUnpaid?.month, firstUnpaid?.remainingDue)}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:text-brand-700 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+                              >
+                                <svg className="w-3.5 h-3.5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
+                                </svg>
+                                <span>Pay for This Ticket</span>
+                              </button>
+                            )}
                           </div>
 
                           {/* Scheme Financial Metrics Matrix */}
@@ -2192,13 +2224,15 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         <h4 className="text-xs font-bold text-slate-900">{grpDues.groupName} ({formatCurrency(grpDues.totalValue)} Pool)</h4>
                         <p className="text-[10px] text-slate-500 mt-0.5">{grpDues.durationMonths} Months Duration · Cycle {grpDues.effectiveCurrentMonth}/{grpDues.durationMonths}</p>
                       </div>
-                      <button 
-                        type="button"
-                        onClick={() => handleOpenRecordPayment(grpDues.groupId, firstUnpaid?.month, firstUnpaid?.remainingDue)}
-                        className="text-[11px] font-bold text-brand-600 bg-white border border-slate-200 px-2 py-1 rounded-lg cursor-pointer hover:bg-slate-50"
-                      >
-                        Pay Ticket
-                      </button>
+                      {canCollect && (
+                        <button 
+                          type="button"
+                          onClick={() => handleOpenRecordPayment(grpDues.groupId, firstUnpaid?.month, firstUnpaid?.remainingDue)}
+                          className="text-[11px] font-bold text-brand-600 bg-white border border-slate-200 px-2 py-1 rounded-lg cursor-pointer hover:bg-slate-50"
+                        >
+                          Pay Ticket
+                        </button>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 text-xs">
                       <div>
@@ -2286,28 +2320,34 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
         </main>
 
         {/* Floating Record Payment Action Button & Bottom Bar */}
-        <div className="sticky bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-3 safe-bottom z-20 flex items-center gap-3">
-          <button 
-            type="button"
-            onClick={() => handleOpenRecordPayment()}
-            className="flex-1 py-3 px-4 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-float flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
-            </svg>
-            <span>Record Installment Payment</span>
-          </button>
-          <button 
-            type="button"
-            onClick={() => window.print()}
-            className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors cursor-pointer" 
-            title="Export Ledger"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-            </svg>
-          </button>
-        </div>
+        {(canCollect || canExport) && (
+          <div className="sticky bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-3 safe-bottom z-20 flex items-center gap-3">
+            {canCollect && (
+              <button 
+                type="button"
+                onClick={() => handleOpenRecordPayment()}
+                className="flex-1 py-3 px-4 bg-brand-600 hover:bg-brand-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-float flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
+                </svg>
+                <span>Record Installment Payment</span>
+              </button>
+            )}
+            {canExport && (
+              <button 
+                type="button"
+                onClick={() => window.print()}
+                className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors cursor-pointer" 
+                title="Export Ledger"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── RECORD / EDIT PAYMENT MODAL (UNIFIED) ── */}

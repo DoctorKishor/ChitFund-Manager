@@ -555,7 +555,12 @@ interface CommunicationBroadcastCenterProps {
 }
 
 export default function CommunicationBroadcastCenter({ onAddAuditLog }: CommunicationBroadcastCenterProps) {
-  const { profile } = useAuth();
+  const { profile, canPerformAction } = useAuth();
+  const canPreAuction = canPerformAction('communication:pre_auction');
+  const canPostAuction = canPerformAction('communication:post_auction');
+  const canDueAlerts = canPerformAction('communication:due_alerts');
+  const canManageTemplates = canPerformAction('communication:manage_templates');
+  const canSendAdhoc = canPerformAction('communication:custom');
   const { organizationName } = useOrganization();
   const [groupsMetadata, setGroupsMetadata] = useState<Record<string, GroupMetadata>>({});
   const [activeGroupKey, setActiveGroupKey] = useState<string>('');
@@ -563,6 +568,10 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   // Language & Template Mode State
   const [language, setLanguage] = useState<'en' | 'ta'>('ta'); // Default to Tamil
   const [templateType, setTemplateType] = useState<TemplateCategory>('pre-auction');
+  const canSendCurrentBroadcast = 
+    templateType === 'pre-auction' ? canPreAuction :
+    templateType === 'post-auction' ? canPostAuction :
+    templateType === 'payment-reminder' ? canDueAlerts : canSendAdhoc;
   const [copied, setCopied] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -1366,8 +1375,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
           <div className="space-y-2 pt-1">
             <button 
               type="button"
-              onClick={() => window.open(formatWhatsAppUrl(), '_blank')}
-              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              disabled={!canSendCurrentBroadcast}
+              onClick={() => canSendCurrentBroadcast && window.open(formatWhatsAppUrl(), '_blank')}
+              className={`w-full py-3 px-4 font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all ${
+                canSendCurrentBroadcast ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-emerald-500/25 cursor-pointer' : 'bg-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+              }`}
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"></path></svg>
               <span>Open WhatsApp &amp; Send Broadcast</span>
@@ -1503,8 +1515,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             </div>
             <button 
               type="button"
-              onClick={() => window.open(formatWhatsAppUrl(), '_blank')}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-500/25 transition-all cursor-pointer active:scale-95"
+              disabled={!canSendCurrentBroadcast}
+              onClick={() => canSendCurrentBroadcast && window.open(formatWhatsAppUrl(), '_blank')}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all ${
+                canSendCurrentBroadcast ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-500/25 cursor-pointer active:scale-95' : 'bg-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+              }`}
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"></path></svg>
               <span>Send via WhatsApp (1-Tap)</span>
@@ -1916,9 +1931,12 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                     <div className="flex-1 bg-white rounded-full py-1.5 px-3 text-xs text-slate-400">Message ready for transmission...</div>
                     <button 
                       type="button"
-                      onClick={() => window.open(formatWhatsAppUrl(), '_blank')}
-                      className="w-8 h-8 rounded-full bg-[#128C7E] hover:bg-emerald-700 active:scale-95 text-white flex items-center justify-center text-xs shadow transition-all cursor-pointer"
-                      title="Send via WhatsApp"
+                      disabled={!canSendCurrentBroadcast}
+                      onClick={() => canSendCurrentBroadcast && window.open(formatWhatsAppUrl(), '_blank')}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs shadow transition-all ${
+                        canSendCurrentBroadcast ? 'bg-[#128C7E] hover:bg-emerald-700 active:scale-95 text-white cursor-pointer' : 'bg-slate-300 text-slate-400 opacity-60 cursor-not-allowed'
+                      }`}
+                      title={canSendCurrentBroadcast ? "Send via WhatsApp" : "Restricted: Broadcast permission required"}
                     >
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
                     </button>
@@ -1932,8 +1950,11 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   
                   <button 
                     type="button"
-                    onClick={() => window.open(formatWhatsAppUrl(), '_blank')}
-                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
+                    disabled={!canSendCurrentBroadcast}
+                    onClick={() => canSendCurrentBroadcast && window.open(formatWhatsAppUrl(), '_blank')}
+                    className={`w-full py-2.5 px-4 font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all ${
+                      canSendCurrentBroadcast ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-500/25 cursor-pointer active:scale-98' : 'bg-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+                    }`}
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"></path></svg>
                     <span>Launch WhatsApp &amp; Send Pre-filled Message</span>

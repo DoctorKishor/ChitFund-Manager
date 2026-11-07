@@ -82,7 +82,12 @@ export interface ReportsCenterProps {
 }
 
 export default function ReportsCenter({ initialSubtab, onSubtabChange }: ReportsCenterProps = {}) {
-  const { profile } = useAuth();
+  const { profile, canPerformAction } = useAuth();
+  const canViewPnl = canPerformAction('reports:view_pnl');
+  const canExportChecklist = canPerformAction('reports:export_checklist');
+  const canExportLedger = canPerformAction('reports:export_ledger');
+  const canViewDefaulters = canPerformAction('reports:view_defaulters');
+  const canViewAuditLogs = canPerformAction('reports:view_audit_logs');
   const { balances } = useWallet();
   const { organizationName: organizerCompanyName, organizationInitials: organizerInitials } = useOrganization();
   const [activeSubtab, setActiveSubtab] = useState<ReportSubtab>(initialSubtab || 'monthly');
@@ -98,6 +103,16 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     setActiveSubtab(sub);
     if (onSubtabChange) onSubtabChange(sub);
   };
+
+  // Fallback to permitted subtab if active subtab is restricted
+  useEffect(() => {
+    if (activeSubtab === 'monthly' && !canExportChecklist) {
+      if (canViewDefaulters) setActiveSubtab('defaulters');
+      else if (canExportLedger) setActiveSubtab('member');
+      else if (canViewPnl) setActiveSubtab('overview');
+      else if (canViewAuditLogs) setActiveSubtab('system_log');
+    }
+  }, [activeSubtab, canExportChecklist, canViewDefaulters, canExportLedger, canViewPnl, canViewAuditLogs]);
 
   // Supabase Data State
   const [loading, setLoading] = useState<boolean>(true);
@@ -2402,97 +2417,111 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
             <section className="bg-white rounded-2xl border border-slate-200/80 p-2 shadow-xs">
               <div className="flex items-center justify-between overflow-x-auto no-scrollbar gap-2">
                 <nav className="flex items-center gap-1.5 min-w-max">
-                  <button
-                    onClick={() => setActiveSubtab('monthly')}
-                    className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-                      activeSubtab === 'monthly'
-                        ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-2xs'
-                        : 'hover:bg-slate-100 text-slate-600 font-semibold'
-                    }`}
-                  >
-                    <span>📊</span> Monthly Collection Ledger
-                  </button>
+                  {canExportChecklist && (
+                    <button
+                      onClick={() => setActiveSubtab('monthly')}
+                      className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                        activeSubtab === 'monthly'
+                          ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-2xs'
+                          : 'hover:bg-slate-100 text-slate-600 font-semibold'
+                      }`}
+                    >
+                      <span>📊</span> Monthly Collection Ledger
+                    </button>
+                  )}
 
-                  <button
-                    onClick={() => setActiveSubtab('defaulters')}
-                    className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                      activeSubtab === 'defaulters'
-                        ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                        : 'hover:bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    <span>⚠️</span> Defaulter &amp; Overdue Tracker
-                    <span className="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px]">
-                      {defaultersStats.defaultersCount}
-                    </span>
-                  </button>
+                  {canViewDefaulters && (
+                    <button
+                      onClick={() => setActiveSubtab('defaulters')}
+                      className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                        activeSubtab === 'defaulters'
+                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                          : 'hover:bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      <span>⚠️</span> Defaulter &amp; Overdue Tracker
+                      <span className="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px]">
+                        {defaultersStats.defaultersCount}
+                      </span>
+                    </button>
+                  )}
 
-                  <button
-                    onClick={() => setActiveSubtab('period')}
-                    className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                      activeSubtab === 'period'
-                        ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                        : 'hover:bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    <span>📅</span> Period &amp; Date-Range Analysis
-                  </button>
+                  {canViewPnl && (
+                    <>
+                      <button
+                        onClick={() => setActiveSubtab('period')}
+                        className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                          activeSubtab === 'period'
+                            ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                            : 'hover:bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        <span>📅</span> Period &amp; Date-Range Analysis
+                      </button>
 
-                  <button
-                    onClick={() => setActiveSubtab('earnings')}
-                    className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                      activeSubtab === 'earnings'
-                        ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                        : 'hover:bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    <span>💼</span> Organizer Earnings &amp; Pool Growth
-                  </button>
+                      <button
+                        onClick={() => setActiveSubtab('earnings')}
+                        className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                          activeSubtab === 'earnings'
+                            ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                            : 'hover:bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        <span>💼</span> Organizer Earnings &amp; Pool Growth
+                      </button>
 
-                  <button
-                    onClick={() => setActiveSubtab('payouts')}
-                    className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                      activeSubtab === 'payouts'
-                        ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                        : 'hover:bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    <span>🏆</span> Prize Pot Disbursals
-                  </button>
+                      <button
+                        onClick={() => setActiveSubtab('payouts')}
+                        className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                          activeSubtab === 'payouts'
+                            ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                            : 'hover:bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        <span>🏆</span> Prize Pot Disbursals
+                      </button>
+                    </>
+                  )}
 
-                  <button
-                    onClick={() => setActiveSubtab('member')}
-                    className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                      activeSubtab === 'member'
-                        ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                        : 'hover:bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    <span>👤</span> Individual Member Statement
-                  </button>
+                  {canExportLedger && (
+                    <button
+                      onClick={() => setActiveSubtab('member')}
+                      className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                        activeSubtab === 'member'
+                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                          : 'hover:bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      <span>👤</span> Individual Member Statement
+                    </button>
+                  )}
 
-                  <button
-                    onClick={() => handleSelectSubtab('reliability')}
-                    className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                      activeSubtab === 'reliability'
-                        ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                        : 'hover:bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    <span>⭐</span> Member Trust &amp; Reliability Score
-                  </button>
+                  {canViewPnl && (
+                    <button
+                      onClick={() => handleSelectSubtab('reliability')}
+                      className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                        activeSubtab === 'reliability'
+                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                          : 'hover:bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      <span>⭐</span> Member Trust &amp; Reliability Score
+                    </button>
+                  )}
 
-                  <button
-                    onClick={() => handleSelectSubtab('system_log')}
-                    className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                      activeSubtab === 'system_log'
-                        ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                        : 'hover:bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    <span>🛡️</span> System Logs
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
-                  </button>
+                  {canViewAuditLogs && (
+                    <button
+                      onClick={() => handleSelectSubtab('system_log')}
+                      className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                        activeSubtab === 'system_log'
+                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                          : 'hover:bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      <span>🛡️</span> System Logs
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
+                    </button>
+                  )}
                 </nav>
 
                 <div className="hidden xl:flex items-center gap-2 pr-2">
@@ -3229,73 +3258,87 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
             ))}
           </div>
 
-          {/* Horizontal Swipeable Subtabs (7 Dimensions) */}
+          {/* Horizontal Swipeable Subtabs (Dynamic Permissions) */}
           <div className="px-3 pb-2 overflow-x-auto no-scrollbar flex items-center space-x-1.5 text-xs border-t border-slate-100 pt-1.5">
-            <button
-              onClick={() => setActiveSubtab('monthly')}
-              className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                activeSubtab === 'monthly' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-              }`}
-            >
-              Monthly Ledger
-            </button>
-            <button
-              onClick={() => setActiveSubtab('defaulters')}
-              className={`flex-shrink-0 px-3 py-1 rounded-xl flex items-center gap-1 cursor-pointer transition-all ${
-                activeSubtab === 'defaulters' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-              }`}
-            >
-              Defaulters <span className="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 font-bold text-[9px]">{defaultersStats.defaultersCount}</span>
-            </button>
-            <button
-              onClick={() => setActiveSubtab('period')}
-              className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                activeSubtab === 'period' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-              }`}
-            >
-              Period Analysis
-            </button>
-            <button
-              onClick={() => setActiveSubtab('earnings')}
-              className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                activeSubtab === 'earnings' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-              }`}
-            >
-              Pool &amp; Earnings
-            </button>
-            <button
-              onClick={() => setActiveSubtab('payouts')}
-              className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                activeSubtab === 'payouts' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-              }`}
-            >
-              Prize Disbursals
-            </button>
-            <button
-              onClick={() => setActiveSubtab('member')}
-              className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                activeSubtab === 'member' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-              }`}
-            >
-              Member
-            </button>
-            <button
-              onClick={() => handleSelectSubtab('reliability')}
-              className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                activeSubtab === 'reliability' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-              }`}
-            >
-              Trust Score
-            </button>
-            <button
-              onClick={() => handleSelectSubtab('system_log')}
-              className={`flex-shrink-0 px-3 py-1 rounded-xl flex items-center gap-1 cursor-pointer transition-all ${
-                activeSubtab === 'system_log' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-              }`}
-            >
-              <span>🛡️</span> System Logs
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            </button>
+            {canExportChecklist && (
+              <button
+                onClick={() => setActiveSubtab('monthly')}
+                className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
+                  activeSubtab === 'monthly' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                }`}
+              >
+                Monthly Ledger
+              </button>
+            )}
+            {canViewDefaulters && (
+              <button
+                onClick={() => setActiveSubtab('defaulters')}
+                className={`flex-shrink-0 px-3 py-1 rounded-xl flex items-center gap-1 cursor-pointer transition-all ${
+                  activeSubtab === 'defaulters' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                }`}
+              >
+                Defaulters <span className="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 font-bold text-[9px]">{defaultersStats.defaultersCount}</span>
+              </button>
+            )}
+            {canViewPnl && (
+              <>
+                <button
+                  onClick={() => setActiveSubtab('period')}
+                  className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
+                    activeSubtab === 'period' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                  }`}
+                >
+                  Period Analysis
+                </button>
+                <button
+                  onClick={() => setActiveSubtab('earnings')}
+                  className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
+                    activeSubtab === 'earnings' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                  }`}
+                >
+                  Pool &amp; Earnings
+                </button>
+                <button
+                  onClick={() => setActiveSubtab('payouts')}
+                  className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
+                    activeSubtab === 'payouts' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                  }`}
+                >
+                  Prize Disbursals
+                </button>
+              </>
+            )}
+            {canExportLedger && (
+              <button
+                onClick={() => setActiveSubtab('member')}
+                className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
+                  activeSubtab === 'member' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                }`}
+              >
+                Member
+              </button>
+            )}
+            {canViewPnl && (
+              <button
+                onClick={() => handleSelectSubtab('reliability')}
+                className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
+                  activeSubtab === 'reliability' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                }`}
+              >
+                Trust Score
+              </button>
+            )}
+            {canViewAuditLogs && (
+              <button
+                onClick={() => handleSelectSubtab('system_log')}
+                className={`flex-shrink-0 px-3 py-1 rounded-xl flex items-center gap-1 cursor-pointer transition-all ${
+                  activeSubtab === 'system_log' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                }`}
+              >
+                <span>🛡️</span> System Logs
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              </button>
+            )}
           </div>
         </header>
 

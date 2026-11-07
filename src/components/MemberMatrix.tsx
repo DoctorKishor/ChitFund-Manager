@@ -80,8 +80,19 @@ interface MemberMatrixProps {
 }
 
 export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory', onOpenAuditLogs }: MemberMatrixProps) {
-  const { profile: currentAdminProfile } = useAuth();
+  const { profile: currentAdminProfile, canPerformAction } = useAuth();
   const { isMaintenanceMode, toggleMaintenanceMode } = useMaintenance();
+
+  // Permission guards
+  const canEnroll = canPerformAction('members:enroll');
+  const canEdit = canPerformAction('members:edit');
+  const canSuspend = canPerformAction('members:suspend');
+  const canPairQr = canPerformAction('members:pair_qr');
+  const canRevokeQr = canPerformAction('members:revoke_qr');
+  const canBatchQr = canPerformAction('members:batch_qr');
+  const canResetMpin = canPerformAction('members:reset_mpin');
+  const canExport = canPerformAction('members:export');
+  const canDelete = canPerformAction('members:delete');
 
   // Core data states
   const [members, setMembers] = useState<MemberRecord[]>([]);
@@ -1218,14 +1229,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           </div>
 
           {/* Clean Enroll Member CTA */}
-          <button
-            type="button"
-            onClick={handleOpenAddModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all whitespace-nowrap cursor-pointer"
-          >
-            <UserPlus size={14} />
-            <span>Enroll Member</span>
-          </button>
+          {canEnroll && (
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all whitespace-nowrap cursor-pointer"
+            >
+              <UserPlus size={14} />
+              <span>Enroll Member</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -1238,14 +1251,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             <p className="text-[11px] text-slate-500 font-medium">{stats.total} Registered Subscribers</p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleOpenAddModal}
-            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Plus size={14} strokeWidth={2.5} />
-            <span>Add Member</span>
-          </button>
+          {canEnroll && (
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Plus size={14} strokeWidth={2.5} />
+              <span>Add Member</span>
+            </button>
+          )}
         </div>
 
         {/* Quick Filter Tabs (Directory only) */}
@@ -1353,26 +1368,32 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 </div>
                 {/* Integrated Contextual Logistics Action Pills */}
                 <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsInventoryOpen(true)}
-                    className="inline-flex items-center gap-1 text-[11px] text-slate-600 hover:text-slate-900 font-semibold bg-slate-100 hover:bg-slate-200/80 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <Layers size={13} className="text-slate-500" />
-                    <span>QR Inventory</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedSubscribersForPrint(null);
-                      setQrCenterTab('subscribers');
-                      setIsQrCenterOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1 text-[11px] text-brand-600 hover:text-brand-700 font-semibold bg-brand-50 hover:bg-brand-100 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <Printer size={13} className="text-brand-600" />
-                    <span>Print Sheet</span>
-                  </button>
+                  {canBatchQr ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsInventoryOpen(true)}
+                        className="inline-flex items-center gap-1 text-[11px] text-slate-600 hover:text-slate-900 font-semibold bg-slate-100 hover:bg-slate-200/80 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Layers size={13} className="text-slate-500" />
+                        <span>QR Inventory</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSubscribersForPrint(null);
+                          setQrCenterTab('subscribers');
+                          setIsQrCenterOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] text-brand-600 hover:text-brand-700 font-semibold bg-brand-50 hover:bg-brand-100 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Printer size={13} className="text-brand-600" />
+                        <span>Print Sheet</span>
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-[11px] text-slate-400 font-medium">Physical Passbook Status</span>
+                  )}
                 </div>
               </div>
 
@@ -1771,14 +1792,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 {activeDrawerMember.fullName}
                               </h3>
                               {/* Edit Profile Trigger */}
-                              <button
-                                type="button"
-                                onClick={(e) => handleOpenEditModal(e, activeDrawerMember)}
-                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded-md border border-brand-200/60 transition-colors whitespace-nowrap cursor-pointer"
-                              >
-                                <Edit3 size={11} />
-                                <span>Edit</span>
-                              </button>
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleOpenEditModal(e, activeDrawerMember)}
+                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded-md border border-brand-200/60 transition-colors whitespace-nowrap cursor-pointer"
+                                >
+                                  <Edit3 size={11} />
+                                  <span>Edit</span>
+                                </button>
+                              )}
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5 truncate">
                               📞 +91 {activeDrawerMember.phoneNumber || '—'}
@@ -1822,14 +1845,16 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => setPairingMember(activeDrawerMember)}
-                              className="text-[11px] font-semibold text-brand-600 hover:text-brand-700 bg-white border border-slate-200 px-2 py-1 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                            >
-                              {activeDrawerMember.passbookToken ? 'Re-bind' : 'Pair QR'}
-                            </button>
-                            {activeDrawerMember.passbookToken && (
+                            {canPairQr && (
+                              <button
+                                type="button"
+                                onClick={() => setPairingMember(activeDrawerMember)}
+                                className="text-[11px] font-semibold text-brand-600 hover:text-brand-700 bg-white border border-slate-200 px-2 py-1 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                              >
+                                {activeDrawerMember.passbookToken ? 'Re-bind' : 'Pair QR'}
+                              </button>
+                            )}
+                            {canRevokeQr && activeDrawerMember.passbookToken && (
                               <button
                                 type="button"
                                 onClick={(e) => handleUnlinkPassbook(e, activeDrawerMember)}
@@ -1896,13 +1921,15 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 : 'Initialized on member mobile device'}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleResetMpin(activeDrawerMember)}
-                            className="text-xs font-bold text-brand-600 hover:text-brand-700 px-2.5 py-1 bg-white border border-slate-200 rounded-lg transition-colors cursor-pointer"
-                          >
-                            Reset MPIN
-                          </button>
+                          {canResetMpin && (
+                            <button
+                              type="button"
+                              onClick={() => handleResetMpin(activeDrawerMember)}
+                              className="text-xs font-bold text-brand-600 hover:text-brand-700 px-2.5 py-1 bg-white border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Reset MPIN
+                            </button>
+                          )}
                         </div>
 
                         {/* High-visibility Active / Suspended Cutoff Toggle Control */}
@@ -1916,30 +1943,30 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/60 rounded-xl">
                             <button
                               type="button"
-                              disabled={activeDrawerMember.id === currentAdminProfile?.id}
+                              disabled={!canSuspend || activeDrawerMember.id === currentAdminProfile?.id}
                               onClick={() => {
                                 if (activeDrawerMember.isBlocked) handleToggleBlock(activeDrawerMember);
                               }}
-                              className={`py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer ${
+                              className={`py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 text-xs transition-colors ${
                                 !activeDrawerMember.isBlocked
                                   ? 'bg-emerald-600 text-white shadow-xs'
                                   : 'text-slate-600 hover:text-slate-900'
-                              }`}
+                              } ${!canSuspend ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
                             >
                               <span className={`w-1.5 h-1.5 rounded-full ${!activeDrawerMember.isBlocked ? 'bg-white' : 'bg-slate-400'}`}></span>
                               <span>Active (Allowed)</span>
                             </button>
                             <button
                               type="button"
-                              disabled={activeDrawerMember.id === currentAdminProfile?.id}
+                              disabled={!canSuspend || activeDrawerMember.id === currentAdminProfile?.id}
                               onClick={() => {
                                 if (!activeDrawerMember.isBlocked) handleToggleBlock(activeDrawerMember);
                               }}
-                              className={`py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 text-xs transition-colors cursor-pointer ${
+                              className={`py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 text-xs transition-colors ${
                                 activeDrawerMember.isBlocked
                                   ? 'bg-rose-600 text-white shadow-xs'
                                   : 'hover:bg-white text-slate-600 hover:text-rose-700'
-                              }`}
+                              } ${!canSuspend ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
                             >
                               <span className={`w-1.5 h-1.5 rounded-full ${activeDrawerMember.isBlocked ? 'bg-white' : 'bg-slate-400'}`}></span>
                               <span>Suspended</span>
@@ -1958,7 +1985,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           <BookOpen size={16} />
                           <span>View Subscriber Ledger &amp; Passbook</span>
                         </button>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className={`grid ${canExport ? 'grid-cols-2' : 'grid-cols-1'} gap-2 text-xs`}>
                           <button
                             type="button"
                             onClick={(e) => handleShareWhatsApp(e, activeDrawerMember)}
@@ -1967,45 +1994,49 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             <Share2 size={14} />
                             <span>WhatsApp Notice</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={(e) => handlePrintMemberStickers(e, activeDrawerMember)}
-                            className="py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <Printer size={14} />
-                            <span>Export PDF</span>
-                          </button>
+                          {canExport && (
+                            <button
+                              type="button"
+                              onClick={(e) => handlePrintMemberStickers(e, activeDrawerMember)}
+                              className="py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Printer size={14} />
+                              <span>Export PDF</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
 
                     {/* Batch QR Logistics Widget */}
-                    <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
-                          Physical Logistics
-                        </span>
-                        <span className="text-xs text-amber-300 font-semibold">
-                          {stats.total - stats.qrLinkedCount} Awaiting Bind
-                        </span>
+                    {canBatchQr && (
+                      <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
+                            Physical Logistics
+                          </span>
+                          <span className="text-xs text-amber-300 font-semibold">
+                            {stats.total - stats.qrLinkedCount} Awaiting Bind
+                          </span>
+                        </div>
+                        <h4 className="font-display font-bold text-sm mt-2">Print Passbook QR Sticker Labels</h4>
+                        <p className="text-xs text-slate-300 mt-1">
+                          Generate high-density A4 label sheets (3x8 grid) with member names, ticket IDs, and encrypted QR check tokens for direct booklet pasting.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSubscribersForPrint(null);
+                            setQrCenterTab('batches');
+                            setIsQrCenterOpen(true);
+                          }}
+                          className="mt-4 w-full py-2.5 px-4 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Printer size={15} />
+                          <span>Download PDF Sticker Sheet (A4)</span>
+                        </button>
                       </div>
-                      <h4 className="font-display font-bold text-sm mt-2">Print Passbook QR Sticker Labels</h4>
-                      <p className="text-xs text-slate-300 mt-1">
-                        Generate high-density A4 label sheets (3x8 grid) with member names, ticket IDs, and encrypted QR check tokens for direct booklet pasting.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedSubscribersForPrint(null);
-                          setQrCenterTab('batches');
-                          setIsQrCenterOpen(true);
-                        }}
-                        className="mt-4 w-full py-2.5 px-4 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <Printer size={15} />
-                        <span>Download PDF Sticker Sheet (A4)</span>
-                      </button>
-                    </div>
+                    )}
                   </>
                 ) : (
                   <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center text-slate-400 text-xs">

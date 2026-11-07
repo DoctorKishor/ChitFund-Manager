@@ -160,7 +160,12 @@ interface DashboardContentProps {
 }
 
 export default function DashboardContent({ activeTab, setActiveTab }: DashboardContentProps) {
-  const { profile } = useAuth();
+  const { profile, canPerformAction } = useAuth();
+  const canCreateChit = canPerformAction('chits:create');
+  const canEditChit = canPerformAction('chits:edit');
+  const canLaunchMonth0 = canPerformAction('chits:launch_month0');
+  const canDeleteChit = canPerformAction('chits:delete');
+  const canRescheduleAuction = canPerformAction('chits:reschedule_auction');
   const { balances, updateBalance } = useWallet();
   const { organizationName, organizationInitials, organizationTagline } = useOrganization();
 
@@ -5496,17 +5501,23 @@ Thank you for your prompt payment! 🙏`;
                 <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                   <button
                     type="button"
-                    onClick={() => openEditGroupModal(selectedWorkspaceGroup)}
-                    className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+                    disabled={!canEditChit}
+                    onClick={() => canEditChit && openEditGroupModal(selectedWorkspaceGroup)}
+                    className={`border border-slate-200 bg-white text-slate-700 font-semibold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs ${
+                      canEditChit ? 'hover:bg-slate-50 active:scale-95 cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                    }`}
                   >
                     <Edit3 size={13} className="text-slate-500" />
                     <span>Edit Details</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => openSoftDeleteModal(selectedWorkspaceGroup)}
-                    className="border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs active:scale-95 cursor-pointer"
-                    title="Move group to Recycle Bin"
+                    disabled={!canDeleteChit}
+                    onClick={() => canDeleteChit && openSoftDeleteModal(selectedWorkspaceGroup)}
+                    className={`border border-rose-200 bg-rose-50 text-rose-700 font-semibold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs ${
+                      canDeleteChit ? 'hover:bg-rose-100 active:scale-95 cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                    }`}
+                    title={canDeleteChit ? "Move group to Recycle Bin" : "Restricted to Administrators"}
                   >
                     <Trash2 size={13} className="text-rose-600" />
                     <span>Move to Bin</span>
@@ -5639,8 +5650,11 @@ Thank you for your prompt payment! 🙏`;
                   </div>
                   <button
                     type="button"
-                    onClick={() => setMonth0LaunchModalGroup(selectedWorkspaceGroup)}
-                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0 active:scale-95 w-full sm:w-auto cursor-pointer"
+                    disabled={!canLaunchMonth0}
+                    onClick={() => canLaunchMonth0 && setMonth0LaunchModalGroup(selectedWorkspaceGroup)}
+                    className={`text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0 w-full sm:w-auto ${
+                      canLaunchMonth0 ? 'bg-amber-600 hover:bg-amber-700 active:scale-95 cursor-pointer' : 'bg-amber-600/60 opacity-75 cursor-not-allowed'
+                    }`}
                   >
                     <Rocket size={14} />
                     <span>Confirm Launch &amp; Roll to M1</span>
@@ -5880,17 +5894,19 @@ Thank you for your prompt payment! 🙏`;
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setShowWizard(true);
-                    }}
-                    className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1 active:scale-95 cursor-pointer"
-                  >
-                    <Plus size={14} />
-                    <span>New Chit</span>
-                  </button>
+                  {canCreateChit && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setShowWizard(true);
+                      }}
+                      className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1 active:scale-95 cursor-pointer"
+                    >
+                      <Plus size={14} />
+                      <span>New Chit</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Mobile Search Input */}
@@ -6079,16 +6095,18 @@ Thank you for your prompt payment! 🙏`;
                 </div>
 
                 {/* Primary New Chit Button */}
-                <button
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setShowWizard(true);
-                  }}
-                  className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 active:scale-95 cursor-pointer"
-                >
-                  <Plus size={14} />
-                  <span>+ New Chit Group</span>
-                </button>
+                {canCreateChit && (
+                  <button
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setShowWizard(true);
+                    }}
+                    className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 active:scale-95 cursor-pointer"
+                  >
+                    <Plus size={14} />
+                    <span>+ New Chit Group</span>
+                  </button>
+                )}
               </div>
 
               {/* ─────────────────────────────────────────────────────────────
@@ -6284,15 +6302,17 @@ Thank you for your prompt payment! 🙏`;
                             : `There are no chit groups with status "${groupFilter}" currently.`}
                         </p>
                       </div>
-                      <button
-                        onClick={() => {
-                          triggerHapticFeedback('light');
-                          setShowWizard(true);
-                        }}
-                        className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
-                      >
-                        + Create Chit Group
-                      </button>
+                      {canCreateChit && (
+                        <button
+                          onClick={() => {
+                            triggerHapticFeedback('light');
+                            setShowWizard(true);
+                          }}
+                          className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
+                        >
+                          + Create Chit Group
+                        </button>
+                      )}
                     </div>
                   ) : (
                     filteredGroups.map((g) => {
@@ -6409,13 +6429,15 @@ Thank you for your prompt payment! 🙏`;
                                 <strong className="text-slate-800 font-semibold text-[10.5px] sm:text-xs whitespace-nowrap">
                                   {getGroupAuctionDate(g.id, g.currentMonth || 1, true).display}
                                 </strong>
-                                <button
-                                  type="button"
-                                  onClick={() => setScheduleModalGroup(g)}
-                                  className="text-[10px] sm:text-[10.5px] font-bold text-brand-700 hover:underline cursor-pointer shrink-0 whitespace-nowrap"
-                                >
-                                  Edit
-                                </button>
+                                {canRescheduleAuction && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setScheduleModalGroup(g)}
+                                    className="text-[10px] sm:text-[10.5px] font-bold text-brand-700 hover:underline cursor-pointer shrink-0 whitespace-nowrap"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -6424,8 +6446,11 @@ Thank you for your prompt payment! 🙏`;
                           {g.currentMonth === 0 ? (
                             <div className="pt-3 border-t border-slate-100">
                               <button
-                                onClick={() => setMonth0LaunchModalGroup(g)}
-                                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
+                                disabled={!canLaunchMonth0}
+                                onClick={() => canLaunchMonth0 && setMonth0LaunchModalGroup(g)}
+                                className={`w-full text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm whitespace-nowrap ${
+                                  canLaunchMonth0 ? 'bg-amber-600 hover:bg-amber-700 active:scale-95 cursor-pointer' : 'bg-amber-600/60 opacity-75 cursor-not-allowed'
+                                }`}
                               >
                                 <Rocket size={14} className="shrink-0" />
                                 <span className="whitespace-nowrap">Confirm Launch &amp; Roll to M1</span>

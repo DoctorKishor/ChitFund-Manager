@@ -73,7 +73,9 @@ const ROLE_COLORS: Record<string, { bg: string; text: string; border: string }> 
 };
 
 export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: UserAccessManagerProps) {
-  const { profile: currentAdminProfile, user: currentAdminUser } = useAuth();
+  const { profile: currentAdminProfile, user: currentAdminUser, canPerformAction } = useAuth();
+  const canManageStaff = canPerformAction('system:manage_staff');
+  const canManageRoles = canPerformAction('system:manage_roles');
   const [activeSubtab, setActiveSubtab] = useState<'staff' | 'roles'>('staff');
   const [staffMembers, setStaffMembers] = useState<StaffProfile[]>([]);
   const [availableRoles, setAvailableRoles] = useState<CustomRole[]>([]);
@@ -152,8 +154,8 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
       // Auto-cleanup probe test user from the database if detected
       const probeUser = allProfiles.find(p => p.phone_number === '9876543210' || p.full_name === 'Test Staff Probe');
       if (probeUser) {
-        // Silently mark as deleted/archived so it vanishes permanently
-        supabase.from('profiles').update({ is_deleted: true, role: 'subscriber' }).eq('id', probeUser.id).then();
+        // Purge permanently from database
+        supabase.from('profiles').delete().eq('id', probeUser.id).then();
       }
 
       // Filter staff: non-subscriber, not deleted, and exclude any test probe artifact
@@ -593,19 +595,21 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              triggerHapticFeedback('light');
-              setIsAddStaffOpen(true);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition-all cursor-pointer whitespace-nowrap"
-          >
-            <UserPlus size={16} />
-            <span>Add Staff Member</span>
-          </button>
-        </div>
+        {canManageStaff && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHapticFeedback('light');
+                setIsAddStaffOpen(true);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <UserPlus size={16} />
+              <span>Add Staff Member</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Subtab Navigation: Staff Directory vs Role Permissions ── */}
@@ -626,21 +630,23 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
           <span>Staff Directory ({staffMembers.length})</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            triggerHapticFeedback('light');
-            setActiveSubtab('roles');
-          }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all cursor-pointer ${
-            activeSubtab === 'roles'
-              ? 'bg-white text-slate-900 shadow-xs font-black'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Sliders size={14} />
-          <span>Role Permissions ({availableRoles.length})</span>
-        </button>
+        {canManageRoles && (
+          <button
+            type="button"
+            onClick={() => {
+              triggerHapticFeedback('light');
+              setActiveSubtab('roles');
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all cursor-pointer ${
+              activeSubtab === 'roles'
+                ? 'bg-white text-slate-900 shadow-xs font-black'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Sliders size={14} />
+            <span>Role Permissions ({availableRoles.length})</span>
+          </button>
+        )}
       </div>
 
       {/* ── SUBTAB 1: STAFF DIRECTORY TABLE ── */}
