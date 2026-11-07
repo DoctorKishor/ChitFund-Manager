@@ -13,38 +13,76 @@ export type MainTabId =
   | 'settings';
 
 export type PermissionAction =
-  // Chit Management
-  | 'chits:create'
-  | 'chits:edit'
-  | 'chits:delete'
-  | 'chits:view'
-  // Member Management
+  // ── Member & Passbook Logistics ──
+  | 'members:view'
   | 'members:enroll'
   | 'members:edit'
-  | 'members:delete'
-  | 'members:view'
   | 'members:collect'
-  // Live Auctions
-  | 'auctions:bid'
-  | 'auctions:conduct'
-  | 'auctions:disburse'
+  | 'members:suspend'
+  | 'members:pair_qr'
+  | 'members:revoke_qr'
+  | 'members:batch_qr'
+  | 'members:reset_mpin'
+  | 'members:export'
+  | 'members:delete'
+
+  // ── Chit Scheme Lifecycle & Governance ──
+  | 'chits:view'
+  | 'chits:create'
+  | 'chits:edit'
+  | 'chits:launch_month0'
+  | 'chits:reschedule_auction'
+  | 'chits:configure_laaba_seetu'
+  | 'chits:delete'
+
+  // ── Live Floor Auctions & Bidding Engine ──
   | 'auctions:view'
-  // Treasury & Vault
+  | 'auctions:conduct'
+  | 'auctions:bid'
+  | 'auctions:conclude'
+  | 'auctions:override_floor'
+  | 'auctions:disburse'
+  | 'auctions:issue_receipt'
+
+  // ── Treasury & Financial Multi-Vaults ──
   | 'treasury:view'
-  | 'treasury:move_money'
-  | 'treasury:deposit'
-  | 'treasury:personal_draw'
-  | 'treasury:recover_float'
-  | 'treasury:reconcile'
+  | 'treasury:view_cash_box'
+  | 'treasury:view_banks'
   | 'treasury:collect_cash'
-  // Communication
-  | 'communication:broadcast'
+  | 'treasury:move_money'
+  | 'treasury:confirm_atm'
+  | 'treasury:deposit'
+  | 'treasury:recover_float'
+  | 'treasury:personal_draw'
+  | 'treasury:settle_draw'
+  | 'treasury:reconcile'
+
+  // ── Communication & WhatsApp Broadcaster ──
   | 'communication:view'
-  // Reports
-  | 'reports:export'
+  | 'communication:broadcast'
+  | 'communication:pre_auction'
+  | 'communication:post_auction'
+  | 'communication:due_alerts'
+  | 'communication:custom'
+  | 'communication:manage_templates'
+
+  // ── Reports, P&L & Compliance Auditing ──
   | 'reports:view'
-  // System & Roles
-  | 'system:manage_users';
+  | 'reports:view_pnl'
+  | 'reports:export'
+  | 'reports:export_checklist'
+  | 'reports:export_ledger'
+  | 'reports:view_defaulters'
+  | 'reports:view_audit_logs'
+  | 'reports:export_audit'
+
+  // ── System Governance & Security Controls ──
+  | 'system:manage_users'
+  | 'system:manage_staff'
+  | 'system:manage_roles'
+  | 'system:maintenance_mode'
+  | 'system:branding'
+  | 'system:reset_database';
 
 export interface CustomRoleRecord {
   id: string;
@@ -91,44 +129,76 @@ export const TREASURY_SUBTAB_PERMISSIONS: Record<CashHandlingSubtab, string[]> =
  * Granular Action Permission Matrix by Default System Role
  */
 export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
-  // Chit Group Controls
-  'chits:create': ['admin'],
-  'chits:edit': ['admin', 'manager'],
-  'chits:delete': ['admin'],
-  'chits:view': ['admin', 'manager', 'auction_clerk', 'auditor', 'subscriber'],
-
-  // Member Controls
+  // ── Member & Passbook Logistics ──
+  'members:view': ['admin', 'manager', 'collections_agent', 'auditor', 'subscriber'],
   'members:enroll': ['admin', 'manager'],
   'members:edit': ['admin', 'manager'],
-  'members:delete': ['admin'],
-  'members:view': ['admin', 'manager', 'collections_agent', 'subscriber'],
   'members:collect': ['admin', 'manager', 'collections_agent'],
+  'members:suspend': ['admin', 'manager'],
+  'members:pair_qr': ['admin', 'manager', 'collections_agent'],
+  'members:revoke_qr': ['admin', 'manager'],
+  'members:batch_qr': ['admin', 'manager'],
+  'members:reset_mpin': ['admin', 'manager'],
+  'members:export': ['admin', 'manager', 'auditor'],
+  'members:delete': ['admin'],
 
-  // Live Auctions & Payouts
-  'auctions:bid': ['admin', 'manager', 'auction_clerk', 'subscriber'],
+  // ── Chit Scheme Lifecycle & Governance ──
+  'chits:view': ['admin', 'manager', 'auction_clerk', 'auditor', 'subscriber'],
+  'chits:create': ['admin'],
+  'chits:edit': ['admin', 'manager'],
+  'chits:launch_month0': ['admin'],
+  'chits:reschedule_auction': ['admin', 'manager'],
+  'chits:configure_laaba_seetu': ['admin'],
+  'chits:delete': ['admin'],
+
+  // ── Live Floor Auctions & Bidding Engine ──
+  'auctions:view': ['admin', 'manager', 'auction_clerk', 'auditor', 'subscriber'],
   'auctions:conduct': ['admin', 'manager'],
+  'auctions:bid': ['admin', 'manager', 'auction_clerk', 'subscriber'],
+  'auctions:conclude': ['admin', 'manager'],
+  'auctions:override_floor': ['admin'],
   'auctions:disburse': ['admin', 'manager'],
-  'auctions:view': ['admin', 'manager', 'auction_clerk', 'subscriber'],
+  'auctions:issue_receipt': ['admin', 'manager', 'auction_clerk'],
 
-  // Treasury & Cash Operations (High-Risk Admin Only)
-  'treasury:view': ['admin'],
-  'treasury:move_money': ['admin'],
-  'treasury:deposit': ['admin'],
-  'treasury:personal_draw': ['admin'],
-  'treasury:recover_float': ['admin'],
-  'treasury:reconcile': ['admin'],
+  // ── Treasury & Financial Multi-Vaults ──
+  'treasury:view': ['admin', 'auditor'],
+  'treasury:view_cash_box': ['admin', 'manager', 'auditor'],
+  'treasury:view_banks': ['admin'],
   'treasury:collect_cash': ['admin', 'manager', 'collections_agent'],
+  'treasury:move_money': ['admin'],
+  'treasury:confirm_atm': ['admin'],
+  'treasury:deposit': ['admin'],
+  'treasury:recover_float': ['admin', 'manager'],
+  'treasury:personal_draw': ['admin'],
+  'treasury:settle_draw': ['admin'],
+  'treasury:reconcile': ['admin'],
 
-  // Communication Center
-  'communication:broadcast': ['admin', 'manager', 'collections_agent'],
+  // ── Communication & WhatsApp Broadcaster ──
   'communication:view': ['admin', 'manager', 'collections_agent'],
+  'communication:broadcast': ['admin', 'manager', 'collections_agent'],
+  'communication:pre_auction': ['admin', 'manager'],
+  'communication:post_auction': ['admin', 'manager'],
+  'communication:due_alerts': ['admin', 'manager', 'collections_agent'],
+  'communication:custom': ['admin', 'manager'],
+  'communication:manage_templates': ['admin', 'manager'],
 
-  // Reports
-  'reports:export': ['admin', 'auditor'],
+  // ── Reports, P&L & Compliance Auditing ──
   'reports:view': ['admin', 'auditor'],
+  'reports:view_pnl': ['admin', 'auditor'],
+  'reports:export': ['admin', 'auditor'],
+  'reports:export_checklist': ['admin', 'manager', 'collections_agent', 'auditor'],
+  'reports:export_ledger': ['admin', 'manager', 'auditor'],
+  'reports:view_defaulters': ['admin', 'manager', 'auditor'],
+  'reports:view_audit_logs': ['admin', 'auditor'],
+  'reports:export_audit': ['admin', 'auditor'],
 
-  // System Administration
+  // ── System Governance & Security Controls ──
   'system:manage_users': ['admin'],
+  'system:manage_staff': ['admin'],
+  'system:manage_roles': ['admin'],
+  'system:maintenance_mode': ['admin'],
+  'system:branding': ['admin'],
+  'system:reset_database': ['admin'],
 };
 
 /**

@@ -56,15 +56,18 @@ const CATEGORIES: PermissionCategory[] = [
     badge: '1',
     badgeClass: 'bg-indigo-50 text-brand-600',
     title: 'Module & Navigation Access',
-    subtitle: 'Controls top navigation & sidebar visibility',
+    subtitle: 'Controls top navigation & sidebar visibility across all devices',
     toggleBgClass: 'peer-checked:bg-brand-600',
     items: [
-      { key: 'dashboard', label: 'Overview Dashboard', desc: 'High-level financial summaries & charts', type: 'tab' },
-      { key: 'chits', label: 'Chits & Groups Directory', desc: 'View scheme rosters and pool balances', type: 'tab' },
-      { key: 'members', label: 'Members & Passbooks', desc: 'Member directory & passbook scanner', type: 'tab' },
-      { key: 'auctions', label: 'Auctions & Live Bidding', desc: 'Real-time auction desk and prize pots', type: 'tab' },
-      { key: 'cash', label: 'Treasury & Cash Vaults', desc: 'Physical cash drawer & bank ledger', type: 'tab' },
-      { key: 'communication', label: 'WhatsApp Broadcaster', desc: 'Direct notices & payment receipts dispatch', type: 'tab' },
+      { key: 'dashboard', label: 'Overview Dashboard', desc: 'High-level financial summaries, KPI cards & cycle statistics', type: 'tab' },
+      { key: 'chits', label: 'Chits & Groups Directory', desc: 'View scheme rosters, pool balances, and cycle progress', type: 'tab' },
+      { key: 'members', label: 'Members & Passbooks', desc: 'Member registry, passbook manager, and ticket allocations', type: 'tab' },
+      { key: 'auctions', label: 'Auctions & Live Bidding', desc: 'Live auction floor desk, real-time shouts & pot awards', type: 'tab' },
+      { key: 'cash', label: 'Treasury & Cash Vaults', desc: 'Multi-account bank ledger, cash drawer & inter-vault transfers', type: 'tab' },
+      { key: 'communication', label: 'WhatsApp Broadcaster', desc: 'Dispatch payment receipts, pre-auction alerts & due reminders', type: 'tab' },
+      { key: 'reports', label: 'Reports & Analytics Center', desc: 'P&L velocity statements, payment checklists & audit trail logs', type: 'tab' },
+      { key: 'users', label: 'Roles & Staff Credentials', desc: 'Workforce identities, login credentials, and RBAC matrix', type: 'tab' },
+      { key: 'settings', label: 'Portal Settings & Security', desc: 'Organization branding, maintenance lockout & system controls', type: 'tab' },
     ],
   },
   {
@@ -72,55 +75,121 @@ const CATEGORIES: PermissionCategory[] = [
     badge: '2',
     badgeClass: 'bg-emerald-50 text-emerald-700',
     title: 'Member & Passbook Logistics',
-    subtitle: 'Core operations for Collections Agent',
+    subtitle: 'Core operations for subscriber records & physical passbooks',
     toggleBgClass: 'peer-checked:bg-emerald-600',
     items: [
-      { key: 'members:view', label: 'View Member Rosters', desc: 'Search subscriber names & ticket IDs', type: 'action' },
-      { key: 'members:collect', label: 'Record Installment Collections', desc: 'Post cash, UPI, & issue digital receipts', type: 'action' },
-      { key: 'members:pair_qr', label: 'Pair & Print Passbook QRs', desc: 'Link camera QR scan to physical booklet', type: 'action' },
-      { key: 'members:enroll', label: 'Enroll New Members', desc: 'Register new subscribers and tickets', type: 'action' },
-      { key: 'members:edit', label: 'Edit Subscriber Info', desc: 'Modify phone numbers and addresses', type: 'action' },
-      { key: 'members:suspend', label: 'Suspend Portal Access', desc: 'Trigger default locks and bidding blocks', type: 'action' },
+      { key: 'members:view', label: 'View Member Directory', desc: 'Search subscriber profiles, enrolled chits, and contact records', type: 'action' },
+      { key: 'members:enroll', label: 'Enroll New Subscribers', desc: 'Register new member profiles and allocate chit scheme tickets', type: 'action' },
+      { key: 'members:edit', label: 'Edit Member Details', desc: 'Update subscriber phone numbers, addresses, and account notes', type: 'action' },
+      { key: 'members:collect', label: 'Collect Installment Payments', desc: 'Post cash, UPI, or bank installments and issue digital receipts', type: 'action' },
+      { key: 'members:suspend', label: 'Suspend / Block Portal Access', desc: 'Lock subscriber passbook logins and disqualify from live auctions', type: 'action' },
+      { key: 'members:pair_qr', label: 'Pair Physical Passbook QR', desc: 'Camera scan and link printed QR codes to member passbooks', type: 'action' },
+      { key: 'members:revoke_qr', label: 'Revoke / Unlink Passbook QR', desc: 'Unpair lost or damaged passbook QR tokens from member profile', type: 'action' },
+      { key: 'members:batch_qr', label: 'Generate Passbook QR Sheets', desc: 'Create printable batches of blank QR stickers for new booklets', type: 'action' },
+      { key: 'members:reset_mpin', label: 'Reset Passbook MPIN', desc: 'Reset subscriber 4-digit passbook portal PIN to default 1234', type: 'action' },
+      { key: 'members:export', label: 'Export Member Directory CSV', desc: 'Download complete roster with phone numbers and ticket status', type: 'action' },
+      { key: 'members:delete', label: 'Delete Subscriber Records', desc: 'Permanently deactivate or purge member profiles from registry', type: 'action' },
     ],
   },
   {
     id: 3,
     badge: '3',
-    badgeClass: 'bg-amber-50 text-amber-700',
-    title: 'Chit Scheme Lifecycle',
-    subtitle: 'Restricted configuration management',
-    toggleBgClass: 'peer-checked:bg-brand-600',
+    badgeClass: 'bg-sky-50 text-sky-700',
+    title: 'Chit Scheme Lifecycle & Governance',
+    subtitle: 'Scheme creation, monthly rules, and Launch Month operations',
+    toggleBgClass: 'peer-checked:bg-sky-600',
     items: [
-      { key: 'chits:view', label: 'View Chit Scheme Details', desc: 'Inspect duration, pot totals, and cycles', type: 'action' },
-      { key: 'chits:create', label: 'Create New Chit Pool', desc: 'Launch ₹1L, ₹2L or custom groups', type: 'action' },
-      { key: 'chits:edit', label: 'Edit Group Rules & Dates', desc: 'Adjust monthly deadlines and caps', type: 'action' },
+      { key: 'chits:view', label: 'View Chit Schemes', desc: 'Inspect duration, pot totals, cycle history, and enrolled tickets', type: 'action' },
+      { key: 'chits:create', label: 'Create New Chit Schemes', desc: 'Launch ₹1L, ₹2L, ₹5L, ₹10L, ₹25L, or custom scheme groups', type: 'action' },
+      { key: 'chits:edit', label: 'Edit Scheme Rules & Caps', desc: 'Modify installment deadlines, maximum bid caps, and group parameters', type: 'action' },
+      { key: 'chits:launch_month0', label: 'Execute Month 0 Launch', desc: 'Confirm Launch Month collections and allocate Organizer Profit pool', type: 'action' },
+      { key: 'chits:reschedule_auction', label: 'Reschedule Auction Schedule', desc: 'Postpone or advance monthly auction dates and notify members', type: 'action' },
+      { key: 'chits:configure_laaba_seetu', label: 'Configure Laaba Seetu Rules', desc: 'Set bonus profit discount threshold and pool rollover parameters', type: 'action' },
+      { key: 'chits:delete', label: 'Delete / Archive Schemes', desc: 'Permanently archive completed pools or delete draft chit schemes', type: 'action' },
     ],
   },
   {
     id: 4,
     badge: '4',
     badgeClass: 'bg-purple-50 text-purple-700',
-    title: 'Live Auctions & Bidding Operations',
-    subtitle: 'Monthly floor bidding & payout dispatch',
+    title: 'Live Floor Auctions & Bidding Engine',
+    subtitle: 'Monthly bidding sessions, proxy shouts, and prize disbursements',
     toggleBgClass: 'peer-checked:bg-purple-600',
     items: [
-      { key: 'auctions:conduct', label: 'Conduct Live Auction Cycles', desc: 'Finalize winning discount bids, advance chit month cycles, & pool', type: 'action' },
+      { key: 'auctions:view', label: 'View Live Auction Floor', desc: 'Monitor active countdowns, shouted bids, and prize pot values', type: 'action' },
+      { key: 'auctions:conduct', label: 'Conduct & Moderate Sessions', desc: 'Start live countdown timer, accept shouts, and moderate bidding desk', type: 'action' },
       { key: 'auctions:bid', label: 'Place Proxy Bids for Tickets', desc: 'Shout live discount bids on behalf of eligible non-winning subscribers', type: 'action' },
-      { key: 'auctions:disburse', label: 'Disburse Prize Pot Payouts', desc: 'Authorize and disburse net pot payouts to winning subscribers', type: 'action' },
+      { key: 'auctions:conclude', label: 'Conclude Cycle & Advance Month', desc: 'Lock winning discount, calculate pot, and advance to next month cycle', type: 'action' },
+      { key: 'auctions:override_floor', label: 'Override Floor / Bid Caps', desc: 'Administrative unlock of minimum floor bid or maximum discount limit', type: 'action' },
+      { key: 'auctions:disburse', label: 'Authorize Prize Pot Payouts', desc: 'Disburse net prize pot to winning subscriber via bank or cash', type: 'action' },
+      { key: 'auctions:issue_receipt', label: 'Issue Winner Payout Voucher', desc: 'Generate and print official prize pot payout settlement certificate', type: 'action' },
     ],
   },
   {
     id: 5,
     badge: '5',
-    badgeClass: 'bg-rose-50 text-rose-700',
-    title: 'Treasury & Financial Vaults',
-    subtitle: 'High-Risk Administrative Controls',
+    badgeClass: 'bg-amber-50 text-amber-700',
+    title: 'Treasury & Multi-Vault Financials',
+    subtitle: 'High-risk banking controls, ATM movements, and cash drawer',
     toggleBgClass: 'peer-checked:bg-amber-500',
     items: [
-      { key: 'treasury:collect_cash', label: 'Accept Physical Cash & Field Receipts', desc: 'Accept physical currency and issue immediate passbook receipts', type: 'action' },
-      { key: 'treasury:move_money', label: 'ATM & Inter-Vault Relocations', desc: 'Transfer funds between digital bank accounts (Kishor / Dad / Mom Bank) & Cash Box', type: 'action' },
-      { key: 'treasury:personal_draw', label: 'Petty Cash & Personal Draws', desc: 'Record authorized expenses such as vehicle fuel, office maintenance, admin draws', type: 'action' },
-      { key: 'treasury:reconcile', label: 'Physical Denomination Reconciliation', desc: 'Perform physical note counts and lock cash-in-hand audits', type: 'action' },
+      { key: 'treasury:view_cash_box', label: 'View Cash Box Drawer Balance', desc: 'Inspect physical cash-in-hand running balance and register count', type: 'action' },
+      { key: 'treasury:view_banks', label: 'View Private Bank Balances', desc: 'Inspect digital balances of Kishor Bank, Dad Bank, and Mom Bank', type: 'action' },
+      { key: 'treasury:collect_cash', label: 'Accept Physical Paper Cash', desc: 'Receive cash currency from members and issue passbook receipts', type: 'action' },
+      { key: 'treasury:move_money', label: 'Initiate ATM & Bank Relocations', desc: 'Debit bank accounts (Kishor / Dad / Mom Bank) for cash box funding', type: 'action' },
+      { key: 'treasury:confirm_atm', label: 'Confirm Physical ATM Arrival', desc: 'Step 2 physical verification: credit cash box after physical delivery', type: 'action' },
+      { key: 'treasury:recover_float', label: 'Recover Agent Field Float', desc: 'Recover floating collections from ground collection agents into vault', type: 'action' },
+      { key: 'treasury:personal_draw', label: 'Record Petty Cash & Personal Draws', desc: 'Log expenses such as vehicle fuel, office maintenance, or admin draws', type: 'action' },
+      { key: 'treasury:settle_draw', label: 'Settle & Repay Personal Debts', desc: 'Record repayment of personal advances and draws back into the vault', type: 'action' },
+      { key: 'treasury:reconcile', label: 'Denomination Note Count Audit', desc: 'Perform physical note counts (₹500, ₹200, ₹100, etc.) and lock audit', type: 'action' },
+    ],
+  },
+  {
+    id: 6,
+    badge: '6',
+    badgeClass: 'bg-teal-50 text-teal-700',
+    title: 'Communication & WhatsApp Broadcaster',
+    subtitle: 'Automated receipts, pre-auction alerts, and overdue notifications',
+    toggleBgClass: 'peer-checked:bg-teal-600',
+    items: [
+      { key: 'communication:view', label: 'View Broadcast History & Logs', desc: 'Inspect WhatsApp delivery logs, timestamps, and subscriber replies', type: 'action' },
+      { key: 'communication:broadcast', label: 'Dispatch Instant Payment Receipts', desc: 'Send automated WhatsApp transaction receipts immediately upon payment', type: 'action' },
+      { key: 'communication:pre_auction', label: 'Broadcast Pre-Auction Notices', desc: 'Send upcoming auction schedules, date/time, and bidding instructions', type: 'action' },
+      { key: 'communication:post_auction', label: 'Broadcast Auction Results', desc: 'Announce winning discount, winner ticket, and monthly dividend to members', type: 'action' },
+      { key: 'communication:due_alerts', label: 'Broadcast Monthly Due Reminders', desc: 'Dispatch bulk WhatsApp alerts for pending installments & defaulters', type: 'action' },
+      { key: 'communication:manage_templates', label: 'Manage Message Templates', desc: 'Edit official Tamil and English WhatsApp alert message templates', type: 'action' },
+    ],
+  },
+  {
+    id: 7,
+    badge: '7',
+    badgeClass: 'bg-blue-50 text-blue-700',
+    title: 'Reports, P&L & Compliance Auditing',
+    subtitle: 'Cycle analytics, printable field checklists, and immutable logs',
+    toggleBgClass: 'peer-checked:bg-blue-600',
+    items: [
+      { key: 'reports:view', label: 'View Reports & Analytics Center', desc: 'Access financial summaries, collection progress, and cycle velocity', type: 'action' },
+      { key: 'reports:view_pnl', label: 'View Financial P&L & Margins', desc: 'Inspect organizer profit revenue, active chit value, and gross yield', type: 'action' },
+      { key: 'reports:export_checklist', label: 'Print Monthly Field Checklists', desc: 'Generate printable collection checklists for field agents to mark dues', type: 'action' },
+      { key: 'reports:export_ledger', label: 'Export Member Passbook Ledgers', desc: 'Download official individual or group PDF & CSV financial statements', type: 'action' },
+      { key: 'reports:view_defaulters', label: 'View Defaulters & Overdue Aging', desc: 'Analyze overdue aging brackets (30/60/90 days) and outstanding dues', type: 'action' },
+      { key: 'reports:view_audit_logs', label: 'Inspect Security Audit Logs', desc: 'Tamper-evident chronological ledger of all administrative mutations', type: 'action' },
+      { key: 'reports:export_audit', label: 'Export Security Audit Trail', desc: 'Export full immutable audit event ledger as CSV spreadsheet or JSON', type: 'action' },
+    ],
+  },
+  {
+    id: 8,
+    badge: '8',
+    badgeClass: 'bg-rose-50 text-rose-700',
+    title: 'System Governance & Security Controls',
+    subtitle: 'Staff access provisioning, RBAC policies, and factory controls',
+    toggleBgClass: 'peer-checked:bg-rose-600',
+    items: [
+      { key: 'system:manage_staff', label: 'Manage Staff Identities & Logins', desc: 'Provision staff accounts, edit profiles, suspend, or delete team members', type: 'action' },
+      { key: 'system:manage_roles', label: 'Configure Custom Roles & RBAC', desc: 'Create custom roles, edit permission matrix, and clone role policies', type: 'action' },
+      { key: 'system:maintenance_mode', label: 'Toggle System Maintenance Lockout', desc: 'Emergency lockout of member passbook portal during critical maintenance', type: 'action' },
+      { key: 'system:branding', label: 'Configure Organization Branding', desc: 'Customize company display title, tagline, and brand logo initials', type: 'action' },
+      { key: 'system:reset_database', label: 'Factory Reset & Test Data Purge', desc: 'Purge test transactions, reset balances, and restore initial state', type: 'action' },
     ],
   },
 ];
@@ -305,8 +374,14 @@ export default function RoleManagerPanel({
   // Select All Permissions
   const handleSelectAll = () => {
     if (activeRole?.id === 'admin') return;
-    const allTabs = CATEGORIES[0].items.map((i) => i.key);
-    const allActs = CATEGORIES.slice(1).flatMap((c) => c.items.map((i) => i.key));
+    const allTabs: string[] = [];
+    const allActs: string[] = [];
+    CATEGORIES.forEach((cat) => {
+      cat.items.forEach((item) => {
+        if (item.type === 'tab') allTabs.push(item.key);
+        else allActs.push(item.key);
+      });
+    });
     setAllowedTabs(allTabs);
     setAllowedActions(allActs);
   };
@@ -1317,175 +1392,68 @@ export default function RoleManagerPanel({
             </div>
           </div>
 
-          {/* Category 1: Navigation & Modules */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
-            <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-md bg-indigo-100 text-brand-600 text-[10px] font-bold flex items-center justify-center">1</span>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Module Navigation Access</h3>
-              </div>
-              <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
-                {CATEGORIES[0].items.filter((i) => allowedTabs.includes(i.key)).length} Allowed
-              </span>
-            </div>
-            <div className="divide-y divide-slate-100 text-xs">
-              {CATEGORIES[0].items.map((item) => {
-                const isChecked = activeRole?.id === 'admin' || allowedTabs.includes(item.key);
-                return (
-                  <div
-                    key={item.key}
-                    onClick={() => {
-                      if (activeRole?.id !== 'admin') toggleTab(item.key);
-                    }}
-                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
-                      isChecked ? 'bg-brand-50/20' : ''
-                    }`}
-                  >
-                    <div className="pr-2 min-w-0">
-                      <span className={`font-bold block text-xs truncate ${isChecked ? 'text-brand-900' : 'text-slate-800'}`}>
-                        {item.label}
-                      </span>
-                      <span className="text-[11px] text-slate-400 block truncate">{item.desc}</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      disabled={activeRole?.id === 'admin'}
-                      onChange={() => toggleTab(item.key)}
-                      className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer shrink-0"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {/* Dynamic Categories Rendering (Matching Desktop & Native Mobile UX) */}
+          {CATEGORIES.map((cat) => {
+            const allowedCount = cat.items.filter((i) =>
+              i.type === 'tab' ? allowedTabs.includes(i.key) : allowedActions.includes(i.key)
+            ).length;
 
-          {/* Category 2: Member & Passbook Operations */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
-            <div className="p-3.5 bg-emerald-50/50 border-b border-emerald-100/60 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center justify-center">2</span>
-                <h3 className="text-xs font-bold text-emerald-900 uppercase tracking-wider">Passbook &amp; Member Operations</h3>
-              </div>
-              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">Core Duties</span>
-            </div>
-            <div className="divide-y divide-slate-100 text-xs">
-              {CATEGORIES[1].items.map((item) => {
-                const isChecked = activeRole?.id === 'admin' || allowedActions.includes(item.key);
-                return (
-                  <div
-                    key={item.key}
-                    onClick={() => {
-                      if (activeRole?.id !== 'admin') toggleAction(item.key);
-                    }}
-                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
-                      isChecked ? 'bg-emerald-50/10' : ''
-                    }`}
-                  >
-                    <div className="pr-2 min-w-0">
-                      <span className={`font-bold block text-xs truncate ${isChecked ? 'text-slate-900' : 'text-slate-400'}`}>
-                        {item.label}
-                      </span>
-                      <span className="text-[11px] text-slate-500 block truncate">{item.desc}</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      disabled={activeRole?.id === 'admin'}
-                      onChange={() => toggleAction(item.key)}
-                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer shrink-0"
-                    />
+            return (
+              <div key={cat.id} className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
+                <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-5 h-5 rounded-md ${cat.badgeClass} text-[10px] font-bold flex items-center justify-center font-display`}>
+                      {cat.badge}
+                    </span>
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{cat.title}</h3>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Category 3: Live Auctions & Bidding Operations */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
-            <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-md bg-purple-100 text-purple-700 text-[10px] font-bold flex items-center justify-center">3</span>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Live Auctions &amp; Bidding Operations</h3>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${allowedCount > 0 ? 'text-brand-600 bg-brand-50' : 'text-slate-400 bg-slate-100'}`}>
+                    {activeRole?.id === 'admin' ? `${cat.items.length} Allowed` : `${allowedCount}/${cat.items.length} Allowed`}
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-100 text-xs">
+                  {cat.items.map((item) => {
+                    const isChecked =
+                      activeRole?.id === 'admin' ||
+                      (item.type === 'tab' ? allowedTabs.includes(item.key) : allowedActions.includes(item.key));
+                    return (
+                      <div
+                        key={item.key}
+                        onClick={() => {
+                          if (activeRole?.id !== 'admin') {
+                            if (item.type === 'tab') toggleTab(item.key);
+                            else toggleAction(item.key);
+                          }
+                        }}
+                        className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
+                          isChecked ? 'bg-brand-50/15' : ''
+                        }`}
+                      >
+                        <div className="pr-3 min-w-0">
+                          <span className={`font-bold block text-xs truncate ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>
+                            {item.label}
+                          </span>
+                          <span className="text-[11px] text-slate-400 block truncate mt-0.5">{item.desc}</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={activeRole?.id === 'admin'}
+                          onChange={() => {
+                            if (item.type === 'tab') toggleTab(item.key);
+                            else toggleAction(item.key);
+                          }}
+                          className={`w-4 h-4 rounded border-slate-300 focus:ring-brand-500 cursor-pointer shrink-0 ${
+                            activeRole?.id === 'admin' ? 'cursor-not-allowed text-brand-600 opacity-80' : 'text-brand-600'
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <span className="text-[10px] font-semibold text-slate-500">
-                {CATEGORIES[3].items.filter((i) => allowedActions.includes(i.key)).length > 0 ? 'Active' : 'Disabled'}
-              </span>
-            </div>
-            <div className="divide-y divide-slate-100 text-xs">
-              {CATEGORIES[3].items.map((item) => {
-                const isChecked = activeRole?.id === 'admin' || allowedActions.includes(item.key);
-                return (
-                  <div
-                    key={item.key}
-                    onClick={() => {
-                      if (activeRole?.id !== 'admin') toggleAction(item.key);
-                    }}
-                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
-                      isChecked ? 'bg-purple-50/10' : ''
-                    }`}
-                  >
-                    <div className="pr-2 min-w-0">
-                      <span className={`font-bold block text-xs truncate ${isChecked ? 'text-slate-800' : 'text-slate-400'}`}>
-                        {item.label}
-                      </span>
-                      <span className="text-[11px] text-slate-400 block truncate">{item.desc}</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      disabled={activeRole?.id === 'admin'}
-                      onChange={() => toggleAction(item.key)}
-                      className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer shrink-0"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Category 4: Treasury & Cash Custody / Vaults */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
-            <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-700 text-[10px] font-bold flex items-center justify-center">4</span>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Treasury &amp; Cash Custody / Vaults</h3>
-              </div>
-              <span className="text-[10px] font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
-                {CATEGORIES[4].items.filter((i) => allowedActions.includes(i.key)).length} Allowed
-              </span>
-            </div>
-            <div className="divide-y divide-slate-100 text-xs">
-              {CATEGORIES[4].items.map((item) => {
-                const isChecked = activeRole?.id === 'admin' || allowedActions.includes(item.key);
-                return (
-                  <div
-                    key={item.key}
-                    onClick={() => {
-                      if (activeRole?.id !== 'admin') toggleAction(item.key);
-                    }}
-                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
-                      isChecked ? 'bg-brand-50/20' : ''
-                    }`}
-                  >
-                    <div className="pr-2 min-w-0">
-                      <span className={`font-bold block text-xs truncate ${isChecked ? 'text-brand-900' : 'text-slate-400'}`}>
-                        {item.label}
-                      </span>
-                      <span className="text-[11px] text-slate-500 block truncate">{item.desc}</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      disabled={activeRole?.id === 'admin'}
-                      onChange={() => toggleAction(item.key)}
-                      className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer shrink-0"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+            );
+          })}
 
           {/* Assigned Staff Card */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-4 space-y-3">
