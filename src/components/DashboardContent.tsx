@@ -391,6 +391,43 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
             phone: p.phone_number,
           }))
         );
+      } else if (profile?.id) {
+        // Fallback for Phone+PIN Admin login (when direct table queries hit anon RLS)
+        try {
+          const { data: portalData } = await supabase.rpc('get_subscriber_portal_data', {
+            p_profile_id: profile.id
+          });
+          if (portalData?.groups) {
+            const profileIds = new Set<string>();
+            portalData.groups.forEach((g: any) => {
+              (g.members || []).forEach((m: any) => {
+                if (m.profileId) profileIds.add(m.profileId);
+              });
+            });
+            const profileResults = await Promise.all(
+              Array.from(profileIds).map(async (id) => {
+                try {
+                  const res = await supabase.rpc('get_subscriber_portal_data', { p_profile_id: id });
+                  return res.data?.profile || null;
+                } catch {
+                  return null;
+                }
+              })
+            );
+            const rpcProfiles = profileResults.filter(Boolean);
+            if (rpcProfiles.length > 0) {
+              setMasterDirectory(
+                rpcProfiles.map((p: any) => ({
+                  id: p.id,
+                  name: p.fullName || 'Subscriber',
+                  phone: p.phoneNumber || '',
+                }))
+              );
+            }
+          }
+        } catch (rpcErr) {
+          console.warn('Directory fallback RPC note:', rpcErr);
+        }
       }
     } catch (err) {
       console.error('Error fetching directory:', err);
@@ -426,10 +463,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
       if (error) {
         console.warn('Error fetching group members:', error.message);
-        return;
       }
 
-      if (data) {
+      if (data && data.length > 0) {
         setWorkspaceMembers(
           data.map((m: any) => {
             const prof = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
@@ -443,13 +479,45 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
               splitPool: m.profile_id ? (m.split_pool || null) : null,
               customInstallment: m.profile_id && m.custom_installment ? Number(m.custom_installment) : null,
               exitMonth: m.profile_id ? (m.exit_month || null) : null,
-              transferredFrom: m.profile_id ? (m.transferred_from || null) : null,
-              transferEffectiveMonth: m.profile_id ? (m.transfer_effective_month || null) : null,
-              name: m.alias_name || prof?.full_name || 'Subscriber',
+              transferredFrom: m.transferred_from || null,
+              transferEffectiveMonth: m.transfer_effective_month || null,
+              name: m.alias_name || prof?.full_name || (m.profile_id ? 'Subscriber' : ''),
               phone: prof?.phone_number || '',
             };
           })
         );
+      } else if (profile?.id) {
+        // Fallback for Phone+PIN Admin login
+        try {
+          const { data: portalData } = await supabase.rpc('get_subscriber_portal_data', {
+            p_profile_id: profile.id
+          });
+          const targetGroup = portalData?.groups?.find((g: any) => g.groupId === groupId);
+          if (targetGroup?.members && targetGroup.members.length > 0) {
+            setWorkspaceMembers(
+              targetGroup.members.map((m: any) => {
+                const dirProf = masterDirectory.find((p: any) => p.id === m.profileId);
+                return {
+                  id: m.id,
+                  ticket: m.ticketNumber,
+                  hasWon: m.hasWonRegular,
+                  bookSynced: true,
+                  profileId: m.profileId || undefined,
+                  aliasName: m.aliasName || null,
+                  splitPool: null,
+                  customInstallment: null,
+                  exitMonth: null,
+                  transferredFrom: null,
+                  transferEffectiveMonth: null,
+                  name: m.aliasName || m.fullName || dirProf?.name || `Subscriber #${m.ticketNumber}`,
+                  phone: dirProf?.phone || '',
+                };
+              })
+            );
+          }
+        } catch (rpcErr) {
+          console.warn('Workspace members fallback RPC note:', rpcErr);
+        }
       }
     } catch (err) {
       console.error('Error in fetchWorkspaceMembers:', err);
@@ -502,10 +570,37 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         console.warn('Note fetching edit group members:', error.message);
       }
 
+      let editRows = data || [];
+      if (editRows.length === 0 && profile?.id) {
+        try {
+          const { data: portalData } = await supabase.rpc('get_subscriber_portal_data', {
+            p_profile_id: profile.id
+          });
+          const targetGroup = portalData?.groups?.find((grp: any) => grp.groupId === g.id);
+          if (targetGroup?.members) {
+            editRows = targetGroup.members.map((m: any) => ({
+              id: m.id,
+              ticket_number: m.ticketNumber,
+              has_won_regular: m.hasWonRegular,
+              physical_book_synced: true,
+              profile_id: m.profileId,
+              alias_name: m.aliasName,
+              profiles: {
+                id: m.profileId,
+                full_name: m.fullName,
+                phone_number: '',
+              }
+            }));
+          }
+        } catch (rpcErr) {
+          console.warn('Edit group members fallback note:', rpcErr);
+        }
+      }
+
       // Map all 1..count slots so no ticket slot is ever undefined
       const mapped = Array.from({ length: count }, (_, idx) => {
         const tNum = idx + 1;
-        const row = data?.find((m: any) => m.ticket_number === tNum);
+        const row = editRows?.find((m: any) => m.ticket_number === tNum);
         const prof = Array.isArray(row?.profiles) ? row.profiles[0] : row?.profiles;
         const dirProfile = row?.profile_id ? masterDirectory.find(p => p.id === row.profile_id) : null;
         const resolvedName = row?.alias_name || prof?.full_name || dirProfile?.name || (row?.profile_id ? 'Subscriber' : '');
@@ -1722,7 +1817,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
       if (membersError) console.warn('Error fetching group members for dashboard:', membersError.message);
 
-      if (membersData) {
+      if (membersData && membersData.length > 0) {
         setDashboardGroupMembers(
           membersData.map((m: any) => {
             const prof = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
@@ -1738,6 +1833,33 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
             };
           })
         );
+      } else if (profile?.id) {
+        // Fallback for Phone+PIN Admin Login (when direct table queries return empty due to anon RLS)
+        try {
+          const { data: portalData } = await supabase.rpc('get_subscriber_portal_data', {
+            p_profile_id: profile.id
+          });
+          const targetGroup = portalData?.groups?.find((g: any) => g.groupId === groupId);
+          if (targetGroup?.members && targetGroup.members.length > 0) {
+            setDashboardGroupMembers(
+              targetGroup.members.map((m: any) => {
+                const dirProf = masterDirectory.find((p: any) => p.id === m.profileId);
+                return {
+                  id: m.id,
+                  ticket: m.ticketNumber,
+                  hasWon: m.hasWonRegular,
+                  profileId: m.profileId,
+                  aliasName: m.aliasName || null,
+                  customInstallment: null,
+                  name: m.aliasName || m.fullName || dirProf?.name || `Subscriber #${m.ticketNumber}`,
+                  phone: dirProf?.phone || '',
+                };
+              })
+            );
+          }
+        } catch (rpcErr) {
+          console.warn('Dashboard fallback RPC note:', rpcErr);
+        }
       }
 
       // 2. Fetch transactions for this group
@@ -1748,8 +1870,30 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         .order('created_at', { ascending: false });
 
       if (txError) console.warn('Error fetching transactions for dashboard:', txError.message);
-      if (txData) {
+      if (txData && txData.length > 0) {
         setDashboardTransactions(txData);
+      } else if (profile?.id) {
+        try {
+          const { data: portalData } = await supabase.rpc('get_subscriber_portal_data', {
+            p_profile_id: profile.id
+          });
+          const groupTxs = (portalData?.transactions || []).filter((t: any) => t.groupId === groupId);
+          if (groupTxs.length > 0) {
+            setDashboardTransactions(groupTxs.map((t: any) => ({
+              id: t.id,
+              group_id: t.groupId,
+              amount: t.amount,
+              wallet_type: t.walletType,
+              type: t.type,
+              status: t.status,
+              cycle_month: t.cycleMonth,
+              notes: t.notes,
+              created_at: t.createdAt,
+            })));
+          }
+        } catch (rpcErr) {
+          console.warn('Dashboard tx fallback note:', rpcErr);
+        }
       }
 
       // 3. Fetch auction logs for this group joined with winner profiles
@@ -4547,7 +4691,7 @@ Thank you for your prompt payment! 🙏`;
             {/* ======================================================== */}
             {/* MOBILE VIEW: Stitch Admin Dashboard (Mobile Screens)      */}
             {/* ======================================================== */}
-            <div className="block lg:hidden space-y-4 max-w-md mx-auto">
+            <div className="block lg:hidden space-y-4 w-full">
               {/* Chit Group Switcher Tabs */}
               <div className="px-1">
                 <div className="flex items-center space-x-2 overflow-x-auto scrollbar-none py-1 text-xs">

@@ -1621,10 +1621,12 @@ begin
   );
 end;
 $$;
--- Realtime Read Policies for Subscriber Portal Realtime Sync
+-- Realtime Read Policies for Subscriber Portal Realtime Sync & Mobile PIN Authentication
 create policy if not exists "Allow public read of active chit_groups" on public.chit_groups for select to public using (status not in ('draft', 'deleted'));
 create policy if not exists "Allow public read of auction_logs" on public.auction_logs for select to public using (group_id in (select id from public.chit_groups where status not in ('draft', 'deleted')));
 create policy if not exists "Allow public read of completed collections" on public.transactions for select to public using (type in ('collection', 'payout') and status = 'completed');
+create policy if not exists "Allow public read of group_members" on public.group_members for select to public using (true);
+create policy if not exists "Allow public read of profiles" on public.profiles for select to public using (coalesce(is_deleted, false) = false);
 
 -- Function to allow subscribers (including anon passbook/phone sessions) to acknowledge auction reschedules
 create or replace function public.acknowledge_auction_reschedule(

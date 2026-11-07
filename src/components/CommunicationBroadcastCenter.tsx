@@ -1065,25 +1065,12 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     <div className="w-full bg-slate-50 min-h-screen text-slate-800 antialiased flex flex-col font-sans">
       
       {/* ═══════════════════════════════════════════════════════════════════
-          MOBILE VIEW (360px viewport feel — block lg:hidden)
-          Matches Stitch Native Android/iOS Mobile Mockup Spec Exactly
+          MOBILE VIEW (Full width touch-first — block lg:hidden)
           ═══════════════════════════════════════════════════════════════════ */}
-      <div className="block lg:hidden w-full max-w-sm mx-auto bg-[#F8FAFC] min-h-screen flex flex-col shadow-xl border-x border-slate-200/80 pb-20">
+      <div className="block lg:hidden w-full -m-4 bg-[#F8FAFC] min-h-screen flex flex-col pb-20">
         
-        {/* Mobile Status Bar & Top Bar */}
-        <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 pt-2">
-          {/* iOS/Android Status Bar Simulation */}
-          <div className="px-4 pt-1 pb-1 flex justify-between items-center text-xs font-semibold text-slate-900 tracking-tight">
-            <span>{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
-            <div className="flex items-center space-x-1.5">
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 18.25A10.93 10.93 0 0 1 1 12C1 5.92 5.92 1 12 1s11 4.92 11 11c0 2.34-.73 4.51-1.98 6.29l-.62-.62A8.96 8.96 0 0 0 21 12c0-4.97-4.03-9-9-9z"></path><circle cx="12" cy="18" r="2"></circle></svg>
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4z"></path></svg>
-              <div className="w-5 h-2.5 border border-slate-800 rounded-xs p-0.5 flex items-center">
-                <div className="w-full h-full bg-slate-800 rounded-2xs"></div>
-              </div>
-            </div>
-          </div>
-
+        {/* Mobile Top Bar */}
+        <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 safe-top">
           {/* App Title & Quick Language Toggle */}
           <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-100/80">
             <div className="flex items-center gap-2">

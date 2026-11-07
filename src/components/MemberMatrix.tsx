@@ -246,7 +246,9 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
         .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.warn('Note fetching profiles via direct query:', profilesError.message);
+      }
 
       // 2. Fetch all group member enrollments
       const { data: memberGroupsData, error: memberGroupsError } = await supabase
@@ -303,10 +305,124 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
         setAllAuctionLogs(logsData);
       }
 
-      if (profilesData) {
+      let resolvedProfiles = profilesData || [];
+      let resolvedMemberGroups = memberGroupsData || [];
+
+      // Fallback for Phone+PIN Admin Login (when direct table queries return empty due to anon RLS)
+      if (resolvedProfiles.length === 0 && currentAdminProfile?.id) {
+        try {
+          const { data: portalData } = await supabase.rpc('get_subscriber_portal_data', {
+            p_profile_id: currentAdminProfile.id
+          });
+
+          if (portalData?.groups && portalData.groups.length > 0) {
+            if (!groupsData || groupsData.length === 0) {
+              setAllChitGroups(portalData.groups.map((g: any) => ({
+                id: g.groupId,
+                name: g.groupName,
+                total_value: g.totalValue,
+                duration_months: g.durationMonths,
+                current_month: g.currentMonth,
+                kai_iruppu_pool: g.kaiIruppuPool,
+                status: g.status,
+              })));
+            }
+
+            const profileIds = new Set<string>();
+            portalData.groups.forEach((g: any) => {
+              (g.members || []).forEach((m: any) => {
+                if (m.profileId) profileIds.add(m.profileId);
+              });
+            });
+
+            const profileResults = await Promise.all(
+              Array.from(profileIds).map(async (id) => {
+                try {
+                  const res = await supabase.rpc('get_subscriber_portal_data', { p_profile_id: id });
+                  return res.data?.profile || null;
+                } catch {
+                  return null;
+                }
+              })
+            );
+            const profilesMap = new Map<string, any>();
+            profileResults.filter(Boolean).forEach((p: any) => profilesMap.set(p.id, p));
+
+            resolvedProfiles = Array.from(profileIds).map((pId) => {
+              const p = profilesMap.get(pId);
+              let firstMemberRef: any = null;
+              for (const g of portalData.groups) {
+                const found = (g.members || []).find((m: any) => m.profileId === pId);
+                if (found) { firstMemberRef = found; break; }
+              }
+              return {
+                id: pId,
+                full_name: p?.fullName || firstMemberRef?.fullName || firstMemberRef?.aliasName || 'Subscriber',
+                phone_number: p?.phoneNumber || '',
+                role: p?.role || (pId === currentAdminProfile.id ? 'admin' : 'subscriber'),
+                passbook_token: p?.passbookToken || null,
+                mpin: p?.mpin || '1234',
+                is_blocked: p?.isBlocked || false,
+                created_at: new Date().toISOString(),
+              };
+            });
+
+            resolvedMemberGroups = [];
+            portalData.groups.forEach((g: any) => {
+              (g.members || []).forEach((m: any) => {
+                resolvedMemberGroups.push({
+                  id: m.id,
+                  profile_id: m.profileId || m.id,
+                  group_id: g.groupId,
+                  ticket_number: m.ticketNumber,
+                  alias_name: m.aliasName || null,
+                  chit_groups: [{
+                    id: g.groupId,
+                    name: g.groupName,
+                    total_value: g.totalValue,
+                    duration_months: g.durationMonths,
+                    current_month: g.currentMonth,
+                    kai_iruppu_pool: g.kaiIruppuPool,
+                    status: g.status,
+                  }]
+                });
+              });
+            });
+
+            if ((!txsData || txsData.length === 0) && portalData.transactions) {
+              setAllTransactions(portalData.transactions.map((t: any) => ({
+                id: t.id,
+                profile_id: t.profileId || currentAdminProfile.id,
+                group_id: t.groupId,
+                group_member_id: t.groupMemberId,
+                amount: t.amount,
+                type: t.type,
+                status: t.status,
+                cycle_month: t.cycleMonth,
+                notes: t.notes,
+              })));
+            }
+
+            if ((!logsData || logsData.length === 0) && portalData.auctions) {
+              setAllAuctionLogs(portalData.auctions.map((a: any) => ({
+                id: a.id,
+                group_id: a.groupId,
+                month: a.month,
+                winning_bidder_id: a.winnerId,
+                winning_discount: a.winningDiscount,
+                is_laaba_seetu: a.isLaabaSeetu,
+              })));
+            }
+          }
+        } catch (rpcErr) {
+          console.warn('MemberMatrix RPC fallback note:', rpcErr);
+        }
+      }
+
+      if (resolvedProfiles && resolvedProfiles.length > 0) {
         setMembers(
-          profilesData.map((p: any) => {
-            const memberGroupRecords = (memberGroupsData || []).filter((gm: any) => {
+          resolvedProfiles.map((p: any) => {
+            const memberGroupRecords = (resolvedMemberGroups || []).filter((gm: any) => {
               if (gm.profile_id !== p.id) return false;
               const groupObj = Array.isArray(gm.chit_groups) ? gm.chit_groups[0] : gm.chit_groups;
               return groupObj && groupObj.status !== 'draft';

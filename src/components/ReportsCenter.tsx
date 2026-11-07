@@ -3166,30 +3166,12 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       </div>
 
       {/* ══════════════════════════════════════════════════════════════
-          2. MOBILE WORKSPACE (360px Native Android Feel — md:hidden)
+          2. MOBILE WORKSPACE (Full width touch-first — md:hidden)
          ══════════════════════════════════════════════════════════════ */}
-      <div className="md:hidden flex-1 flex flex-col min-w-0 bg-[#F8FAFC] pb-24 relative overflow-y-auto w-full max-w-[360px] mx-auto shadow-2xl border-x border-slate-200/80">
+      <div className="md:hidden flex-1 flex flex-col min-w-0 bg-[#F8FAFC] pb-24 relative overflow-y-auto w-full -m-4">
         
-        {/* Top Status Bar & App Header */}
+        {/* Top App Header */}
         <header className="bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 safe-top">
-          
-          {/* Android Status Bar */}
-          <div className="px-5 pt-2.5 pb-1 flex justify-between items-center text-xs font-semibold text-slate-900 tracking-tight">
-            <span>09:41</span>
-            <div className="flex items-center space-x-1.5">
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 18.25A10.93 10.93 0 0 1 1 12C1 5.92 5.92 1 12 1s11 4.92 11 11c0 2.34-.73 4.51-1.98 6.29l-.62-.62A8.96 8.96 0 0 0 21 12c0-4.97-4.03-9-9-9z"></path>
-                <circle cx="12" cy="18" r="2"></circle>
-              </svg>
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4z"></path>
-              </svg>
-              <div className="w-5 h-2.5 border border-slate-800 rounded-sm p-0.5 flex items-center">
-                <div className="w-full h-full bg-slate-800 rounded-2xs"></div>
-              </div>
-            </div>
-          </div>
-
           {/* App Title Bar */}
           <div className="px-4 pt-2 pb-2 flex items-center justify-between">
             <div className="flex items-center space-x-2.5">

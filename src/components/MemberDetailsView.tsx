@@ -114,6 +114,26 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       }
       if (profData) {
         setMemberProfile(profData);
+      } else if (memberId) {
+        try {
+          const { data: portalData } = await supabase.rpc('get_subscriber_portal_data', {
+            p_profile_id: memberId
+          });
+          if (portalData?.profile) {
+            setMemberProfile({
+              id: portalData.profile.id,
+              full_name: portalData.profile.fullName,
+              phone_number: portalData.profile.phoneNumber,
+              role: portalData.profile.role,
+              passbook_token: portalData.profile.passbookToken,
+              mpin: portalData.profile.mpin,
+              is_blocked: portalData.profile.isBlocked || false,
+              created_at: new Date().toISOString(),
+            });
+          }
+        } catch (rpcErr) {
+          console.warn('Member details fallback RPC note:', rpcErr);
+        }
       }
 
       // 2. Fetch Group Enrollments
@@ -141,12 +161,44 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         `)
         .eq('profile_id', memberId);
 
-      if (enrollData) {
+      if (enrollData && enrollData.length > 0) {
         const nonDraftEnrollments = enrollData.filter((e: any) => {
           const g = Array.isArray(e.chit_groups) ? e.chit_groups[0] : e.chit_groups;
           return g && g.status !== 'draft';
         });
         setMemberEnrollments(nonDraftEnrollments);
+      } else if (memberId) {
+        try {
+          const { data: portalData } = await supabase.rpc('get_subscriber_portal_data', {
+            p_profile_id: memberId
+          });
+          if (portalData?.groups && portalData.groups.length > 0) {
+            const mappedEnroll = portalData.groups.map((g: any) => ({
+              id: g.groupMemberId,
+              profile_id: memberId,
+              group_id: g.groupId,
+              ticket_number: g.ticketNumber,
+              alias_name: g.aliasName,
+              has_won_regular: g.hasWonRegular,
+              custom_installment: g.customInstallment,
+              physical_book_synced: g.physicalBookSynced,
+              chit_groups: {
+                id: g.groupId,
+                name: g.groupName,
+                total_value: g.totalValue,
+                duration_months: g.durationMonths,
+                current_month: g.currentMonth,
+                kai_iruppu_pool: g.kaiIruppuPool,
+                status: g.status,
+                start_date: g.startDate,
+              }
+            }));
+            const nonDraftEnrollments = mappedEnroll.filter((e: any) => e.chit_groups.status !== 'draft');
+            setMemberEnrollments(nonDraftEnrollments);
+          }
+        } catch (rpcErr) {
+          console.warn('Enrollment RPC fallback note:', rpcErr);
+        }
       }
 
       // 3. Fetch Transactions for this member
