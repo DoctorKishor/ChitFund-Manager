@@ -10,6 +10,7 @@ import PassbookSheetGeneratorModal, { StickerItem } from './PassbookSheetGenerat
 import { PaymentReceiptModal } from './PaymentReceiptModal';
 import UniversalRecordPaymentModal from './UniversalRecordPaymentModal';
 import { getPassbookScanUrl } from '@/utils/qrCodeGenerator';
+import { triggerHapticFeedback } from '@/utils/haptics';
 import { 
   ArrowLeft,
   CheckCircle2, 
@@ -108,6 +109,16 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
   const [receiptFileToUpload, setReceiptFileToUpload] = useState<File | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [viewingReceiptTx, setViewingReceiptTx] = useState<any | null>(null);
+
+  // Chit group enrollment modal states
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState<boolean>(false);
+  const [selectedEnrollGroupId, setSelectedEnrollGroupId] = useState<string>('');
+  const [selectedEnrollTicket, setSelectedEnrollTicket] = useState<number | ''>('');
+  const [enrollAliasName, setEnrollAliasName] = useState<string>('');
+  const [isSubmittingEnroll, setIsSubmittingEnroll] = useState<boolean>(false);
+  const [enrollError, setEnrollError] = useState<string | null>(null);
+  const [groupTakenTickets, setGroupTakenTickets] = useState<{ ticket_number: number; profile_id: string | null; member_name?: string }[]>([]);
+  const [loadingGroupTickets, setLoadingGroupTickets] = useState<boolean>(false);
 
   const fetchMemberData = async () => {
     try {
@@ -219,8 +230,23 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         .or(`profile_id.eq.${memberId},group_member_id.in.(${(enrollData || []).map((e: any) => e.id).join(',') || '00000000-0000-0000-0000-000000000000'})`)
         .order('created_at', { ascending: false });
 
-      if (txData) {
+      if (txData && txData.length > 0) {
         setMemberTransactions(txData);
+      } else if (memberId) {
+        try {
+          const { data: portalData } = await supabase.rpc('get_subscriber_portal_data', {
+            p_profile_id: memberId
+          });
+          if (portalData?.transactions && portalData.transactions.length > 0) {
+            setMemberTransactions(portalData.transactions);
+          } else {
+            setMemberTransactions([]);
+          }
+        } catch {
+          setMemberTransactions([]);
+        }
+      } else {
+        setMemberTransactions([]);
       }
 
       // 4. Fetch All Groups & Auction Logs (excluding drafts)
@@ -608,6 +634,133 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       `Status: COMPLETED\n\n` +
       `Thank you,\n${organizationName}`;
     return `https://web.whatsapp.com/send?phone=${memberProfile?.phone_number || ''}&text=${encodeURIComponent(text)}`;
+  };
+
+  // Chit Group Enrollment Handlers
+  const loadTakenTickets = async (groupId: string) => {
+    if (!groupId) return;
+    setLoadingGroupTickets(true);
+    try {
+      const { data, error } = await supabase
+        .from('group_members')
+        .select('id, ticket_number, profile_id, alias_name, profiles(full_name)')
+        .eq('group_id', groupId);
+
+      if (error) {
+        console.warn('Error fetching group members for enrollment:', error);
+        setGroupTakenTickets([]);
+      } else {
+        const taken = (data || []).map((m: any) => ({
+          ticket_number: m.ticket_number,
+          profile_id: m.profile_id,
+          member_name: m.profiles?.full_name || m.alias_name || null
+        }));
+        setGroupTakenTickets(taken);
+      }
+    } catch (err) {
+      console.error('Failed to load taken tickets:', err);
+    } finally {
+      setLoadingGroupTickets(false);
+    }
+  };
+
+  const handleOpenEnrollModal = () => {
+    setEnrollError(null);
+    setSelectedEnrollTicket('');
+    setEnrollAliasName('');
+    setIsEnrollModalOpen(true);
+    triggerHapticFeedback('light');
+
+    // Default to first active or available chit group
+    const targetGroup = allChitGroups.find(g => g.status === 'active') || allChitGroups[0];
+    if (targetGroup) {
+      setSelectedEnrollGroupId(targetGroup.id);
+      loadTakenTickets(targetGroup.id);
+    }
+  };
+
+  const handleExecuteEnroll = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEnrollGroupId) {
+      setEnrollError('Please select a chit scheme.');
+      triggerHapticFeedback('warning');
+      return;
+    }
+    const ticketNum = Number(selectedEnrollTicket);
+    if (!ticketNum || ticketNum <= 0) {
+      setEnrollError('Please select an available ticket slot.');
+      triggerHapticFeedback('warning');
+      return;
+    }
+
+    const targetGroup = allChitGroups.find(g => g.id === selectedEnrollGroupId);
+    const maxCapacity = targetGroup?.duration_months || targetGroup?.member_count || 20;
+    if (ticketNum > maxCapacity) {
+      setEnrollError(`Ticket number cannot exceed group capacity (${maxCapacity}).`);
+      triggerHapticFeedback('warning');
+      return;
+    }
+
+    // Check if ticket is taken by another member
+    const existingSlot = groupTakenTickets.find(
+      t => t.ticket_number === ticketNum && t.profile_id && t.profile_id !== memberId
+    );
+    if (existingSlot) {
+      setEnrollError(`Ticket #${ticketNum} is already assigned to ${existingSlot.member_name || 'another member'}. Please select another ticket.`);
+      triggerHapticFeedback('warning');
+      return;
+    }
+
+    // Check if this member is already holding this ticket
+    const alreadyHolding = groupTakenTickets.find(
+      t => t.ticket_number === ticketNum && t.profile_id === memberId
+    );
+    if (alreadyHolding) {
+      setEnrollError(`This subscriber is already assigned to Ticket #${ticketNum} in this scheme.`);
+      triggerHapticFeedback('warning');
+      return;
+    }
+
+    setIsSubmittingEnroll(true);
+    setEnrollError(null);
+
+    try {
+      const payload = {
+        group_id: selectedEnrollGroupId,
+        ticket_number: ticketNum,
+        profile_id: memberId,
+        alias_name: enrollAliasName.trim() || null,
+        has_won_regular: false,
+        physical_book_synced: true,
+      };
+
+      const { error: upsertError } = await supabase
+        .from('group_members')
+        .upsert(payload, { onConflict: 'group_id,ticket_number' });
+
+      if (upsertError) {
+        throw upsertError;
+      }
+
+      // Security audit log
+      await supabase.from('security_audit_logs').insert({
+        action_description: `MEMBER ENROLLED: ${memberProfile?.full_name || 'Subscriber'} enrolled into scheme "${targetGroup?.name || 'Chit Group'}" as Ticket #${ticketNum}${enrollAliasName ? ` (${enrollAliasName.trim()})` : ''}`,
+        target_table: 'group_members',
+        admin_id: profile?.id || null
+      }).then();
+
+      triggerHapticFeedback('success');
+      setIsEnrollModalOpen(false);
+      setSelectedEnrollTicket('');
+      setEnrollAliasName('');
+      await fetchMemberData();
+    } catch (err: any) {
+      console.error('Enrollment error:', err);
+      setEnrollError(err.message || 'Failed to enroll member in chit group.');
+      triggerHapticFeedback('error');
+    } finally {
+      setIsSubmittingEnroll(false);
+    }
   };
 
   // Handle Record New Payment for this member with prefilled group, month, and amount
@@ -1546,7 +1699,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   {canEnroll && (
                     <button 
                       type="button"
-                      onClick={() => handleOpenRecordPayment()}
+                      onClick={handleOpenEnrollModal}
                       className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-xl border border-brand-200/60 transition-colors cursor-pointer"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2207,7 +2360,19 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
           <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Enrolled Chit Scheme</h3>
-              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/60">Ticket #{firstTicket}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/60">Ticket #{firstTicket}</span>
+                {canEnroll && (
+                  <button
+                    type="button"
+                    onClick={handleOpenEnrollModal}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-600 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded-full border border-brand-200/60 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-2.5 h-2.5" />
+                    <span>Enroll</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {groupDuesBreakdowns.length === 0 ? (
@@ -2520,6 +2685,226 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 transition-colors shadow-xs cursor-pointer disabled:cursor-not-allowed"
                 >
                   {isSavingPin ? 'Saving...' : 'Save PIN'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ── MODAL: ENROLL IN CHIT GROUP ── */}
+      {isEnrollModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+            onClick={() => !isSubmittingEnroll && setIsEnrollModalOpen(false)}
+          />
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200/80 p-5 sm:p-6 z-10 max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-brand-50 border border-brand-200/60 flex items-center justify-center text-brand-600">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-display font-extrabold text-base text-slate-900">
+                    Enroll in Chit Scheme
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Assign {memberProfile?.full_name || 'Subscriber'} to an active chit group
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isSubmittingEnroll && setIsEnrollModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Error Banner */}
+            {enrollError && (
+              <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-700 text-xs shrink-0">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{enrollError}</span>
+              </div>
+            )}
+
+            {/* Form Content */}
+            <form onSubmit={handleExecuteEnroll} className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+              {/* Chit Group Selector */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Select Chit Scheme <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedEnrollGroupId}
+                  onChange={(e) => {
+                    setSelectedEnrollGroupId(e.target.value);
+                    setSelectedEnrollTicket('');
+                    loadTakenTickets(e.target.value);
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 cursor-pointer"
+                >
+                  <option value="" disabled>-- Select a Chit Scheme --</option>
+                  {allChitGroups.map((g: any) => {
+                    const dur = g.duration_months || g.member_count || 20;
+                    const val = Number(g.total_value) || 0;
+                    return (
+                      <option key={g.id} value={g.id}>
+                        {g.name} — ₹{val.toLocaleString('en-IN')} ({dur} Months / Tickets) • Cycle M{g.current_month || 0}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Selected Group Quick Summary */}
+              {(() => {
+                const grp = allChitGroups.find(g => g.id === selectedEnrollGroupId);
+                if (!grp) return null;
+                const dur = grp.duration_months || grp.member_count || 20;
+                const val = Number(grp.total_value) || 0;
+                const monthlyInst = Math.round(val / dur);
+                const assignedCount = groupTakenTickets.filter(t => t.profile_id).length;
+                const freeCount = Math.max(0, dur - assignedCount);
+
+                return (
+                  <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
+                    <div className="text-center">
+                      <span className="block text-[10px] uppercase font-bold text-slate-400">Monthly Due</span>
+                      <span className="text-xs font-extrabold text-slate-900">₹{monthlyInst.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="text-center border-x border-slate-200/60">
+                      <span className="block text-[10px] uppercase font-bold text-slate-400">Current Cycle</span>
+                      <span className="text-xs font-extrabold text-brand-600">Month {grp.current_month || 0}</span>
+                    </div>
+                    <div className="text-center">
+                      <span className="block text-[10px] uppercase font-bold text-slate-400">Free Slots</span>
+                      <span className={`text-xs font-extrabold ${freeCount > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {freeCount} of {dur}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Ticket Slot Selection Grid */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-700">
+                    Select Available Ticket Number <span className="text-rose-500">*</span>
+                  </label>
+                  {loadingGroupTickets && (
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      Checking roster...
+                    </span>
+                  )}
+                </div>
+
+                {(() => {
+                  const grp = allChitGroups.find(g => g.id === selectedEnrollGroupId);
+                  const dur = grp?.duration_months || grp?.member_count || 20;
+                  const ticketSlots = Array.from({ length: dur }, (_, i) => i + 1);
+
+                  return (
+                    <div className="grid grid-cols-5 sm:grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1.5 bg-slate-50/60 rounded-xl border border-slate-100">
+                      {ticketSlots.map((num) => {
+                        const takenRecord = groupTakenTickets.find(t => t.ticket_number === num && t.profile_id);
+                        const isTakenByCurrentMember = takenRecord && takenRecord.profile_id === memberId;
+                        const isTakenByOther = takenRecord && takenRecord.profile_id !== memberId;
+                        const isSelected = selectedEnrollTicket === num;
+
+                        let buttonClasses = 'h-11 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center relative ';
+                        if (isTakenByCurrentMember) {
+                          buttonClasses += 'bg-purple-100 text-purple-700 border border-purple-200 cursor-not-allowed opacity-80';
+                        } else if (isTakenByOther) {
+                          buttonClasses += 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60';
+                        } else if (isSelected) {
+                          buttonClasses += 'bg-brand-600 text-white shadow-md shadow-brand-500/25 ring-2 ring-brand-500 scale-95';
+                        } else {
+                          buttonClasses += 'bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200/80 hover:border-emerald-300 cursor-pointer';
+                        }
+
+                        return (
+                          <button
+                            key={num}
+                            type="button"
+                            disabled={Boolean(isTakenByCurrentMember || isTakenByOther)}
+                            onClick={() => {
+                              setSelectedEnrollTicket(num);
+                              triggerHapticFeedback('light');
+                            }}
+                            title={
+                              isTakenByCurrentMember 
+                                ? `Ticket #${num} is already enrolled for this subscriber` 
+                                : isTakenByOther 
+                                ? `Ticket #${num} is taken by ${takenRecord?.member_name || 'another member'}` 
+                                : `Select Ticket #${num}`
+                            }
+                            className={buttonClasses}
+                          >
+                            <span className="font-mono text-xs">#{num}</span>
+                            <span className="text-[8px] font-normal leading-none mt-0.5">
+                              {isTakenByCurrentMember ? 'Enrolled' : isTakenByOther ? 'Taken' : 'Open'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {selectedEnrollTicket && (
+                  <p className="text-[11px] font-bold text-emerald-600 mt-2 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Selected Ticket #{selectedEnrollTicket}
+                  </p>
+                )}
+              </div>
+
+              {/* Optional Alias / Sub-account Tag */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Ticket Alias / Note <span className="text-slate-400 font-normal">(Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={enrollAliasName}
+                  onChange={(e) => setEnrollAliasName(e.target.value)}
+                  placeholder="e.g. Ticket 2, Self, Business, etc."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              {/* Actions Footer */}
+              <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEnrollModalOpen(false)}
+                  disabled={isSubmittingEnroll}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEnroll || !selectedEnrollGroupId || !selectedEnrollTicket}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 transition-all shadow-md shadow-brand-500/20 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                >
+                  {isSubmittingEnroll ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Enrolling...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Confirm Enrollment</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
