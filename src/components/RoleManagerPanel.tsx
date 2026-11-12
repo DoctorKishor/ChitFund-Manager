@@ -24,7 +24,8 @@ import {
   AlertTriangle,
   UserCheck,
   UserX,
-  Eye
+  Eye,
+  Layers
 } from 'lucide-react';
 import RoleAppPreviewModal from './RoleAppPreviewModal';
 
@@ -637,84 +638,48 @@ export default function RoleManagerPanel({
         <div className="w-full max-w-[1550px] mx-auto space-y-6">
 
           {/* Top Overview Metrics Strip */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <section className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
             {/* Metric 1: Active Staff & Admins */}
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Staff &amp; Admins</span>
-                <span className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-xs font-bold font-display">
-                  {staffCount}
-                </span>
-              </div>
-              <div className="mt-2.5 flex items-baseline gap-2">
-                <span className="text-2xl font-black font-display text-slate-900">{staffCount} Staff</span>
-                <span className="text-xs text-slate-500 font-medium whitespace-nowrap">/ {totalUsers} Total Users</span>
-              </div>
-              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>
-                  {adminProfiles.length} Super Admin · {Math.max(0, staffCount - adminProfiles.length)} Operations Agent
-                  {Math.max(0, staffCount - adminProfiles.length) === 1 ? '' : 's'}
-                </span>
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Staff &amp; Workforce</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-xl font-black font-display text-slate-900">{staffCount} Personnel</span>
+                <span className="text-xs text-slate-500 font-medium">({adminProfiles.length} Admins)</span>
               </div>
             </div>
 
             {/* Metric 2: Security Architecture */}
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Security Architecture</span>
-                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-brand-700 text-[10px] font-bold border border-brand-200/60">
-                  RBAC Local
-                </span>
-              </div>
-              <div className="mt-2.5 flex items-baseline gap-2">
-                <span className="text-2xl font-black font-display text-slate-900">{roles.length} Roles</span>
-                <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
-                  ({builtInRoles.length} Built-in, {customRoles.length} Custom)
-                </span>
-              </div>
-              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
-                <span>Granular module gating</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Configured Roles</span>
                 <span 
                   onClick={onOpenAuditLogs}
-                  className="text-brand-600 font-semibold cursor-pointer hover:underline text-[11px]"
+                  className="text-brand-600 font-semibold cursor-pointer hover:underline text-[10px]"
                 >
                   Audit Logs
                 </span>
               </div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-xl font-black font-display text-slate-900">{roles.length} Roles</span>
+                <span className="text-xs text-slate-500 font-medium">({customRoles.length} Custom)</span>
+              </div>
             </div>
 
             {/* Metric 3: Permission Checkpoints */}
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Permission Checkpoints</span>
-                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200/60">
-                  24 Rules
-                </span>
-              </div>
-              <div className="mt-2.5 flex items-baseline gap-2">
-                <span className="text-2xl font-black font-display text-slate-900">5 Modules</span>
-                <span className="text-xs text-emerald-600 font-semibold whitespace-nowrap">Strict Zero-Trust</span>
-              </div>
-              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500">
-                <span>Enforces physical QR verification limits</span>
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">RBAC Security</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-xl font-black font-display text-slate-900">{CATEGORIES.length} Categories</span>
+                <span className="text-xs text-emerald-600 font-bold">Zero-Trust</span>
               </div>
             </div>
 
             {/* Metric 4: Default Subscriber Tier */}
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Default Subscriber Tier</span>
-                <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-xs font-bold">
-                  🔒
-                </span>
-              </div>
-              <div className="mt-2.5 flex items-baseline gap-2">
-                <span className="text-2xl font-black font-display text-slate-900">Read-Only</span>
-                <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Mobile App Appointed</span>
-              </div>
-              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-indigo-600 font-medium">
-                <span>{subscriberCount} active members bound to Subscriber tier</span>
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Subscriber Portal</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-xl font-black font-display text-slate-900">{subscriberCount} Members</span>
+                <span className="text-xs text-slate-500 font-medium">Read-Only</span>
               </div>
             </div>
           </section>
@@ -885,9 +850,9 @@ export default function RoleManagerPanel({
                               <span className="text-[10px] font-bold text-brand-700 uppercase">Selected</span>
                             </div>
                           </div>
-                          <div className="mt-2.5 pt-2 border-t border-brand-100 flex items-center justify-between text-[11px] text-slate-500">
-                            <span className="truncate pr-2">{role.description || 'Custom operations'}</span>
-                            <span className="font-mono text-brand-600 font-semibold shrink-0">
+                          <div className="mt-2 pt-2 border-t border-brand-100 flex items-center justify-between text-[11px] text-slate-500">
+                            <span className="font-mono text-[10px] text-slate-400">role_{role.id}</span>
+                            <span className="font-mono text-brand-600 font-semibold text-[11px] shrink-0">
                               {(role.allowed_tabs?.length || 0) + (role.allowed_actions?.length || 0)} Perms
                             </span>
                           </div>
@@ -964,101 +929,122 @@ export default function RoleManagerPanel({
             <section className="xl:col-span-8 space-y-6">
 
               {/* Role Banner & Summary Header */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div
-                    className="w-12 h-12 rounded-2xl font-bold flex items-center justify-center font-display text-xl shadow-xs shrink-0"
-                    style={{
-                      backgroundColor: `${editColor}20`,
-                      color: editColor,
-                    }}
-                  >
-                    {ROLE_EMOJIS[activeRole?.id || ''] || '💳'}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="font-display font-bold text-lg text-slate-900 leading-tight truncate">
-                        {activeRole?.name}
-                      </h2>
-                      <span className="text-xs font-bold py-0.5 px-2 bg-amber-100 text-amber-800 border border-amber-200/60 rounded-full whitespace-nowrap">
-                        {activeRole?.is_system ? 'Protected System Role' : 'Custom Field Role'}
-                      </span>
-                      <span className="text-xs text-slate-400 font-mono">
-                        ID: {activeRole?.id}
-                      </span>
-                      <div className="h-3.5 w-px bg-slate-200 hidden sm:block"></div>
-                      <div className="flex items-center gap-1.5 pl-1">
-                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mr-0.5">
-                          Role Color:
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
+                {/* Upper Row: Role Identity, Badges, and Color Picker */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div
+                      className="w-11 h-11 rounded-xl font-bold flex items-center justify-center font-display text-xl shadow-xs shrink-0"
+                      style={{
+                        backgroundColor: `${editColor}18`,
+                        color: editColor,
+                      }}
+                    >
+                      {ROLE_EMOJIS[activeRole?.id || ''] || '💳'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="font-display font-bold text-lg text-slate-900 leading-tight truncate">
+                          {activeRole?.name}
+                        </h2>
+                        <span className="text-[11px] font-bold py-0.5 px-2.5 bg-amber-50 text-amber-800 border border-amber-200/80 rounded-full whitespace-nowrap">
+                          {activeRole?.is_system ? 'Protected System Role' : 'Custom Field Role'}
                         </span>
-                        {COLOR_PRESETS.map((p) => {
-                          const isActive = editColor.toLowerCase() === p.hex.toLowerCase();
-                          return (
-                            <button
-                              key={p.name}
-                              type="button"
-                              onClick={() => setEditColor(p.hex)}
-                              title={p.name}
-                              className={`w-3.5 h-3.5 rounded-full hover:scale-110 transition-transform cursor-pointer ${p.bgClass} ${
-                                isActive ? 'ring-2 ring-brand-500 ring-offset-1' : ''
-                              }`}
-                            />
-                          );
-                        })}
+                        <span className="text-xs text-slate-400 font-mono">
+                          ID: {activeRole?.id}
+                        </span>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                      {activeRole?.description ||
-                        'Authorizes ground field personnel to accept offline installments, authenticate booklets via camera scanner, and record daily cash collections.'}
-                    </p>
+                  </div>
+
+                  {/* Accent Color Picker */}
+                  <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Color:
+                    </span>
+                    <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-full border border-slate-200/80">
+                      {COLOR_PRESETS.map((p) => {
+                        const isActive = editColor.toLowerCase() === p.hex.toLowerCase();
+                        return (
+                          <button
+                            key={p.name}
+                            type="button"
+                            onClick={() => setEditColor(p.hex)}
+                            title={p.name}
+                            className={`w-3.5 h-3.5 rounded-full hover:scale-110 transition-transform cursor-pointer ${p.bgClass} ${
+                              isActive ? 'ring-2 ring-brand-500 ring-offset-1' : ''
+                            }`}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
-                {/* Role Control Actions */}
-                <div className="flex items-center gap-2.5 shrink-0 self-end md:self-auto">
-                  <button
-                    type="button"
-                    onClick={() => setIsPreviewModalOpen(true)}
-                    className="px-3.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/90 hover:bg-indigo-100 text-brand-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs hover:shadow-xs"
-                    title="Preview full application from this role's perspective & live configure screen elements"
-                  >
-                    <Eye className="w-3.5 h-3.5 text-brand-600" />
-                    <span>Live App Preview</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportActivePolicy}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
-                    title="Export role permission policy to JSON"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Export Policy</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetDefaults}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer"
-                  >
-                    Reset to Defaults
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveRole}
-                    disabled={isSaving}
-                    className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-brand-500/25 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-                  >
-                    {saveSuccess ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-300" strokeWidth={2.5} />
-                        <span>Saved!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-3.5 h-3.5" />
-                        <span>{isSaving ? 'Saving...' : 'Save Permission Changes'}</span>
-                      </>
-                    )}
-                  </button>
+                {/* Lower Row: Summary Badges & Action Toolbar */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-wrap text-xs">
+                    <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-brand-700 font-semibold border border-indigo-100 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-brand-500" />
+                      <span>{allowedTabs.length} of 9 Tabs Allowed</span>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>{allowedActions.length} Actions Enabled</span>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium">
+                      {assignedPersonnel.length} Assigned Staff
+                    </span>
+                  </div>
+
+                  {/* Action Buttons Toolbar */}
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsPreviewModalOpen(true)}
+                      className="px-3.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/90 hover:bg-indigo-100 text-brand-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs hover:shadow-xs active:scale-95"
+                      title="Open Live App Preview & Screen Configurator"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-brand-600" />
+                      <span>Live App Preview</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportActivePolicy}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                      title="Export role permission policy to JSON"
+                    >
+                      <Download className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Export</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetDefaults}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Reset Defaults
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveRole}
+                      disabled={isSaving}
+                      className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-brand-500/25 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                    >
+                      {saveSuccess ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-300" strokeWidth={2.5} />
+                          <span>Saved!</span>
+                        </>
+                      ) : isSaving ? (
+                        <span>Saving...</span>
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1401,10 +1387,6 @@ export default function RoleManagerPanel({
                 )}
               </div>
             </div>
-            <p className="text-xs text-slate-600 mt-2.5 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-              {activeRole?.description ||
-                'Grants permission to scan passbook physical QR tokens, record door-to-door cash collections, and dispatch instant WhatsApp receipts.'}
-            </p>
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
               <span className="text-slate-500 font-medium">Assigned Personnel:</span>
               <div className="flex items-center gap-2">

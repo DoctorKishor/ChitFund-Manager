@@ -1057,7 +1057,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
 
       {/* ── SUBTAB 2: ROLE PERMISSIONS (EMBEDDED ROLE MANAGER PANEL) ── */}
       {activeSubtab === 'roles' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 shadow-xs">
+        <div className="space-y-4 animate-in fade-in duration-150">
           <RoleManagerPanel 
             onOpenAuditLogs={onOpenAuditLogs}
             onRoleUpdated={fetchStaffData}
