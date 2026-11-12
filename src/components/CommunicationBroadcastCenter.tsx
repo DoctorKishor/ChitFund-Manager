@@ -1293,16 +1293,29 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             /* 4B. MOBILE INLINE TEMPLATE EDITOR */
             <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-card space-y-2.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-800">Raw Message Composer</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-800">Raw Message Composer</span>
+                  {!canManageTemplates && (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                      View-Only
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] text-slate-400 font-mono">{activeRawTemplate.length} chars</span>
               </div>
               <textarea 
                 ref={mobileTextareaRef}
                 rows={9}
+                readOnly={!canManageTemplates}
+                data-action="communication:manage_templates"
                 value={activeRawTemplate}
-                onChange={(e) => handleTemplateChange(e.target.value)}
-                className="w-full text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 focus:bg-white focus:ring-brand-500 focus:border-brand-500 leading-relaxed transition-all resize-none shadow-inner"
-                placeholder="Type broadcast message..."
+                onChange={(e) => canManageTemplates && handleTemplateChange(e.target.value)}
+                className={`w-full text-xs font-mono border rounded-xl p-3 leading-relaxed transition-all resize-none shadow-inner ${
+                  canManageTemplates 
+                    ? 'bg-slate-50 border-slate-200 text-slate-800 focus:bg-white focus:ring-brand-500 focus:border-brand-500' 
+                    : 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                }`}
+                placeholder={canManageTemplates ? "Type broadcast message..." : "Template is locked for your role (View-Only)"}
               />
 
               {/* Quick Emojis Strip */}
@@ -1795,7 +1808,14 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                 {/* Template Raw Text Area */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-slate-700">Message Content (Raw Markdown/WhatsApp Text):</label>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-slate-700">Message Content (Raw Markdown/WhatsApp Text):</label>
+                      {!canManageTemplates && (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                          View-Only Template
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[11px] text-slate-400 font-mono">
                       Characters: {activeRawTemplate.length} · WhatsApp Compliant
                     </span>
@@ -1803,10 +1823,16 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   <textarea 
                     ref={textareaRef}
                     rows={11} 
+                    readOnly={!canManageTemplates}
+                    data-action="communication:manage_templates"
                     value={activeRawTemplate}
-                    onChange={(e) => handleTemplateChange(e.target.value)}
-                    className="w-full text-xs font-mono bg-slate-50/80 border border-slate-200 rounded-xl p-3.5 text-slate-800 focus:bg-white focus:ring-brand-500 focus:border-brand-500 leading-relaxed transition-all shadow-inner resize-none"
-                    placeholder="Type or customize your broadcast template..."
+                    onChange={(e) => canManageTemplates && handleTemplateChange(e.target.value)}
+                    className={`w-full text-xs font-mono border rounded-xl p-3.5 leading-relaxed transition-all shadow-inner resize-none ${
+                      canManageTemplates 
+                        ? 'bg-slate-50/80 border-slate-200 text-slate-800 focus:bg-white focus:ring-brand-500 focus:border-brand-500' 
+                        : 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                    }`}
+                    placeholder={canManageTemplates ? "Type or customize your broadcast template..." : "Template is locked for your role (View-Only)"}
                   />
                 </div>
 

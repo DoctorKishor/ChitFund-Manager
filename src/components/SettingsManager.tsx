@@ -1079,7 +1079,8 @@ export default function SettingsManager() {
 
                   <button
                     type="submit"
-                    disabled={isSavingOrg}
+                    disabled={isSavingOrg || !canBranding}
+                    data-action="system:branding"
                     className="w-full min-h-[48px] rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
                   >
                     {isSavingOrg ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
@@ -1599,7 +1600,8 @@ export default function SettingsManager() {
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     type="button"
-                    disabled={isTogglingMaint || isMaintenanceMode}
+                    disabled={isTogglingMaint || isMaintenanceMode || !canMaintenance}
+                    data-action="system:maintenance_mode"
                     onClick={() => handleToggleMaintenanceMode(true)}
                     className="flex-1 min-h-[44px] rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 active:scale-98"
                   >
@@ -1608,7 +1610,8 @@ export default function SettingsManager() {
                   </button>
                   <button
                     type="button"
-                    disabled={isTogglingMaint || !isMaintenanceMode}
+                    disabled={isTogglingMaint || !isMaintenanceMode || !canMaintenance}
+                    data-action="system:maintenance_mode"
                     onClick={() => handleToggleMaintenanceMode(false)}
                     className="flex-1 min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 active:scale-98"
                   >
@@ -2162,7 +2165,8 @@ export default function SettingsManager() {
                     <div className="pt-2">
                       <button
                         type="submit"
-                        disabled={isSavingOrg}
+                        disabled={isSavingOrg || !canBranding}
+                        data-action="system:branding"
                         className="px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                       >
                         {isSavingOrg ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
@@ -2687,7 +2691,8 @@ export default function SettingsManager() {
                     <div className="flex items-center gap-3 pt-1">
                       <button
                         type="button"
-                        disabled={isTogglingMaint || isMaintenanceMode}
+                        disabled={isTogglingMaint || isMaintenanceMode || !canMaintenance}
+                        data-action="system:maintenance_mode"
                         onClick={() => handleToggleMaintenanceMode(true)}
                         className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40"
                       >
@@ -2696,7 +2701,8 @@ export default function SettingsManager() {
                       </button>
                       <button
                         type="button"
-                        disabled={isTogglingMaint || !isMaintenanceMode}
+                        disabled={isTogglingMaint || !isMaintenanceMode || !canMaintenance}
+                        data-action="system:maintenance_mode"
                         onClick={() => handleToggleMaintenanceMode(false)}
                         className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40"
                       >

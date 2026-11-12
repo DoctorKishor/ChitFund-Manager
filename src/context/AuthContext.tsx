@@ -718,14 +718,12 @@ export const RolePreviewAuthProvider: React.FC<RolePreviewAuthProviderProps> = (
   }), [roleId, roleName, allowedTabs, allowedActions]);
 
   const canAccessTab = React.useCallback((tab: MainTabId): boolean => {
-    if (roleId === 'admin') return true;
     return allowedTabs.includes(tab);
-  }, [roleId, allowedTabs]);
+  }, [allowedTabs]);
 
   const canPerformAction = React.useCallback((action: PermissionAction): boolean => {
-    if (roleId === 'admin') return true;
     return allowedActions.includes(action);
-  }, [roleId, allowedActions]);
+  }, [allowedActions]);
 
   const contextValue = React.useMemo(() => ({
     ...baseAuth,

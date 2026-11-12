@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/utils/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 import {
   ShieldCheck,
   Search,
@@ -67,6 +68,8 @@ export interface SystemAuditLogViewerProps {
 }
 
 export default function SystemAuditLogViewer({ onBack, className = '' }: SystemAuditLogViewerProps) {
+  const { canPerformAction } = useAuth();
+  const canExportAudit = canPerformAction('reports:export_audit');
 
   // Core Data States
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
@@ -630,25 +633,31 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
               <span>Refresh</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleExportCSV}
-              className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              title="Export as CSV Spreadsheet"
-            >
-              <FileSpreadsheet size={13} />
-              <span>Export CSV</span>
-            </button>
+            {canExportAudit && (
+              <>
+                <button
+                  type="button"
+                  data-action="reports:export_audit"
+                  onClick={handleExportCSV}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Export as CSV Spreadsheet"
+                >
+                  <FileSpreadsheet size={13} />
+                  <span>Export CSV</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={handleExportJSON}
-              className="hidden sm:inline-flex px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-all items-center gap-1.5 cursor-pointer shadow-2xs"
-              title="Export raw JSON"
-            >
-              <FileCode size={13} />
-              <span>JSON</span>
-            </button>
+                <button
+                  type="button"
+                  data-action="reports:export_audit"
+                  onClick={handleExportJSON}
+                  className="hidden sm:inline-flex px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-all items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Export raw JSON"
+                >
+                  <FileCode size={13} />
+                  <span>JSON</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 

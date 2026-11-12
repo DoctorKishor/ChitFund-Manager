@@ -206,6 +206,24 @@ function resolveComponentFromDOM(
       }
     }
 
+    // 1. Direct explicit data-action check (High Priority)
+    const explicitAction = cur.getAttribute('data-action') as PermissionAction | null;
+    if (explicitAction) {
+      const a = ALL_ACTIONS.find((x) => x.key === explicitAction);
+      if (a) {
+        return {
+          type: 'action',
+          key: a.key,
+          name: a.label,
+          category: a.category,
+          desc: a.desc,
+          icon: a.icon,
+          isEnabled: allowedActions.includes(a.key),
+          targetEl: cur,
+        };
+      }
+    }
+
     // 2. Direct tab ID attribute
     const tabAttr = cur.getAttribute('data-tab-id') || cur.getAttribute('data-nav-tab');
     if (tabAttr) {
@@ -232,7 +250,7 @@ function resolveComponentFromDOM(
       const lower = text.toLowerCase();
 
       // Collect / Payment
-      if (lower.includes('record payment') || lower.includes('collect payment') || lower.includes('quick collect') || lower.includes('+ collect') || lower.includes('pay installment')) {
+      if (lower.includes('record payment') || lower.includes('collect payment') || lower.includes('quick collect') || lower.includes('+ collect') || lower.includes('pay installment') || lower === 'record') {
         const a = ALL_ACTIONS.find((x) => x.key === 'members:collect')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
@@ -243,14 +261,38 @@ function resolveComponentFromDOM(
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
+      // Member Edit
+      if (lower.includes('edit member') || lower.includes('edit information')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'members:edit')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
+      // Member Delete / Archive
+      if (lower.includes('archive / delete') || lower.includes('archive member') || lower.includes('delete subscriber') || lower.includes('delete member')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'members:delete')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
+      // Member Suspend
+      if (lower.includes('suspend') || lower.includes('lockout standing') || lower.includes('in good standing')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'members:suspend')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
       // QR Passbook Pairing
-      if (lower.includes('pair qr') || lower.includes('scan passbook') || lower.includes('scan qr') || lower.includes('link passbook')) {
+      if (lower.includes('pair qr') || lower.includes('scan passbook') || lower.includes('scan qr') || lower.includes('link passbook') || lower.includes('re-bind qr')) {
         const a = ALL_ACTIONS.find((x) => x.key === 'members:pair_qr')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
+      // Revoke QR
+      if (lower.includes('revoke') || lower.includes('lost booklet') || lower.includes('unlink')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'members:revoke_qr')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
       // Batch QR Printing
-      if (lower.includes('batch qr') || lower.includes('print qr') || lower.includes('qr sheets')) {
+      if (lower.includes('batch qr') || lower.includes('print qr') || lower.includes('qr sheets') || lower.includes('print sticker')) {
         const a = ALL_ACTIONS.find((x) => x.key === 'members:batch_qr')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
@@ -262,13 +304,31 @@ function resolveComponentFromDOM(
       }
 
       // Export Members
-      if (lower.includes('export member') || lower.includes('export csv') || lower.includes('download roster')) {
+      if (lower.includes('export member') || lower.includes('export csv') || lower.includes('download roster') || lower.includes('export pdf')) {
         const a = ALL_ACTIONS.find((x) => x.key === 'members:export')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
+      // Create Chit Group
+      if (lower.includes('create group') || lower.includes('new scheme') || lower.includes('new chit') || lower.includes('create chit')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'chits:create')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
+      // Edit Chit Rules
+      if (lower.includes('edit chit') || lower.includes('edit rules') || lower.includes('edit group')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'chits:edit')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
+      // Delete Chit Scheme
+      if (lower.includes('move to recycle bin') || lower.includes('delete scheme') || lower.includes('delete chit') || lower.includes('archive scheme')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'chits:delete')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
       // Launch Month 0
-      if (lower.includes('month 0') || lower.includes('launch month') || lower.includes('organizer profit')) {
+      if (lower.includes('month 0') || lower.includes('launch month') || lower.includes('organizer profit') || lower.includes('confirm launch')) {
         const a = ALL_ACTIONS.find((x) => x.key === 'chits:launch_month0')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
@@ -280,20 +340,38 @@ function resolveComponentFromDOM(
       }
 
       // Auction Start / Conduct
-      if (lower.includes('start auction') || lower.includes('conduct auction') || lower.includes('live arena')) {
+      if (lower.includes('start auction') || lower.includes('conduct auction') || lower.includes('live arena') || lower.includes('begin live') || lower.includes('begin auction') || lower.includes('end live stream')) {
         const a = ALL_ACTIONS.find((x) => x.key === 'auctions:conduct')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
+      // Floor Override
+      if (lower.includes('admin override') || lower.includes('early live auction') || lower.includes('start live auction now')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'auctions:override_floor')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
       // Place Proxy Bid
-      if (lower.includes('place bid') || lower.includes('proxy bid') || lower.includes('shout bid')) {
+      if (lower.includes('place bid') || lower.includes('proxy bid') || lower.includes('shout bid') || lower.includes('shout')) {
         const a = ALL_ACTIONS.find((x) => x.key === 'auctions:bid')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
       // Conclude Auction
-      if (lower.includes('conclude') || lower.includes('award pot') || lower.includes('advance month')) {
+      if (lower.includes('conclude') || lower.includes('award pot') || lower.includes('advance month') || lower.includes('close month')) {
         const a = ALL_ACTIONS.find((x) => x.key === 'auctions:conclude')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
+      // Disburse Payout
+      if (lower.includes('confirm & disburse') || lower.includes('disburse pot') || lower.includes('disburse payout')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'auctions:disburse')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
+      // Issue Receipt / Voucher
+      if (lower.includes('download pdf report') || lower.includes('pdf report') || lower.includes('winner voucher') || lower.includes('issue receipt')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'auctions:issue_receipt')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
@@ -315,15 +393,39 @@ function resolveComponentFromDOM(
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
+      // Reconcile Notes
+      if (lower.includes('count notes') || lower.includes('denomination') || lower.includes('reconcil')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'treasury:reconcile')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
       // WhatsApp Broadcast
-      if (lower.includes('broadcast') || lower.includes('send reminder') || lower.includes('whatsapp alert')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'communication:broadcast')!;
+      if (lower.includes('broadcast') || lower.includes('send reminder') || lower.includes('whatsapp alert') || lower.includes('remind all') || lower === 'remind') {
+        const a = ALL_ACTIONS.find((x) => x.key === 'communication:broadcast') || ALL_ACTIONS.find((x) => x.key === 'communication:due_alerts')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
       // Printable Checklist Booklet
       if (lower.includes('checklist') || lower.includes('print register') || lower.includes('collection sheet')) {
         const a = ALL_ACTIONS.find((x) => x.key === 'reports:export_checklist')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
+      // Export Audit Logs
+      if (lower.includes('export csv') || lower.includes('export json') || lower.includes('audit log')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'reports:export_audit')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
+      // Branding
+      if (lower.includes('save organization branding') || lower.includes('branding')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'system:branding')!;
+        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
+      // Maintenance Mode
+      if (lower.includes('engage lockout') || lower.includes('restore access') || lower.includes('maintenance')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'system:maintenance_mode')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
@@ -381,6 +483,14 @@ function IsolatedPreviewFrame({
     if (!iframe) return;
     const doc = iframe.contentDocument || iframe.contentWindow?.document;
     if (!doc) return;
+
+    // Ensure viewport meta tag is present for accurate mobile media query evaluation
+    if (!doc.head.querySelector('meta[name="viewport"]')) {
+      const meta = doc.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, initial-scale=1.0';
+      doc.head.prepend(meta);
+    }
 
     // Copy all style and link tags from main window
     document.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {

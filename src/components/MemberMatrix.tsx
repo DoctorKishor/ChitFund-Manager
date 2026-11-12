@@ -2053,6 +2053,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           {canExport && (
                             <button
                               type="button"
+                              data-action="members:export"
                               onClick={(e) => handlePrintMemberStickers(e, activeDrawerMember)}
                               className="py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                             >
@@ -2061,6 +2062,18 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                             </button>
                           )}
                         </div>
+
+                        {canDelete && activeDrawerMember.id !== currentAdminProfile?.id && (
+                          <button
+                            type="button"
+                            data-action="members:delete"
+                            onClick={(e) => handleDeleteMember(e, activeDrawerMember)}
+                            className="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl border border-rose-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Trash2 size={14} />
+                            <span>Archive / Delete Subscriber Profile</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 

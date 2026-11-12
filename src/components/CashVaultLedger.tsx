@@ -1003,38 +1003,48 @@ export default function CashVaultLedger() {
           >
             All ({formatShortCurrency(totalTreasuryBalance)})
           </button>
-          <button 
-            onClick={() => { setSelectedWalletFilter('cash_in_hand'); setActiveExpandedCard('cash_in_hand'); triggerHapticFeedback('light'); }}
-            className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
-              selectedWalletFilter === 'cash_in_hand' ? 'bg-emerald-900 text-white border-emerald-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <span>🗄️</span> Physical Cash ({formatShortCurrency(balances.cash_in_hand || 0)})
-          </button>
-          <button 
-            onClick={() => { setSelectedWalletFilter('kishor_bank'); setActiveExpandedCard('kishor_bank'); triggerHapticFeedback('light'); }}
-            className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
-              selectedWalletFilter === 'kishor_bank' ? 'bg-indigo-900 text-white border-indigo-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <span>🏦</span> Dr. Kishor ({formatShortCurrency(balances.kishor_bank || 0)})
-          </button>
-          <button 
-            onClick={() => { setSelectedWalletFilter('dad_bank'); setActiveExpandedCard('dad_bank'); triggerHapticFeedback('light'); }}
-            className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
-              selectedWalletFilter === 'dad_bank' ? 'bg-cyan-900 text-white border-cyan-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <span>💳</span> Dad Bank ({formatShortCurrency(balances.dad_bank || 0)})
-          </button>
-          <button 
-            onClick={() => { setSelectedWalletFilter('mom_bank'); setActiveExpandedCard('mom_bank'); triggerHapticFeedback('light'); }}
-            className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
-              selectedWalletFilter === 'mom_bank' ? 'bg-rose-900 text-white border-rose-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <span>🪙</span> Mom Bank ({formatShortCurrency(balances.mom_bank || 0)})
-          </button>
+          {canViewCashBox && (
+            <button 
+              data-action="treasury:view_cash_box"
+              onClick={() => { setSelectedWalletFilter('cash_in_hand'); setActiveExpandedCard('cash_in_hand'); triggerHapticFeedback('light'); }}
+              className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
+                selectedWalletFilter === 'cash_in_hand' ? 'bg-emerald-900 text-white border-emerald-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span>🗄️</span> Physical Cash ({formatShortCurrency(balances.cash_in_hand || 0)})
+            </button>
+          )}
+          {canViewBanks && (
+            <>
+              <button 
+                data-action="treasury:view_banks"
+                onClick={() => { setSelectedWalletFilter('kishor_bank'); setActiveExpandedCard('kishor_bank'); triggerHapticFeedback('light'); }}
+                className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
+                  selectedWalletFilter === 'kishor_bank' ? 'bg-indigo-900 text-white border-indigo-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span>🏦</span> Dr. Kishor ({formatShortCurrency(balances.kishor_bank || 0)})
+              </button>
+              <button 
+                data-action="treasury:view_banks"
+                onClick={() => { setSelectedWalletFilter('dad_bank'); setActiveExpandedCard('dad_bank'); triggerHapticFeedback('light'); }}
+                className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
+                  selectedWalletFilter === 'dad_bank' ? 'bg-cyan-900 text-white border-cyan-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span>💳</span> Dad Bank ({formatShortCurrency(balances.dad_bank || 0)})
+              </button>
+              <button 
+                data-action="treasury:view_banks"
+                onClick={() => { setSelectedWalletFilter('mom_bank'); setActiveExpandedCard('mom_bank'); triggerHapticFeedback('light'); }}
+                className={`flex-shrink-0 px-3 py-1 font-medium rounded-full border transition-all flex items-center gap-1 cursor-pointer ${
+                  selectedWalletFilter === 'mom_bank' ? 'bg-rose-900 text-white border-rose-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span>🪙</span> Mom Bank ({formatShortCurrency(balances.mom_bank || 0)})
+              </button>
+            </>
+          )}
         </div>
 
         {/* 1. Mobile Hero Card */}
@@ -1764,67 +1774,71 @@ export default function CashVaultLedger() {
         {/* 2. Desktop Four Financial Vault Cards */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* VAULT 1 */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-900 via-slate-800 to-emerald-950 p-5 text-white shadow-xl border border-emerald-500/25 flex flex-col justify-between transition-all group min-h-[224px]">
-            <div className="absolute -right-12 -top-12 w-36 h-36 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none"></div>
-            <div className="absolute -left-10 -bottom-10 w-28 h-28 bg-brand-500/10 rounded-full blur-xl pointer-events-none"></div>
-            
-            <div className="relative z-10 flex items-start justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-7 rounded-md bg-gradient-to-br from-amber-200 via-amber-400 to-amber-600 p-0.5 shadow-sm border border-amber-300/60 flex flex-col justify-between overflow-hidden flex-shrink-0">
-                  <div className="flex justify-between items-center h-full">
-                    <div className="w-2.5 h-full border-r border-amber-700/40"></div>
-                    <div className="flex-1 h-2 border-y border-amber-700/40 mx-0.5"></div>
-                    <div className="w-2.5 h-full border-l border-amber-700/40"></div>
+          {canViewCashBox && (
+            <div data-action="treasury:view_cash_box" className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-900 via-slate-800 to-emerald-950 p-5 text-white shadow-xl border border-emerald-500/25 flex flex-col justify-between transition-all group min-h-[224px]">
+              <div className="absolute -right-12 -top-12 w-36 h-36 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none"></div>
+              <div className="absolute -left-10 -bottom-10 w-28 h-28 bg-brand-500/10 rounded-full blur-xl pointer-events-none"></div>
+              
+              <div className="relative z-10 flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-7 rounded-md bg-gradient-to-br from-amber-200 via-amber-400 to-amber-600 p-0.5 shadow-sm border border-amber-300/60 flex flex-col justify-between overflow-hidden flex-shrink-0">
+                    <div className="flex justify-between items-center h-full">
+                      <div className="w-2.5 h-full border-r border-amber-700/40"></div>
+                      <div className="flex-1 h-2 border-y border-amber-700/40 mx-0.5"></div>
+                      <div className="w-2.5 h-full border-l border-amber-700/40"></div>
+                    </div>
                   </div>
+                  <svg className="w-4 h-4 text-emerald-400/80 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
+                  </svg>
                 </div>
-                <svg className="w-4 h-4 text-emerald-400/80 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M8.5 14.5A2.5 2.5 0 0011 12a2.5 2.5 0 00-2.5-2.5M5.5 17.5A6.5 6.5 0 0012 11a6.5 6.5 0 00-6.5-6.5" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-                </svg>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-bold tracking-wide backdrop-blur-md">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Safe #01 · cash_in_hand
-                </span>
-                <span className="text-[9px] text-emerald-200/80 font-medium block mt-0.5">Physical Liquid Safe</span>
-              </div>
-            </div>
-
-            <div className="relative z-10 my-3">
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Available Balance</p>
-                  <p className="text-2xl font-black font-display tracking-tight text-white tabular-nums mt-0.5">
-                    {formatCurrency(balances.cash_in_hand || 0)}
-                  </p>
-                </div>
-                {pendingRelocations.length > 0 && (
-                  <span className="px-2 py-0.5 rounded bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[10px] font-bold tabular-nums">
-                    +{formatCurrency(pendingRelocations.reduce((s, r) => s + r.amount, 0))} in-transit
+                <div className="text-right">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-bold tracking-wide backdrop-blur-md">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Safe #01 · cash_in_hand
                   </span>
+                  <span className="text-[9px] text-emerald-200/80 font-medium block mt-0.5">Physical Liquid Safe</span>
+                </div>
+              </div>
+
+              <div className="relative z-10 my-3">
+                <div className="flex items-baseline justify-between">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Available Balance</p>
+                    <p className="text-2xl font-black font-display tracking-tight text-white tabular-nums mt-0.5">
+                      {formatCurrency(balances.cash_in_hand || 0)}
+                    </p>
+                  </div>
+                  {pendingRelocations.length > 0 && (
+                    <span className="px-2 py-0.5 rounded bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[10px] font-bold tabular-nums">
+                      +{formatCurrency(pendingRelocations.reduce((s, r) => s + r.amount, 0))} in-transit
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="relative z-10 pt-2.5 border-t border-white/10 flex items-end justify-between">
+                <div>
+                  <p className="font-mono text-xs tracking-wider text-slate-300 font-semibold">VAULT-01 •••• SAFE</p>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-emerald-300 mt-0.5">PHYSICAL CASH BOX</p>
+                </div>
+                {canReconcile && (
+                  <button 
+                    type="button"
+                    onClick={() => setActiveModal('denominations')}
+                    className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs border border-white/15 backdrop-blur-md transition-all shadow-sm cursor-pointer"
+                  >
+                    Count Notes
+                  </button>
                 )}
               </div>
             </div>
+          )}
 
-            <div className="relative z-10 pt-2.5 border-t border-white/10 flex items-end justify-between">
-              <div>
-                <p className="font-mono text-xs tracking-wider text-slate-300 font-semibold">VAULT-01 •••• SAFE</p>
-                <p className="text-[11px] font-black uppercase tracking-wider text-emerald-300 mt-0.5">PHYSICAL CASH BOX</p>
-              </div>
-              {canReconcile && (
-                <button 
-                  type="button"
-                  onClick={() => setActiveModal('denominations')}
-                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs border border-white/15 backdrop-blur-md transition-all shadow-sm cursor-pointer"
-                >
-                  Count Notes
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* VAULT 2 */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-brand-900 p-5 text-white shadow-xl border border-indigo-500/30 flex flex-col justify-between transition-all group min-h-[224px]">
+          {canViewBanks && (
+            <>
+              {/* VAULT 2 */}
+              <div data-action="treasury:view_banks" className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-brand-900 p-5 text-white shadow-xl border border-indigo-500/30 flex flex-col justify-between transition-all group min-h-[224px]">
             <div className="absolute -right-12 -top-12 w-36 h-36 bg-brand-500/20 rounded-full blur-2xl pointer-events-none"></div>
             <div className="absolute -left-10 -bottom-10 w-28 h-28 bg-indigo-500/15 rounded-full blur-xl pointer-events-none"></div>
             
@@ -1985,6 +1999,8 @@ export default function CashVaultLedger() {
               </button>
             </div>
           </div>
+            </>
+          )}
         </section>
 
         {/* 3. Desktop Split Section: Denominations & Personal Draws */}

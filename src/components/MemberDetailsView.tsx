@@ -1562,6 +1562,31 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                       )}
                     </div>
                   </div>
+
+                  {/* Danger Zone: Archive / Delete Profile */}
+                  {canDelete && memberProfile?.id !== profile?.id && (
+                    <div className="pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        data-action="members:delete"
+                        onClick={async () => {
+                          if (!confirm(`Are you sure you want to archive "${memberName}"? All financial ledger records will be preserved.`)) return;
+                          try {
+                            const { error } = await supabase.from('profiles').update({ is_deleted: true }).eq('id', memberId);
+                            if (error) throw error;
+                            alert(`Member profile "${memberName}" has been archived.`);
+                            onBack();
+                          } catch (err: any) {
+                            alert(`Failed to archive member: ${err.message}`);
+                          }
+                        }}
+                        className="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl border border-rose-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                        <span>Archive Member Profile</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -166,6 +166,12 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const canLaunchMonth0 = canPerformAction('chits:launch_month0');
   const canDeleteChit = canPerformAction('chits:delete');
   const canRescheduleAuction = canPerformAction('chits:reschedule_auction');
+  const canConfigureLaabaSeetu = canPerformAction('chits:configure_laaba_seetu');
+  const canCollect = canPerformAction('members:collect') || canPerformAction('treasury:collect_cash');
+  const canPersonalDraw = canPerformAction('treasury:personal_draw');
+  const canBroadcastReminders = canPerformAction('communication:due_alerts') || canPerformAction('communication:broadcast');
+  const canAtmRelocate = canPerformAction('treasury:confirm_atm') || canPerformAction('treasury:move_money');
+  const canExportChecklist = canPerformAction('reports:export_checklist');
   const { balances, updateBalance } = useWallet();
   const { organizationName, organizationInitials, organizationTagline } = useOrganization();
 
@@ -3812,14 +3818,17 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* Primary Quick Action: Record Payment */}
-              <button
-                type="button"
-                onClick={() => handleOpenRecordPayment(null)}
-                className="inline-flex items-center gap-2 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all shrink-0 cursor-pointer"
-              >
-                <Plus size={14} className="stroke-[2.5]" />
-                <span>Record Payment</span>
-              </button>
+              {canCollect && (
+                <button
+                  type="button"
+                  data-action="members:collect"
+                  onClick={() => handleOpenRecordPayment(null)}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all shrink-0 cursor-pointer"
+                >
+                  <Plus size={14} className="stroke-[2.5]" />
+                  <span>Record Payment</span>
+                </button>
+              )}
             </div>
 
             {/* BEGIN: CycleTimelineBar */}
@@ -3967,9 +3976,10 @@ Thank you for your prompt payment! 🙏`;
                   <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2">
 
-                      {pendingList.length > 0 && (
+                      {canBroadcastReminders && pendingList.length > 0 && (
                         <button
                           type="button"
+                          data-action="communication:due_alerts"
                           onClick={() => {
                             setRemindModalTab('individual');
                             setShowRemindModal(true);
@@ -4422,9 +4432,10 @@ Thank you for your prompt payment! 🙏`;
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
-                              {member.status !== 'paid' && (
+                              {canBroadcastReminders && member.status !== 'paid' && (
                                 <button
                                   type="button"
+                                  data-action="communication:due_alerts"
                                   onClick={() => {
                                     triggerHapticFeedback('light');
                                     const msg = encodeURIComponent(
@@ -4448,14 +4459,17 @@ Thank you for your prompt payment! 🙏`;
                                 </button>
                               )}
 
-                              <button
-                                type="button"
-                                onClick={() => handleOpenRecordPayment(member, activeDashboardGroupId, selectedDashboardMonth)}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
-                              >
-                                <Coins size={13} />
-                                <span>Record</span>
-                              </button>
+                              {canCollect && (
+                                <button
+                                  type="button"
+                                  data-action="members:collect"
+                                  onClick={() => handleOpenRecordPayment(member, activeDashboardGroupId, selectedDashboardMonth)}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+                                >
+                                  <Coins size={13} />
+                                  <span>Record</span>
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -5177,9 +5191,10 @@ Thank you for your prompt payment! 🙏`;
                             </div>
 
                             <div className="flex items-center space-x-1.5 shrink-0">
-                              {!isPaid && (
+                              {canBroadcastReminders && !isPaid && (
                                 <button
                                   type="button"
+                                  data-action="communication:due_alerts"
                                   onClick={() => {
                                     triggerHapticFeedback('light');
                                     const msg = encodeURIComponent(
@@ -5201,13 +5216,16 @@ Thank you for your prompt payment! 🙏`;
                                   <Send size={14} />
                                 </button>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => handleOpenRecordPayment(member, activeDashboardGroupId, selectedDashboardMonth)}
-                                className="px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center space-x-1 shadow-xs cursor-pointer"
-                              >
-                                <span>Record</span>
-                              </button>
+                              {canCollect && (
+                                <button
+                                  type="button"
+                                  data-action="members:collect"
+                                  onClick={() => handleOpenRecordPayment(member, activeDashboardGroupId, selectedDashboardMonth)}
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center space-x-1 shadow-xs cursor-pointer"
+                                >
+                                  <span>Record</span>
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -5331,15 +5349,18 @@ Thank you for your prompt payment! 🙏`;
         {/* END: MOBILE VIEW */}
 
             {/* Floating Quick Record FAB (Desktop Only) */}
-            <button
-              type="button"
-              onClick={() => handleOpenRecordPayment(null)}
-              className="hidden lg:flex fixed bottom-6 right-6 w-12 h-12 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white rounded-full shadow-lg shadow-brand-600/35 items-center justify-center transition-transform hover:scale-105 z-40 cursor-pointer"
-              data-purpose="floating-quick-action"
-              title="Quick Record Cash Entry"
-            >
-              <Plus size={22} className="stroke-[2.5]" />
-            </button>
+            {canCollect && (
+              <button
+                type="button"
+                data-action="members:collect"
+                onClick={() => handleOpenRecordPayment(null)}
+                className="hidden lg:flex fixed bottom-6 right-6 w-12 h-12 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white rounded-full shadow-lg shadow-brand-600/35 items-center justify-center transition-transform hover:scale-105 z-40 cursor-pointer"
+                data-purpose="floating-quick-action"
+                title="Quick Record Cash Entry"
+              >
+                <Plus size={22} className="stroke-[2.5]" />
+              </button>
+            )}
 
 
           </div>
@@ -6350,22 +6371,28 @@ Thank you for your prompt payment! 🙏`;
 
                               {/* Quick Action Menu */}
                               <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                  type="button"
-                                  title="Edit chit details"
-                                  onClick={() => openEditGroupModal(g)}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors active:scale-95 cursor-pointer"
-                                >
-                                  <Edit3 size={14} />
-                                </button>
-                                <button
-                                  type="button"
-                                  title="Move to Recycle Bin"
-                                  onClick={() => openSoftDeleteModal(g)}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors active:scale-95 cursor-pointer"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                {canEditChit && (
+                                  <button
+                                    type="button"
+                                    title="Edit chit details"
+                                    data-action="chits:edit"
+                                    onClick={() => openEditGroupModal(g)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors active:scale-95 cursor-pointer"
+                                  >
+                                    <Edit3 size={14} />
+                                  </button>
+                                )}
+                                {canDeleteChit && (
+                                  <button
+                                    type="button"
+                                    title="Move to Recycle Bin"
+                                    data-action="chits:delete"
+                                    onClick={() => openSoftDeleteModal(g)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors active:scale-95 cursor-pointer"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
                               </div>
                             </div>
 
@@ -10115,7 +10142,7 @@ Thank you for your prompt payment! 🙏`;
       })()}
 
       {/* ── FLOATING ACTION BUTTON (FAB) & SPEED-DIAL MENU (DESKTOP ONLY) ────── */}
-      {activeTab === 'dashboard' && (
+      {activeTab === 'dashboard' && (canCollect || canPersonalDraw || canBroadcastReminders || canAtmRelocate) && (
         <>
           {/* Backdrop Blur Overlay when FAB is Open */}
           {isFabOpen && (
@@ -10131,77 +10158,89 @@ Thank you for your prompt payment! 🙏`;
               <div className="flex flex-col items-end gap-2 animate-in slide-in-from-bottom-3 duration-200">
                 
                 {/* 1. Quick Collect Payment (Primary Action) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setIsFabOpen(false);
-                    handleOpenRecordPayment(null);
-                  }}
-                  className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
-                >
-                  <span className="text-xs font-bold tracking-tight text-white">
-                    Quick Collect Payment
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-[#02B15A] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                    <Coins size={16} />
-                  </div>
-                </button>
+                {canCollect && (
+                  <button
+                    type="button"
+                    data-action="members:collect"
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setIsFabOpen(false);
+                      handleOpenRecordPayment(null);
+                    }}
+                    className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                  >
+                    <span className="text-xs font-bold tracking-tight text-white">
+                      Quick Collect Payment
+                    </span>
+                    <div className="w-8 h-8 rounded-xl bg-[#02B15A] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                      <Coins size={16} />
+                    </div>
+                  </button>
+                )}
 
                 {/* 2. Log Cash Spend / Personal Draw */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setIsFabOpen(false);
-                    setShowQuickPersonalDrawModal(true);
-                  }}
-                  className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
-                >
-                  <span className="text-xs font-bold tracking-tight text-white">
-                    Log Cash Spend (Draw)
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-[#E41414] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                    <MinusCircle size={16} />
-                  </div>
-                </button>
+                {canPersonalDraw && (
+                  <button
+                    type="button"
+                    data-action="treasury:personal_draw"
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setIsFabOpen(false);
+                      setShowQuickPersonalDrawModal(true);
+                    }}
+                    className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                  >
+                    <span className="text-xs font-bold tracking-tight text-white">
+                      Log Cash Spend (Draw)
+                    </span>
+                    <div className="w-8 h-8 rounded-xl bg-[#E41414] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                      <MinusCircle size={16} />
+                    </div>
+                  </button>
+                )}
 
                 {/* 3. Send Dues Reminder */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setIsFabOpen(false);
-                    setRemindModalTab('individual');
-                    setShowRemindModal(true);
-                  }}
-                  className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
-                >
-                  <span className="text-xs font-bold tracking-tight text-white">
-                    Send Dues Reminder
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-[#6359E9] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                    <Send size={15} />
-                  </div>
-                </button>
+                {canBroadcastReminders && (
+                  <button
+                    type="button"
+                    data-action="communication:due_alerts"
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setIsFabOpen(false);
+                      setRemindModalTab('individual');
+                      setShowRemindModal(true);
+                    }}
+                    className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                  >
+                    <span className="text-xs font-bold tracking-tight text-white">
+                      Send Dues Reminder
+                    </span>
+                    <div className="w-8 h-8 rounded-xl bg-[#6359E9] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                      <Send size={15} />
+                    </div>
+                  </button>
+                )}
 
                 {/* 4. ATM Cash Withdrawal */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setIsFabOpen(false);
-                    setShowQuickAtmModal(true);
-                  }}
-                  className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
-                >
-                  <span className="text-xs font-bold tracking-tight text-white">
-                    ATM Cash Withdrawal
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-[#64CFF6] text-[#141332] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                    <Landmark size={15} />
-                  </div>
-                </button>
+                {canAtmRelocate && (
+                  <button
+                    type="button"
+                    data-action="treasury:confirm_atm"
+                    onClick={() => {
+                      triggerHapticFeedback('light');
+                      setIsFabOpen(false);
+                      setShowQuickAtmModal(true);
+                    }}
+                    className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
+                  >
+                    <span className="text-xs font-bold tracking-tight text-white">
+                      ATM Cash Withdrawal
+                    </span>
+                    <div className="w-8 h-8 rounded-xl bg-[#64CFF6] text-[#141332] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                      <Landmark size={15} />
+                    </div>
+                  </button>
+                )}
 
               </div>
             )}
