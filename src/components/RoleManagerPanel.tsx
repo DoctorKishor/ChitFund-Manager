@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth, broadcastRoleUpdate } from '@/context/AuthContext';
-import { CustomRoleRecord } from '@/utils/rbac';
+import { CustomRoleRecord, MainTabId, PermissionAction } from '@/utils/rbac';
 import {
   Shield,
   ShieldCheck,
@@ -40,174 +40,180 @@ interface ProfileRecord {
 
 interface PermissionCategory {
   id: number;
+  tabKey: MainTabId;
   badge: string;
   badgeClass: string;
   title: string;
   subtitle: string;
   toggleBgClass: string;
   items: {
-    key: string;
+    key: PermissionAction;
     label: string;
     desc: string;
-    type: 'tab' | 'action';
   }[];
 }
 
 const CATEGORIES: PermissionCategory[] = [
   {
     id: 1,
+    tabKey: 'dashboard',
     badge: '1',
     badgeClass: 'bg-indigo-50 text-brand-600',
-    title: 'Primary Screen Tabs',
-    subtitle: 'Main navigation tabs matching desktop sidebar & mobile drawer',
+    title: 'Overview Dashboard',
+    subtitle: 'Executive metrics, cash pot totals, and live cycle progress',
     toggleBgClass: 'peer-checked:bg-brand-600',
     items: [
-      { key: 'dashboard', label: 'Overview Dashboard', desc: 'High-level financial summaries, KPI cards & cycle statistics', type: 'tab' },
-      { key: 'chits', label: 'Chits / Groups Tab', desc: 'View scheme rosters, pool balances, and cycle progress', type: 'tab' },
-      { key: 'members', label: 'Members Directory Tab', desc: 'Member registry, passbook manager, and ticket allocations', type: 'tab' },
-      { key: 'auctions', label: 'Auctions & Bidding Tab', desc: 'Live auction floor desk, real-time shouts & pot awards', type: 'tab' },
-      { key: 'cash', label: 'Treasury Tab', desc: 'Multi-account bank ledger, cash drawer & inter-vault transfers', type: 'tab' },
-      { key: 'reports', label: 'Reports & Analytics Tab', desc: 'P&L velocity statements, payment checklists & audit trail logs', type: 'tab' },
-      { key: 'communication', label: 'Communication Tab', desc: 'Dispatch payment receipts, pre-auction alerts & due reminders', type: 'tab' },
-      { key: 'users', label: 'Roles & Staff Tab', desc: 'Workforce identities, login credentials, and RBAC matrix', type: 'tab' },
-      { key: 'settings', label: 'Portal Settings Tab', desc: 'Organization branding, maintenance lockout & system controls', type: 'tab' },
+      { key: 'dashboard:view_kpis', label: 'View Financial KPIs & Net Reserves', desc: 'Inspect high-level cash collections, pool totals & active cycle targets' },
+      { key: 'dashboard:quick_actions', label: 'Access Dashboard Quick Actions', desc: 'Use floating and header quick action shortcuts for payments and spends' },
     ],
   },
   {
     id: 2,
+    tabKey: 'chits',
     badge: '2',
     badgeClass: 'bg-sky-50 text-sky-700',
     title: 'Chits & Groups Tab',
     subtitle: 'Scheme setup, monthly rules, and Launch Month operations',
     toggleBgClass: 'peer-checked:bg-sky-600',
     items: [
-      { key: 'chits:view', label: 'View Chit Schemes', desc: 'Inspect duration, pot totals, cycle history, and enrolled tickets', type: 'action' },
-      { key: 'chits:create', label: 'Create New Chit Schemes', desc: 'Launch ₹1L, ₹2L, ₹5L, ₹10L, ₹25L, or custom scheme groups', type: 'action' },
-      { key: 'chits:edit', label: 'Edit Scheme Rules & Caps', desc: 'Modify installment deadlines, maximum bid caps, and group parameters', type: 'action' },
-      { key: 'chits:launch_month0', label: 'Execute Month 0 Launch', desc: 'Confirm Launch Month collections and allocate Organizer Profit pool', type: 'action' },
-      { key: 'chits:reschedule_auction', label: 'Reschedule Auction Schedule', desc: 'Postpone or advance monthly auction dates and notify members', type: 'action' },
-      { key: 'chits:configure_laaba_seetu', label: 'Configure Laaba Seetu Rules', desc: 'Set bonus profit discount threshold and pool rollover parameters', type: 'action' },
-      { key: 'chits:delete', label: 'Delete / Archive Schemes', desc: 'Permanently archive completed pools or delete draft chit schemes', type: 'action' },
+      { key: 'chits:view', label: 'View Chit Schemes', desc: 'Inspect duration, pot totals, cycle history, and enrolled tickets' },
+      { key: 'chits:create', label: 'Create New Chit Schemes', desc: 'Launch ₹1L, ₹2L, ₹5L, ₹10L, ₹25L, or custom scheme groups' },
+      { key: 'chits:edit', label: 'Edit Scheme Rules & Caps', desc: 'Modify installment deadlines, maximum bid caps, and group parameters' },
+      { key: 'chits:launch_month0', label: 'Execute Month 0 Launch', desc: 'Confirm Launch Month collections and allocate Organizer Profit pool' },
+      { key: 'chits:reschedule_auction', label: 'Reschedule Auction Schedule', desc: 'Postpone or advance monthly auction dates and notify members' },
+      { key: 'chits:configure_laaba_seetu', label: 'Configure Laaba Seetu Rules', desc: 'Set bonus profit discount threshold and pool rollover parameters' },
+      { key: 'chits:swap_ticket', label: 'Swap / Substitute Member Tickets', desc: 'Transfer enrolled ticket allocations between members in active groups' },
+      { key: 'chits:delete', label: 'Delete / Archive Schemes', desc: 'Permanently archive completed pools or delete draft chit schemes' },
     ],
   },
   {
     id: 3,
+    tabKey: 'members',
     badge: '3',
     badgeClass: 'bg-emerald-50 text-emerald-700',
     title: 'Members Directory Tab',
     subtitle: 'Subscriber profiles, ticket enrollments & physical passbooks',
     toggleBgClass: 'peer-checked:bg-emerald-600',
     items: [
-      { key: 'members:view', label: 'View Member Directory', desc: 'Search subscriber profiles, enrolled chits, and contact records', type: 'action' },
-      { key: 'members:enroll', label: 'Enroll New Subscribers', desc: 'Register new member profiles and allocate chit scheme tickets', type: 'action' },
-      { key: 'members:edit', label: 'Edit Member Details', desc: 'Update subscriber phone numbers, addresses, and account notes', type: 'action' },
-      { key: 'members:collect', label: 'Collect Installment Payments', desc: 'Post cash, UPI, or bank installments and issue digital receipts', type: 'action' },
-      { key: 'members:suspend', label: 'Suspend / Block Portal Access', desc: 'Lock subscriber passbook logins and disqualify from live auctions', type: 'action' },
-      { key: 'members:pair_qr', label: 'Pair Physical Passbook QR', desc: 'Camera scan and link printed QR codes to member passbooks', type: 'action' },
-      { key: 'members:revoke_qr', label: 'Revoke / Unlink Passbook QR', desc: 'Unpair lost or damaged passbook QR tokens from member profile', type: 'action' },
-      { key: 'members:batch_qr', label: 'Generate Passbook QR Sheets', desc: 'Create printable batches of blank QR stickers for new booklets', type: 'action' },
-      { key: 'members:reset_mpin', label: 'Reset Passbook MPIN', desc: 'Reset subscriber 4-digit passbook portal PIN to default 1234', type: 'action' },
-      { key: 'members:export', label: 'Export Member Directory CSV', desc: 'Download complete roster with phone numbers and ticket status', type: 'action' },
-      { key: 'members:delete', label: 'Delete Subscriber Records', desc: 'Permanently deactivate or purge member profiles from registry', type: 'action' },
+      { key: 'members:view', label: 'View Member Directory', desc: 'Search subscriber profiles, enrolled chits, and contact records' },
+      { key: 'members:enroll', label: 'Enroll New Subscribers', desc: 'Register new member profiles and allocate chit scheme tickets' },
+      { key: 'members:edit', label: 'Edit Member Details', desc: 'Update subscriber phone numbers, addresses, and account notes' },
+      { key: 'members:collect', label: 'Collect Installment Payments', desc: 'Post cash, UPI, or bank installments and issue digital receipts' },
+      { key: 'members:waive_penalties', label: 'Waive Fines & Adjust Dues', desc: 'Authorize manual penalty fee waivers and custom member installments' },
+      { key: 'members:suspend', label: 'Suspend / Block Portal Access', desc: 'Lock subscriber passbook logins and disqualify from live auctions' },
+      { key: 'members:pair_qr', label: 'Pair Physical Passbook QR', desc: 'Camera scan and link printed QR codes to member passbooks' },
+      { key: 'members:revoke_qr', label: 'Revoke / Unlink Passbook QR', desc: 'Unpair lost or damaged passbook QR tokens from member profile' },
+      { key: 'members:batch_qr', label: 'Generate Passbook QR Sheets', desc: 'Create printable batches of blank QR stickers for new booklets' },
+      { key: 'members:reset_mpin', label: 'Reset Passbook MPIN', desc: 'Reset subscriber 4-digit passbook portal PIN to default 1234' },
+      { key: 'members:export', label: 'Export Member Directory CSV', desc: 'Download complete roster with phone numbers and ticket status' },
+      { key: 'members:delete', label: 'Delete Subscriber Records', desc: 'Permanently deactivate or purge member profiles from registry' },
     ],
   },
   {
     id: 4,
+    tabKey: 'auctions',
     badge: '4',
     badgeClass: 'bg-purple-50 text-purple-700',
     title: 'Auctions & Bidding Tab',
     subtitle: 'Live auction floor desk, real-time bidding shouts & prize disbursements',
     toggleBgClass: 'peer-checked:bg-purple-600',
     items: [
-      { key: 'auctions:view', label: 'View Live Auction Floor', desc: 'Monitor active countdowns, shouted bids, and prize pot values', type: 'action' },
-      { key: 'auctions:conduct', label: 'Conduct & Moderate Sessions', desc: 'Start live countdown timer, accept shouts, and moderate bidding desk', type: 'action' },
-      { key: 'auctions:bid', label: 'Place Proxy Bids for Tickets', desc: 'Shout live discount bids on behalf of eligible non-winning subscribers', type: 'action' },
-      { key: 'auctions:conclude', label: 'Conclude Cycle & Advance Month', desc: 'Lock winning discount, calculate pot, and advance to next month cycle', type: 'action' },
-      { key: 'auctions:override_floor', label: 'Override Floor / Bid Caps', desc: 'Administrative unlock of minimum floor bid or maximum discount limit', type: 'action' },
-      { key: 'auctions:disburse', label: 'Authorize Prize Pot Payouts', desc: 'Disburse net prize pot to winning subscriber via bank or cash', type: 'action' },
-      { key: 'auctions:issue_receipt', label: 'Issue Winner Payout Voucher', desc: 'Generate and print official prize pot payout settlement certificate', type: 'action' },
+      { key: 'auctions:view', label: 'View Live Auction Floor', desc: 'Monitor active countdowns, shouted bids, and prize pot values' },
+      { key: 'auctions:conduct', label: 'Conduct & Moderate Sessions', desc: 'Start live countdown timer, accept shouts, and moderate bidding desk' },
+      { key: 'auctions:bid', label: 'Place Proxy Bids for Tickets', desc: 'Shout live discount bids on behalf of eligible non-winning subscribers' },
+      { key: 'auctions:conclude', label: 'Conclude Cycle & Advance Month', desc: 'Lock winning discount, calculate pot, and advance to next month cycle' },
+      { key: 'auctions:override_floor', label: 'Override Floor / Bid Caps', desc: 'Administrative unlock of minimum floor bid or maximum discount limit' },
+      { key: 'auctions:edit_historical', label: 'Correct Historical Auction Logs', desc: 'Fix accidental bid amounts or winner ticket errors with audit logging' },
+      { key: 'auctions:disburse', label: 'Authorize Prize Pot Payouts', desc: 'Disburse net prize pot to winning subscriber via bank or cash' },
+      { key: 'auctions:issue_receipt', label: 'Issue Winner Payout Voucher', desc: 'Generate and print official prize pot payout settlement certificate' },
     ],
   },
   {
     id: 5,
+    tabKey: 'cash',
     badge: '5',
     badgeClass: 'bg-amber-50 text-amber-700',
     title: 'Treasury Tab',
     subtitle: 'Multi-vault balances, physical cash safe, ATM relocations & reconciliations',
     toggleBgClass: 'peer-checked:bg-amber-500',
     items: [
-      { key: 'treasury:view', label: 'View Global Treasury', desc: 'Combined financial balances across all 4 operational vaults', type: 'action' },
-      { key: 'treasury:view_cash_box', label: 'View Cash Box Drawer Balance', desc: 'Inspect physical cash-in-hand running balance and safe drawer', type: 'action' },
-      { key: 'treasury:view_banks', label: 'View Private Bank Balances', desc: 'Inspect digital balances of Kishor Bank, Dad Bank, and Mom Bank', type: 'action' },
-      { key: 'treasury:collect_cash', label: 'Accept Physical Paper Cash', desc: 'Receive physical currency from members and issue passbook receipts', type: 'action' },
-      { key: 'treasury:move_money', label: 'Initiate ATM & Bank Relocations', desc: 'Debit bank accounts (Kishor / Dad / Mom Bank) for cash box funding', type: 'action' },
-      { key: 'treasury:confirm_atm', label: 'Confirm Physical ATM Arrival', desc: 'Step 2 physical verification: credit cash box after physical delivery', type: 'action' },
-      { key: 'treasury:deposit', label: 'Deposit Reserve Cash', desc: 'Deposit external owner cash float or reserve capital into vaults', type: 'action' },
-      { key: 'treasury:recover_float', label: 'Recover Agent Field Float', desc: 'Recover floating collections from ground collection agents into vault', type: 'action' },
-      { key: 'treasury:personal_draw', label: 'Record Petty Cash & Personal Draws', desc: 'Log expenses such as vehicle fuel, office maintenance, or admin draws', type: 'action' },
-      { key: 'treasury:settle_draw', label: 'Settle & Repay Personal Debts', desc: 'Record repayment of personal advances and draws back into the vault', type: 'action' },
-      { key: 'treasury:reconcile', label: 'Denomination Note Count Audit', desc: 'Perform physical note counts (₹500, ₹200, ₹100, etc.) and lock audit', type: 'action' },
+      { key: 'treasury:view', label: 'View Global Treasury', desc: 'Combined financial balances across all 4 operational vaults' },
+      { key: 'treasury:view_cash_box', label: 'View Cash Box Drawer Balance', desc: 'Inspect physical cash-in-hand running balance and safe drawer' },
+      { key: 'treasury:view_banks', label: 'View Private Bank Balances', desc: 'Inspect digital balances of Kishor Bank, Dad Bank, and Mom Bank' },
+      { key: 'treasury:collect_cash', label: 'Accept Physical Paper Cash', desc: 'Receive physical currency from members and issue passbook receipts' },
+      { key: 'treasury:move_money', label: 'Initiate ATM & Bank Relocations', desc: 'Debit bank accounts (Kishor / Dad / Mom Bank) for cash box funding' },
+      { key: 'treasury:confirm_atm', label: 'Confirm Physical ATM Arrival', desc: 'Step 2 physical verification: credit cash box after physical delivery' },
+      { key: 'treasury:deposit', label: 'Deposit Reserve Cash', desc: 'Deposit external owner cash float or reserve capital into vaults' },
+      { key: 'treasury:recover_float', label: 'Recover Agent Field Float', desc: 'Recover floating collections from ground collection agents into vault' },
+      { key: 'treasury:personal_draw', label: 'Record Petty Cash & Personal Draws', desc: 'Log expenses such as vehicle fuel, office maintenance, or admin draws' },
+      { key: 'treasury:settle_draw', label: 'Settle & Repay Personal Debts', desc: 'Record repayment of personal advances and draws back into the vault' },
+      { key: 'treasury:delete_transaction', label: 'Void / Reverse Financial Entries', desc: 'Authorize cancellation of erroneous transaction entries in vault ledger' },
+      { key: 'treasury:reconcile', label: 'Denomination Note Count Audit', desc: 'Perform physical note counts (₹500, ₹200, ₹100, etc.) and lock audit' },
     ],
   },
   {
     id: 6,
+    tabKey: 'reports',
     badge: '6',
     badgeClass: 'bg-blue-50 text-blue-700',
     title: 'Reports & Analytics Tab',
     subtitle: 'P&L margins, printable field registers, defaulters & audit logs',
     toggleBgClass: 'peer-checked:bg-blue-600',
     items: [
-      { key: 'reports:view', label: 'View Reports & Analytics Center', desc: 'Access financial summaries, collection progress, and cycle velocity', type: 'action' },
-      { key: 'reports:view_pnl', label: 'View Financial P&L & Margins', desc: 'Inspect organizer profit revenue, active chit value, and gross yield', type: 'action' },
-      { key: 'reports:export', label: 'Export General Reports', desc: 'Download CSV / Excel statements and ledger data for accounting audit', type: 'action' },
-      { key: 'reports:export_checklist', label: 'Print Monthly Field Checklists', desc: 'Generate printable collection checklists for field agents to mark dues', type: 'action' },
-      { key: 'reports:export_ledger', label: 'Export Member Passbook Ledgers', desc: 'Download official individual or group PDF & CSV financial statements', type: 'action' },
-      { key: 'reports:view_defaulters', label: 'View Defaulters & Overdue Aging', desc: 'Analyze overdue aging brackets (30/60/90 days) and outstanding dues', type: 'action' },
-      { key: 'reports:view_audit_logs', label: 'Inspect Security Audit Logs', desc: 'Tamper-evident chronological ledger of all administrative mutations', type: 'action' },
-      { key: 'reports:export_audit', label: 'Export Security Audit Trail', desc: 'Export full immutable audit event ledger as CSV spreadsheet or JSON', type: 'action' },
+      { key: 'reports:view', label: 'View Reports & Analytics Center', desc: 'Access financial summaries, collection progress, and cycle velocity' },
+      { key: 'reports:view_pnl', label: 'View Financial P&L & Margins', desc: 'Inspect organizer profit revenue, active chit value, and gross yield' },
+      { key: 'reports:export', label: 'Export General Reports', desc: 'Download CSV / Excel statements and ledger data for accounting audit' },
+      { key: 'reports:export_checklist', label: 'Print Monthly Field Checklists', desc: 'Generate printable collection checklists for field agents to mark dues' },
+      { key: 'reports:export_ledger', label: 'Export Member Passbook Ledgers', desc: 'Download official individual or group PDF & CSV financial statements' },
+      { key: 'reports:view_defaulters', label: 'View Defaulters & Overdue Aging', desc: 'Analyze overdue aging brackets (30/60/90 days) and outstanding dues' },
+      { key: 'reports:view_audit_logs', label: 'Inspect Security Audit Logs', desc: 'Tamper-evident chronological ledger of all administrative mutations' },
+      { key: 'reports:export_audit', label: 'Export Security Audit Trail', desc: 'Export full immutable audit event ledger as CSV spreadsheet or JSON' },
     ],
   },
   {
     id: 7,
+    tabKey: 'communication',
     badge: '7',
     badgeClass: 'bg-teal-50 text-teal-700',
     title: 'Communication Tab',
     subtitle: 'WhatsApp payment receipts, pre-auction floor notices & due alerts',
     toggleBgClass: 'peer-checked:bg-teal-600',
     items: [
-      { key: 'communication:view', label: 'View Broadcast History & Logs', desc: 'Inspect WhatsApp delivery logs, timestamps, and subscriber replies', type: 'action' },
-      { key: 'communication:broadcast', label: 'Dispatch Instant Payment Receipts', desc: 'Send automated WhatsApp transaction receipts immediately upon payment', type: 'action' },
-      { key: 'communication:pre_auction', label: 'Broadcast Pre-Auction Notices', desc: 'Send upcoming auction schedules, date/time, and bidding instructions', type: 'action' },
-      { key: 'communication:post_auction', label: 'Broadcast Auction Results', desc: 'Announce winning discount, winner ticket, and monthly dividend to members', type: 'action' },
-      { key: 'communication:due_alerts', label: 'Broadcast Monthly Due Reminders', desc: 'Dispatch bulk WhatsApp alerts for pending installments & defaulters', type: 'action' },
-      { key: 'communication:custom', label: 'Compose Custom WhatsApp Broadcast', desc: 'Free-form manual WhatsApp message composing and dispatching', type: 'action' },
-      { key: 'communication:manage_templates', label: 'Manage Message Templates', desc: 'Edit official Tamil and English WhatsApp alert message templates', type: 'action' },
+      { key: 'communication:view', label: 'View Broadcast History & Logs', desc: 'Inspect WhatsApp delivery logs, timestamps, and subscriber replies' },
+      { key: 'communication:broadcast', label: 'Dispatch Instant Payment Receipts', desc: 'Send automated WhatsApp transaction receipts immediately upon payment' },
+      { key: 'communication:pre_auction', label: 'Broadcast Pre-Auction Notices', desc: 'Send upcoming auction schedules, date/time, and bidding instructions' },
+      { key: 'communication:post_auction', label: 'Broadcast Auction Results', desc: 'Announce winning discount, winner ticket, and monthly dividend to members' },
+      { key: 'communication:due_alerts', label: 'Broadcast Monthly Due Reminders', desc: 'Dispatch bulk WhatsApp alerts for pending installments & defaulters' },
+      { key: 'communication:custom', label: 'Compose Custom WhatsApp Broadcast', desc: 'Free-form manual WhatsApp message composing and dispatching' },
+      { key: 'communication:manage_templates', label: 'Manage Message Templates', desc: 'Edit official Tamil and English WhatsApp alert message templates' },
     ],
   },
   {
     id: 8,
+    tabKey: 'users',
     badge: '8',
     badgeClass: 'bg-violet-50 text-violet-700',
     title: 'Roles & Staff Tab',
     subtitle: 'Workforce provisioning, custom roles & permission matrix',
     toggleBgClass: 'peer-checked:bg-violet-600',
     items: [
-      { key: 'system:manage_users', label: 'Manage Subscriber Accounts', desc: 'Provision, inspect, and unblock subscriber credentials & portal standing', type: 'action' },
-      { key: 'system:manage_staff', label: 'Manage Staff Identities & Logins', desc: 'Provision staff accounts, edit profiles, suspend, or delete team members', type: 'action' },
-      { key: 'system:manage_roles', label: 'Configure Custom Roles & RBAC', desc: 'Create custom roles, edit permission matrix, and clone role policies', type: 'action' },
+      { key: 'system:manage_users', label: 'Manage Subscriber Accounts', desc: 'Provision, inspect, and unblock subscriber credentials & portal standing' },
+      { key: 'system:manage_staff', label: 'Manage Staff Identities & Logins', desc: 'Provision staff accounts, edit profiles, suspend, or delete team members' },
+      { key: 'system:manage_roles', label: 'Configure Custom Roles & RBAC', desc: 'Create custom roles, edit permission matrix, and clone role policies' },
     ],
   },
   {
     id: 9,
+    tabKey: 'settings',
     badge: '9',
     badgeClass: 'bg-rose-50 text-rose-700',
     title: 'Portal Settings Tab',
     subtitle: 'Organization branding, emergency lockout & system controls',
     toggleBgClass: 'peer-checked:bg-rose-600',
     items: [
-      { key: 'system:branding', label: 'Configure Organization Branding', desc: 'Customize company display title, tagline, and brand logo initials', type: 'action' },
-      { key: 'system:maintenance_mode', label: 'Toggle System Maintenance Lockout', desc: 'Emergency lockout of member passbook portal during critical maintenance', type: 'action' },
-      { key: 'system:reset_database', label: 'Factory Reset & Test Data Purge', desc: 'Purge test transactions, reset balances, and restore initial state', type: 'action' },
+      { key: 'system:branding', label: 'Configure Organization Branding', desc: 'Customize company display title, tagline, and brand logo initials' },
+      { key: 'system:maintenance_mode', label: 'Toggle System Maintenance Lockout', desc: 'Emergency lockout of member passbook portal during critical maintenance' },
+      { key: 'system:reset_database', label: 'Factory Reset & Test Data Purge', desc: 'Purge test transactions, reset balances, and restore initial state' },
     ],
   },
 ];
@@ -395,16 +401,29 @@ export default function RoleManagerPanel({
   // Select All Permissions
   const handleSelectAll = () => {
     if (activeRole?.id === 'admin') return;
-    const allTabs: string[] = [];
+    const allTabs = CATEGORIES.map((cat) => cat.tabKey);
     const allActs: string[] = [];
     CATEGORIES.forEach((cat) => {
       cat.items.forEach((item) => {
-        if (item.type === 'tab') allTabs.push(item.key);
-        else allActs.push(item.key);
+        allActs.push(item.key);
       });
     });
     setAllowedTabs(allTabs);
     setAllowedActions(allActs);
+  };
+
+  // Quick toggle all actions belonging to a specific tab
+  const toggleAllActionsInTab = (cat: PermissionCategory, enable: boolean) => {
+    if (activeRole?.id === 'admin') return;
+    const tabActionKeys = cat.items.map((i) => i.key);
+    setAllowedActions((prev) => {
+      if (enable) {
+        const merged = new Set([...prev, ...tabActionKeys]);
+        return Array.from(merged);
+      } else {
+        return prev.filter((k) => !tabActionKeys.includes(k as any));
+      }
+    });
   };
 
   // Deselect All Permissions
@@ -1090,66 +1109,142 @@ export default function RoleManagerPanel({
                 </div>
 
                 <div className="divide-y divide-slate-100 text-xs">
-                  {CATEGORIES.map((cat) => (
-                    <div key={cat.id} className="p-5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-6 h-6 rounded-lg ${cat.badgeClass} flex items-center justify-center font-bold text-xs font-display`}>
-                            {cat.badge}
+                  {CATEGORIES.map((cat) => {
+                    const isTabEnabled = activeRole?.id === 'admin' || allowedTabs.includes(cat.tabKey);
+                    const activeActionsCount = cat.items.filter((i) => allowedActions.includes(i.key)).length;
+
+                    return (
+                      <div key={cat.id} className="p-5 space-y-4">
+                        {/* Category Header with Master Tab Switch */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-xl ${cat.badgeClass} flex items-center justify-center font-bold text-sm font-display shrink-0`}>
+                              {cat.badge}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-display font-bold text-sm text-slate-900 tracking-tight">
+                                  {cat.title}
+                                </h4>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  isTabEnabled 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                                }`}>
+                                  {isTabEnabled ? `${activeActionsCount}/${cat.items.length} Actions Active` : 'Tab Hidden'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                {cat.subtitle}
+                              </p>
+                            </div>
                           </div>
-                          <h4 className="font-display font-bold text-xs text-slate-900 uppercase tracking-wider">
-                            {cat.title}
-                          </h4>
-                        </div>
-                        <span className="text-[11px] text-slate-400">
-                          {cat.subtitle}
-                        </span>
-                      </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-                        {cat.items.map((item) => {
-                          const isChecked =
-                            activeRole?.id === 'admin' ||
-                            (item.type === 'tab' ? allowedTabs.includes(item.key) : allowedActions.includes(item.key));
-
-                          return (
-                            <label
-                              key={item.key}
-                              className={`flex items-start justify-between p-3 rounded-xl border transition-colors cursor-pointer select-none ${
-                                isChecked
-                                  ? 'border-brand-200/80 bg-brand-50/20 hover:bg-brand-50/30'
-                                  : 'border-slate-200/80 bg-slate-50/40 hover:bg-slate-50'
-                              } ${activeRole?.id === 'admin' ? 'cursor-not-allowed opacity-90' : ''}`}
-                            >
-                              <div className="pr-2 min-w-0">
-                                <span className={`font-bold block text-xs truncate ${isChecked ? 'text-slate-900' : 'text-slate-800'}`}>
-                                  {item.label}
-                                </span>
-                                <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
-                                  {item.desc}
-                                </span>
-                              </div>
-                              <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
+                          {/* Master Tab Toggle Switch + Tab Quick Presets */}
+                          <div className="flex items-center gap-3 self-end sm:self-auto bg-slate-50 sm:bg-transparent p-2 sm:p-0 rounded-xl">
+                            {isTabEnabled && (
+                              <div className="flex items-center gap-1.5 mr-1 border-r border-slate-200 pr-3 hidden md:flex">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleAllActionsInTab(cat, true)}
                                   disabled={activeRole?.id === 'admin'}
-                                  onChange={() => {
-                                    if (item.type === 'tab') toggleTab(item.key);
-                                    else toggleAction(item.key);
-                                  }}
-                                  className="sr-only peer"
-                                />
-                                <div
-                                  className={`w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${cat.toggleBgClass}`}
-                                ></div>
+                                  className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer"
+                                >
+                                  Enable All
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleAllActionsInTab(cat, false)}
+                                  disabled={activeRole?.id === 'admin'}
+                                  className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer"
+                                >
+                                  Clear
+                                </button>
                               </div>
+                            )}
+
+                            <div className="text-right">
+                              <span className="text-xs font-bold block text-slate-800">
+                                {isTabEnabled ? 'Tab Access Enabled' : 'Tab Access Disabled'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 block">
+                                {isTabEnabled ? 'Visible in app navigation' : 'Hidden from staff navigation'}
+                              </span>
+                            </div>
+
+                            <label className="relative inline-flex items-center cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={isTabEnabled}
+                                disabled={activeRole?.id === 'admin'}
+                                onChange={() => toggleTab(cat.tabKey)}
+                                className="sr-only peer"
+                              />
+                              <div
+                                className={`w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${cat.toggleBgClass}`}
+                              ></div>
                             </label>
-                          );
-                        })}
+                          </div>
+                        </div>
+
+                        {/* Granular Permissions Section */}
+                        {isTabEnabled ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                            {cat.items.map((item) => {
+                              const isChecked = activeRole?.id === 'admin' || allowedActions.includes(item.key);
+                              return (
+                                <label
+                                  key={item.key}
+                                  className={`flex items-start justify-between p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                                    isChecked
+                                      ? 'border-brand-200/80 bg-brand-50/20 hover:bg-brand-50/30 shadow-2xs'
+                                      : 'border-slate-200/80 bg-slate-50/40 hover:bg-slate-50'
+                                  } ${activeRole?.id === 'admin' ? 'cursor-not-allowed opacity-90' : ''}`}
+                                >
+                                  <div className="pr-2 min-w-0">
+                                    <span className={`font-bold block text-xs truncate ${isChecked ? 'text-slate-900' : 'text-slate-800'}`}>
+                                      {item.label}
+                                    </span>
+                                    <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
+                                      {item.desc}
+                                    </span>
+                                  </div>
+                                  <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      disabled={activeRole?.id === 'admin'}
+                                      onChange={() => toggleAction(item.key)}
+                                      className="sr-only peer"
+                                    />
+                                    <div
+                                      className={`w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${cat.toggleBgClass}`}
+                                    ></div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          /* Collapsed / Informative Banner when Master Tab Toggle is Disabled */
+                          <div className="py-3.5 px-4 rounded-xl bg-slate-50/70 border border-dashed border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                            <div className="flex items-center gap-2.5">
+                              <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                              <span>This entire tab is <strong>hidden from navigation</strong> for {activeRole?.name}. Enable the master toggle above to display and configure granular permissions.</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleTab(cat.tabKey)}
+                              disabled={activeRole?.id === 'admin'}
+                              className="text-xs font-bold text-brand-600 hover:text-brand-700 hover:underline shrink-0 ml-3 cursor-pointer"
+                            >
+                              Enable Tab Access
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Footer Action Panel */}
@@ -1422,63 +1517,87 @@ export default function RoleManagerPanel({
 
           {/* Dynamic Categories Rendering (Matching Desktop & Native Mobile UX) */}
           {CATEGORIES.map((cat) => {
-            const allowedCount = cat.items.filter((i) =>
-              i.type === 'tab' ? allowedTabs.includes(i.key) : allowedActions.includes(i.key)
-            ).length;
+            const isTabEnabled = activeRole?.id === 'admin' || allowedTabs.includes(cat.tabKey);
+            const activeActionsCount = cat.items.filter((i) => allowedActions.includes(i.key)).length;
 
             return (
               <div key={cat.id} className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
-                <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-5 h-5 rounded-md ${cat.badgeClass} text-[10px] font-bold flex items-center justify-center font-display`}>
+                <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-6 h-6 rounded-md ${cat.badgeClass} text-[11px] font-bold flex items-center justify-center font-display shrink-0`}>
                       {cat.badge}
                     </span>
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{cat.title}</h3>
+                    <div className="min-w-0">
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider truncate">{cat.title}</h3>
+                      <span className={`text-[10px] font-semibold ${isTabEnabled ? 'text-emerald-700' : 'text-slate-400'}`}>
+                        {isTabEnabled ? `${activeActionsCount}/${cat.items.length} Active` : 'Tab Disabled'}
+                      </span>
+                    </div>
                   </div>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${allowedCount > 0 ? 'text-brand-600 bg-brand-50' : 'text-slate-400 bg-slate-100'}`}>
-                    {activeRole?.id === 'admin' ? `${cat.items.length} Allowed` : `${allowedCount}/${cat.items.length} Allowed`}
-                  </span>
+
+                  {/* Master Tab Switch */}
+                  <label className="relative inline-flex items-center cursor-pointer select-none shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={isTabEnabled}
+                      disabled={activeRole?.id === 'admin'}
+                      onChange={() => toggleTab(cat.tabKey)}
+                      className="sr-only peer"
+                    />
+                    <div
+                      className={`w-10 h-5.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all ${cat.toggleBgClass}`}
+                    ></div>
+                  </label>
                 </div>
-                <div className="divide-y divide-slate-100 text-xs">
-                  {cat.items.map((item) => {
-                    const isChecked =
-                      activeRole?.id === 'admin' ||
-                      (item.type === 'tab' ? allowedTabs.includes(item.key) : allowedActions.includes(item.key));
-                    return (
-                      <div
-                        key={item.key}
-                        onClick={() => {
-                          if (activeRole?.id !== 'admin') {
-                            if (item.type === 'tab') toggleTab(item.key);
-                            else toggleAction(item.key);
-                          }
-                        }}
-                        className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
-                          isChecked ? 'bg-brand-50/15' : ''
-                        }`}
-                      >
-                        <div className="pr-3 min-w-0">
-                          <span className={`font-bold block text-xs truncate ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>
-                            {item.label}
-                          </span>
-                          <span className="text-[11px] text-slate-400 block truncate mt-0.5">{item.desc}</span>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          disabled={activeRole?.id === 'admin'}
-                          onChange={() => {
-                            if (item.type === 'tab') toggleTab(item.key);
-                            else toggleAction(item.key);
+
+                {isTabEnabled ? (
+                  <div className="divide-y divide-slate-100 text-xs">
+                    {cat.items.map((item) => {
+                      const isChecked = activeRole?.id === 'admin' || allowedActions.includes(item.key);
+                      return (
+                        <div
+                          key={item.key}
+                          onClick={() => {
+                            if (activeRole?.id !== 'admin') {
+                              toggleAction(item.key);
+                            }
                           }}
-                          className={`w-4 h-4 rounded border-slate-300 focus:ring-brand-500 cursor-pointer shrink-0 ${
-                            activeRole?.id === 'admin' ? 'cursor-not-allowed text-brand-600 opacity-80' : 'text-brand-600'
+                          className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
+                            isChecked ? 'bg-brand-50/15' : ''
                           }`}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
+                        >
+                          <div className="pr-3 min-w-0">
+                            <span className={`font-bold block text-xs truncate ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>
+                              {item.label}
+                            </span>
+                            <span className="text-[11px] text-slate-400 block truncate mt-0.5">{item.desc}</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={activeRole?.id === 'admin'}
+                            onChange={() => toggleAction(item.key)}
+                            className={`w-4 h-4 rounded border-slate-300 focus:ring-brand-500 cursor-pointer shrink-0 ${
+                              activeRole?.id === 'admin' ? 'cursor-not-allowed text-brand-600 opacity-80' : 'text-brand-600'
+                            }`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-slate-50/50 flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="truncate">Tab navigation hidden for this role.</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleTab(cat.tabKey)}
+                      disabled={activeRole?.id === 'admin'}
+                      className="font-bold text-brand-600 ml-2 shrink-0 cursor-pointer"
+                    >
+                      Enable
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}

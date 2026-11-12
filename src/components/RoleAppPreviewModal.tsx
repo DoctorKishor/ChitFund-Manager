@@ -105,21 +105,39 @@ const ALL_TABS: { id: MainTabId; label: string; icon: any; desc: string }[] = [
   { id: 'settings', label: 'Portal Settings', icon: Settings, desc: 'Branding, security PIN policy & system configurations' },
 ];
 
+const CATEGORY_TAB_MAP: Record<string, MainTabId> = {
+  'Overview Dashboard': 'dashboard',
+  'Chits & Groups Tab': 'chits',
+  'Members Directory Tab': 'members',
+  'Auctions & Bidding Tab': 'auctions',
+  'Treasury Tab': 'cash',
+  'Reports & Analytics Tab': 'reports',
+  'Communication Tab': 'communication',
+  'Roles & Staff Tab': 'users',
+  'Portal Settings Tab': 'settings',
+};
+
 const ALL_ACTIONS: ActionMeta[] = [
-  // 1. Chits & Groups Tab (7 Actions)
+  // 1. Overview Dashboard (2 Actions)
+  { key: 'dashboard:view_kpis', label: 'View Financial KPIs & Reserves', desc: 'Inspect high-level cash collections, pool totals & active cycle targets', category: 'Overview Dashboard', icon: BarChart3 },
+  { key: 'dashboard:quick_actions', label: 'Access Dashboard Quick Actions', desc: 'Use floating and header quick action shortcuts for payments and spends', category: 'Overview Dashboard', icon: Sparkles },
+
+  // 2. Chits & Groups Tab (8 Actions)
   { key: 'chits:view', label: 'View Chit Schemes', desc: 'Inspect duration, pot totals, cycle history, and enrolled tickets', category: 'Chits & Groups Tab', icon: Briefcase },
   { key: 'chits:create', label: 'Create New Chit Schemes', desc: 'Launch ₹1L, ₹2L, ₹5L, ₹10L, ₹25L, or custom scheme groups', category: 'Chits & Groups Tab', icon: Plus },
   { key: 'chits:edit', label: 'Edit Scheme Rules & Caps', desc: 'Modify installment deadlines, maximum bid caps, and group parameters', category: 'Chits & Groups Tab', icon: Settings },
   { key: 'chits:launch_month0', label: 'Execute Month 0 Launch', desc: 'Confirm Launch Month collections and allocate Organizer Profit pool', category: 'Chits & Groups Tab', icon: Sparkles },
   { key: 'chits:reschedule_auction', label: 'Reschedule Auction Schedule', desc: 'Postpone or advance monthly auction dates and notify members', category: 'Chits & Groups Tab', icon: Calendar },
   { key: 'chits:configure_laaba_seetu', label: 'Configure Laaba Seetu Rules', desc: 'Set bonus profit discount threshold and pool rollover parameters', category: 'Chits & Groups Tab', icon: DollarSign },
+  { key: 'chits:swap_ticket', label: 'Swap / Substitute Member Tickets', desc: 'Transfer enrolled ticket allocations between members in active groups', category: 'Chits & Groups Tab', icon: ArrowRight },
   { key: 'chits:delete', label: 'Delete / Archive Schemes', desc: 'Permanently archive completed pools or delete draft chit schemes', category: 'Chits & Groups Tab', icon: Trash2 },
 
-  // 2. Members Directory Tab (11 Actions)
+  // 3. Members Directory Tab (12 Actions)
   { key: 'members:view', label: 'View Member Directory', desc: 'Search subscriber profiles, enrolled chits, and contact records', category: 'Members Directory Tab', icon: Users },
   { key: 'members:enroll', label: 'Enroll New Subscribers', desc: 'Register new member profiles and allocate chit scheme tickets', category: 'Members Directory Tab', icon: Plus },
   { key: 'members:edit', label: 'Edit Member Details', desc: 'Update subscriber phone numbers, addresses, and account notes', category: 'Members Directory Tab', icon: Settings },
   { key: 'members:collect', label: 'Collect Installment Payments', desc: 'Post cash, UPI, or bank installments and issue digital receipts', category: 'Members Directory Tab', icon: Coins },
+  { key: 'members:waive_penalties', label: 'Waive Fines & Adjust Dues', desc: 'Authorize manual penalty fee waivers and custom member installments', category: 'Members Directory Tab', icon: Sliders },
   { key: 'members:suspend', label: 'Suspend / Block Portal Access', desc: 'Lock subscriber passbook logins and disqualify from live auctions', category: 'Members Directory Tab', icon: Lock },
   { key: 'members:pair_qr', label: 'Pair Physical Passbook QR', desc: 'Camera scan and link printed QR codes to member passbooks', category: 'Members Directory Tab', icon: Zap },
   { key: 'members:revoke_qr', label: 'Revoke / Unlink Passbook QR', desc: 'Unpair lost or damaged passbook QR tokens from member profile', category: 'Members Directory Tab', icon: Undo2 },
@@ -128,16 +146,17 @@ const ALL_ACTIONS: ActionMeta[] = [
   { key: 'members:export', label: 'Export Member Directory CSV', desc: 'Download complete roster with phone numbers and ticket status', category: 'Members Directory Tab', icon: ArrowRight },
   { key: 'members:delete', label: 'Delete Subscriber Records', desc: 'Permanently deactivate or purge member profiles from registry', category: 'Members Directory Tab', icon: Trash2 },
 
-  // 3. Auctions & Bidding Tab (7 Actions)
+  // 4. Auctions & Bidding Tab (8 Actions)
   { key: 'auctions:view', label: 'View Live Auction Floor', desc: 'Monitor active countdowns, shouted bids, and prize pot values', category: 'Auctions & Bidding Tab', icon: Gavel },
   { key: 'auctions:conduct', label: 'Conduct & Moderate Sessions', desc: 'Start live countdown timer, accept shouts, and moderate bidding desk', category: 'Auctions & Bidding Tab', icon: Zap },
   { key: 'auctions:bid', label: 'Place Proxy Bids for Tickets', desc: 'Shout live discount bids on behalf of eligible non-winning subscribers', category: 'Auctions & Bidding Tab', icon: Plus },
   { key: 'auctions:conclude', label: 'Conclude Cycle & Advance Month', desc: 'Lock winning discount, calculate pot, and advance to next month cycle', category: 'Auctions & Bidding Tab', icon: CheckCircle2 },
   { key: 'auctions:override_floor', label: 'Override Floor / Bid Caps', desc: 'Administrative unlock of minimum floor bid or maximum discount limit', category: 'Auctions & Bidding Tab', icon: Sliders },
+  { key: 'auctions:edit_historical', label: 'Correct Historical Auction Logs', desc: 'Fix accidental bid amounts or winner ticket errors with audit logging', category: 'Auctions & Bidding Tab', icon: RotateCcw },
   { key: 'auctions:disburse', label: 'Authorize Prize Pot Payouts', desc: 'Disburse net prize pot to winning subscriber via bank or cash', category: 'Auctions & Bidding Tab', icon: Landmark },
   { key: 'auctions:issue_receipt', label: 'Issue Winner Payout Voucher', desc: 'Generate and print official prize pot payout settlement certificate', category: 'Auctions & Bidding Tab', icon: Check },
 
-  // 4. Treasury Tab (11 Actions)
+  // 5. Treasury Tab (12 Actions)
   { key: 'treasury:view', label: 'View Global Treasury', desc: 'Combined financial balances across all 4 operational vaults', category: 'Treasury Tab', icon: Vault },
   { key: 'treasury:view_cash_box', label: 'View Cash Box Drawer Balance', desc: 'Inspect physical cash-in-hand running balance and safe drawer', category: 'Treasury Tab', icon: Coins },
   { key: 'treasury:view_banks', label: 'View Private Bank Balances', desc: 'Inspect digital balances of Kishor Bank, Dad Bank, and Mom Bank', category: 'Treasury Tab', icon: Landmark },
@@ -148,9 +167,10 @@ const ALL_ACTIONS: ActionMeta[] = [
   { key: 'treasury:recover_float', label: 'Recover Agent Field Float', desc: 'Recover floating collections from ground collection agents into vault', category: 'Treasury Tab', icon: RotateCcw },
   { key: 'treasury:personal_draw', label: 'Record Petty Cash & Personal Draws', desc: 'Log expenses such as vehicle fuel, office maintenance, or admin draws', category: 'Treasury Tab', icon: DollarSign },
   { key: 'treasury:settle_draw', label: 'Settle & Repay Personal Debts', desc: 'Record repayment of personal advances and draws back into the vault', category: 'Treasury Tab', icon: Check },
+  { key: 'treasury:delete_transaction', label: 'Void / Reverse Financial Entries', desc: 'Authorize cancellation of erroneous transaction entries in vault ledger', category: 'Treasury Tab', icon: Trash2 },
   { key: 'treasury:reconcile', label: 'Denomination Note Count Audit', desc: 'Perform physical note counts (₹500, ₹200, ₹100, etc.) and lock audit', category: 'Treasury Tab', icon: Layers },
 
-  // 5. Reports & Analytics Tab (8 Actions)
+  // 6. Reports & Analytics Tab (8 Actions)
   { key: 'reports:view', label: 'View Reports & Analytics Center', desc: 'Access financial summaries, collection progress, and cycle velocity', category: 'Reports & Analytics Tab', icon: BarChart3 },
   { key: 'reports:view_pnl', label: 'View Financial P&L & Margins', desc: 'Inspect organizer profit revenue, active chit value, and gross yield', category: 'Reports & Analytics Tab', icon: DollarSign },
   { key: 'reports:export', label: 'Export General Reports', desc: 'Download CSV / Excel statements and ledger data for accounting audit', category: 'Reports & Analytics Tab', icon: ArrowRight },
@@ -160,7 +180,7 @@ const ALL_ACTIONS: ActionMeta[] = [
   { key: 'reports:view_audit_logs', label: 'Inspect Security Audit Logs', desc: 'Tamper-evident chronological ledger of all administrative mutations', category: 'Reports & Analytics Tab', icon: Shield },
   { key: 'reports:export_audit', label: 'Export Security Audit Trail', desc: 'Export full immutable audit event ledger as CSV spreadsheet or JSON', category: 'Reports & Analytics Tab', icon: ArrowRight },
 
-  // 6. Communication Tab (7 Actions)
+  // 7. Communication Tab (7 Actions)
   { key: 'communication:view', label: 'View Broadcast History & Logs', desc: 'Inspect WhatsApp delivery logs, timestamps, and subscriber replies', category: 'Communication Tab', icon: MessageSquare },
   { key: 'communication:broadcast', label: 'Dispatch Instant Payment Receipts', desc: 'Send automated WhatsApp transaction receipts immediately upon payment', category: 'Communication Tab', icon: Send },
   { key: 'communication:pre_auction', label: 'Broadcast Pre-Auction Notices', desc: 'Send upcoming auction schedules, date/time, and bidding instructions', category: 'Communication Tab', icon: Calendar },
@@ -169,12 +189,12 @@ const ALL_ACTIONS: ActionMeta[] = [
   { key: 'communication:custom', label: 'Compose Custom WhatsApp Broadcast', desc: 'Free-form manual WhatsApp message composing and dispatching', category: 'Communication Tab', icon: MessageSquare },
   { key: 'communication:manage_templates', label: 'Manage Message Templates', desc: 'Edit official Tamil and English WhatsApp alert message templates', category: 'Communication Tab', icon: Settings },
 
-  // 7. Roles & Staff Tab (3 Actions)
+  // 8. Roles & Staff Tab (3 Actions)
   { key: 'system:manage_users', label: 'Manage Subscriber Accounts', desc: 'Provision, inspect, and unblock subscriber credentials & portal standing', category: 'Roles & Staff Tab', icon: Users },
   { key: 'system:manage_staff', label: 'Manage Staff Identities & Logins', desc: 'Provision staff accounts, edit profiles, suspend, or delete team members', category: 'Roles & Staff Tab', icon: ShieldCheck },
   { key: 'system:manage_roles', label: 'Configure Custom Roles & RBAC', desc: 'Create custom roles, edit permission matrix, and clone role policies', category: 'Roles & Staff Tab', icon: Sliders },
 
-  // 8. Portal Settings Tab (3 Actions)
+  // 9. Portal Settings Tab (3 Actions)
   { key: 'system:branding', label: 'Configure Organization Branding', desc: 'Customize company display title, tagline, and brand logo initials', category: 'Portal Settings Tab', icon: Sparkles },
   { key: 'system:maintenance_mode', label: 'Toggle System Maintenance Lockout', desc: 'Emergency lockout of member passbook portal during critical maintenance', category: 'Portal Settings Tab', icon: Lock },
   { key: 'system:reset_database', label: 'Factory Reset & Test Data Purge', desc: 'Purge test transactions, reset balances, and restore initial state', category: 'Portal Settings Tab', icon: Trash2 },
@@ -1464,69 +1484,106 @@ export default function RoleAppPreviewModal({
                     {(inspectorFilter === 'all' || inspectorFilter === 'actions') && (
                       <div className="space-y-6">
                         {actionsByCategory.map(([category, items]) => {
+                          const tabId = CATEGORY_TAB_MAP[category];
+                          const isTabEnabled = tabId ? allowedTabs.includes(tabId) : true;
                           const enabledCount = items.filter((i) => allowedActions.includes(i.key)).length;
+
                           return (
                             <div key={category} className="space-y-2.5">
-                              <div className="flex items-center justify-between pb-1 border-b border-slate-800">
-                                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                                  {category}
-                                </span>
+                              <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                                    {category}
+                                  </span>
+                                  {tabId && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleTab(tabId)}
+                                      className={`text-[9px] font-bold px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                                        isTabEnabled
+                                          ? 'bg-emerald-950/70 text-emerald-300 border-emerald-700/60 hover:bg-emerald-900/60'
+                                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                                      }`}
+                                      title="Toggle master tab navigation visibility"
+                                    >
+                                      {isTabEnabled ? 'Tab Active' : 'Tab Hidden'}
+                                    </button>
+                                  )}
+                                </div>
                                 <span className="text-[10px] text-slate-500 font-mono">
                                   {enabledCount}/{items.length} active
                                 </span>
                               </div>
 
-                              <div className="space-y-2">
-                                {items.map((act) => {
-                                  const Icon = act.icon;
-                                  const isEnabled = allowedActions.includes(act.key);
-                                  return (
-                                    <div
-                                      key={act.key}
-                                      onClick={() => handleToggleAction(act.key)}
-                                      className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                                        isEnabled
-                                          ? 'bg-slate-950/40 border-slate-700/80 hover:border-brand-500/50'
-                                          : 'bg-slate-950/60 border-slate-850 opacity-50 hover:opacity-90'
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-2.5 min-w-0">
-                                        <div
-                                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                                            isEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'
-                                          }`}
-                                        >
-                                          <Icon size={14} />
-                                        </div>
-                                        <div className="min-w-0">
-                                          <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="text-xs font-bold text-white truncate">
-                                              {act.label}
-                                            </span>
-                                            <span className="text-[9px] font-mono text-slate-500">
-                                              {act.key}
-                                            </span>
-                                          </div>
-                                          <p className="text-[10px] text-slate-400 truncate mt-0.5">{act.desc}</p>
-                                        </div>
-                                      </div>
-
-                                      <button
-                                        type="button"
-                                        className={`w-8 h-4.5 rounded-full transition-colors relative shrink-0 p-0.5 ${
-                                          isEnabled ? 'bg-brand-600' : 'bg-slate-700'
+                              {isTabEnabled ? (
+                                <div className="space-y-2">
+                                  {items.map((act) => {
+                                    const Icon = act.icon;
+                                    const isEnabled = allowedActions.includes(act.key);
+                                    return (
+                                      <div
+                                        key={act.key}
+                                        onClick={() => handleToggleAction(act.key)}
+                                        className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                          isEnabled
+                                            ? 'bg-slate-950/40 border-slate-700/80 hover:border-brand-500/50'
+                                            : 'bg-slate-950/60 border-slate-850 opacity-50 hover:opacity-90'
                                         }`}
                                       >
-                                        <div
-                                          className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${
-                                            isEnabled ? 'translate-x-3.5' : 'translate-x-0'
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <div
+                                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                              isEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'
+                                            }`}
+                                          >
+                                            <Icon size={14} />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <span className="text-xs font-bold text-white truncate">
+                                                {act.label}
+                                              </span>
+                                              <span className="text-[9px] font-mono text-slate-500">
+                                                {act.key}
+                                              </span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 truncate mt-0.5">{act.desc}</p>
+                                          </div>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          className={`w-8 h-4.5 rounded-full transition-colors relative shrink-0 p-0.5 ${
+                                            isEnabled ? 'bg-brand-600' : 'bg-slate-700'
                                           }`}
-                                        />
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                                        >
+                                          <div
+                                            className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${
+                                              isEnabled ? 'translate-x-3.5' : 'translate-x-0'
+                                            }`}
+                                          />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="p-3 rounded-xl bg-slate-950/70 border border-dashed border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Lock size={13} className="text-slate-500 shrink-0" />
+                                    <span className="truncate">Tab navigation hidden. Enable tab above to unlock.</span>
+                                  </div>
+                                  {tabId && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleTab(tabId)}
+                                      className="text-[11px] font-bold text-brand-400 hover:text-brand-300 shrink-0 ml-2 cursor-pointer"
+                                    >
+                                      Enable
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           );
                         })}

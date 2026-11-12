@@ -13,11 +13,16 @@ export type MainTabId =
   | 'settings';
 
 export type PermissionAction =
+  // ── Overview & Dashboard Controls ──
+  | 'dashboard:view_kpis'
+  | 'dashboard:quick_actions'
+
   // ── Member & Passbook Logistics ──
   | 'members:view'
   | 'members:enroll'
   | 'members:edit'
   | 'members:collect'
+  | 'members:waive_penalties'
   | 'members:suspend'
   | 'members:pair_qr'
   | 'members:revoke_qr'
@@ -33,6 +38,7 @@ export type PermissionAction =
   | 'chits:launch_month0'
   | 'chits:reschedule_auction'
   | 'chits:configure_laaba_seetu'
+  | 'chits:swap_ticket'
   | 'chits:delete'
 
   // ── Live Floor Auctions & Bidding Engine ──
@@ -41,6 +47,7 @@ export type PermissionAction =
   | 'auctions:bid'
   | 'auctions:conclude'
   | 'auctions:override_floor'
+  | 'auctions:edit_historical'
   | 'auctions:disburse'
   | 'auctions:issue_receipt'
 
@@ -55,6 +62,7 @@ export type PermissionAction =
   | 'treasury:recover_float'
   | 'treasury:personal_draw'
   | 'treasury:settle_draw'
+  | 'treasury:delete_transaction'
   | 'treasury:reconcile'
 
   // ── Communication & WhatsApp Broadcaster ──
@@ -129,11 +137,16 @@ export const TREASURY_SUBTAB_PERMISSIONS: Record<CashHandlingSubtab, string[]> =
  * Granular Action Permission Matrix by Default System Role
  */
 export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
+  // ── Overview & Dashboard Controls ──
+  'dashboard:view_kpis': ['admin', 'manager', 'auditor'],
+  'dashboard:quick_actions': ['admin', 'manager', 'collections_agent'],
+
   // ── Member & Passbook Logistics ──
   'members:view': ['admin', 'manager', 'collections_agent', 'auditor', 'subscriber'],
   'members:enroll': ['admin', 'manager'],
   'members:edit': ['admin', 'manager'],
   'members:collect': ['admin', 'manager', 'collections_agent'],
+  'members:waive_penalties': ['admin'],
   'members:suspend': ['admin', 'manager'],
   'members:pair_qr': ['admin', 'manager', 'collections_agent'],
   'members:revoke_qr': ['admin', 'manager'],
@@ -149,6 +162,7 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
   'chits:launch_month0': ['admin'],
   'chits:reschedule_auction': ['admin', 'manager'],
   'chits:configure_laaba_seetu': ['admin'],
+  'chits:swap_ticket': ['admin', 'manager'],
   'chits:delete': ['admin'],
 
   // ── Live Floor Auctions & Bidding Engine ──
@@ -157,6 +171,7 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
   'auctions:bid': ['admin', 'manager', 'auction_clerk', 'subscriber'],
   'auctions:conclude': ['admin', 'manager'],
   'auctions:override_floor': ['admin'],
+  'auctions:edit_historical': ['admin'],
   'auctions:disburse': ['admin', 'manager'],
   'auctions:issue_receipt': ['admin', 'manager', 'auction_clerk'],
 
@@ -171,6 +186,7 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
   'treasury:recover_float': ['admin', 'manager'],
   'treasury:personal_draw': ['admin'],
   'treasury:settle_draw': ['admin'],
+  'treasury:delete_transaction': ['admin'],
   'treasury:reconcile': ['admin'],
 
   // ── Communication & WhatsApp Broadcaster ──
