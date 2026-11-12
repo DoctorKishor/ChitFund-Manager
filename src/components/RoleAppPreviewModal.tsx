@@ -929,11 +929,11 @@ export default function RoleAppPreviewModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-2 md:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
-      <div className="relative w-full h-full max-w-[1760px] bg-slate-900 border border-slate-700/80 rounded-none sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100 font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-2 md:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none">
+      <div className="relative w-full h-full max-w-[1760px] bg-slate-50 border border-slate-200/90 rounded-none sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-800 font-sans">
         
         {/* ── TOP COCKPIT BAR: Tool Switcher, Role Selector, Device Viewport, Save Controls ── */}
-        <header className="px-3 sm:px-6 py-2.5 sm:py-0 sm:h-16 bg-slate-950/95 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between shrink-0 z-30 gap-2.5 sm:gap-3">
+        <header className="px-3 sm:px-6 py-2 sm:py-0 sm:h-16 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between shrink-0 z-30 gap-2 sm:gap-3">
           
           {/* Row 1 on mobile / Left on desktop: Brand Logo, Role Badge & Primary Actions */}
           <div className="flex items-center justify-between w-full sm:w-auto gap-3">
@@ -944,14 +944,14 @@ export default function RoleAppPreviewModal({
 
               <div className="flex flex-col min-w-0 mr-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-xs sm:text-sm text-white tracking-tight truncate">
+                  <span className="font-bold text-xs sm:text-sm text-slate-900 tracking-tight truncate">
                     Role Simulator
                   </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-500/15 text-brand-300 border border-brand-500/30 truncate">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-50 text-brand-700 border border-brand-200/80 truncate">
                     {activeRole?.name || 'Staff'}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 hidden sm:block truncate">
+                <p className="text-[10px] text-slate-500 hidden sm:block truncate">
                   Interactive Android &amp; Desktop UI preview
                 </p>
               </div>
@@ -964,13 +964,13 @@ export default function RoleAppPreviewModal({
                 onClick={() => setIsInspectorOpen((prev) => !prev)}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   isInspectorOpen
-                    ? 'bg-brand-600 text-white shadow-xs'
-                    : 'bg-slate-800 border border-slate-700 text-slate-300 hover:text-white'
+                    ? 'bg-brand-50 border border-brand-200 text-brand-700 shadow-2xs'
+                    : 'bg-slate-100 border border-slate-200/80 text-slate-700 hover:bg-slate-200'
                 }`}
                 title="Toggle Controls Inspector"
               >
                 <Sliders size={12} />
-                <span>Controls</span>
+                <span>Inspector</span>
                 {totalHiddenCount > 0 && (
                   <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500 text-white font-mono">
                     {totalHiddenCount}
@@ -982,7 +982,7 @@ export default function RoleAppPreviewModal({
                 type="button"
                 onClick={handleSaveAndBroadcast}
                 disabled={isSaving}
-                className="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-bold shadow-xs active:scale-95"
+                className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold shadow-2xs active:scale-95 cursor-pointer"
               >
                 {isSaving ? '...' : saveSuccess ? '✓' : 'Save'}
               </button>
@@ -990,7 +990,7 @@ export default function RoleAppPreviewModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 cursor-pointer"
                 aria-label="Close"
               >
                 <X size={15} />
@@ -1001,7 +1001,7 @@ export default function RoleAppPreviewModal({
           {/* Row 2 on mobile / Center on desktop: Canvas Tools & Viewport Toggles */}
           <div className="flex items-center justify-between sm:justify-start gap-2 overflow-x-auto scrollbar-none w-full sm:w-auto pb-0.5 sm:pb-0">
             {/* Viewport Device Switcher */}
-            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl p-0.5 shrink-0">
+            <div className="flex items-center bg-slate-100 border border-slate-200/80 rounded-xl p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -1010,8 +1010,8 @@ export default function RoleAppPreviewModal({
                 }}
                 className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewportMode === 'mobile'
-                    ? 'bg-brand-600 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-white text-brand-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
                 title="Android Smartphone Viewport"
               >
@@ -1027,8 +1027,8 @@ export default function RoleAppPreviewModal({
                 }}
                 className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewportMode === 'desktop'
-                    ? 'bg-brand-600 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-white text-brand-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
                 title="Desktop View (Full Width)"
               >
@@ -1038,7 +1038,7 @@ export default function RoleAppPreviewModal({
             </div>
 
             {/* Mode Switcher: Navigate vs Inspect */}
-            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl p-0.5 shrink-0">
+            <div className="flex items-center bg-slate-100 border border-slate-200/80 rounded-xl p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -1047,8 +1047,8 @@ export default function RoleAppPreviewModal({
                 }}
                 className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   canvasTool === 'navigate'
-                    ? 'bg-brand-600 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-white text-emerald-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
                 title="Navigate & Test Live App Mode"
               >
@@ -1064,8 +1064,8 @@ export default function RoleAppPreviewModal({
                 }}
                 className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   canvasTool === 'inspect'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-purple-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
                 title="Select & Edit Component Mode"
               >
@@ -1075,18 +1075,18 @@ export default function RoleAppPreviewModal({
             </div>
 
             {/* Role Switcher Dropdown */}
-            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1 shrink-0">
-              <span className="text-[11px] text-slate-400 font-medium mr-1 hidden lg:inline">Role:</span>
+            <div className="flex items-center bg-slate-100 border border-slate-200/80 rounded-xl px-2.5 py-1 shrink-0">
+              <span className="text-[11px] text-slate-500 font-medium mr-1 hidden lg:inline">Role:</span>
               <select
                 value={selectedRoleId}
                 onChange={(e) => {
                   setSelectedRoleId(e.target.value);
                   triggerHapticFeedback('light');
                 }}
-                className="bg-transparent text-xs font-bold text-brand-300 focus:outline-none cursor-pointer pr-1"
+                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer pr-1"
               >
                 {allRoles.map((r) => (
-                  <option key={r.id} value={r.id} className="bg-slate-900 text-white">
+                  <option key={r.id} value={r.id} className="bg-white text-slate-900">
                     {r.name} {r.is_system ? '(System)' : '(Custom)'}
                   </option>
                 ))}
@@ -1101,8 +1101,8 @@ export default function RoleAppPreviewModal({
               onClick={() => setIsInspectorOpen((prev) => !prev)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                 isInspectorOpen
-                  ? 'bg-brand-500/15 border-brand-500/40 text-brand-300'
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                  ? 'bg-brand-50 border-brand-200 text-brand-700 shadow-2xs'
+                  : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/80'
               }`}
               title="Toggle Controls Inspector"
             >
@@ -1119,10 +1119,10 @@ export default function RoleAppPreviewModal({
               type="button"
               onClick={handleSaveAndBroadcast}
               disabled={isSaving}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer ${
                 saveSuccess
                   ? 'bg-emerald-600 text-white'
-                  : 'bg-brand-600 hover:bg-brand-500 active:scale-95 text-white shadow-brand-500/25'
+                  : 'bg-brand-600 hover:bg-brand-700 active:scale-95 text-white shadow-brand-500/25'
               }`}
             >
               {isSaving ? (
@@ -1143,7 +1143,7 @@ export default function RoleAppPreviewModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer ml-1"
+              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer ml-1"
               aria-label="Close Preview"
             >
               <X size={16} />
@@ -1152,31 +1152,14 @@ export default function RoleAppPreviewModal({
         </header>
 
         {/* ── MAIN WORKSPACE: Live App Canvas (Center) + Inspector Panel (Right) ── */}
-        <div className="flex-1 flex min-h-0 relative overflow-hidden bg-slate-950">
+        <div className="flex-1 flex min-h-0 relative overflow-hidden bg-slate-100/70">
           
           {/* 1. APP CANVAS AREA */}
-          <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 md:p-6 overflow-auto bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] relative">
+          <div className="flex-1 flex flex-col items-center justify-center p-1 sm:p-4 md:p-6 overflow-auto bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] relative">
             
-            {/* Quick Canvas Mode Indicator Banner */}
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-full px-3.5 py-1 text-xs flex items-center gap-2 shadow-lg select-none">
-              {canvasTool === 'inspect' ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
-                  <span className="text-purple-300 font-bold">Select &amp; Edit Mode:</span>
-                  <span className="text-slate-300 text-[11px]">Hover over any button or section to highlight and click to turn on/off</span>
-                </>
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span className="text-emerald-300 font-bold">Navigate &amp; Test Mode:</span>
-                  <span className="text-slate-300 text-[11px]">Interact with the live application exactly as field staff</span>
-                </>
-              )}
-            </div>
-
             {/* DESKTOP FRAME */}
             {viewportMode === 'desktop' && (
-              <div className="w-full h-full max-h-[880px] bg-white rounded-2xl shadow-2xl border border-slate-700 flex flex-col overflow-hidden relative">
+              <div className="w-full h-full max-h-[880px] bg-white rounded-2xl shadow-xl border border-slate-200/90 flex flex-col overflow-hidden relative">
                 
                 {/* Desktop Window Titlebar */}
                 <div className="h-9 bg-slate-100 border-b border-slate-200/90 px-4 flex items-center justify-between shrink-0 select-none">
@@ -1418,25 +1401,25 @@ export default function RoleAppPreviewModal({
             <>
               {/* Mobile Backdrop Overlay */}
               <div
-                className="fixed inset-0 bg-black/70 backdrop-blur-xs z-40 md:hidden animate-in fade-in duration-200"
+                className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 md:hidden animate-in fade-in duration-200"
                 onClick={() => setIsInspectorOpen(false)}
               />
 
-              <aside className="fixed inset-x-0 bottom-0 max-h-[84vh] md:static md:w-[440px] md:max-h-none bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 rounded-t-3xl md:rounded-none flex flex-col shrink-0 z-50 md:z-30 shadow-2xl overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-right duration-200">
+              <aside className="fixed inset-x-0 bottom-0 h-[82vh] md:h-auto md:static md:w-[440px] bg-white border-t md:border-t-0 md:border-l border-slate-200 rounded-t-3xl md:rounded-none flex flex-col shrink-0 z-50 md:z-30 shadow-2xl md:shadow-none overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-right duration-200 text-slate-800">
                 {/* Android Drag Handle Pill (Mobile only) */}
-                <div className="pt-2.5 pb-1 md:hidden flex justify-center shrink-0 bg-slate-950/80">
-                  <div className="w-12 h-1 bg-slate-700 rounded-full" />
+                <div className="pt-2.5 pb-1 md:hidden flex justify-center shrink-0 bg-slate-50">
+                  <div className="w-12 h-1 bg-slate-300 rounded-full" />
                 </div>
 
                 {/* Inspector Header with Subtabs */}
-                <div className="p-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/70">
+                <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center font-bold text-xs">
+                    <div className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-xs">
                       <Sliders size={14} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-sm text-white">Controls Inspector</h3>
-                      <p className="text-[11px] text-slate-400">Live app permission &amp; component state</p>
+                      <h3 className="font-bold text-sm text-slate-900">Controls Inspector</h3>
+                      <p className="text-[11px] text-slate-500">Live app permission &amp; component state</p>
                     </div>
                   </div>
 
@@ -1444,7 +1427,7 @@ export default function RoleAppPreviewModal({
                     <button
                       type="button"
                       onClick={handleResetToDatabase}
-                      className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white transition-colors cursor-pointer"
+                      className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
                       title="Revert to database values"
                     >
                       <RotateCcw size={11} />
@@ -1454,7 +1437,7 @@ export default function RoleAppPreviewModal({
                     <button
                       type="button"
                       onClick={() => setIsInspectorOpen(false)}
-                      className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white md:hidden ml-1"
+                      className="p-1 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-800 md:hidden ml-1 cursor-pointer"
                       aria-label="Close Inspector"
                     >
                       <X size={15} />
@@ -1462,417 +1445,419 @@ export default function RoleAppPreviewModal({
                   </div>
                 </div>
 
-              {/* Inspector Subtabs: All Controls vs Hidden Components */}
-              <div className="px-4 pt-3 pb-2 border-b border-slate-800 flex items-center gap-2 bg-slate-950/40">
-                <button
-                  type="button"
-                  onClick={() => setInspectorSubtab('controls')}
-                  className={`flex-1 py-1.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    inspectorSubtab === 'controls'
-                      ? 'bg-brand-600 text-white shadow-xs'
-                      : 'bg-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Sliders size={13} />
-                  <span>All Controls</span>
-                </button>
+                {/* Inspector Subtabs: All Controls vs Hidden Components */}
+                <div className="px-3 sm:px-4 pt-2.5 pb-2 border-b border-slate-100 flex items-center gap-2 bg-slate-50/70">
+                  <button
+                    type="button"
+                    onClick={() => setInspectorSubtab('controls')}
+                    className={`flex-1 py-1.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      inspectorSubtab === 'controls'
+                        ? 'bg-white text-brand-700 shadow-2xs border border-slate-200/80'
+                        : 'bg-slate-100/90 text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Sliders size={13} />
+                    <span>All Controls</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setInspectorSubtab('hidden')}
-                  className={`flex-1 py-1.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    inspectorSubtab === 'hidden'
-                      ? 'bg-rose-600 text-white shadow-xs'
-                      : 'bg-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <EyeOff size={13} />
-                  <span>Hidden Components</span>
-                  {totalHiddenCount > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-950 text-rose-200 font-mono font-bold">
-                      {totalHiddenCount}
-                    </span>
-                  )}
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setInspectorSubtab('hidden')}
+                    className={`flex-1 py-1.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      inspectorSubtab === 'hidden'
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200/80 shadow-2xs'
+                        : 'bg-slate-100/90 text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <EyeOff size={13} />
+                    <span>Hidden Components</span>
+                    {totalHiddenCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-rose-700 font-mono font-bold">
+                        {totalHiddenCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
 
-              {/* ── SUBTAB 1: ALL CONTROLS & TOGGLE SWITCHES ── */}
-              {inspectorSubtab === 'controls' && (
-                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                  {/* Filter Pills & Search */}
-                  <div className="p-3 border-b border-slate-800 space-y-2 bg-slate-900 shrink-0">
-                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setInspectorFilter('all')}
-                        className={`flex-1 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
-                          inspectorFilter === 'all' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        All ({ALL_TABS.length + ALL_ACTIONS.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setInspectorFilter('tabs')}
-                        className={`flex-1 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
-                          inspectorFilter === 'tabs' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        Tabs ({allowedTabs.length}/{ALL_TABS.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setInspectorFilter('actions')}
-                        className={`flex-1 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
-                          inspectorFilter === 'actions' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        Actions ({allowedActions.length}/{ALL_ACTIONS.length})
-                      </button>
+                {/* ── SUBTAB 1: ALL CONTROLS & TOGGLE SWITCHES ── */}
+                {inspectorSubtab === 'controls' && (
+                  <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50/30">
+                    {/* Filter Pills & Search */}
+                    <div className="p-3 border-b border-slate-100 space-y-2 bg-white shrink-0">
+                      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setInspectorFilter('all')}
+                          className={`flex-1 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
+                            inspectorFilter === 'all' ? 'bg-white text-brand-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          All ({ALL_TABS.length + ALL_ACTIONS.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setInspectorFilter('tabs')}
+                          className={`flex-1 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
+                            inspectorFilter === 'tabs' ? 'bg-white text-brand-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Tabs ({allowedTabs.length}/{ALL_TABS.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setInspectorFilter('actions')}
+                          className={`flex-1 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
+                            inspectorFilter === 'actions' ? 'bg-white text-brand-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Actions ({allowedActions.length}/{ALL_ACTIONS.length})
+                        </button>
+                      </div>
+
+                      <div className="relative">
+                        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search buttons, tabs or actions..."
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 shadow-2xs"
+                        />
+                      </div>
                     </div>
 
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search buttons, tabs or actions..."
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
-                    />
-                  </div>
+                    {/* Scrollable List of Toggle Switches */}
+                    <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-5">
+                      
+                      {/* Primary Tabs Section */}
+                      {(inspectorFilter === 'all' || inspectorFilter === 'tabs') && (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between pb-1 border-b border-slate-200/80">
+                            <span className="text-xs font-bold text-brand-700 uppercase tracking-wider flex items-center gap-1.5">
+                              <Layers size={13} />
+                              Primary Screen Tabs
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {allowedTabs.length} of {ALL_TABS.length} enabled
+                            </span>
+                          </div>
 
-                  {/* Scrollable List of Toggle Switches */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                    
-                    {/* Primary Tabs Section */}
-                    {(inspectorFilter === 'all' || inspectorFilter === 'tabs') && (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between pb-1 border-b border-slate-800">
-                          <span className="text-xs font-bold text-brand-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <Layers size={13} />
-                            Primary Screen Tabs
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            {allowedTabs.length} of {ALL_TABS.length} enabled
-                          </span>
-                        </div>
-
-                        <div className="space-y-2">
-                          {ALL_TABS.filter((t) =>
-                            t.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            t.desc.toLowerCase().includes(searchQuery.toLowerCase())
-                          ).map((tab) => {
-                            const Icon = tab.icon;
-                            const isEnabled = allowedTabs.includes(tab.id);
-                            return (
-                              <div
-                                key={tab.id}
-                                onClick={() => handleToggleTab(tab.id)}
-                                className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                                  isEnabled
-                                    ? 'bg-brand-950/30 border-brand-500/40 hover:bg-brand-950/50'
-                                    : 'bg-slate-950/60 border-slate-800/80 opacity-60 hover:opacity-100'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div
-                                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                                      isEnabled ? 'bg-brand-500/20 text-brand-400' : 'bg-slate-800 text-slate-500'
-                                    }`}
-                                  >
-                                    <Icon size={16} />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <span className="text-xs font-bold text-white block truncate">
-                                      {tab.label}
-                                    </span>
-                                    <p className="text-[10px] text-slate-400 truncate">{tab.desc}</p>
-                                  </div>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  className={`w-9 h-5 rounded-full transition-colors relative shrink-0 p-0.5 ${
-                                    isEnabled ? 'bg-brand-600' : 'bg-slate-700'
+                          <div className="space-y-2">
+                            {ALL_TABS.filter((t) =>
+                              t.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              t.desc.toLowerCase().includes(searchQuery.toLowerCase())
+                            ).map((tab) => {
+                              const Icon = tab.icon;
+                              const isEnabled = allowedTabs.includes(tab.id);
+                              return (
+                                <div
+                                  key={tab.id}
+                                  onClick={() => handleToggleTab(tab.id)}
+                                  className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                    isEnabled
+                                      ? 'bg-white border-slate-200/90 hover:border-brand-300 shadow-2xs'
+                                      : 'bg-slate-50/80 border-slate-200/60 opacity-60 hover:opacity-100'
                                   }`}
                                 >
-                                  <div
-                                    className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                                      isEnabled ? 'translate-x-4' : 'translate-x-0'
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div
+                                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                        isEnabled ? 'bg-brand-50 text-brand-600' : 'bg-slate-100 text-slate-400'
+                                      }`}
+                                    >
+                                      <Icon size={16} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className={`text-xs font-bold block truncate ${isEnabled ? 'text-slate-900' : 'text-slate-600'}`}>
+                                        {tab.label}
+                                      </span>
+                                      <p className="text-[10px] text-slate-500 truncate">{tab.desc}</p>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    className={`w-9 h-5 rounded-full transition-colors relative shrink-0 p-0.5 ${
+                                      isEnabled ? 'bg-brand-600' : 'bg-slate-200'
                                     }`}
-                                  />
-                                </button>
+                                  >
+                                    <div
+                                      className={`w-4 h-4 rounded-full bg-white shadow-xs transition-transform ${
+                                        isEnabled ? 'translate-x-4' : 'translate-x-0'
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Categorized Action Permissions Section */}
+                      {(inspectorFilter === 'all' || inspectorFilter === 'actions') && (
+                        <div className="space-y-5">
+                          {actionsByCategory.map(([category, items]) => {
+                            const tabId = CATEGORY_TAB_MAP[category];
+                            const isTabEnabled = tabId ? allowedTabs.includes(tabId) : true;
+                            const enabledCount = items.filter((i) => allowedActions.includes(i.key)).length;
+
+                            return (
+                              <div key={category} className="space-y-2">
+                                <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/80">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                      {category}
+                                    </span>
+                                    {tabId && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleTab(tabId)}
+                                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                                          isTabEnabled
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100'
+                                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                                        }`}
+                                        title="Toggle master tab navigation visibility"
+                                      >
+                                        {isTabEnabled ? 'Tab Active' : 'Tab Hidden'}
+                                      </button>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 font-mono">
+                                    {enabledCount}/{items.length} active
+                                  </span>
+                                </div>
+
+                                {isTabEnabled ? (
+                                  <div className="space-y-1.5">
+                                    {items.map((act) => {
+                                      const Icon = act.icon;
+                                      const isEnabled = allowedActions.includes(act.key);
+                                      return (
+                                        <div
+                                          key={act.key}
+                                          onClick={() => handleToggleAction(act.key)}
+                                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                            isEnabled
+                                              ? 'bg-white border-slate-200/90 hover:border-brand-300 shadow-2xs'
+                                              : 'bg-slate-50/80 border-slate-200/60 opacity-60 hover:opacity-100'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2.5 min-w-0">
+                                            <div
+                                              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                                isEnabled ? 'bg-indigo-50 text-brand-600' : 'bg-slate-100 text-slate-400'
+                                              }`}
+                                            >
+                                              <Icon size={14} />
+                                            </div>
+                                            <div className="min-w-0">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className={`text-xs font-bold truncate ${isEnabled ? 'text-slate-900' : 'text-slate-600'}`}>
+                                                  {act.label}
+                                                </span>
+                                                <span className="text-[9px] font-mono text-slate-400">
+                                                  {act.key}
+                                                </span>
+                                              </div>
+                                              <p className="text-[10px] text-slate-500 truncate mt-0.5">{act.desc}</p>
+                                            </div>
+                                          </div>
+
+                                          <button
+                                            type="button"
+                                            className={`w-8 h-4.5 rounded-full transition-colors relative shrink-0 p-0.5 ${
+                                              isEnabled ? 'bg-brand-600' : 'bg-slate-200'
+                                            }`}
+                                          >
+                                            <div
+                                              className={`w-3.5 h-3.5 rounded-full bg-white shadow-xs transition-transform ${
+                                                isEnabled ? 'translate-x-3.5' : 'translate-x-0'
+                                              }`}
+                                            />
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="p-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-xs text-slate-500 flex items-center justify-between">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <Lock size={13} className="text-slate-400 shrink-0" />
+                                      <span className="truncate">Tab navigation hidden. Enable tab above to unlock.</span>
+                                    </div>
+                                    {tabId && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleTab(tabId)}
+                                        className="text-[11px] font-bold text-brand-600 hover:text-brand-700 shrink-0 ml-2 cursor-pointer"
+                                      >
+                                        Enable
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Categorized Action Permissions Section */}
-                    {(inspectorFilter === 'all' || inspectorFilter === 'actions') && (
-                      <div className="space-y-6">
-                        {actionsByCategory.map(([category, items]) => {
-                          const tabId = CATEGORY_TAB_MAP[category];
-                          const isTabEnabled = tabId ? allowedTabs.includes(tabId) : true;
-                          const enabledCount = items.filter((i) => allowedActions.includes(i.key)).length;
-
-                          return (
-                            <div key={category} className="space-y-2.5">
-                              <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                                    {category}
-                                  </span>
-                                  {tabId && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleTab(tabId)}
-                                      className={`text-[9px] font-bold px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
-                                        isTabEnabled
-                                          ? 'bg-emerald-950/70 text-emerald-300 border-emerald-700/60 hover:bg-emerald-900/60'
-                                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
-                                      }`}
-                                      title="Toggle master tab navigation visibility"
-                                    >
-                                      {isTabEnabled ? 'Tab Active' : 'Tab Hidden'}
-                                    </button>
-                                  )}
-                                </div>
-                                <span className="text-[10px] text-slate-500 font-mono">
-                                  {enabledCount}/{items.length} active
-                                </span>
-                              </div>
-
-                              {isTabEnabled ? (
-                                <div className="space-y-2">
-                                  {items.map((act) => {
-                                    const Icon = act.icon;
-                                    const isEnabled = allowedActions.includes(act.key);
-                                    return (
-                                      <div
-                                        key={act.key}
-                                        onClick={() => handleToggleAction(act.key)}
-                                        className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                                          isEnabled
-                                            ? 'bg-slate-950/40 border-slate-700/80 hover:border-brand-500/50'
-                                            : 'bg-slate-950/60 border-slate-850 opacity-50 hover:opacity-90'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-2.5 min-w-0">
-                                          <div
-                                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                                              isEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'
-                                            }`}
-                                          >
-                                            <Icon size={14} />
-                                          </div>
-                                          <div className="min-w-0">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                              <span className="text-xs font-bold text-white truncate">
-                                                {act.label}
-                                              </span>
-                                              <span className="text-[9px] font-mono text-slate-500">
-                                                {act.key}
-                                              </span>
-                                            </div>
-                                            <p className="text-[10px] text-slate-400 truncate mt-0.5">{act.desc}</p>
-                                          </div>
-                                        </div>
-
-                                        <button
-                                          type="button"
-                                          className={`w-8 h-4.5 rounded-full transition-colors relative shrink-0 p-0.5 ${
-                                            isEnabled ? 'bg-brand-600' : 'bg-slate-700'
-                                          }`}
-                                        >
-                                          <div
-                                            className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${
-                                              isEnabled ? 'translate-x-3.5' : 'translate-x-0'
-                                            }`}
-                                          />
-                                        </button>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <div className="p-3 rounded-xl bg-slate-950/70 border border-dashed border-slate-800 text-xs text-slate-400 flex items-center justify-between">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <Lock size={13} className="text-slate-500 shrink-0" />
-                                    <span className="truncate">Tab navigation hidden. Enable tab above to unlock.</span>
-                                  </div>
-                                  {tabId && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleTab(tabId)}
-                                      className="text-[11px] font-bold text-brand-400 hover:text-brand-300 shrink-0 ml-2 cursor-pointer"
-                                    >
-                                      Enable
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* ── SUBTAB 2: DEDICATED HIDDEN COMPONENTS & RESTORE LIST ── */}
-              {inspectorSubtab === 'hidden' && (
-                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                  
-                  {/* Top Action Bar: Restore All */}
-                  <div className="p-3 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between shrink-0">
-                    <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
-                      <EyeOff size={13} />
-                      {totalHiddenCount} Component{totalHiddenCount === 1 ? '' : 's'} Disabled
-                    </span>
-
-                    {totalHiddenCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleRestoreAllComponents}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                        title="Re-enable all tabs and action permissions"
-                      >
-                        <RotateCcw size={11} />
-                        <span>Restore All</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* List of Turned-Off / Hidden Elements */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* ── SUBTAB 2: DEDICATED HIDDEN COMPONENTS & RESTORE LIST ── */}
+                {inspectorSubtab === 'hidden' && (
+                  <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50/30">
                     
-                    {totalHiddenCount === 0 ? (
-                      <div className="text-center py-16 px-4 space-y-3">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto">
-                          <ShieldCheck size={24} />
+                    {/* Top Action Bar: Restore All */}
+                    <div className="p-3 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
+                      <span className="text-xs font-bold text-rose-600 flex items-center gap-1.5">
+                        <EyeOff size={13} />
+                        {totalHiddenCount} Component{totalHiddenCount === 1 ? '' : 's'} Disabled
+                      </span>
+
+                      {totalHiddenCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleRestoreAllComponents}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                          title="Re-enable all tabs and action permissions"
+                        >
+                          <RotateCcw size={11} />
+                          <span>Restore All</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* List of Turned-Off / Hidden Elements */}
+                    <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4">
+                      
+                      {totalHiddenCount === 0 ? (
+                        <div className="text-center py-16 px-4 space-y-3">
+                          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto">
+                            <ShieldCheck size={24} />
+                          </div>
+                          <h4 className="font-bold text-sm text-slate-900">All UI Components Active</h4>
+                          <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+                            No buttons, tabs, or features are currently hidden for this role. Use the canvas cursor in <strong>Select &amp; Edit</strong> mode to click and hide any button.
+                          </p>
                         </div>
-                        <h4 className="font-bold text-sm text-white">All UI Components Active</h4>
-                        <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-                          No buttons, tabs, or features are currently hidden for this role. Use the canvas cursor in <strong>Select &amp; Edit</strong> mode to click and hide any button.
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        {/* 1. Hidden Primary Tabs */}
-                        {hiddenTabs.length > 0 && (
-                          <div className="space-y-2">
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                              Hidden Screen Tabs ({hiddenTabs.length})
-                            </span>
+                      ) : (
+                        <>
+                          {/* 1. Hidden Primary Tabs */}
+                          {hiddenTabs.length > 0 && (
                             <div className="space-y-2">
-                              {hiddenTabs.map((t) => {
-                                const Icon = t.icon;
-                                return (
-                                  <div
-                                    key={t.id}
-                                    className="p-3 rounded-xl bg-slate-950/80 border border-rose-500/30 flex items-center justify-between gap-3 shadow-sm hover:border-rose-500/60 transition-all"
-                                  >
-                                    <div className="flex items-center gap-2.5 min-w-0">
-                                      <div className="w-8 h-8 rounded-lg bg-rose-500/15 text-rose-400 flex items-center justify-center shrink-0">
-                                        <Icon size={16} />
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-xs font-bold text-white truncate">{t.label}</span>
-                                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-950 text-rose-300 font-mono">
-                                            tab:{t.id}
-                                          </span>
-                                        </div>
-                                        <p className="text-[10px] text-slate-400 truncate mt-0.5">{t.desc}</p>
-                                      </div>
-                                    </div>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleTab(t.id)}
-                                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-xs shrink-0 active:scale-95"
-                                      title="Restore this tab to live app"
+                              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                                Hidden Screen Tabs ({hiddenTabs.length})
+                              </span>
+                              <div className="space-y-2">
+                                {hiddenTabs.map((t) => {
+                                  const Icon = t.icon;
+                                  return (
+                                    <div
+                                      key={t.id}
+                                      className="p-3 rounded-xl bg-white border border-rose-200 flex items-center justify-between gap-3 shadow-2xs hover:border-rose-300 transition-all"
                                     >
-                                      <Eye size={12} />
-                                      <span>Restore</span>
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 2. Hidden Action Buttons / Functions */}
-                        {hiddenActions.length > 0 && (
-                          <div className="space-y-2 pt-2">
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                              Hidden Actions &amp; Buttons ({hiddenActions.length})
-                            </span>
-                            <div className="space-y-2">
-                              {hiddenActions.map((a) => {
-                                const Icon = a.icon;
-                                return (
-                                  <div
-                                    key={a.key}
-                                    className="p-3 rounded-xl bg-slate-950/80 border border-rose-500/30 flex items-center justify-between gap-3 shadow-sm hover:border-rose-500/60 transition-all"
-                                  >
-                                    <div className="flex items-center gap-2.5 min-w-0">
-                                      <div className="w-8 h-8 rounded-lg bg-rose-500/15 text-rose-400 flex items-center justify-center shrink-0">
-                                        <Icon size={16} />
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <span className="text-xs font-bold text-white truncate">{a.label}</span>
-                                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
-                                            {a.key}
-                                          </span>
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                                          <Icon size={16} />
                                         </div>
-                                        <span className="text-[9px] font-semibold text-rose-400/90 block">
-                                          {a.category}
-                                        </span>
-                                        <p className="text-[10px] text-slate-400 truncate mt-0.5">{a.desc}</p>
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-xs font-bold text-slate-900 truncate">{t.label}</span>
+                                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 font-mono font-bold">
+                                              tab:{t.id}
+                                            </span>
+                                          </div>
+                                          <p className="text-[10px] text-slate-500 truncate mt-0.5">{t.desc}</p>
+                                        </div>
                                       </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleTab(t.id)}
+                                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-xs shrink-0 active:scale-95"
+                                        title="Restore this tab to live app"
+                                      >
+                                        <Eye size={12} />
+                                        <span>Restore</span>
+                                      </button>
                                     </div>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleAction(a.key)}
-                                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-xs shrink-0 active:scale-95"
-                                      title="Restore this button / action to live app"
-                                    >
-                                      <Eye size={12} />
-                                      <span>Restore</span>
-                                    </button>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </>
-                    )}
+                          )}
 
+                          {/* 2. Hidden Action Buttons / Functions */}
+                          {hiddenActions.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                                Hidden Actions &amp; Buttons ({hiddenActions.length})
+                              </span>
+                              <div className="space-y-2">
+                                {hiddenActions.map((a) => {
+                                  const Icon = a.icon;
+                                  return (
+                                    <div
+                                      key={a.key}
+                                      className="p-3 rounded-xl bg-white border border-rose-200 flex items-center justify-between gap-3 shadow-2xs hover:border-rose-300 transition-all"
+                                    >
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                                          <Icon size={16} />
+                                        </div>
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="text-xs font-bold text-slate-900 truncate">{a.label}</span>
+                                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-mono">
+                                              {a.key}
+                                            </span>
+                                          </div>
+                                          <span className="text-[9px] font-semibold text-rose-600 block">
+                                            {a.category}
+                                          </span>
+                                          <p className="text-[10px] text-slate-500 truncate mt-0.5">{a.desc}</p>
+                                        </div>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleAction(a.key)}
+                                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-xs shrink-0 active:scale-95"
+                                        title="Restore this button / action to live app"
+                                      >
+                                        <Eye size={12} />
+                                        <span>Restore</span>
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Inspector Footer Bar */}
-              <div className="p-3 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between shrink-0 text-xs">
-                <span className="text-[11px] text-slate-400">
-                  {allowedTabs.length} tabs · {allowedActions.length} actions enabled
-                </span>
-                <button
-                  type="button"
-                  onClick={handleSaveAndBroadcast}
-                  className="px-3.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs cursor-pointer shadow-xs active:scale-95 transition-all"
-                >
-                  Save &amp; Broadcast
-                </button>
-              </div>
+                {/* Inspector Footer Bar */}
+                <div className="p-3 border-t border-slate-100 bg-white flex items-center justify-between shrink-0 text-xs">
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {allowedTabs.length} tabs · {allowedActions.length} actions enabled
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSaveAndBroadcast}
+                    className="px-3.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs cursor-pointer shadow-sm shadow-brand-500/25 active:scale-95 transition-all"
+                  >
+                    Save &amp; Broadcast
+                  </button>
+                </div>
 
             </aside>
           </>
