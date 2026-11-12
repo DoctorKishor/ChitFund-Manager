@@ -206,12 +206,12 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
  */
 export function canAccessTab(role: UserRole | undefined, tab: MainTabId, customRole?: CustomRoleRecord | null): boolean {
   if (!role) return false;
+  if (role === 'admin') return true;
   if (customRole && (customRole.id === role || customRole.id === role.toLowerCase())) {
     if (customRole.allowed_tabs && Array.isArray(customRole.allowed_tabs)) {
       return customRole.allowed_tabs.includes(tab);
     }
   }
-  if (role === 'admin') return true;
   const allowed = TAB_PERMISSIONS[tab];
   return allowed ? allowed.includes(role) : false;
 }
@@ -231,12 +231,12 @@ export function canAccessTreasurySubtab(role: UserRole | undefined, subtab: Cash
  */
 export function hasPermission(role: UserRole | undefined, action: PermissionAction, customRole?: CustomRoleRecord | null): boolean {
   if (!role) return false;
+  if (role === 'admin') return true;
   if (customRole && (customRole.id === role || customRole.id === role.toLowerCase())) {
     if (customRole.allowed_actions && Array.isArray(customRole.allowed_actions)) {
       return customRole.allowed_actions.includes(action);
     }
   }
-  if (role === 'admin') return true;
   const allowed = ACTION_PERMISSIONS[action];
   return allowed ? allowed.includes(role) : false;
 }

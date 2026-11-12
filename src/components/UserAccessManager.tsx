@@ -660,9 +660,10 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
           <span>Staff Directory ({staffMembers.length})</span>
         </button>
 
-        {canManageRoles && (
+        {(canManageRoles || currentAdminProfile?.role === 'admin') && (
           <button
             type="button"
+            data-action="system:manage_roles"
             onClick={() => {
               triggerHapticFeedback('light');
               setActiveSubtab('roles');
