@@ -256,7 +256,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
         console.warn('Note fetching profiles via direct query:', profilesError.message);
       }
 
-      // 2. Fetch all group member enrollments
+      // 2. Fetch all group member enrollments with joined profiles & groups
       const { data: memberGroupsData, error: memberGroupsError } = await supabase
         .from('group_members')
         .select(`
@@ -265,6 +265,17 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
           group_id,
           ticket_number,
           alias_name,
+          has_won_regular,
+          profiles (
+            id,
+            full_name,
+            phone_number,
+            role,
+            passbook_token,
+            mpin,
+            is_blocked,
+            created_at
+          ),
           chit_groups (
             id,
             name,
@@ -311,10 +322,44 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
         setAllAuctionLogs(logsData);
       }
 
-      let resolvedProfiles = (profilesData || []).filter((p: any) => p.role === 'subscriber' || !p.role);
-      let resolvedMemberGroups = memberGroupsData || [];
+      let resolvedProfiles: any[] = (profilesData || []).filter((p: any) => p.role === 'subscriber' || !p.role);
+      let resolvedMemberGroups: any[] = (memberGroupsData as any[]) || [];
 
-      // Fallback for Phone+PIN Admin Login (when direct table queries return empty due to anon RLS)
+      // Fallback 1: Extract subscriber profiles from joined group_members if direct profiles table query is empty/restricted
+      if (resolvedProfiles.length === 0 && memberGroupsData && memberGroupsData.length > 0) {
+        const extractedMap = new Map<string, any>();
+        memberGroupsData.forEach((gm: any) => {
+          const prof = Array.isArray(gm.profiles) ? gm.profiles[0] : gm.profiles;
+          if (prof && prof.id && !extractedMap.has(prof.id)) {
+            extractedMap.set(prof.id, {
+              id: prof.id,
+              full_name: prof.full_name || gm.alias_name || 'Subscriber',
+              phone_number: prof.phone_number || '',
+              role: prof.role || 'subscriber',
+              passbook_token: prof.passbook_token || null,
+              mpin: prof.mpin || '1234',
+              is_blocked: prof.is_blocked || false,
+              created_at: prof.created_at || new Date().toISOString(),
+            });
+          } else if (gm.profile_id && !extractedMap.has(gm.profile_id)) {
+            extractedMap.set(gm.profile_id, {
+              id: gm.profile_id,
+              full_name: gm.alias_name || `Member (Ticket #${gm.ticket_number})`,
+              phone_number: '',
+              role: 'subscriber',
+              passbook_token: null,
+              mpin: '1234',
+              is_blocked: false,
+              created_at: new Date().toISOString(),
+            });
+          }
+        });
+        if (extractedMap.size > 0) {
+          resolvedProfiles = Array.from(extractedMap.values());
+        }
+      }
+
+      // Fallback 2 for Phone+PIN Admin Login (when direct table queries return empty due to anon RLS)
       if (resolvedProfiles.length === 0 && currentAdminProfile?.id) {
         try {
           const { data: portalData } = await supabase.rpc('get_subscriber_portal_data', {
@@ -382,6 +427,17 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
                   group_id: g.groupId,
                   ticket_number: m.ticketNumber,
                   alias_name: m.aliasName || null,
+                  has_won_regular: m.hasWon || false,
+                  profiles: [{
+                    id: m.profileId || m.id,
+                    full_name: m.fullName || m.aliasName || 'Subscriber',
+                    phone_number: m.phoneNumber || '',
+                    role: 'subscriber',
+                    passbook_token: null,
+                    mpin: '1234',
+                    is_blocked: false,
+                    created_at: new Date().toISOString(),
+                  }],
                   chit_groups: [{
                     id: g.groupId,
                     name: g.groupName,

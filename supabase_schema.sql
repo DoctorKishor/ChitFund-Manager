@@ -33,13 +33,13 @@ values
   ('manager', 'Manager', 'Operational management, member enrollment, live bidding arena & WhatsApp dispatch', '#2563eb', true, true, 
    array['dashboard', 'chits', 'members', 'auctions', 'communication', 'reports'], 
    array['members:view', 'members:enroll', 'members:edit', 'members:collect', 'members:suspend', 'members:pair_qr', 'members:revoke_qr', 'members:batch_qr', 'members:reset_mpin', 'members:export', 'chits:view', 'chits:create', 'chits:edit', 'chits:reschedule_auction', 'chits:configure_laaba_seetu', 'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:disburse', 'auctions:issue_receipt', 'treasury:view_cash_box', 'treasury:collect_cash', 'treasury:recover_float', 'communication:view', 'communication:broadcast', 'communication:pre_auction', 'communication:post_auction', 'communication:due_alerts', 'communication:custom', 'communication:manage_templates', 'reports:view', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters']),
-  ('collections_agent', 'Collections Agent', 'Ground field agent: offline collections, booklet QR scanner pairing & payment broadcast', '#f59e0b', false, false, 
+  ('collections_agent', 'Collections Agent', 'Ground field agent: offline collections, booklet QR scanner pairing & payment broadcast', '#f59e0b', false, true, 
    array['dashboard', 'members', 'communication'], 
    array['members:view', 'members:collect', 'members:pair_qr', 'treasury:collect_cash', 'communication:view', 'communication:broadcast', 'communication:due_alerts']),
-  ('auction_clerk', 'Auction Clerk', 'Assists organizer during monthly live bidding sessions by recording shouted proxy discounts', '#a855f7', false, false, 
+  ('auction_clerk', 'Auction Clerk', 'Assists organizer during monthly live bidding sessions by recording shouted proxy discounts', '#a855f7', false, true, 
    array['dashboard', 'chits', 'members', 'auctions'], 
    array['chits:view', 'auctions:view', 'auctions:bid', 'auctions:issue_receipt']),
-  ('auditor', 'Auditor / CA', 'Read-only financial auditor access for balance sheets, ledger downloads & dividend statements', '#0d9488', false, false, 
+  ('auditor', 'Auditor / CA', 'Read-only financial auditor access for balance sheets, ledger downloads & dividend statements', '#0d9488', false, true, 
    array['dashboard', 'chits', 'members', 'cash', 'reports'], 
    array['chits:view', 'members:view', 'members:export', 'auctions:view', 'treasury:view', 'treasury:view_cash_box', 'reports:view', 'reports:view_pnl', 'reports:export', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_audit_logs', 'reports:export_audit']),
   ('subscriber', 'Subscriber', 'Member portal: personal enrolled chits, ledger & live auction bidding room', '#10b981', true, false, 
@@ -189,7 +189,7 @@ returns text as $$
   select role from public.profiles where id = user_id;
 $$ language sql security definer set search_path = public;
 
--- Check if the current authenticated user is an admin, manager, or has an is_privileged role
+-- Check if the current authenticated user is an admin, manager, or has an is_privileged role (or operational staff)
 create or replace function public.is_admin_or_manager()
 returns boolean as $$
   select coalesce(
@@ -201,6 +201,7 @@ returns boolean as $$
         and (
           p.role in ('admin', 'manager')
           or coalesce(cr.is_privileged, false) = true
+          or p.role != 'subscriber'
         )
     ),
     false
@@ -1031,6 +1032,7 @@ alter table public.profiles replica identity full;
 alter table public.transactions replica identity full;
 alter table public.auction_logs replica identity full;
 alter table public.global_treasury replica identity full;
+alter table public.custom_roles replica identity full;
 
 do $$
 begin
@@ -1040,6 +1042,7 @@ begin
   begin alter publication supabase_realtime add table public.transactions; exception when duplicate_object then null; end;
   begin alter publication supabase_realtime add table public.auction_logs; exception when duplicate_object then null; end;
   begin alter publication supabase_realtime add table public.global_treasury; exception when duplicate_object then null; end;
+  begin alter publication supabase_realtime add table public.custom_roles; exception when duplicate_object then null; end;
 end $$;
 
 -- ==========================================

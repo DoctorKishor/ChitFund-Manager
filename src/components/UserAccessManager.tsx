@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@supabase/supabase-js';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import RoleManagerPanel from './RoleManagerPanel';
+import RoleAppPreviewModal from './RoleAppPreviewModal';
 import {
   ShieldCheck,
   UserPlus,
@@ -88,6 +89,8 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
   const [isEditStaffOpen, setIsEditStaffOpen] = useState<boolean>(false);
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState<boolean>(false);
   const [isDeleteStaffOpen, setIsDeleteStaffOpen] = useState<boolean>(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
+  const [selectedPreviewRoleId, setSelectedPreviewRoleId] = useState<string>('collections_agent');
   const [selectedStaff, setSelectedStaff] = useState<StaffProfile | null>(null);
 
   // Add staff form state
@@ -401,10 +404,17 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
         },
       });
 
+      // Direct staff confirmation & reset emails to production Cloudflare Pages deployment address
+      const productionSiteUrl = 'https://chitfund-manager.pages.dev';
+      const redirectBase = typeof window !== 'undefined' && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1')
+        ? window.location.origin
+        : productionSiteUrl;
+
       const { data: authData, error: authErr } = await isolatedClient.auth.signUp({
         email: cleanEmail,
         password: newPassword,
         options: {
+          emailRedirectTo: `${redirectBase}/`,
           data: {
             full_name: newFullName.trim(),
             phone_number: cleanPhone,
@@ -547,8 +557,13 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
 
     try {
       setIsResettingPassword(true);
+      const productionSiteUrl = 'https://chitfund-manager.pages.dev';
+      const redirectBase = typeof window !== 'undefined' && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1')
+        ? window.location.origin
+        : productionSiteUrl;
+
       const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${redirectBase}/`,
       });
 
       if (error) throw error;
@@ -595,8 +610,23 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
           </div>
         </div>
 
-        {canManageStaff && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              triggerHapticFeedback('light');
+              setSelectedPreviewRoleId('collections_agent');
+              setIsPreviewModalOpen(true);
+            }}
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/90 hover:bg-indigo-100 text-brand-700 text-xs font-bold transition-all cursor-pointer shadow-2xs whitespace-nowrap active:scale-95"
+            title="Preview entire application exactly as experienced by field staff roles and configure screens in real-time"
+          >
+            <Eye size={16} className="text-brand-600" />
+            <span className="hidden sm:inline">Live Role App Preview</span>
+            <span className="sm:hidden">App Preview</span>
+          </button>
+
+          {canManageStaff && (
             <button
               type="button"
               onClick={() => {
@@ -608,8 +638,8 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
               <UserPlus size={16} />
               <span>Add Staff Member</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ── Subtab Navigation: Staff Directory vs Role Permissions ── */}
@@ -813,6 +843,19 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                         {/* Actions */}
                         <td className="py-3.5 px-4 text-right">
                           <div className="inline-flex items-center gap-1.5 justify-end">
+                            {/* 0. Live Preview App as this Role */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPreviewRoleId(staff.role);
+                                setIsPreviewModalOpen(true);
+                              }}
+                              className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-brand-700 transition-colors cursor-pointer"
+                              title={`Live Preview & Configure App as ${staff.role}`}
+                            >
+                              <Eye size={14} />
+                            </button>
+
                             {/* 1. Edit Staff */}
                             <button
                               type="button"
@@ -936,6 +979,19 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                     <div className="grid grid-cols-4 gap-1.5 pt-1">
                       <button
                         type="button"
+                        onClick={() => {
+                          setSelectedPreviewRoleId(staff.role);
+                          setIsPreviewModalOpen(true);
+                        }}
+                        className="text-xs font-bold text-brand-700 flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 cursor-pointer"
+                        title="Live Preview App as this Role"
+                      >
+                        <Eye size={13} />
+                        <span>Preview</span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => handleOpenEditStaff(staff)}
                         className="text-xs font-bold text-slate-700 flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 cursor-pointer"
                         title="Edit Details"
@@ -1002,7 +1058,10 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
       {/* ── SUBTAB 2: ROLE PERMISSIONS (EMBEDDED ROLE MANAGER PANEL) ── */}
       {activeSubtab === 'roles' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 shadow-xs">
-          <RoleManagerPanel onOpenAuditLogs={onOpenAuditLogs} />
+          <RoleManagerPanel 
+            onOpenAuditLogs={onOpenAuditLogs}
+            onRoleUpdated={fetchStaffData}
+          />
         </div>
       )}
 
@@ -1437,6 +1496,15 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
           </div>
         </div>
       )}
+      {/* ── MODAL 5: ROLE APP PREVIEW & SCREEN CONFIGURATOR ── */}
+      <RoleAppPreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        initialRoleId={selectedPreviewRoleId || 'collections_agent'}
+        onRoleUpdated={() => {
+          fetchStaffData();
+        }}
+      />
     </div>
   );
 }

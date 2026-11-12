@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/utils/supabase/client';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, broadcastRoleUpdate } from '@/context/AuthContext';
 import { CustomRoleRecord } from '@/utils/rbac';
 import {
   Shield,
@@ -23,8 +23,10 @@ import {
   CheckCircle2,
   AlertTriangle,
   UserCheck,
-  UserX
+  UserX,
+  Eye
 } from 'lucide-react';
+import RoleAppPreviewModal from './RoleAppPreviewModal';
 
 interface ProfileRecord {
   id: string;
@@ -257,6 +259,9 @@ export default function RoleManagerPanel({
   const [selectedProfileIdToAssign, setSelectedProfileIdToAssign] = useState<string>('');
   const [isAssigning, setIsAssigning] = useState<boolean>(false);
 
+  // Live Role Preview Modal state
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
+
   // Fetch Roles and Profiles from Supabase
   const fetchData = async () => {
     try {
@@ -407,11 +412,13 @@ export default function RoleManagerPanel({
     if (!activeRole) return;
     try {
       setIsSaving(true);
+      const isPrivileged = activeRole.id !== 'subscriber';
       const { error } = await supabase
         .from('custom_roles')
         .update({
           name: editName ? editName.trim() : activeRole.name,
           color: editColor,
+          is_privileged: isPrivileged,
           allowed_tabs: activeRole.id === 'admin' ? activeRole.allowed_tabs : allowedTabs,
           allowed_actions: activeRole.id === 'admin' ? activeRole.allowed_actions : allowedActions,
           updated_at: new Date().toISOString(),
@@ -419,6 +426,9 @@ export default function RoleManagerPanel({
         .eq('id', activeRole.id);
 
       if (error) throw error;
+
+      // Broadcast changes across all connected staff sessions in real-time
+      await broadcastRoleUpdate(activeRole.id);
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -444,12 +454,14 @@ export default function RoleManagerPanel({
         description: activeRole.description || 'Cloned custom security role',
         color: activeRole.color || '#4F46E5',
         is_system: false,
-        is_privileged: !!activeRole.is_privileged,
+        is_privileged: cloneId !== 'subscriber',
         allowed_tabs: allowedTabs,
         allowed_actions: allowedActions,
       });
 
       if (error) throw error;
+
+      await broadcastRoleUpdate(cloneId);
 
       setSelectedRoleId(cloneId);
       await fetchData();
@@ -1006,6 +1018,15 @@ export default function RoleManagerPanel({
                 <div className="flex items-center gap-2.5 shrink-0 self-end md:self-auto">
                   <button
                     type="button"
+                    onClick={() => setIsPreviewModalOpen(true)}
+                    className="px-3.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/90 hover:bg-indigo-100 text-brand-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs hover:shadow-xs"
+                    title="Preview full application from this role's perspective & live configure screen elements"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-brand-600" />
+                    <span>Live App Preview</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleExportActivePolicy}
                     className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
                     title="Export role permission policy to JSON"
@@ -1386,9 +1407,19 @@ export default function RoleManagerPanel({
             </p>
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
               <span className="text-slate-500 font-medium">Assigned Personnel:</span>
-              <span className="font-bold text-slate-900">
-                {assignedPersonnel.length} Staff Member{assignedPersonnel.length === 1 ? '' : 's'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-900">
+                  {assignedPersonnel.length} Staff Member{assignedPersonnel.length === 1 ? '' : 's'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-brand-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer active:scale-95"
+                >
+                  <Eye className="w-3 h-3 text-brand-600" />
+                  <span>Preview</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1717,6 +1748,17 @@ export default function RoleManagerPanel({
           </div>
         </div>
       )}
+
+      {/* Live Role Preview & Screen Configurator Modal */}
+      <RoleAppPreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        initialRoleId={selectedRoleId}
+        onRoleUpdated={() => {
+          fetchData();
+          onRoleUpdated?.();
+        }}
+      />
 
     </div>
   );

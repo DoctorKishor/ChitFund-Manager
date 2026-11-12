@@ -559,9 +559,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       )
       .subscribe();
 
+    // Fast-path WebSocket broadcast channel for instant cross-tab / cross-device role updates
+    const broadcastChannel = supabase
+      .channel('cf-role-sync-broadcast')
+      .on('broadcast', { event: 'role_updated' }, async (payload: any) => {
+        const targetRoleId = payload?.payload?.roleId;
+        if (!targetRoleId || (profile?.role && targetRoleId.toLowerCase() === profile.role.toLowerCase())) {
+          if (profile?.role) {
+            await fetchCustomRole(profile.role);
+          }
+        }
+      })
+      .subscribe();
+
+    // If active session is Administrator, ensure all operational staff roles have is_privileged=true
+    if (profile?.role === 'admin') {
+      supabase
+        .from('custom_roles')
+        .update({ is_privileged: true })
+        .neq('id', 'subscriber')
+        .eq('is_privileged', false)
+        .then(({ error }: any) => {
+          if (!error) {
+            supabase
+              .from('custom_roles')
+              .select('*')
+              .then();
+          }
+        });
+    }
+
     return () => {
       supabase.removeChannel(profileChannel);
       supabase.removeChannel(roleChannel);
+      supabase.removeChannel(broadcastChannel);
     };
   }, [profile?.id, profile?.role]);
 
@@ -628,4 +659,87 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+};
+
+/**
+ * Broadcast role permission changes across all connected browser tabs & active staff devices in real-time
+ */
+export const broadcastRoleUpdate = async (roleId: string) => {
+  try {
+    const channel = supabase.channel('cf-role-sync-broadcast');
+    await channel.send({
+      type: 'broadcast',
+      event: 'role_updated',
+      payload: { roleId, timestamp: Date.now() },
+    });
+  } catch (err) {
+    console.warn('Failed to broadcast role update:', err);
+  }
+};
+
+/**
+ * RolePreviewAuthProvider:
+ * Allows rendering any UI component tree simulating the exact permissions, allowed tabs,
+ * and allowed actions of any selected staff role without altering the active admin login session.
+ */
+export interface RolePreviewAuthProviderProps {
+  roleId: string;
+  roleName?: string;
+  allowedTabs: MainTabId[];
+  allowedActions: PermissionAction[];
+  children: React.ReactNode;
+}
+
+export const RolePreviewAuthProvider: React.FC<RolePreviewAuthProviderProps> = ({
+  roleId,
+  roleName,
+  allowedTabs,
+  allowedActions,
+  children,
+}) => {
+  const baseAuth = useAuth();
+
+  const previewProfile: UserProfile = React.useMemo(() => ({
+    id: `simulated-staff-${roleId}`,
+    fullName: `${roleName || roleId} (Preview)`,
+    phoneNumber: '9876543210',
+    role: roleId as UserRole,
+    isBlocked: false,
+    mpin: '1234',
+    isDefaultPin: false,
+  }), [roleId, roleName]);
+
+  const previewCustomRole: CustomRoleRecord = React.useMemo(() => ({
+    id: roleId,
+    name: roleName || roleId,
+    allowed_tabs: allowedTabs,
+    allowed_actions: allowedActions,
+    is_privileged: roleId !== 'subscriber',
+  }), [roleId, roleName, allowedTabs, allowedActions]);
+
+  const canAccessTab = React.useCallback((tab: MainTabId): boolean => {
+    if (roleId === 'admin') return true;
+    return allowedTabs.includes(tab);
+  }, [roleId, allowedTabs]);
+
+  const canPerformAction = React.useCallback((action: PermissionAction): boolean => {
+    if (roleId === 'admin') return true;
+    return allowedActions.includes(action);
+  }, [roleId, allowedActions]);
+
+  const contextValue = React.useMemo(() => ({
+    ...baseAuth,
+    profile: previewProfile,
+    customRole: previewCustomRole,
+    canAccessTab,
+    canPerformAction,
+    allowedTabs,
+    allowedActions,
+  }), [baseAuth, previewProfile, previewCustomRole, canAccessTab, canPerformAction, allowedTabs, allowedActions]);
+
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
