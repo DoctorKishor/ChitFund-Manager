@@ -915,104 +915,90 @@ export default function RoleAppPreviewModal({
       <div className="relative w-full h-full max-w-[1760px] bg-slate-900 border border-slate-700/80 rounded-none sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100 font-sans">
         
         {/* ── TOP COCKPIT BAR: Tool Switcher, Role Selector, Device Viewport, Save Controls ── */}
-        <header className="h-16 px-4 sm:px-6 bg-slate-950/95 border-b border-slate-800 flex items-center justify-between shrink-0 z-30 gap-3">
+        <header className="px-3 sm:px-6 py-2.5 sm:py-0 sm:h-16 bg-slate-950/95 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between shrink-0 z-30 gap-2.5 sm:gap-3">
           
-          {/* Left: Brand & Canvas Tool Mode Switcher (Figma Style) */}
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-brand-500/20 shrink-0">
-              <Eye size={18} />
-            </div>
-
-            <div className="flex flex-col min-w-0 mr-2">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-white tracking-tight flex items-center gap-1.5 truncate">
-                  UI Role Studio &amp; Configurator
-                </span>
-                <span className="hidden xl:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-500/10 text-brand-400 border border-brand-500/30">
-                  <Sparkles size={10} /> Live Realtime Preview
-                </span>
+          {/* Row 1 on mobile / Left on desktop: Brand Logo, Role Badge & Primary Actions */}
+          <div className="flex items-center justify-between w-full sm:w-auto gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shadow-brand-500/20 shrink-0">
+                <Eye size={17} />
               </div>
-              <p className="text-[11px] text-slate-400 truncate">
-                Interactive preview &amp; visual component editor
-              </p>
+
+              <div className="flex flex-col min-w-0 mr-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-xs sm:text-sm text-white tracking-tight truncate">
+                    Role Simulator
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-500/15 text-brand-300 border border-brand-500/30 truncate">
+                    {activeRole?.name || 'Staff'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 hidden sm:block truncate">
+                  Interactive Android &amp; Desktop UI preview
+                </p>
+              </div>
             </div>
 
-            {/* FIGMA CANVAS TOOL SWITCHER: Navigate vs Select & Edit */}
-            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl p-0.5 shrink-0">
+            {/* Mobile Header Quick Actions: Inspector Pill, Save & Close */}
+            <div className="flex items-center gap-1.5 sm:hidden">
               <button
                 type="button"
-                onClick={() => {
-                  setCanvasTool('navigate');
-                  triggerHapticFeedback('light');
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  canvasTool === 'navigate'
+                onClick={() => setIsInspectorOpen((prev) => !prev)}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  isInspectorOpen
                     ? 'bg-brand-600 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-white'
+                    : 'bg-slate-800 border border-slate-700 text-slate-300 hover:text-white'
                 }`}
-                title="Navigate & Test App Mode (Shortcut: V)"
+                title="Toggle Controls Inspector"
               >
-                <MousePointer size={14} />
-                <span className="hidden md:inline">Navigate &amp; Test</span>
+                <Sliders size={12} />
+                <span>Controls</span>
+                {totalHiddenCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500 text-white font-mono">
+                    {totalHiddenCount}
+                  </span>
+                )}
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  setCanvasTool('inspect');
-                  triggerHapticFeedback('light');
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  canvasTool === 'inspect'
-                    ? 'bg-purple-600 text-white shadow-xs animate-pulse'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Select & Edit Component Mode (Shortcut: C)"
+                onClick={handleSaveAndBroadcast}
+                disabled={isSaving}
+                className="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-bold shadow-xs active:scale-95"
               >
-                <Crosshair size={14} />
-                <span className="hidden md:inline">Select &amp; Edit</span>
+                {isSaving ? '...' : saveSuccess ? '✓' : 'Save'}
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                aria-label="Close"
+              >
+                <X size={15} />
               </button>
             </div>
           </div>
 
-          {/* Center: Live Role Switcher Dropdown & Viewport Switcher */}
-          <div className="flex items-center gap-2.5">
-            {/* Role Switcher */}
-            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1">
-              <span className="text-xs text-slate-400 font-medium mr-1.5 hidden lg:inline">Role:</span>
-              <select
-                value={selectedRoleId}
-                onChange={(e) => {
-                  setSelectedRoleId(e.target.value);
-                  triggerHapticFeedback('light');
-                }}
-                className="bg-transparent text-xs font-bold text-brand-300 focus:outline-none cursor-pointer pr-2"
-              >
-                {allRoles.map((r) => (
-                  <option key={r.id} value={r.id} className="bg-slate-900 text-white">
-                    {r.name} {r.is_system ? '(System)' : '(Custom)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-
+          {/* Row 2 on mobile / Center on desktop: Canvas Tools & Viewport Toggles */}
+          <div className="flex items-center justify-between sm:justify-start gap-2 overflow-x-auto scrollbar-none w-full sm:w-auto pb-0.5 sm:pb-0">
             {/* Viewport Device Switcher */}
-            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl p-0.5">
+            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   setViewportMode('mobile');
                   triggerHapticFeedback('light');
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewportMode === 'mobile'
                     ? 'bg-brand-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-white'
                 }`}
-                title="Real Mobile Smartphone Frame (390px)"
+                title="Android Smartphone Viewport"
               >
-                <Smartphone size={14} />
-                <span className="hidden sm:inline">Mobile Frame</span>
+                <Smartphone size={13} />
+                <span>Android App</span>
               </button>
 
               <button
@@ -1021,21 +1007,77 @@ export default function RoleAppPreviewModal({
                   setViewportMode('desktop');
                   triggerHapticFeedback('light');
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewportMode === 'desktop'
                     ? 'bg-brand-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-white'
                 }`}
                 title="Desktop View (Full Width)"
               >
-                <Monitor size={14} />
-                <span className="hidden sm:inline">Desktop</span>
+                <Monitor size={13} />
+                <span>Desktop</span>
               </button>
+            </div>
+
+            {/* Mode Switcher: Navigate vs Inspect */}
+            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl p-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setCanvasTool('navigate');
+                  triggerHapticFeedback('light');
+                }}
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  canvasTool === 'navigate'
+                    ? 'bg-brand-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Navigate & Test Live App Mode"
+              >
+                <MousePointer size={13} />
+                <span>Test Mode</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCanvasTool('inspect');
+                  triggerHapticFeedback('light');
+                }}
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  canvasTool === 'inspect'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Select & Edit Component Mode"
+              >
+                <Crosshair size={13} />
+                <span>Select &amp; Edit</span>
+              </button>
+            </div>
+
+            {/* Role Switcher Dropdown */}
+            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1 shrink-0">
+              <span className="text-[11px] text-slate-400 font-medium mr-1 hidden lg:inline">Role:</span>
+              <select
+                value={selectedRoleId}
+                onChange={(e) => {
+                  setSelectedRoleId(e.target.value);
+                  triggerHapticFeedback('light');
+                }}
+                className="bg-transparent text-xs font-bold text-brand-300 focus:outline-none cursor-pointer pr-1"
+              >
+                {allRoles.map((r) => (
+                  <option key={r.id} value={r.id} className="bg-slate-900 text-white">
+                    {r.name} {r.is_system ? '(System)' : '(Custom)'}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Right: Inspector Drawer Toggle, Save & Close Controls */}
-          <div className="flex items-center gap-2">
+          {/* Desktop Right Actions: Inspector Toggle, Save & Broadcast, Close */}
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setIsInspectorOpen((prev) => !prev)}
@@ -1047,7 +1089,7 @@ export default function RoleAppPreviewModal({
               title="Toggle Controls Inspector"
             >
               <Sliders size={13} />
-              <span className="hidden md:inline">Inspector</span>
+              <span>Inspector</span>
               {totalHiddenCount > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500 text-white font-mono">
                   {totalHiddenCount}
@@ -1075,8 +1117,7 @@ export default function RoleAppPreviewModal({
               ) : (
                 <>
                   <Save size={14} />
-                  <span className="hidden sm:inline">Save &amp; Broadcast</span>
-                  <span className="sm:hidden">Save</span>
+                  <span>Save &amp; Broadcast</span>
                 </>
               )}
             </button>
@@ -1208,31 +1249,46 @@ export default function RoleAppPreviewModal({
               </div>
             )}
 
-            {/* REAL MOBILE SMARTPHONE FRAME (Authentic 390px Viewport) */}
+            {/* NATIVE ANDROID SMARTPHONE FRAME */}
             {viewportMode === 'mobile' && (
-              <div className="relative w-[390px] h-[812px] max-h-[92vh] bg-slate-900 rounded-[50px] p-3 shadow-2xl border-4 border-slate-700 flex flex-col overflow-hidden shrink-0">
+              <div className="relative w-full max-w-[395px] h-[820px] max-h-[90vh] bg-slate-900 rounded-[38px] p-2.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] border-[5px] border-slate-800 flex flex-col overflow-hidden shrink-0 select-none">
                 
-                {/* Dynamic Island / Speaker Notch */}
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-5 bg-black rounded-full z-40 flex items-center justify-center select-none pointer-events-none">
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-900 mr-2" />
-                  <div className="w-2 h-2 rounded-full bg-blue-900/60" />
-                </div>
+                {/* Android Hardware Side Buttons */}
+                <div className="absolute -left-[7px] top-28 w-1.5 h-12 bg-slate-700 rounded-l-sm" />
+                <div className="absolute -left-[7px] top-44 w-1.5 h-12 bg-slate-700 rounded-l-sm" />
+                <div className="absolute -right-[7px] top-32 w-1.5 h-10 bg-slate-700 rounded-r-sm" />
 
-                {/* Inner Screen */}
-                <div className="w-full h-full bg-slate-50 rounded-[40px] overflow-hidden flex flex-col relative">
+                {/* Inner Android Screen */}
+                <div className="w-full h-full bg-slate-50 rounded-[30px] overflow-hidden flex flex-col relative shadow-inner">
                   
-                  {/* Status Bar */}
-                  <div className="h-8 bg-white/95 backdrop-blur-md px-6 pt-1 flex items-center justify-between text-[11px] font-bold text-slate-800 shrink-0 select-none z-30 border-b border-slate-100">
-                    <span>9:41</span>
-                    <div className="flex items-center gap-1.5 text-[10px]">
-                      <span>5G</span>
-                      <div className="w-5 h-2.5 border border-slate-800 rounded-xs p-0.5">
-                        <div className="h-full w-3/4 bg-slate-800 rounded-xs" />
+                  {/* Android Status Bar */}
+                  <div className="h-7.5 bg-white/95 backdrop-blur-md px-5 flex items-center justify-between text-[11px] font-semibold text-slate-700 shrink-0 select-none z-30 border-b border-slate-100">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-slate-900 tracking-tight">10:30</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse ml-0.5" />
+                    </div>
+
+                    {/* Minimal Centered Punch-Hole Camera (Real Android) */}
+                    <div className="w-3.5 h-3.5 bg-black rounded-full ring-2 ring-slate-800/20 shadow-inner flex items-center justify-center pointer-events-none">
+                      <div className="w-1 h-1 rounded-full bg-indigo-950/80" />
+                    </div>
+
+                    {/* Native Android Status Icons */}
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-600">
+                      <span className="font-bold text-[9px] text-slate-700">5G</span>
+                      <svg className="w-3.5 h-3.5 text-slate-700" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4z" />
+                      </svg>
+                      <div className="flex items-center gap-0.5">
+                        <span className="text-[10px] font-bold">98%</span>
+                        <div className="w-3.5 h-2 border border-slate-700 rounded-xs p-0.5 flex items-center">
+                          <div className="h-full w-full bg-slate-800 rounded-2xs" />
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* App Screen in Isolated Frame (True 390px viewport width) */}
+                  {/* App Screen in Isolated Frame */}
                   <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-slate-50">
                     <RolePreviewAuthProvider
                       roleId={selectedRoleId}
@@ -1249,6 +1305,28 @@ export default function RoleAppPreviewModal({
                         onSelectComponent={handleCanvasComponentToggle}
                       >
                         <div className="flex flex-col min-h-screen bg-slate-50 text-slate-800 font-sans antialiased pb-20">
+                          
+                          {/* Android App Top Header Bar */}
+                          <header className="h-14 bg-white border-b border-slate-200/80 px-4 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                                CF
+                              </div>
+                              <div>
+                                <div className="font-display font-bold text-sm text-slate-900 leading-none flex items-center gap-1">
+                                  ChitFunds<span className="text-brand-600">.Admin</span>
+                                </div>
+                                <span className="text-[10px] text-slate-500 font-medium">Fintech Workspace</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
+                                {activeRole?.name || 'Staff'}
+                              </span>
+                            </div>
+                          </header>
+
                           {/* Main Content Board Canvas in True Mobile View (Single Column, Stacked Cards) */}
                           <main className="flex-1 p-3 pb-24 space-y-4 overflow-y-auto w-full bg-slate-50">
                             <DashboardContent 
@@ -1263,13 +1341,23 @@ export default function RoleAppPreviewModal({
                             setActiveTab={(t: string) => setPreviewTab(t as MainTabId)} 
                             onOpenDrawer={() => setMobileDrawerOpen(true)} 
                           />
+
+                          {/* Slide-over Mobile Navigation Drawer */}
+                          <Sidebar 
+                            activeTab={previewTab} 
+                            setActiveTab={(t: string) => setPreviewTab(t as MainTabId)} 
+                            mobileOpen={mobileDrawerOpen} 
+                            setMobileOpen={setMobileDrawerOpen} 
+                          />
                         </div>
                       </IsolatedPreviewFrame>
                     </RolePreviewAuthProvider>
                   </div>
 
-                  {/* Home Indicator Bar */}
-                  <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-slate-400 rounded-full z-40 pointer-events-none" />
+                  {/* Android Gesture Navigation Pill */}
+                  <div className="h-4 bg-white/95 flex items-center justify-center shrink-0 z-30 border-t border-slate-100">
+                    <div className="w-24 h-1 bg-slate-400 rounded-full" />
+                  </div>
                 </div>
               </div>
             )}
@@ -1307,32 +1395,54 @@ export default function RoleAppPreviewModal({
 
           </div>
 
-          {/* 2. RIGHT-SIDE INSPECTOR DRAWER / CONTROLS PANEL */}
+          {/* 2. RIGHT-SIDE INSPECTOR DRAWER / MOBILE BOTTOM SHEET */}
           {isInspectorOpen && (
-            <aside className="w-full sm:w-[440px] bg-slate-900 border-l border-slate-800 flex flex-col shrink-0 z-30 shadow-xl overflow-hidden animate-in slide-in-from-right duration-200">
-              
-              {/* Inspector Header with Subtabs */}
-              <div className="p-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/70">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center font-bold text-xs">
-                    <Sliders size={14} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-white">Controls Inspector</h3>
-                    <p className="text-[11px] text-slate-400">Live app permission &amp; component state</p>
-                  </div>
+            <>
+              {/* Mobile Backdrop Overlay */}
+              <div
+                className="fixed inset-0 bg-black/70 backdrop-blur-xs z-40 md:hidden animate-in fade-in duration-200"
+                onClick={() => setIsInspectorOpen(false)}
+              />
+
+              <aside className="fixed inset-x-0 bottom-0 max-h-[84vh] md:static md:w-[440px] md:max-h-none bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 rounded-t-3xl md:rounded-none flex flex-col shrink-0 z-50 md:z-30 shadow-2xl overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-right duration-200">
+                {/* Android Drag Handle Pill (Mobile only) */}
+                <div className="pt-2.5 pb-1 md:hidden flex justify-center shrink-0 bg-slate-950/80">
+                  <div className="w-12 h-1 bg-slate-700 rounded-full" />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleResetToDatabase}
-                  className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white transition-colors cursor-pointer"
-                  title="Revert to database values"
-                >
-                  <RotateCcw size={11} />
-                  <span>Revert</span>
-                </button>
-              </div>
+                {/* Inspector Header with Subtabs */}
+                <div className="p-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/70">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center font-bold text-xs">
+                      <Sliders size={14} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-white">Controls Inspector</h3>
+                      <p className="text-[11px] text-slate-400">Live app permission &amp; component state</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleResetToDatabase}
+                      className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white transition-colors cursor-pointer"
+                      title="Revert to database values"
+                    >
+                      <RotateCcw size={11} />
+                      <span>Revert</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsInspectorOpen(false)}
+                      className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white md:hidden ml-1"
+                      aria-label="Close Inspector"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                </div>
 
               {/* Inspector Subtabs: All Controls vs Hidden Components */}
               <div className="px-4 pt-3 pb-2 border-b border-slate-800 flex items-center gap-2 bg-slate-950/40">
@@ -1747,7 +1857,8 @@ export default function RoleAppPreviewModal({
               </div>
 
             </aside>
-          )}
+          </>
+        )}
 
         </div>
 

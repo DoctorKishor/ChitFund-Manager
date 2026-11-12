@@ -3833,7 +3833,7 @@ Thank you for your prompt payment! 🙏`;
 
             {/* BEGIN: CycleTimelineBar */}
             {activeGroup && (
-              <section className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs flex items-center justify-between gap-4 overflow-x-auto scrollbar-none" data-purpose="cycle-timeline">
+              <section className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 overflow-x-auto scrollbar-none" data-purpose="cycle-timeline">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1 flex items-center gap-1.5 shrink-0">
                     <Calendar size={14} className="text-slate-400" />
