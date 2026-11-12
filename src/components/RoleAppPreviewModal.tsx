@@ -61,7 +61,9 @@ import {
   DollarSign,
   Send,
   Zap,
-  ArrowRight
+  ArrowRight,
+  Rocket,
+  ChevronDown
 } from 'lucide-react';
 
 interface RoleAppPreviewModalProps {
@@ -118,9 +120,13 @@ const CATEGORY_TAB_MAP: Record<string, MainTabId> = {
 };
 
 const ALL_ACTIONS: ActionMeta[] = [
-  // 1. Overview Dashboard (2 Actions)
+  // 1. Overview Dashboard (6 Actions)
   { key: 'dashboard:view_kpis', label: 'View Financial KPIs & Reserves', desc: 'Inspect high-level cash collections, pool totals & active cycle targets', category: 'Overview Dashboard', icon: BarChart3 },
   { key: 'dashboard:quick_actions', label: 'Access Dashboard Quick Actions', desc: 'Use floating and header quick action shortcuts for payments and spends', category: 'Overview Dashboard', icon: Sparkles },
+  { key: 'dashboard:launch_month0', label: 'Confirm Launch & Roll to Month 1', desc: 'Confirm Launch Month collections and roll to Month 1 (Organizer Profit)', category: 'Overview Dashboard', icon: Rocket },
+  { key: 'dashboard:advance_month', label: 'Conclude Cycle & Advance Month', desc: 'Close active auction month cycle and advance chit to the next month', category: 'Overview Dashboard', icon: ArrowRight },
+  { key: 'dashboard:revert_month', label: 'Roll Back / Revert Cycle Month', desc: 'Revert active chit cycle to the preceding month in case of errors', category: 'Overview Dashboard', icon: RotateCcw },
+  { key: 'dashboard:view_reserves', label: 'View Kai Iruppu Reserve History', desc: 'Expand and inspect historical discount breakdown in Kai Iruppu pool', category: 'Overview Dashboard', icon: ChevronDown },
 
   // 2. Chits & Groups Tab (8 Actions)
   { key: 'chits:view', label: 'View Chit Schemes', desc: 'Inspect duration, pot totals, cycle history, and enrolled tickets', category: 'Chits & Groups Tab', icon: Briefcase },
@@ -350,9 +356,21 @@ function resolveComponentFromDOM(
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
+      // Revert Month
+      if (lower.includes('revert to m') || lower.includes('revert month') || lower.includes('roll back active cycle')) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'dashboard:revert_month');
+        if (a) return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
+      // Kai Iruppu Reserves History
+      if (lower.includes('history (') || (lower.includes('breakdown') && lower.includes('kai iruppu'))) {
+        const a = ALL_ACTIONS.find((x) => x.key === 'dashboard:view_reserves');
+        if (a) return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      }
+
       // Launch Month 0
       if (lower.includes('month 0') || lower.includes('launch month') || lower.includes('organizer profit') || lower.includes('confirm launch')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'chits:launch_month0')!;
+        const a = ALL_ACTIONS.find((x) => x.key === 'dashboard:launch_month0') || ALL_ACTIONS.find((x) => x.key === 'chits:launch_month0')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
@@ -380,9 +398,9 @@ function resolveComponentFromDOM(
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 
-      // Conclude Auction
+      // Conclude Auction / Advance Month
       if (lower.includes('conclude') || lower.includes('award pot') || lower.includes('advance month') || lower.includes('close month')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'auctions:conclude')!;
+        const a = ALL_ACTIONS.find((x) => x.key === 'dashboard:advance_month') || ALL_ACTIONS.find((x) => x.key === 'auctions:conclude')!;
         return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
       }
 

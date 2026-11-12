@@ -65,6 +65,10 @@ const CATEGORIES: PermissionCategory[] = [
     items: [
       { key: 'dashboard:view_kpis', label: 'View Financial KPIs & Net Reserves', desc: 'Inspect high-level cash collections, pool totals & active cycle targets' },
       { key: 'dashboard:quick_actions', label: 'Access Dashboard Quick Actions', desc: 'Use floating and header quick action shortcuts for payments and spends' },
+      { key: 'dashboard:launch_month0', label: 'Confirm Launch & Roll to Month 1', desc: 'Confirm Launch Month collections and roll to Month 1 (Organizer Profit)' },
+      { key: 'dashboard:advance_month', label: 'Conclude Cycle & Advance Month', desc: 'Close active auction month cycle and advance chit to the next month' },
+      { key: 'dashboard:revert_month', label: 'Roll Back / Revert Cycle Month', desc: 'Revert active chit cycle to the preceding month in case of operational errors' },
+      { key: 'dashboard:view_reserves', label: 'View Kai Iruppu Reserve History', desc: 'Expand and inspect historical discount breakdown in Kai Iruppu pool' },
     ],
   },
   {

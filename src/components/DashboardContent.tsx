@@ -163,7 +163,12 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const { profile, canPerformAction } = useAuth();
   const canCreateChit = canPerformAction('chits:create');
   const canEditChit = canPerformAction('chits:edit');
-  const canLaunchMonth0 = canPerformAction('chits:launch_month0');
+  const canLaunchMonth0 = canPerformAction('chits:launch_month0') || canPerformAction('dashboard:launch_month0');
+  const canConcludeMonth = canPerformAction('auctions:conclude') || canPerformAction('dashboard:advance_month');
+  const canRevertMonth = canPerformAction('chits:edit') || canPerformAction('dashboard:revert_month');
+  const canViewReserves = canPerformAction('dashboard:view_reserves');
+  const canViewKpis = canPerformAction('dashboard:view_kpis');
+  const canQuickActions = canPerformAction('dashboard:quick_actions');
   const canDeleteChit = canPerformAction('chits:delete');
   const canRescheduleAuction = canPerformAction('chits:reschedule_auction');
   const canConfigureLaabaSeetu = canPerformAction('chits:configure_laaba_seetu');
@@ -3818,10 +3823,11 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* Primary Quick Action: Record Payment */}
-              {canCollect && (
+              {canCollect && canQuickActions && (
                 <button
                   type="button"
                   data-action="members:collect"
+                  data-permission-key="dashboard:quick_actions"
                   onClick={() => handleOpenRecordPayment(null)}
                   className="inline-flex items-center gap-2 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all shrink-0 cursor-pointer"
                 >
@@ -3918,9 +3924,10 @@ Thank you for your prompt payment! 🙏`;
                       </div>
 
                       <div className="flex items-center gap-1.5">
-                        {(activeGroup.currentMonth ?? 0) > 0 && (
+                        {(activeGroup.currentMonth ?? 0) > 0 && canRevertMonth && (
                           <button
                             type="button"
+                            data-action="dashboard:revert_month"
                             onClick={handleRevertMonth}
                             disabled={isClosingMonth}
                             className="px-2.5 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
@@ -3992,19 +3999,22 @@ Thank you for your prompt payment! 🙏`;
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleCloseMonth}
-                      disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100/80 text-brand-700 text-xs font-bold transition-colors border border-brand-200/50 disabled:opacity-40 cursor-pointer"
-                    >
-                      <span>
-                        {selectedDashboardMonth === 0 
-                          ? (isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M1') 
-                          : (isClosingMonth ? 'Closing...' : 'Close Month Cycle')}
-                      </span>
-                      <ArrowRight size={14} />
-                    </button>
+                    {((selectedDashboardMonth === 0 && canLaunchMonth0) || (selectedDashboardMonth > 0 && canConcludeMonth)) && (
+                      <button
+                        type="button"
+                        data-action={selectedDashboardMonth === 0 ? "dashboard:launch_month0" : "dashboard:advance_month"}
+                        onClick={handleCloseMonth}
+                        disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100/80 text-brand-700 text-xs font-bold transition-colors border border-brand-200/50 disabled:opacity-40 cursor-pointer"
+                      >
+                        <span>
+                          {selectedDashboardMonth === 0 
+                            ? (isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M1') 
+                            : (isClosingMonth ? 'Closing...' : 'Close Month Cycle')}
+                        </span>
+                        <ArrowRight size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -4015,9 +4025,10 @@ Thank you for your prompt payment! 🙏`;
                       <span className="text-[11px] font-bold tracking-wider uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
                         KAI IRUPPU POOL
                       </span>
-                      {completedGroupAuctions.length > 0 && (
+                      {completedGroupAuctions.length > 0 && canViewReserves && (
                         <button
                           type="button"
+                          data-action="dashboard:view_reserves"
                           onClick={() => setShowKaiIruppuBreakdown(prev => !prev)}
                           className="text-xs text-brand-600 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                         >
@@ -4072,14 +4083,17 @@ Thank you for your prompt payment! 🙏`;
                       <span className={`w-2 h-2 rounded-full ${isLaabaActive ? 'bg-emerald-500' : 'bg-amber-400'}`} />
                       <span>{isLaabaActive ? 'Laaba Seetu Active (₹0 Due)' : 'Interest accruing: 1.2%/mo'}</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowKaiIruppuBreakdown(p => !p)}
-                      className="text-slate-600 hover:text-slate-900 font-semibold cursor-pointer"
-                      title="Breakdown"
-                    >
-                      Breakdown
-                    </button>
+                    {canViewReserves && (
+                      <button
+                        type="button"
+                        data-action="dashboard:view_reserves"
+                        onClick={() => setShowKaiIruppuBreakdown(p => !p)}
+                        className="text-slate-600 hover:text-slate-900 font-semibold cursor-pointer"
+                        title="Breakdown"
+                      >
+                        Breakdown
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -4814,19 +4828,22 @@ Thank you for your prompt payment! 🙏`;
                 </div>
 
                 {/* Primary Cycle Advance CTA Inside Hero */}
-                <div className="relative z-10 mt-5">
-                  <button
-                    type="button"
-                    onClick={handleCloseMonth}
-                    disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup?.currentMonth ?? 0)}
-                    className="w-full py-3 px-4 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-40 cursor-pointer"
-                  >
-                    <span>
-                      {selectedDashboardMonth === 0 ? 'Confirm Launch & Roll to Month 1' : 'Conclude & Advance Month'}
-                    </span>
-                    <ArrowRight size={15} className="shrink-0" />
-                  </button>
-                </div>
+                {((selectedDashboardMonth === 0 && canLaunchMonth0) || (selectedDashboardMonth > 0 && canConcludeMonth)) && (
+                  <div className="relative z-10 mt-5">
+                    <button
+                      type="button"
+                      data-action={selectedDashboardMonth === 0 ? "dashboard:launch_month0" : "dashboard:advance_month"}
+                      onClick={handleCloseMonth}
+                      disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup?.currentMonth ?? 0)}
+                      className="w-full py-3 px-4 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-40 cursor-pointer"
+                    >
+                      <span>
+                        {selectedDashboardMonth === 0 ? 'Confirm Launch & Roll to Month 1' : 'Conclude & Advance Month'}
+                      </span>
+                      <ArrowRight size={15} className="shrink-0" />
+                    </button>
+                  </div>
+                )}
               </section>
               {/* END: HeroFinancialCard */}
 
@@ -10142,7 +10159,7 @@ Thank you for your prompt payment! 🙏`;
       })()}
 
       {/* ── FLOATING ACTION BUTTON (FAB) & SPEED-DIAL MENU (DESKTOP ONLY) ────── */}
-      {activeTab === 'dashboard' && (canCollect || canPersonalDraw || canBroadcastReminders || canAtmRelocate) && (
+      {activeTab === 'dashboard' && canQuickActions && (canCollect || canPersonalDraw || canBroadcastReminders || canAtmRelocate) && (
         <>
           {/* Backdrop Blur Overlay when FAB is Open */}
           {isFabOpen && (
@@ -10248,6 +10265,7 @@ Thank you for your prompt payment! 🙏`;
             {/* Main Primary FAB Trigger Button */}
             <button
               type="button"
+              data-permission-key="dashboard:quick_actions"
               onClick={() => {
                 triggerHapticFeedback('light');
                 setIsFabOpen(prev => !prev);

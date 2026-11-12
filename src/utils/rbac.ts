@@ -16,6 +16,10 @@ export type PermissionAction =
   // ── Overview & Dashboard Controls ──
   | 'dashboard:view_kpis'
   | 'dashboard:quick_actions'
+  | 'dashboard:launch_month0'
+  | 'dashboard:advance_month'
+  | 'dashboard:revert_month'
+  | 'dashboard:view_reserves'
 
   // ── Member & Passbook Logistics ──
   | 'members:view'
@@ -140,6 +144,10 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
   // ── Overview & Dashboard Controls ──
   'dashboard:view_kpis': ['admin', 'manager', 'auditor'],
   'dashboard:quick_actions': ['admin', 'manager', 'collections_agent'],
+  'dashboard:launch_month0': ['admin'],
+  'dashboard:advance_month': ['admin', 'manager'],
+  'dashboard:revert_month': ['admin'],
+  'dashboard:view_reserves': ['admin', 'manager', 'auditor'],
 
   // ── Member & Passbook Logistics ──
   'members:view': ['admin', 'manager', 'collections_agent', 'auditor', 'subscriber'],
