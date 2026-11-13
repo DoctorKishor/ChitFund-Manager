@@ -11,6 +11,7 @@ import { PaymentReceiptModal } from './PaymentReceiptModal';
 import UniversalRecordPaymentModal from './UniversalRecordPaymentModal';
 import { getPassbookScanUrl } from '@/utils/qrCodeGenerator';
 import { triggerHapticFeedback } from '@/utils/haptics';
+import { generateReceiptNumber } from '@/utils/receiptNumber';
 import { 
   ArrowLeft,
   CheckCircle2, 
@@ -958,7 +959,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         const userNote = paymentNote.trim() 
           ? (monthTag && !paymentNote.toLowerCase().includes('month') ? `${paymentNote.trim()} (${monthTag})` : paymentNote.trim())
           : defaultNote;
-        const batchId = `RCP-${Date.now().toString(36).toUpperCase()}`;
+        const batchId = generateReceiptNumber(effectiveDateStr ? new Date(effectiveDateStr) : undefined);
         const finalNote = `${userNote} [Batch:${batchId}]`;
 
         const { error: insertErr } = await supabase

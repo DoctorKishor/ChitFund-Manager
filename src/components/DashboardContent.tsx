@@ -22,6 +22,7 @@ import SlideToConfirm from './SlideToConfirm';
 import { HelpTooltip } from './HelpTooltip';
 import { triggerHapticFeedback } from '../utils/haptics';
 import { computeNextAuctionDateTime, formatTime12h, getFirstSundayOnOrAfterDay } from '../utils/auctionSchedule';
+import { generateReceiptNumber } from '@/utils/receiptNumber';
 import { 
   DollarSign, 
   Users, 
@@ -2183,7 +2184,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       }
 
       // 3. Build atomic collection rows per allocated month with linked Batch ID
-      const batchId = `RCP-${Date.now().toString(36).toUpperCase()}`;
+      const batchId = generateReceiptNumber(effectiveDateStr ? new Date(effectiveDateStr) : undefined);
       const batchTag = `[Batch:${batchId}|Total:${amt}|Alloc:${allocations.map(a => `${a.month}:${a.amount}:${a.type}`).join(';')}]`;
 
       const rowsToInsert = allocations.map(item => {
@@ -2706,7 +2707,7 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
     try {
       setIsMarkingAllPaid(true);
 
-      const batchId = `BATCH-${Date.now().toString(36).toUpperCase()}`;
+      const batchId = generateReceiptNumber();
 
       const txsToInsert = pendingMembers.map(p => ({
         group_id: activeDashboardGroupId,
@@ -3354,7 +3355,7 @@ Thank you for your prompt payment! 🙏`;
       // 1. Insert a permanent Supabase transaction record so payment survives refresh
       // Determine the earliest unpaid month from the ledger for cycle_month
       const earliestUnpaidMonth = member.ledger.find(e => e.original - e.paid > 0)?.month ?? selectedDashboardMonth ?? 1;
-      const batchId = `RCP-${Date.now().toString(36).toUpperCase()}`;
+      const batchId = generateReceiptNumber();
       const fifoNote = `[FIFO] ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} — oldest arrears cleared first [Batch:${batchId}]`;
       const { error: txErr } = await supabase.from('transactions').insert({
         profile_id: member.id || null,
@@ -5148,13 +5149,29 @@ Thank you for your prompt payment! 🙏`;
                     </div>
                   </div>
                   {setActiveTab && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('reports')}
-                      className="text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors cursor-pointer"
-                    >
-                      View All
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            sessionStorage.setItem('cf_reports_subtab', 'receipts');
+                          }
+                          setActiveTab('reports');
+                        }}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                        title="Search and view all official receipts in Reports Center"
+                      >
+                        <Receipt size={12} />
+                        <span>Receipts Vault</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('reports')}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                      >
+                        View All
+                      </button>
+                    </div>
                   )}
                 </div>
 

@@ -9,6 +9,7 @@ import PassbookScannerModal from '@/components/PassbookScannerModal';
 import { PaymentReceiptModal } from '@/components/PaymentReceiptModal';
 import { searchSubscribersFuzzy } from '@/utils/fuzzySearch';
 import { logAuditEvent } from '@/utils/auditLogger';
+import { generateReceiptNumber } from '@/utils/receiptNumber';
 import {
   X,
   Check,
@@ -877,7 +878,7 @@ export default function UniversalRecordPaymentModal({
       }
 
       // 3. Build Batch Collection Rows
-      const batchId = `RCP-${Date.now().toString(36).toUpperCase()}`;
+      const batchId = generateReceiptNumber(effectiveDateStr ? new Date(effectiveDateStr) : undefined);
       const batchTag = `[Batch:${batchId}]`;
 
       const rowsToInsert = calculatedItemsList.map(item => {

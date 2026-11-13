@@ -170,6 +170,7 @@ const CATEGORIES: PermissionCategory[] = [
       { key: 'reports:export_checklist', label: 'Print Monthly Collection Checklist', desc: 'Print sheet for agents to mark off dues physically in the field' },
       { key: 'reports:export_ledger', label: 'Download Passbook Ledgers (PDF)', desc: 'Download official member payment history statement PDFs' },
       { key: 'reports:view_defaulters', label: 'View Defaulters & Overdue Dues', desc: 'See members with unpaid installments and overdue payment alerts' },
+      { key: 'reports:view_receipts', label: 'Search & View Payment Receipts', desc: 'Search, audit, verify, download, and re-issue subscriber payment receipts' },
       { key: 'reports:view_audit_logs', label: 'View System Activity & Audit Logs', desc: 'View history of all staff logins, changes, payments, and edits' },
       { key: 'reports:export_audit', label: 'Download Activity Log (CSV)', desc: 'Export full history of system activities and changes' },
     ],

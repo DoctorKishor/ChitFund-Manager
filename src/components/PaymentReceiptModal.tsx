@@ -21,6 +21,7 @@ import {
 import { toPng } from 'html-to-image';
 import { triggerHapticFeedback } from '../utils/haptics';
 import { useOrganization } from '@/context/OrganizationContext';
+import { extractReceiptNumber } from '@/utils/receiptNumber';
 
 export interface PaymentAllocationItem {
   month: number;
@@ -94,24 +95,34 @@ function numberToWordsINR(amount: number): string {
 // Helper to parse batch metadata from transaction note if not passed directly via props
 function parseBatchMetadata(notes?: string | null): { batchId?: string; totalAmount?: number; allocations?: PaymentAllocationItem[] } | null {
   if (!notes) return null;
-  const match = notes.match(/\[Batch:([A-Za-z0-9_-]+)\|Total:([0-9.]+)\|Alloc:([^\]]+)\]/);
-  if (!match) return null;
-  try {
-    const batchId = match[1];
-    const totalAmount = parseFloat(match[2]);
-    const allocStr = match[3];
-    const allocations: PaymentAllocationItem[] = allocStr.split(';').map(item => {
-      const [m, a, t] = item.split(':');
-      return {
-        month: parseInt(m, 10),
-        amount: parseFloat(a),
-        type: (t as any) || 'current'
-      };
-    });
-    return { batchId, totalAmount, allocations };
-  } catch {
-    return null;
+  // 1. Full multi-month allocation batch tag: [Batch:RCP-...|Total:10000|Alloc:...]
+  const fullMatch = notes.match(/\[Batch:([A-Za-z0-9_-]+)\|Total:([0-9.]+)\|Alloc:([^\]]+)\]/);
+  if (fullMatch) {
+    try {
+      const batchId = fullMatch[1];
+      const totalAmount = parseFloat(fullMatch[2]);
+      const allocStr = fullMatch[3];
+      const allocations: PaymentAllocationItem[] = allocStr.split(';').map(item => {
+        const [m, a, t] = item.split(':');
+        return {
+          month: parseInt(m, 10),
+          amount: parseFloat(a),
+          type: (t as any) || 'current'
+        };
+      });
+      return { batchId, totalAmount, allocations };
+    } catch {
+      // Fall through
+    }
   }
+
+  // 2. Simple batch tag: [Batch:RCP-...] or [RCP-...]
+  const simpleMatch = notes.match(/\[(?:Batch:)?((?:RCP|BATCH)-[A-Za-z0-9_-]+)\]/i);
+  if (simpleMatch && simpleMatch[1]) {
+    return { batchId: simpleMatch[1].toUpperCase() };
+  }
+
+  return null;
 }
 
 // Helper to get formatted Calendar Month label for a chit group month
@@ -200,7 +211,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   const isCleared = remainingBalance === 0;
   const totalGroupOutstanding = isMultiMonth ? pastPendingDues : (remainingBalance + pastPendingDues);
 
-  const receiptNo = parsedBatch?.batchId || `RCP-${String(transaction.id || 'TX001').slice(0, 8).toUpperCase()}`;
+  const receiptNo = parsedBatch?.batchId || extractReceiptNumber(transaction);
   const monthLabel = isMultiMonth 
     ? `Multi-Month Settlement (${activeAllocations!.map(a => `M${a.month}`).join(' + ')})`
     : getReceiptMonthLabel(group?.start_date, month, transaction.created_at);

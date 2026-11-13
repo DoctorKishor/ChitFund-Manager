@@ -105,7 +105,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
       'members:view', 'members:enroll', 'members:edit', 'members:collect', 'members:waive_penalties', 'members:suspend', 'members:pair_qr', 'members:revoke_qr', 'members:batch_qr', 'members:reset_mpin', 'members:export', 'members:delete',
       'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:override_floor', 'auctions:edit_historical', 'auctions:disburse', 'auctions:issue_receipt',
       'treasury:view', 'treasury:view_cash_box', 'treasury:view_banks', 'treasury:collect_cash', 'treasury:move_money', 'treasury:confirm_atm', 'treasury:deposit', 'treasury:recover_float', 'treasury:personal_draw', 'treasury:settle_draw', 'treasury:delete_transaction', 'treasury:reconcile',
-      'reports:view', 'reports:view_pnl', 'reports:export', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_audit_logs', 'reports:export_audit',
+      'reports:view', 'reports:view_pnl', 'reports:export', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_receipts', 'reports:view_audit_logs', 'reports:export_audit',
       'communication:view', 'communication:broadcast', 'communication:pre_auction', 'communication:post_auction', 'communication:due_alerts', 'communication:custom', 'communication:manage_templates',
       'system:manage_users', 'system:manage_staff', 'system:manage_roles', 'system:branding', 'system:maintenance_mode', 'system:reset_database'
     ],
@@ -125,7 +125,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
       'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:disburse', 'auctions:issue_receipt',
       'treasury:view_cash_box', 'treasury:collect_cash', 'treasury:recover_float',
       'communication:view', 'communication:broadcast', 'communication:pre_auction', 'communication:post_auction', 'communication:due_alerts', 'communication:custom', 'communication:manage_templates',
-      'reports:view', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters'
+      'reports:view', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_receipts'
     ],
   },
   {
@@ -140,6 +140,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
       'dashboard:quick_actions',
       'members:view', 'members:collect', 'members:pair_qr',
       'treasury:collect_cash',
+      'reports:view_receipts',
       'communication:view', 'communication:broadcast', 'communication:due_alerts'
     ],
   },
@@ -171,7 +172,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
       'members:view', 'members:export',
       'auctions:view',
       'treasury:view', 'treasury:view_cash_box',
-      'reports:view', 'reports:view_pnl', 'reports:export', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_audit_logs', 'reports:export_audit'
+      'reports:view', 'reports:view_pnl', 'reports:export', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_receipts', 'reports:view_audit_logs', 'reports:export_audit'
     ],
   },
   {
@@ -276,6 +277,7 @@ const ALL_ACTIONS: ActionMeta[] = [
   { key: 'reports:export_checklist', label: 'Print Monthly Collection Checklist', desc: 'Print sheet for agents to mark off dues physically in the field', category: 'Reports & Analytics Tab', icon: Layers },
   { key: 'reports:export_ledger', label: 'Download Passbook Ledgers (PDF)', desc: 'Download official member payment history statement PDFs', category: 'Reports & Analytics Tab', icon: BarChart3 },
   { key: 'reports:view_defaulters', label: 'View Defaulters & Overdue Dues', desc: 'See members with unpaid installments and overdue payment alerts', category: 'Reports & Analytics Tab', icon: AlertTriangle },
+  { key: 'reports:view_receipts', label: 'Search & View Payment Receipts', desc: 'Search, audit, verify, download, and re-issue subscriber payment receipts', category: 'Reports & Analytics Tab', icon: Layers },
   { key: 'reports:view_audit_logs', label: 'View System Activity & Audit Logs', desc: 'View history of all staff logins, changes, payments, and edits', category: 'Reports & Analytics Tab', icon: Shield },
   { key: 'reports:export_audit', label: 'Download Activity Log (CSV)', desc: 'Export full history of system activities and changes', category: 'Reports & Analytics Tab', icon: ArrowRight },
 
@@ -362,6 +364,7 @@ const ACTION_MATCH_RULES: { key: PermissionAction; match: (lower: string) => boo
   { key: 'reports:export_audit', match: (t) => t.includes('export activity') || t.includes('download activity') || t.includes('export audit') },
   { key: 'reports:export_ledger', match: (t) => t.includes('passbook ledger') || t.includes('download passbook') || t.includes('statement pdf') },
   { key: 'reports:view_defaulters', match: (t) => t.includes('defaulter') || t.includes('overdue dues') || t.includes('unpaid installment') },
+  { key: 'reports:view_receipts', match: (t) => t.includes('payment receipt') || t.includes('receipt archive') || t.includes('search receipt') || t.includes('receipt') },
   { key: 'reports:view_audit_logs', match: (t) => t.includes('audit log') || t.includes('system activity') || t.includes('activity log') },
   { key: 'reports:view_pnl', match: (t) => t.includes('profit & loss') || t.includes('p&l') || t.includes('organizer earnings') },
   { key: 'reports:export', match: (t) => t.includes('download reports') || t.includes('export csv') || t.includes('export excel') },

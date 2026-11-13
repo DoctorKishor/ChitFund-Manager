@@ -42,9 +42,11 @@ import {
   Wallet,
   Percent,
   Trophy,
-  RefreshCw
+  RefreshCw,
+  Receipt,
 } from 'lucide-react';
 import SystemAuditLogViewer from './SystemAuditLogViewer';
+import ReceiptsVaultViewer from './ReceiptsVaultViewer';
 
 export type ReportSubtab = 
   | 'monthly' 
@@ -55,6 +57,7 @@ export type ReportSubtab =
   | 'payouts' 
   | 'member' 
   | 'reliability'
+  | 'receipts'
   | 'system_log';
 
 interface SubtabConfig {
@@ -73,6 +76,7 @@ const REPORT_SUBTABS: SubtabConfig[] = [
   { id: 'payouts', label: 'Payouts', icon: CreditCard, description: 'Auction prize disbursements, net payouts & debt liabilities' },
   { id: 'member', label: 'Member', icon: User, description: 'Individual subscriber ledgers, statements & ticket history' },
   { id: 'reliability', label: 'Reliability', icon: ShieldCheck, description: 'Punctuality ratings, member trust score & payment habits' },
+  { id: 'receipts', label: 'Receipts', icon: Receipt, description: 'Search, audit, verify & re-issue all subscriber payment receipts' },
   { id: 'system_log', label: 'System Logs', icon: ShieldCheck, description: 'Live immutable system audit trail, security events & administrative history' },
 ];
 
@@ -87,15 +91,36 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
   const canExportChecklist = canPerformAction('reports:export_checklist');
   const canExportLedger = canPerformAction('reports:export_ledger');
   const canViewDefaulters = canPerformAction('reports:view_defaulters');
+  const canViewReceipts = canPerformAction('reports:view_receipts');
   const canViewAuditLogs = canPerformAction('reports:view_audit_logs');
   const { balances } = useWallet();
   const { organizationName: organizerCompanyName, organizationInitials: organizerInitials } = useOrganization();
-  const [activeSubtab, setActiveSubtab] = useState<ReportSubtab>(initialSubtab || 'monthly');
+  const [activeSubtab, setActiveSubtab] = useState<ReportSubtab>(() => {
+    if (initialSubtab) return initialSubtab;
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('cf_reports_subtab');
+        if (saved) {
+          sessionStorage.removeItem('cf_reports_subtab');
+          return saved as ReportSubtab;
+        }
+      } catch {}
+    }
+    return 'monthly';
+  });
 
-  // Sync external initialSubtab navigation
+  // Sync external initialSubtab navigation or session storage triggers
   useEffect(() => {
     if (initialSubtab) {
       setActiveSubtab(initialSubtab);
+    } else if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('cf_reports_subtab');
+        if (saved) {
+          sessionStorage.removeItem('cf_reports_subtab');
+          setActiveSubtab(saved as ReportSubtab);
+        }
+      } catch {}
     }
   }, [initialSubtab]);
 
@@ -107,12 +132,13 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
   // Fallback to permitted subtab if active subtab is restricted
   useEffect(() => {
     if (activeSubtab === 'monthly' && !canExportChecklist) {
-      if (canViewDefaulters) handleSelectSubtab('defaulters');
+      if (canViewReceipts) handleSelectSubtab('receipts');
+      else if (canViewDefaulters) handleSelectSubtab('defaulters');
       else if (canExportLedger) handleSelectSubtab('member');
       else if (canViewPnl) handleSelectSubtab('overview');
       else if (canViewAuditLogs) handleSelectSubtab('system_log');
     }
-  }, [activeSubtab, canExportChecklist, canViewDefaulters, canExportLedger, canViewPnl, canViewAuditLogs]);
+  }, [activeSubtab, canExportChecklist, canViewReceipts, canViewDefaulters, canExportLedger, canViewPnl, canViewAuditLogs]);
 
   // Supabase Data State
   const [loading, setLoading] = useState<boolean>(true);
@@ -2509,6 +2535,19 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                     </button>
                   )}
 
+                  {canViewReceipts && (
+                    <button
+                      onClick={() => handleSelectSubtab('receipts')}
+                      className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                        activeSubtab === 'receipts'
+                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                          : 'hover:bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      <span>🧾</span> Payment Receipts
+                    </button>
+                  )}
+
                   {canViewAuditLogs && (
                     <button
                       onClick={() => handleSelectSubtab('system_log')}
@@ -3185,6 +3224,11 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
               </section>
             )}
 
+            {/* Subtab: Receipts Archive & Search */}
+            {activeSubtab === 'receipts' && (
+              <ReceiptsVaultViewer />
+            )}
+
             {/* Subtab 8: Live System Audit Log */}
             {activeSubtab === 'system_log' && (
               <SystemAuditLogViewer onBack={() => handleSelectSubtab('monthly')} />
@@ -3326,6 +3370,16 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                 }`}
               >
                 Trust Score
+              </button>
+            )}
+            {canViewReceipts && (
+              <button
+                onClick={() => handleSelectSubtab('receipts')}
+                className={`flex-shrink-0 px-3 py-1 rounded-xl flex items-center gap-1 cursor-pointer transition-all ${
+                  activeSubtab === 'receipts' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                }`}
+              >
+                <span>🧾</span> Receipts
               </button>
             )}
             {canViewAuditLogs && (
@@ -3630,6 +3684,11 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                 </div>
               ))}
             </section>
+          )}
+
+          {/* Subtab on Mobile: Receipts Archive & Search */}
+          {activeSubtab === 'receipts' && (
+            <ReceiptsVaultViewer />
           )}
 
           {/* Subtab 8 on Mobile: Live System Audit Log */}

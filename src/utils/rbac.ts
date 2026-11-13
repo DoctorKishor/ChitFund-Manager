@@ -85,6 +85,7 @@ export type PermissionAction =
   | 'reports:export_checklist'
   | 'reports:export_ledger'
   | 'reports:view_defaulters'
+  | 'reports:view_receipts'
   | 'reports:view_audit_logs'
   | 'reports:export_audit'
 
@@ -213,6 +214,7 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
   'reports:export_checklist': ['admin', 'manager', 'collections_agent', 'auditor'],
   'reports:export_ledger': ['admin', 'manager', 'auditor'],
   'reports:view_defaulters': ['admin', 'manager', 'auditor'],
+  'reports:view_receipts': ['admin', 'manager', 'collections_agent', 'auditor'],
   'reports:view_audit_logs': ['admin', 'auditor'],
   'reports:export_audit': ['admin', 'auditor'],
 
