@@ -18,6 +18,7 @@ import QuickPersonalDrawModal from './QuickPersonalDrawModal';
 import QuickAtmWithdrawalModal from './QuickAtmWithdrawalModal';
 import PaymentChecklistPrintModal from './PaymentChecklistPrintModal';
 import { PaymentReceiptModal } from './PaymentReceiptModal';
+import LiveAuditLogWidget from './LiveAuditLogWidget';
 import SlideToConfirm from './SlideToConfirm';
 import { HelpTooltip } from './HelpTooltip';
 import { triggerHapticFeedback } from '../utils/haptics';
@@ -4500,59 +4501,16 @@ Thank you for your prompt payment! 🙏`;
                   )}
                 </div>
 
-                {/* Card 2: Live System Audit Log */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3.5">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
-                        <ShieldAlert size={16} />
-                      </div>
-                      <h3 className="font-display font-bold text-sm text-slate-900">Live System Audit Log</h3>
-                    </div>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/50">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Connected
-                    </span>
-                  </div>
-
-                  {/* Structured Audit Feed */}
-                  <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-0.5 scrollbar-thin">
-                    {auditLogs.length === 0 ? (
-                      <div className="py-6 text-center text-xs text-slate-400">
-                        No transactions logged yet. Real database actions will appear here live.
-                      </div>
-                    ) : (
-                      auditLogs.slice(0, 5).map((log, index) => (
-                        <div key={index} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1">
-                          <div className="flex items-center justify-between font-mono text-[10px] text-slate-500 mb-0.5">
-                            <span>{log.timestamp}</span>
-                            <span className="text-brand-600 font-semibold uppercase">{log.table}</span>
-                          </div>
-                          <p className="font-semibold text-slate-800 text-[11px] leading-tight">{log.desc}</p>
-                          <div className="flex items-center justify-between mt-1 text-[10px] text-slate-500">
-                            <span>Executor: {log.executor}</span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <span className="italic text-[11px]">Database stream synced</span>
-                    {setActiveTab && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReportsInitialSubtab('system_log');
-                          setActiveTab('reports');
-                        }}
-                        className="font-semibold text-brand-600 hover:underline cursor-pointer"
-                      >
-                        Full Log Report
-                      </button>
-                    )}
-                  </div>
-                </div>
+                {/* Card 2: Live System Activity Feed Widget (Identical to SystemAuditLogViewer) */}
+                <LiveAuditLogWidget
+                  onViewFullReport={() => {
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.setItem('cf_reports_subtab', 'system_log');
+                    }
+                    setReportsInitialSubtab('system_log');
+                    if (setActiveTab) setActiveTab('reports');
+                  }}
+                />
 
                 {/* Card 3: Quick WhatsApp Broadcast Card */}
                 <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
@@ -5242,6 +5200,18 @@ Thank you for your prompt payment! 🙏`;
                 </div>
               </section>
               {/* END: RecentPaymentsLedgerSection */}
+
+              {/* Card: Live System Activity Feed (Mobile) */}
+              <LiveAuditLogWidget
+                limit={5}
+                onViewFullReport={() => {
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('cf_reports_subtab', 'system_log');
+                  }
+                  setReportsInitialSubtab('system_log');
+                  if (setActiveTab) setActiveTab('reports');
+                }}
+              />
             </>
           )}
         </div>
