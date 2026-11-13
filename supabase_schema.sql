@@ -339,15 +339,25 @@ begin
                            ' to ' || coalesce(target_member_name, 'Winner') || 
                            ' from ' || replace(coalesce(new.wallet_type, 'bank'), '_', ' ');
       elsif new.type = 'personal_draw' then
-        log_description := 'Logged personal draw of ₹' || trim(to_char(new.amount, '99,99,999')) || 
-                           ' from ' || replace(coalesce(new.wallet_type, 'cash'), '_', ' ') || 
-                           coalesce(' (' || nullif(new.notes, '') || ')', '');
+        if new.notes like '%[Float Recovery]%' then
+          log_description := 'RECOVERED FLOATING CASH: Returned ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                             ' from ' || replace(coalesce(new.wallet_type, 'vault'), '_', ' ') || ' (Float Recovery)';
+        else
+          log_description := 'Logged personal draw of ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                             ' from ' || replace(coalesce(new.wallet_type, 'cash'), '_', ' ') || 
+                             coalesce(' (' || nullif(new.notes, '') || ')', '');
+        end if;
       elsif new.type = 'atm_withdrawal' then
         log_description := 'Logged ATM cash withdrawal of ₹' || trim(to_char(new.amount, '99,99,999')) || 
                            ' from ' || replace(coalesce(new.wallet_type, 'bank'), '_', ' ');
       elsif new.type = 'transfer' then
-        log_description := 'Transferred ₹' || trim(to_char(new.amount, '99,99,999')) || 
-                           ' from ' || replace(coalesce(new.wallet_type, 'account'), '_', ' ');
+        if new.notes like '%[Float Recovery]%' then
+          log_description := 'RECOVERED FLOATING CASH: Returned ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                             ' from ' || replace(coalesce(new.wallet_type, 'vault'), '_', ' ') || ' (Float Recovery)';
+        else
+          log_description := 'Transferred ₹' || trim(to_char(new.amount, '99,99,999')) || 
+                             ' from ' || replace(coalesce(new.wallet_type, 'account'), '_', ' ');
+        end if;
       else
         log_description := 'Recorded ' || replace(new.type, '_', ' ') || ' of ₹' || trim(to_char(new.amount, '99,99,999')) || 
                            ' via ' || replace(coalesce(new.wallet_type, ''), '_', ' ');
@@ -1412,7 +1422,7 @@ begin
   ) values (
     p_source_wallet,
     p_source_wallet,
-    'personal_draw',
+    'transfer',
     'completed',
     p_amount,
     '[Float Recovery] ₹' || p_amount || ' returned from ' || p_source_wallet || ' (Ref Float: ' || p_float_id || ')',

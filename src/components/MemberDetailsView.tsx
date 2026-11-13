@@ -646,7 +646,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
     try {
       const { data, error } = await supabase
         .from('group_members')
-        .select('id, ticket_number, profile_id, alias_name, profiles(full_name)')
+        .select('id, ticket_number, profile_id, alias_name, profiles:profile_id(full_name)')
         .eq('group_id', groupId);
 
       if (error) {

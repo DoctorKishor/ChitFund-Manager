@@ -381,7 +381,7 @@ export default function CashVaultLedger() {
   // Computed Personal Draws
   const computedPersonalDraws = useMemo<PersonalDraw[]>(() => {
     return recentTransactions
-      .filter((t) => t.type === 'personal_draw')
+      .filter((t) => t.type === 'personal_draw' && !(t.notes || '').toLowerCase().includes('[float recovery'))
       .map((tx) => {
         const notes = tx.notes || '';
         
@@ -446,7 +446,16 @@ export default function CashVaultLedger() {
           depositedBy = byMatch[1].trim();
         }
 
-        const isRecovered = /(?:status:\s*(?:recovered|settled)|\[recovered\])/i.test(notes);
+        // Calculate recoveries linked to this floating deposit
+        const recoveries = recentTransactions.filter((r) =>
+          (r.notes || '').toLowerCase().includes('[float recovery') &&
+          ((r.notes || '').includes(tx.id) || (r.notes || '').includes(`ref float: ${tx.id}`))
+        );
+        const totalRecovered = recoveries.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+        const remainingAmount = Math.max(0, Number(tx.amount || 0) - totalRecovered);
+
+        const isExplicitlyRecovered = /(?:status:\s*(?:recovered|settled)|\[recovered\])/i.test(notes) && !notes.toLowerCase().includes('partially recovered');
+        const isRecovered = remainingAmount <= 0 || isExplicitlyRecovered;
         const status: 'active' | 'recovered' = isRecovered ? 'recovered' : 'active';
 
         let tag = 'Temporary Float';
@@ -455,15 +464,19 @@ export default function CashVaultLedger() {
           tag = tagMatch[1].trim();
         }
 
-        const desc = notes
+        let desc = notes
           .replace(/\[Floating Deposit.*?\]\s*/i, '')
           .replace(/\|\s*Deposited By:[^|]+/i, '')
           .replace(/\|\s*Status:[^|]+/i, '')
           .trim() || 'Floating Deposit';
 
+        if (totalRecovered > 0 && status === 'active') {
+          desc += ` (Recovered: ₹${totalRecovered.toLocaleString('en-IN')})`;
+        }
+
         return {
           id: tx.id,
-          amount: Number(tx.amount || 0),
+          amount: status === 'recovered' ? Number(tx.amount || 0) : remainingAmount,
           depositedBy,
           walletType: tx.wallet_type,
           tag,
@@ -934,7 +947,7 @@ export default function CashVaultLedger() {
     }
   };
 
-  // 7. Recover Floating Deposit (Atomic via recover_floating_deposit RPC)
+  // 7. Recover Floating Deposit (Atomic via recover_floating_deposit RPC with full fallback and audit logging)
   const handleConfirmRecoverFloat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recoveringFloat) return;
@@ -955,6 +968,7 @@ export default function CashVaultLedger() {
     try {
       setIsProcessingRecover(true);
 
+      let rpcSucceeded = false;
       const { data: rpcData, error: rpcErr } = await supabase.rpc('recover_floating_deposit', {
         p_float_id: recoveringFloat.id,
         p_source_wallet: recoverSourceWallet,
@@ -962,11 +976,56 @@ export default function CashVaultLedger() {
         p_admin_id: profile?.id || null,
       });
 
-      if (rpcErr || !rpcData?.success) {
-        alert('Failed to recover float: ' + (rpcData?.error || rpcErr?.message));
-        return;
+      if (!rpcErr && rpcData?.success) {
+        rpcSucceeded = true;
+      } else {
+        console.warn('RPC recover_floating_deposit failed, executing direct ledger recovery:', rpcErr?.message || rpcData?.error);
+
+        // 1. Debit the source wallet
+        const balRes = await updateBalance(recoverSourceWallet, -amount);
+        if (!balRes.success) {
+          throw new Error('Failed to update source wallet balance: ' + (balRes.error || 'Unknown error'));
+        }
+
+        // 2. Insert recovery transaction record
+        const recoveryNote = `[Float Recovery] Returned ${formatCurrency(amount)} to ${recoveringFloat.depositedBy} from ${WALLET_META[recoverSourceWallet].name} (Ref Float: ${recoveringFloat.id})`;
+        const { error: insErr } = await supabase.from('transactions').insert([
+          {
+            wallet_type: recoverSourceWallet,
+            from_wallet: recoverSourceWallet,
+            type: 'transfer',
+            status: 'completed',
+            amount: amount,
+            notes: recoveryNote,
+            created_by: profile?.id || null,
+          }
+        ]);
+        if (insErr) console.warn('Failed to insert recovery transaction record:', insErr.message);
+
+        // 3. Update notes on original float transaction
+        const isFullRecovery = amount >= recoveringFloat.amount;
+        const statusTag = isFullRecovery
+          ? 'Status: Recovered'
+          : `Status: Partially Recovered (Remaining: ₹${recoveringFloat.amount - amount})`;
+        await supabase
+          .from('transactions')
+          .update({
+            notes: `${recoveringFloat.notes} | ${statusTag} on ${new Date().toLocaleDateString()}`
+          })
+          .eq('id', recoveringFloat.id);
+
+        rpcSucceeded = true;
       }
 
+      // 4. Record System Audit Log Event so it is prominently visible in the System Log
+      await logAuditEvent({
+        actionDescription: `RECOVERED FLOATING CASH: Returned ${formatCurrency(amount)} to ${recoveringFloat.depositedBy} from ${WALLET_META[recoverSourceWallet].name}.`,
+        targetTable: 'global_treasury',
+        adminId: profile?.id || null,
+      });
+      window.dispatchEvent(new CustomEvent('chitfund:audit_updated'));
+
+      triggerHapticFeedback('success');
       setRecoveringFloat(null);
       setActiveModal('none');
       await fetchData();

@@ -418,20 +418,20 @@ export default function PassbookQrCenterModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 font-sans overflow-y-auto">
-      <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90dvh] my-auto text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200 font-sans overflow-y-auto">
+      <div className="bg-white border border-slate-200/90 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90dvh] my-auto text-slate-900">
         
         {/* Header with Navigation Tabs */}
-        <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between shrink-0">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-[#6359E9]/10 border border-[#6359E9]/20 text-[#6359E9] shrink-0">
+            <div className="p-2.5 rounded-xl bg-brand-50 border border-brand-100 text-brand-600 shrink-0">
               <FileText size={20} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
                 Passbook QR Center
               </h3>
-              <p className="text-[11px] sm:text-xs text-[#AEABD8] truncate">
+              <p className="text-[11px] sm:text-xs text-slate-500 truncate">
                 Print subscriber passbook stickers &amp; manage blank batch inventory
               </p>
             </div>
@@ -440,46 +440,46 @@ export default function PassbookQrCenterModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors shrink-0"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Tab Switcher */}
-        <div className="px-5 pt-3 pb-0 bg-[#141332] border-b border-[#27264E] flex items-center gap-2">
+        <div className="px-5 pt-3 pb-0 bg-slate-50/80 border-b border-slate-200/80 flex items-center gap-2">
           <button
             type="button"
             onClick={() => {
               setActiveTab('subscribers');
               setBatchToPrint(null);
             }}
-            className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-2 ${
+            className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
               activeTab === 'subscribers' && !batchToPrint
-                ? 'border-[#6359E9] text-white'
-                : 'border-transparent text-[#AEABD8] hover:text-white'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Users size={14} className={activeTab === 'subscribers' && !batchToPrint ? 'text-[#64CFF6]' : ''} />
+            <Users size={14} className={activeTab === 'subscribers' && !batchToPrint ? 'text-brand-600' : ''} />
             <span>Registered Subscribers ({registeredSubscribers.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('batches')}
-            className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-2 ${
+            className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
               activeTab === 'batches' || batchToPrint
-                ? 'border-[#6359E9] text-white'
-                : 'border-transparent text-[#AEABD8] hover:text-white'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Layers size={14} className={activeTab === 'batches' || batchToPrint ? 'text-[#64CFF6]' : ''} />
+            <Layers size={14} className={activeTab === 'batches' || batchToPrint ? 'text-brand-600' : ''} />
             <span>Blank Stock Batches ({batchSummaries.length})</span>
           </button>
         </div>
 
         {/* Body Content */}
-        <div className="p-5 overflow-y-auto flex-1 space-y-4">
+        <div className="p-5 overflow-y-auto flex-1 space-y-4 bg-white">
           
           {/* ══════════════ TAB 1: REGISTERED SUBSCRIBERS ══════════════ */}
           {activeTab === 'subscribers' && !batchToPrint && (
@@ -487,72 +487,72 @@ export default function PassbookQrCenterModal({
               
               {/* Preset Selector */}
               <div>
-                <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
                   Sticker Dimension Presets
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     type="button"
                     onClick={() => setPreset('2x3')}
-                    className={`p-3 rounded-2xl border text-left transition-all relative ${
+                    className={`p-3 rounded-2xl border text-left transition-all relative cursor-pointer ${
                       preset === '2x3'
-                        ? 'bg-[#6359E9]/15 border-[#6359E9] text-white'
-                        : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:text-white hover:border-[#6359E9]/40'
+                        ? 'bg-brand-50/80 border-brand-500 text-slate-900 shadow-xs ring-1 ring-brand-500/30'
+                        : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
                     }`}
                   >
-                    <span className="text-[10px] absolute top-2 right-2 px-1.5 py-0.5 rounded bg-[#6359E9] text-white font-black">
+                    <span className="text-[10px] absolute top-2 right-2 px-1.5 py-0.5 rounded bg-brand-600 text-white font-bold">
                       REC
                     </span>
-                    <div className="text-xs font-bold text-white">2 × 3 cm</div>
-                    <div className="text-[10px] text-[#AEABD8]/70">Passbook (66/pg)</div>
+                    <div className="text-xs font-bold text-slate-900">2 × 3 cm</div>
+                    <div className="text-[10px] text-slate-500">Passbook (66/pg)</div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setPreset('2x2')}
-                    className={`p-3 rounded-2xl border text-left transition-all ${
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                       preset === '2x2'
-                        ? 'bg-[#6359E9]/15 border-[#6359E9] text-white'
-                        : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:text-white hover:border-[#6359E9]/40'
+                        ? 'bg-brand-50/80 border-brand-500 text-slate-900 shadow-xs ring-1 ring-brand-500/30'
+                        : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
                     }`}
                   >
-                    <div className="text-xs font-bold text-white">2 × 2 cm</div>
-                    <div className="text-[10px] text-[#AEABD8]/70">Compact (96/pg)</div>
+                    <div className="text-xs font-bold text-slate-900">2 × 2 cm</div>
+                    <div className="text-[10px] text-slate-500">Compact (96/pg)</div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setPreset('3x3')}
-                    className={`p-3 rounded-2xl border text-left transition-all ${
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                       preset === '3x3'
-                        ? 'bg-[#6359E9]/15 border-[#6359E9] text-white'
-                        : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:text-white hover:border-[#6359E9]/40'
+                        ? 'bg-brand-50/80 border-brand-500 text-slate-900 shadow-xs ring-1 ring-brand-500/30'
+                        : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
                     }`}
                   >
-                    <div className="text-xs font-bold text-white">3 × 3 cm</div>
-                    <div className="text-[10px] text-[#AEABD8]/70">Large (40/pg)</div>
+                    <div className="text-xs font-bold text-slate-900">3 × 3 cm</div>
+                    <div className="text-[10px] text-slate-500">Large (40/pg)</div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setPreset('custom')}
-                    className={`p-3 rounded-2xl border text-left transition-all ${
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                       preset === 'custom'
-                        ? 'bg-[#6359E9]/15 border-[#6359E9] text-white'
-                        : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:text-white hover:border-[#6359E9]/40'
+                        ? 'bg-brand-50/80 border-brand-500 text-slate-900 shadow-xs ring-1 ring-brand-500/30'
+                        : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
                     }`}
                   >
-                    <div className="text-xs font-bold text-white">Custom mm</div>
-                    <div className="text-[10px] text-[#AEABD8]/70">Exact input</div>
+                    <div className="text-xs font-bold text-slate-900">Custom mm</div>
+                    <div className="text-[10px] text-slate-500">Exact input</div>
                   </button>
                 </div>
               </div>
 
               {/* Custom Dimensions Form */}
               {preset === 'custom' && (
-                <div className="p-4 bg-[#141332] rounded-2xl border border-[#27264E] grid grid-cols-2 gap-3 animate-in fade-in duration-200">
+                <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 grid grid-cols-2 gap-3 animate-in fade-in duration-200">
                   <div>
-                    <label className="text-[11px] font-semibold text-[#AEABD8] block mb-1">
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">
                       Sticker Width (mm)
                     </label>
                     <input
@@ -561,11 +561,11 @@ export default function PassbookQrCenterModal({
                       max={150}
                       value={customWidthMm}
                       onChange={(e) => setCustomWidthMm(Number(e.target.value))}
-                      className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#6359E9]"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-[#AEABD8] block mb-1">
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">
                       Sticker Height (mm)
                     </label>
                     <input
@@ -574,27 +574,27 @@ export default function PassbookQrCenterModal({
                       max={150}
                       value={customHeightMm}
                       onChange={(e) => setCustomHeightMm(Number(e.target.value))}
-                      className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#6359E9]"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20"
                     />
                   </div>
                 </div>
               )}
 
               {/* Page Layout Spec Box */}
-              <div className="p-4 rounded-2xl bg-[#141332] border border-[#27264E] text-xs space-y-2">
-                <div className="flex justify-between text-[#AEABD8]">
+              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 text-xs space-y-2">
+                <div className="flex justify-between text-slate-600">
                   <span>A4 Dimensions:</span>
-                  <span className="font-mono text-white">210 mm × 297 mm</span>
+                  <span className="font-mono text-slate-900 font-medium">210 mm × 297 mm</span>
                 </div>
-                <div className="flex justify-between text-[#AEABD8]">
+                <div className="flex justify-between text-slate-600">
                   <span>Grid Layout:</span>
-                  <span className="font-mono text-white">
+                  <span className="font-mono text-slate-900 font-medium">
                     {colsPerPage} cols × {rowsPerPage} rows ({stickersPerPage} per sheet)
                   </span>
                 </div>
-                <div className="flex justify-between font-bold text-white border-t border-[#27264E] pt-2">
+                <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200/80 pt-2">
                   <span>Total Stickers / Pages:</span>
-                  <span className="text-[#64CFF6]">
+                  <span className="text-brand-600">
                     {registeredSubscribers.length} stickers ({totalPages} A4 page{totalPages !== 1 ? 's' : ''})
                   </span>
                 </div>
@@ -606,7 +606,7 @@ export default function PassbookQrCenterModal({
                   type="button"
                   onClick={() => handleGeneratePdf('print')}
                   disabled={isGeneratingPdf || registeredSubscribers.length === 0}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#27264E] hover:bg-[#27264E]/80 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all border border-[#27264E]"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-all border border-slate-200 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Printer size={15} />
                   <span>Preview &amp; Print</span>
@@ -616,7 +616,7 @@ export default function PassbookQrCenterModal({
                   type="button"
                   onClick={() => handleGeneratePdf('download')}
                   disabled={isGeneratingPdf || registeredSubscribers.length === 0}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#6359E9] hover:bg-[#6F64FF] active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#6359E9]/30"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm shadow-brand-600/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isGeneratingPdf ? <RefreshCw className="animate-spin" size={15} /> : <Download size={15} />}
                   <span>{isGeneratingPdf ? generationProgress || 'Generating...' : 'Download A4 PDF'}</span>
@@ -631,20 +631,20 @@ export default function PassbookQrCenterModal({
               
               {/* If specific batch print is active */}
               {batchToPrint ? (
-                <div className="p-4 rounded-2xl bg-[#6359E9]/10 border border-[#6359E9]/30 space-y-3">
+                <div className="p-4 rounded-2xl bg-brand-50/70 border border-brand-200 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-sm font-bold text-white">
+                      <h4 className="text-sm font-bold text-slate-900">
                         Print Batch: {batchToPrint.code}
                       </h4>
-                      <p className="text-xs text-[#AEABD8]">
+                      <p className="text-xs text-slate-600">
                         {batchToPrint.items.length} unassigned blank stickers ready for A4 sheet printing
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setBatchToPrint(null)}
-                      className="text-xs text-[#AEABD8] hover:text-white"
+                      className="text-xs text-brand-600 hover:text-brand-800 font-semibold cursor-pointer"
                     >
                       Back to Batches
                     </button>
@@ -655,7 +655,7 @@ export default function PassbookQrCenterModal({
                       type="button"
                       onClick={() => handleGeneratePdf('print', batchToPrint.items)}
                       disabled={isGeneratingPdf}
-                      className="px-4 py-2 rounded-xl bg-[#27264E] hover:bg-[#27264E]/80 text-white font-bold text-xs flex items-center gap-1.5"
+                      className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
                     >
                       <Printer size={14} /> Preview &amp; Print
                     </button>
@@ -663,7 +663,7 @@ export default function PassbookQrCenterModal({
                       type="button"
                       onClick={() => handleGeneratePdf('download', batchToPrint.items)}
                       disabled={isGeneratingPdf}
-                      className="px-4 py-2 rounded-xl bg-[#6359E9] hover:bg-[#6F64FF] text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[#6359E9]/30"
+                      className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm shadow-brand-600/30 cursor-pointer"
                     >
                       {isGeneratingPdf ? <RefreshCw className="animate-spin" size={14} /> : <Download size={14} />}
                       <span>Download A4 PDF</span>
@@ -674,28 +674,28 @@ export default function PassbookQrCenterModal({
                 <>
                   {/* Stats Bar */}
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="p-3.5 rounded-2xl bg-[#141332] border border-[#27264E]">
-                      <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Total Pool</span>
-                      <span className="text-xl font-black text-white">{totalPool}</span>
+                    <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Pool</span>
+                      <span className="text-xl font-black text-slate-900">{totalPool}</span>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-[#141332] border border-[#02B15A]/30">
-                      <span className="text-[10px] font-bold text-[#02B15A] uppercase tracking-wider block">Available (Ready)</span>
-                      <span className="text-xl font-black text-[#02B15A]">{unassignedCount}</span>
+                    <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/80">
+                      <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Available (Ready)</span>
+                      <span className="text-xl font-black text-emerald-700">{unassignedCount}</span>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-[#141332] border border-[#6359E9]/30">
-                      <span className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider block">Paired to Books</span>
-                      <span className="text-xl font-black text-[#64CFF6]">{assignedCount}</span>
+                    <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200/80">
+                      <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">Paired to Books</span>
+                      <span className="text-xl font-black text-indigo-700">{assignedCount}</span>
                     </div>
                   </div>
 
                   {/* Batch Generator Form */}
-                  <div className="p-4 rounded-2xl bg-[#141332] border border-[#27264E]">
+                  <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200">
                     <form onSubmit={handleCreateBatch} className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <Sparkles size={14} className="text-[#64CFF6]" /> Generate New Blank QR Batch
+                        <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                          <Sparkles size={14} className="text-brand-600" /> Generate New Blank QR Batch
                         </span>
-                        <span className="text-[11px] text-[#AEABD8]">66 stickers = Exactly 1 full A4 sheet</span>
+                        <span className="text-[11px] text-slate-500">66 stickers = Exactly 1 full A4 sheet</span>
                       </div>
 
                       <div className="flex flex-col sm:flex-row gap-3">
@@ -706,7 +706,7 @@ export default function PassbookQrCenterModal({
                             placeholder="Batch Code (e.g. BATCH_2026_01)"
                             value={batchCode}
                             onChange={(e) => setBatchCode(e.target.value)}
-                            className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3.5 py-2 text-xs text-white placeholder-[#AEABD8]/40 focus:outline-none focus:border-[#6359E9] font-mono"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 font-mono shadow-xs"
                           />
                         </div>
                         <div className="w-full sm:w-32">
@@ -717,13 +717,13 @@ export default function PassbookQrCenterModal({
                             required
                             value={batchCount}
                             onChange={(e) => setBatchCount(Number(e.target.value))}
-                            className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-[#6359E9]"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 shadow-xs"
                           />
                         </div>
                         <button
                           type="submit"
                           disabled={isGeneratingBatch}
-                          className="px-4 py-2 rounded-xl bg-[#6359E9] hover:bg-[#6F64FF] active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-[#6359E9]/30 shrink-0"
+                          className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm shadow-brand-600/30 shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isGeneratingBatch ? <RefreshCw className="animate-spin" size={14} /> : <Plus size={14} />}
                           <span>Generate Batch</span>
@@ -735,14 +735,14 @@ export default function PassbookQrCenterModal({
                   {/* Batches List */}
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                         Batches ({batchSummaries.length})
                       </span>
                       {unassignedCount > 0 && (
                         <button
                           type="button"
                           onClick={handleDeleteAllUnassigned}
-                          className="text-xs font-semibold text-[#E41414] hover:text-red-400 flex items-center gap-1 transition-colors"
+                          className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 transition-colors cursor-pointer"
                         >
                           <Trash2 size={13} /> Clear All Unassigned ({unassignedCount})
                         </button>
@@ -750,38 +750,38 @@ export default function PassbookQrCenterModal({
                     </div>
 
                     {loadingInventory ? (
-                      <div className="py-10 flex justify-center items-center text-[#AEABD8] text-xs">
-                        <RefreshCw size={18} className="animate-spin mr-2 text-[#6359E9]" /> Loading batches...
+                      <div className="py-10 flex justify-center items-center text-slate-500 text-xs">
+                        <RefreshCw size={18} className="animate-spin mr-2 text-brand-600" /> Loading batches...
                       </div>
                     ) : batchSummaries.length === 0 ? (
-                      <div className="py-8 text-center text-[#AEABD8] text-xs bg-[#141332] rounded-2xl border border-[#27264E]">
+                      <div className="py-8 text-center text-slate-500 text-xs bg-slate-50 rounded-2xl border border-slate-200">
                         No passbook batches generated yet. Generate a batch above to create blank stock.
                       </div>
                     ) : (
                       batchSummaries.map((batch) => (
                         <div
                           key={batch.batch_code}
-                          className="p-3.5 rounded-2xl bg-[#141332] border border-[#27264E] flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[#6359E9]/50 transition-colors"
+                          className="p-3.5 rounded-2xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-brand-300 transition-colors shadow-xs"
                         >
                           <div className="flex items-start sm:items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-[#6359E9]/10 border border-[#6359E9]/20 flex items-center justify-center text-[#64CFF6] shrink-0">
+                            <div className="w-9 h-9 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                               <PackageCheck size={18} />
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-mono text-xs font-bold text-white">
+                                <span className="font-mono text-xs font-bold text-slate-900">
                                   {batch.batch_code}
                                 </span>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1D1D41] border border-[#27264E] text-[#AEABD8] font-medium">
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-medium">
                                   {batch.total} Total
                                 </span>
                               </div>
-                              <div className="flex items-center gap-2 mt-1 text-[11px] text-[#AEABD8]">
-                                <span className="text-[#02B15A] font-semibold">{batch.unassigned} Ready</span>
+                              <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                <span className="text-emerald-600 font-semibold">{batch.unassigned} Ready</span>
                                 <span>•</span>
-                                <span className="text-[#64CFF6]">{batch.assigned} Paired</span>
+                                <span className="text-indigo-600 font-semibold">{batch.assigned} Paired</span>
                                 <span>•</span>
-                                <span className="text-[#AEABD8]/70 flex items-center gap-1">
+                                <span className="text-slate-400 flex items-center gap-1">
                                   <Calendar size={11} /> {new Date(batch.created_at).toLocaleDateString()}
                                 </span>
                               </div>
@@ -801,10 +801,10 @@ export default function PassbookQrCenterModal({
                                 setBatchToPrint({ code: batch.batch_code, items });
                               }}
                               disabled={batch.unassigned === 0}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                                 batch.unassigned > 0
-                                  ? 'bg-[#6359E9] hover:bg-[#6F64FF] text-white shadow-sm shadow-[#6359E9]/30'
-                                  : 'bg-[#1D1D41] text-[#AEABD8]/40 border border-[#27264E] cursor-not-allowed'
+                                  ? 'bg-brand-600 hover:bg-brand-700 text-white shadow-xs'
+                                  : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
                               }`}
                             >
                               <Printer size={13} />
@@ -816,10 +816,10 @@ export default function PassbookQrCenterModal({
                               onClick={() => handleDeleteBatch(batch)}
                               disabled={deletingBatch === batch.batch_code || batch.unassigned === 0}
                               title={batch.unassigned === 0 ? 'All stickers in this batch are paired' : 'Delete unassigned QR codes'}
-                              className={`p-2 rounded-xl text-xs transition-colors ${
+                              className={`p-2 rounded-xl text-xs transition-colors cursor-pointer ${
                                 batch.unassigned > 0
-                                  ? 'text-[#E41414] hover:text-red-400 hover:bg-[#E41414]/10 border border-[#E41414]/20'
-                                  : 'text-[#AEABD8]/30 border border-[#27264E]/60 cursor-not-allowed'
+                                  ? 'text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200'
+                                  : 'text-slate-300 border border-slate-200 cursor-not-allowed'
                               }`}
                             >
                               {deletingBatch === batch.batch_code ? (
@@ -842,11 +842,11 @@ export default function PassbookQrCenterModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#27264E] bg-[#141332]/60 flex justify-end">
+        <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-50 shadow-xs transition-colors cursor-pointer"
           >
             Close
           </button>

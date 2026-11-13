@@ -84,7 +84,7 @@ export default function Home() {
         return (
           <>
             <span className="sm:hidden">Members</span>
-            <span className="hidden sm:inline">Members &amp; Access Control</span>
+            <span className="hidden sm:inline">Members Directory</span>
           </>
         );
       case 'communication':

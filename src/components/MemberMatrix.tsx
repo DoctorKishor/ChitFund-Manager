@@ -266,7 +266,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
           ticket_number,
           alias_name,
           has_won_regular,
-          profiles (
+          profiles:profile_id (
             id,
             full_name,
             phone_number,
@@ -1614,17 +1614,6 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           </button>
                         </label>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (activeDrawerMember) handleShareWhatsApp({} as any, activeDrawerMember);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors whitespace-nowrap cursor-pointer"
-                      >
-                        <Share2 size={13} className="text-slate-500" />
-                        <span>WhatsApp Notice</span>
-                      </button>
                     </div>
                   </div>
 

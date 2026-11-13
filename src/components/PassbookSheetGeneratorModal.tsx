@@ -221,17 +221,17 @@ export default function PassbookSheetGeneratorModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-[#1D1D41] border border-[#27264E] rounded-3xl w-full max-w-lg max-h-[90dvh] overflow-hidden shadow-2xl relative flex flex-col my-auto text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-white border border-slate-200/90 rounded-3xl w-full max-w-lg max-h-[90dvh] overflow-hidden shadow-2xl relative flex flex-col my-auto text-slate-900">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-[#27264E] flex items-center justify-between shrink-0">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-[#6359E9]/10 border border-[#6359E9]/20 text-[#6359E9] shrink-0">
+            <div className="p-2.5 rounded-xl bg-brand-50 border border-brand-100 text-brand-600 shrink-0">
               <FileText size={20} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">{defaultTitle}</h3>
-              <p className="text-[11px] sm:text-xs text-[#AEABD8] truncate">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">{defaultTitle}</h3>
+              <p className="text-[11px] sm:text-xs text-slate-500 truncate">
                 {items.length} sticker{items.length !== 1 ? 's' : ''} ready for A4 grid printing
               </p>
             </div>
@@ -239,17 +239,17 @@ export default function PassbookSheetGeneratorModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors shrink-0"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Content & Options */}
-        <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto flex-1">
+        <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto flex-1 bg-white">
           {/* Dimension Presets */}
           <div>
-            <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block mb-2.5">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2.5">
               Sticker Dimension Presets
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -263,19 +263,19 @@ export default function PassbookSheetGeneratorModal({
                   key={p.id}
                   type="button"
                   onClick={() => setPreset(p.id as SizePreset)}
-                  className={`p-3 rounded-2xl border text-left transition-all relative ${
+                  className={`p-3 rounded-2xl border text-left transition-all relative cursor-pointer ${
                     preset === p.id
-                      ? 'bg-[#6359E9]/15 border-[#6359E9] text-white shadow-sm'
-                      : 'bg-[#141332] border-[#27264E] text-[#AEABD8] hover:border-[#6359E9]/40 hover:text-white'
+                      ? 'bg-brand-50/80 border-brand-500 text-slate-900 shadow-xs ring-1 ring-brand-500/30'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900'
                   }`}
                 >
                   {p.rec && (
-                    <span className="absolute top-1.5 right-1.5 px-1.5 py-0.2 rounded text-[8px] font-black bg-[#6359E9] text-white">
+                    <span className="absolute top-1.5 right-1.5 px-1.5 py-0.2 rounded text-[8px] font-bold bg-brand-600 text-white">
                       REC
                     </span>
                   )}
-                  <p className="text-xs font-bold text-white">{p.name}</p>
-                  <p className="text-[10px] text-[#AEABD8]/70 mt-0.5">{p.desc}</p>
+                  <p className="text-xs font-bold text-slate-900">{p.name}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{p.desc}</p>
                 </button>
               ))}
             </div>
@@ -283,67 +283,67 @@ export default function PassbookSheetGeneratorModal({
 
           {/* Custom Millimeter Inputs if 'custom' selected */}
           {preset === 'custom' && (
-            <div className="p-4 rounded-2xl bg-[#141332] border border-[#27264E] flex gap-4">
+            <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 flex gap-4">
               <div className="flex-1">
-                <label className="text-[11px] font-semibold text-[#AEABD8] block mb-1">Width (mm)</label>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Width (mm)</label>
                 <input
                   type="number"
                   min={15}
                   max={100}
                   value={customWidthMm}
                   onChange={(e) => setCustomWidthMm(Number(e.target.value))}
-                  className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-[#6359E9]"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20"
                 />
               </div>
               <div className="flex-1">
-                <label className="text-[11px] font-semibold text-[#AEABD8] block mb-1">Height (mm)</label>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Height (mm)</label>
                 <input
                   type="number"
                   min={15}
                   max={100}
                   value={customHeightMm}
                   onChange={(e) => setCustomHeightMm(Number(e.target.value))}
-                  className="w-full bg-[#1D1D41] border border-[#27264E] rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-[#6359E9]"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20"
                 />
               </div>
             </div>
           )}
 
           {/* Sheet Preview Statistics */}
-          <div className="p-4 rounded-2xl bg-[#141332] border border-[#27264E] space-y-2">
-            <div className="flex justify-between text-xs text-[#AEABD8]">
+          <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-2">
+            <div className="flex justify-between text-xs text-slate-600">
               <span>A4 Dimensions:</span>
-              <span className="font-mono text-white">210 mm × 297 mm</span>
+              <span className="font-mono text-slate-900 font-medium">210 mm × 297 mm</span>
             </div>
-            <div className="flex justify-between text-xs text-[#AEABD8]">
+            <div className="flex justify-between text-xs text-slate-600">
               <span>Grid Layout:</span>
-              <span className="font-mono text-white">
+              <span className="font-mono text-slate-900 font-medium">
                 {colsPerPage} cols × {rowsPerPage} rows ({stickersPerPage} per sheet)
               </span>
             </div>
-            <div className="flex justify-between text-xs font-bold text-white border-t border-[#27264E] pt-2">
+            <div className="flex justify-between text-xs font-bold text-slate-900 border-t border-slate-200/80 pt-2">
               <span>Total Stickers / Pages:</span>
-              <span className="font-mono text-[#64CFF6]">
+              <span className="font-mono text-brand-600">
                 {items.length} stickers ({Math.ceil(items.length / (stickersPerPage || 1))} A4 page{Math.ceil(items.length / (stickersPerPage || 1)) !== 1 ? 's' : ''})
               </span>
             </div>
           </div>
 
           {isGenerating && (
-            <div className="p-3 rounded-xl bg-[#6359E9]/10 border border-[#6359E9]/20 text-[#64CFF6] text-xs flex items-center gap-2 animate-pulse">
-              <RefreshCw size={16} className="animate-spin shrink-0 text-[#6359E9]" />
+            <div className="p-3 rounded-xl bg-brand-50 border border-brand-200 text-brand-700 text-xs flex items-center gap-2 animate-pulse">
+              <RefreshCw size={16} className="animate-spin shrink-0 text-brand-600" />
               <span>{generationProgress || 'Generating vector PDF...'}</span>
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 sm:p-5 border-t border-[#27264E] bg-[#141332]/60 flex flex-col sm:flex-row justify-end gap-2.5 sm:gap-3 shrink-0">
+        <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row justify-end gap-2.5 sm:gap-3 shrink-0">
           <button
             type="button"
             onClick={onClose}
             disabled={isGenerating}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-[#AEABD8] hover:text-white hover:bg-[#27264E] transition-colors text-center"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-50 shadow-xs transition-colors text-center cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
@@ -352,7 +352,7 @@ export default function PassbookSheetGeneratorModal({
             type="button"
             onClick={() => handleGeneratePdf('print')}
             disabled={isGenerating || items.length === 0}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#27264E] hover:bg-[#27264E]/80 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer disabled:opacity-50"
           >
             <Printer size={15} /> Preview &amp; Print
           </button>
@@ -361,7 +361,7 @@ export default function PassbookSheetGeneratorModal({
             type="button"
             onClick={() => handleGeneratePdf('download')}
             disabled={isGenerating || items.length === 0}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#6359E9] hover:bg-[#6F64FF] active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#6359E9]/30"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm shadow-brand-600/30 cursor-pointer disabled:opacity-50"
           >
             <Download size={15} /> Download A4 PDF
           </button>
