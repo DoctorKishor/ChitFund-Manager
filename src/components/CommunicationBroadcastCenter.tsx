@@ -1061,6 +1061,16 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
     return `https://api.whatsapp.com/send?text=${encodeURIComponent(compiledBroadcastText)}`;
   };
 
+  const handleOpenWhatsApp = () => {
+    if (!canSendCurrentBroadcast) return;
+    triggerHapticFeedback('light');
+    window.open(formatWhatsAppUrl(), '_blank');
+    if (onAddAuditLog) {
+      const templateLabel = templateType === 'pre-auction' ? 'Pre-Auction Notice' : templateType === 'post-auction' ? 'Post-Auction Settlement' : 'Payment Due Reminder';
+      onAddAuditLog(`WHATSAPP BROADCAST: Dispatched "${templateLabel}" to members of ${selectedMeta?.name || 'Chit Group'}`);
+    }
+  };
+
   const formatSmsUrl = () => {
     return `sms:?body=${encodeURIComponent(compiledBroadcastText)}`;
   };
@@ -1389,7 +1399,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             <button 
               type="button"
               disabled={!canSendCurrentBroadcast}
-              onClick={() => canSendCurrentBroadcast && window.open(formatWhatsAppUrl(), '_blank')}
+              onClick={handleOpenWhatsApp}
               className={`w-full py-3 px-4 font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all ${
                 canSendCurrentBroadcast ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-emerald-500/25 cursor-pointer' : 'bg-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
               }`}
@@ -1529,7 +1539,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             <button 
               type="button"
               disabled={!canSendCurrentBroadcast}
-              onClick={() => canSendCurrentBroadcast && window.open(formatWhatsAppUrl(), '_blank')}
+              onClick={handleOpenWhatsApp}
               className={`inline-flex items-center gap-1.5 px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-all ${
                 canSendCurrentBroadcast ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-500/25 cursor-pointer active:scale-95' : 'bg-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
               }`}
@@ -1958,7 +1968,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                     <button 
                       type="button"
                       disabled={!canSendCurrentBroadcast}
-                      onClick={() => canSendCurrentBroadcast && window.open(formatWhatsAppUrl(), '_blank')}
+                      onClick={handleOpenWhatsApp}
                       className={`w-8 h-8 rounded-full flex items-center justify-center text-xs shadow transition-all ${
                         canSendCurrentBroadcast ? 'bg-[#128C7E] hover:bg-emerald-700 active:scale-95 text-white cursor-pointer' : 'bg-slate-300 text-slate-400 opacity-60 cursor-not-allowed'
                       }`}
@@ -1977,7 +1987,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
                   <button 
                     type="button"
                     disabled={!canSendCurrentBroadcast}
-                    onClick={() => canSendCurrentBroadcast && window.open(formatWhatsAppUrl(), '_blank')}
+                    onClick={handleOpenWhatsApp}
                     className={`w-full py-2.5 px-4 font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all ${
                       canSendCurrentBroadcast ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-500/25 cursor-pointer active:scale-98' : 'bg-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
                     }`}

@@ -1663,7 +1663,14 @@ export default function RoleAppPreviewModal({
 
                                   <button
                                     type="button"
-                                    className={`w-9 h-5 rounded-full transition-colors relative shrink-0 p-0.5 ${
+                                    role="switch"
+                                    aria-checked={isEnabled}
+                                    aria-label={isEnabled ? `Disable ${tab.label} Tab` : `Enable ${tab.label} Tab`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleTab(tab.id);
+                                    }}
+                                    className={`w-9 h-5 rounded-full transition-colors relative shrink-0 p-0.5 cursor-pointer ${
                                       isEnabled ? 'bg-brand-600' : 'bg-slate-200'
                                     }`}
                                   >
@@ -1775,7 +1782,14 @@ export default function RoleAppPreviewModal({
 
                                           <button
                                             type="button"
-                                            className={`w-8 h-4.5 rounded-full transition-colors relative shrink-0 p-0.5 ${
+                                            role="switch"
+                                            aria-checked={isEnabled}
+                                            aria-label={isEnabled ? `Disable ${act.label}` : `Enable ${act.label}`}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleToggleAction(act.key);
+                                            }}
+                                            className={`w-8 h-4.5 rounded-full transition-colors relative shrink-0 p-0.5 cursor-pointer ${
                                               isEnabled ? 'bg-brand-600' : 'bg-slate-200'
                                             }`}
                                           >

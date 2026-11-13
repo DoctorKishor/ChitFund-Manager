@@ -121,6 +121,7 @@ export default function QuickAtmWithdrawalModal({
         await supabase.from('security_audit_logs').insert({
           action_description: `ATM TX RECORD FAILURE: Transaction insert failed (${error.message}). Auto-reversed debit of ₹${amount} back to ${sourceName}.`,
           target_table: 'transactions',
+          admin_id: profile?.id || null,
         });
         throw error;
       }
@@ -128,6 +129,7 @@ export default function QuickAtmWithdrawalModal({
       await supabase.from('security_audit_logs').insert({
         action_description: `ATM RELOCATION TRIGGERED: ₹${amount.toLocaleString('en-IN')} debited from ${sourceName}. Pending physical cash box confirmation.`,
         target_table: 'transactions',
+        admin_id: profile?.id || null,
       });
 
       setRelocateAmount('');

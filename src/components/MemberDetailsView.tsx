@@ -224,10 +224,12 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       }
 
       // 3. Fetch Transactions for this member
+      const enrollIds = (enrollData || []).map((e: any) => e.id).filter(Boolean);
+      const inClause = enrollIds.length > 0 ? enrollIds.join(',') : '00000000-0000-0000-0000-000000000000';
       const { data: txData } = await supabase
         .from('transactions')
         .select('*')
-        .or(`profile_id.eq.${memberId},group_member_id.in.(${(enrollData || []).map((e: any) => e.id).join(',') || '00000000-0000-0000-0000-000000000000'})`)
+        .or(`profile_id.eq.${memberId},group_member_id.in.(${inClause})`)
         .order('created_at', { ascending: false });
 
       if (txData && txData.length > 0) {
@@ -743,11 +745,16 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
       }
 
       // Security audit log
+      const auditDesc = `MEMBER ENROLLED: ${memberProfile?.full_name || 'Subscriber'} enrolled into scheme "${targetGroup?.name || 'Chit Group'}" as Ticket #${ticketNum}${enrollAliasName ? ` (${enrollAliasName.trim()})` : ''}`;
       await supabase.from('security_audit_logs').insert({
-        action_description: `MEMBER ENROLLED: ${memberProfile?.full_name || 'Subscriber'} enrolled into scheme "${targetGroup?.name || 'Chit Group'}" as Ticket #${ticketNum}${enrollAliasName ? ` (${enrollAliasName.trim()})` : ''}`,
+        action_description: auditDesc,
         target_table: 'group_members',
         admin_id: profile?.id || null
       }).then();
+
+      if (onAddAuditLog) {
+        onAddAuditLog(auditDesc);
+      }
 
       triggerHapticFeedback('success');
       setIsEnrollModalOpen(false);
@@ -917,6 +924,10 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
             }
           }
         }
+
+        if (onAddAuditLog) {
+          onAddAuditLog(`EDITED PAYMENT: Updated transaction to ₹${amt.toLocaleString('en-IN')} (${newWallet.replace(/_/g, ' ')}) for ${memberProfile?.full_name || 'Member'}`);
+        }
       } else {
         // Record new payment
         const targetEnroll = memberEnrollments.find(e => e.group_id === modalTargetGroupId) || memberEnrollments[0];
@@ -974,6 +985,10 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         if (balRes && !balRes.success) {
           alert('Note: Payment recorded but treasury warning: ' + (balRes.error || ''));
         }
+
+        if (onAddAuditLog) {
+          onAddAuditLog(`COLLECTION CONFIRMED: Received ₹${amt.toLocaleString('en-IN')} via ${paymentWalletType.replace(/_/g, ' ')} from ${memberProfile?.full_name || 'Member'}`);
+        }
       }
 
       setIsPaymentModalOpen(false);
@@ -1009,6 +1024,10 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         await updateBalance(tx.wallet_type as any, -balanceDelta);
         alert('Failed to delete transaction: ' + delErr.message);
         return;
+      }
+
+      if (onAddAuditLog) {
+        onAddAuditLog(`VOIDED PAYMENT: Removed ₹${amt.toLocaleString('en-IN')} (${tx.wallet_type?.replace(/_/g, ' ') || 'Cash Box'}) transaction for ${memberProfile?.full_name || 'Member'}`);
       }
 
       if (tx.verification_proof_url?.includes('/storage/v1/object/public/receipts/')) {
