@@ -379,7 +379,7 @@ export default function ReceiptsVaultViewer() {
         : "Mom's Account";
 
     const msg =
-      `🧾 *OFFICIAL PAYMENT RECEIPT*\n` +
+      `*OFFICIAL PAYMENT RECEIPT*\n` +
       `--------------------------------\n` +
       `*Receipt No:* \`${item.receiptNo}\`\n` +
       `*Subscriber:* ${item.memberName} (Ticket #${item.ticketNumber})\n` +
@@ -388,7 +388,7 @@ export default function ReceiptsVaultViewer() {
       `*Payment Mode:* ${walletLabel}\n` +
       `*Cycle Month:* ${item.isMultiMonth ? 'Multi-Month Settlement' : `Month ${item.cycleMonth}`}\n` +
       `*Date & Time:* ${dateStr}\n` +
-      `*Status:* Confirmed & Audited in System Ledger ✓\n` +
+      `*Status:* Confirmed & Audited in System Ledger\n` +
       `--------------------------------\n` +
       `_Issued by ${organizationName || 'Chit Funds Management'}_`;
 
@@ -681,8 +681,9 @@ export default function ReceiptsVaultViewer() {
                         ? `Multi-Month (${item.allocations.map((a) => `M${a.month}`).join(', ')})`
                         : `Month ${item.cycleMonth}`}
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Paid ✓
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                      <CheckCircle2 size={10} className="text-emerald-600" />
+                      <span>Paid</span>
                     </span>
                   </div>
 

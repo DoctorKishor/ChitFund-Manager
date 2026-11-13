@@ -378,9 +378,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               const tag = a.type === 'arrear' ? 'Past Arrear' : a.type === 'advance' ? 'Advance Pre-paid' : 'Current Month';
               return `  • ${mName} (${tag}): ${formatCurrency(a.amount)}`;
             }).join('\n') + '\n'
-          : `*Month ${month === 0 ? '0' : month} Pending Due:* ${isCleared ? 'No Pending (Cleared ✅)' : `${formatCurrency(remainingBalance)} Pending`}\n`;
+          : `*Month ${month === 0 ? '0' : month} Pending Due:* ${isCleared ? 'No Pending (Cleared)' : `${formatCurrency(remainingBalance)} Pending`}\n`;
 
-        const msg = `*CHIT FUNDS PAYMENT RECEIPT* 🧾\n` +
+        const msg = `*CHIT FUNDS PAYMENT RECEIPT*\n` +
           `----------------------------------\n` +
           `*Receipt No:* ${receiptNo}\n` +
           `*Subscriber:* ${memberName} (Ticket #${ticketNum})\n` +
@@ -391,9 +391,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           `*Date:* ${dateFormatted}, ${timeFormatted}\n` +
           `----------------------------------\n` +
           settlementSection +
-          `*Past Pending Dues (${groupName}):* ${pastPendingDues > 0 ? `${formatCurrency(pastPendingDues)} (Pending in M${pastPendingMonths.join(', M')})` : 'No Past Pending (Cleared ✅)'}\n` +
-          `*Total Group Outstanding:* ${totalGroupOutstanding === 0 ? 'No Pending (Fully Cleared ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}\n\n` +
-          `_Receipt image downloaded. Thank you!_ 🙏`;
+          `*Past Pending Dues (${groupName}):* ${pastPendingDues > 0 ? `${formatCurrency(pastPendingDues)} (Pending in M${pastPendingMonths.join(', M')})` : 'No Past Pending (Cleared)'}\n` +
+          `*Total Group Outstanding:* ${totalGroupOutstanding === 0 ? 'No Pending (Fully Cleared)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}\n\n` +
+          `_Official digital receipt attached. Registered on Supabase Ledger._`;
         
         const waUrl = cleanPhone 
           ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
@@ -460,7 +460,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
   // Shared Receipt Visual Template Component (Full-page, Crisp Light Luxury Theme)
   const renderReceiptCard = (isExport: boolean = false) => (
-    <div className={`${isExport ? 'w-[480px] min-w-[480px]' : 'w-full max-w-[480px]'} bg-white text-slate-900 shadow-xl overflow-hidden font-sans border border-slate-200 rounded-2xl`}>
+    <div className={`${isExport ? 'w-[480px] min-w-[480px]' : 'w-full max-w-[480px]'} bg-white text-slate-900 shadow-xl overflow-hidden font-sans border border-slate-200/90 rounded-2xl relative`}>
       
       {/* ── TOP LIGHT LUXURY HEADER ── */}
       <div className="bg-gradient-to-b from-slate-50 via-slate-50/90 to-white text-slate-900 px-3.5 sm:px-4 py-3 sm:py-3.5 border-b-2 border-emerald-500">
@@ -483,7 +483,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
           {/* Paid Tag Badge */}
           <div className="shrink-0 text-right">
-            <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 sm:px-2.5 py-0.5 rounded-lg text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider shadow-2xs">
+            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-300 px-2 sm:px-2.5 py-0.5 rounded-lg text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider shadow-2xs">
               <CheckCircle2 size={11} className="text-emerald-600" /> PAID
             </span>
             <p className="text-[8.5px] sm:text-[9.5px] font-mono text-slate-500 mt-0.5 font-bold">
@@ -590,10 +590,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
                       <span className="font-extrabold text-emerald-700 font-mono text-[11px] sm:text-[11.5px] block">
                         +{formatCurrency(alloc.amount)}
                       </span>
-                      <span className={`text-[8.5px] sm:text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                      <span className={`text-[8.5px] sm:text-[9px] px-1.5 py-0.5 rounded font-bold ${
                         isArr ? 'bg-amber-100 text-amber-800' : isAdv ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800'
                       }`}>
-                        {isArr ? 'Arrear Settled ✅' : isAdv ? 'Advance Pre-paid ⚡' : 'Applied ✅'}
+                        {isArr ? 'Arrear Settled' : isAdv ? 'Advance Pre-paid' : 'Applied'}
                       </span>
                     </div>
                   </div>
@@ -610,7 +610,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
                   ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
                   : 'text-amber-700 bg-amber-50 border-amber-200'
               }`}>
-                {isCleared ? 'No Pending (Cleared ✅)' : `${formatCurrency(remainingBalance)} Pending`}
+                {isCleared ? 'Cleared' : `${formatCurrency(remainingBalance)} Pending`}
               </span>
             </div>
           )}
@@ -630,7 +630,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
                 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
                 : 'text-amber-700 bg-amber-50 border-amber-200'
             }`}>
-              {pastPendingDues === 0 ? 'No Past Pending ✅' : `${formatCurrency(pastPendingDues)} Pending`}
+              {pastPendingDues === 0 ? 'No Past Pending' : `${formatCurrency(pastPendingDues)} Pending`}
             </span>
           </div>
 
@@ -642,7 +642,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
                 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
                 : 'text-rose-600 bg-rose-50 border-rose-200'
             }`}>
-              {totalGroupOutstanding === 0 ? '₹0 (All Cleared ✅)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}
+              {totalGroupOutstanding === 0 ? '₹0 (All Cleared)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}
             </span>
           </div>
 
@@ -656,27 +656,49 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
             </div>
           )}
         </div>
+      </div>
 
-        {/* Sign-off & Verification Seal */}
-        <div className="pt-2 sm:pt-2.5 border-t border-dashed border-slate-300 flex items-center justify-between text-[8.5px] sm:text-[9px] text-slate-500">
+      {/* ── REALISTIC PERFORATED TICKET TEAR LINE WITH NOTCHES ── */}
+      <div className="relative py-2.5 bg-white flex items-center justify-between select-none">
+        {/* Left Circular Ticket Notch (Cuts inward into left card edge) */}
+        <div 
+          className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 border border-slate-300 shadow-inner z-10" 
+          aria-hidden="true"
+        />
+
+        {/* Dotted Tear Line (Punch holes) */}
+        <div className="w-full border-t-2 border-dotted border-slate-300 mx-4" />
+
+        {/* Right Circular Ticket Notch (Cuts inward into right card edge) */}
+        <div 
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 border border-slate-300 shadow-inner z-10" 
+          aria-hidden="true"
+        />
+      </div>
+
+      {/* ── TICKET STUB / DIGITAL SECURITY COUNTERFOIL (NO SIGNATORY NEEDED) ── */}
+      <div className="px-3.5 sm:px-4 py-2.5 bg-slate-50/70 border-t border-slate-100">
+        <div className="flex items-center justify-between gap-2 text-[8.5px] sm:text-[9px] text-slate-500">
           <div className="space-y-0.5 min-w-0">
-            <div className="flex items-center gap-1 text-emerald-700 font-extrabold">
-              <ShieldCheck size={12} className="text-emerald-600 shrink-0" />
-              <span className="truncate">AUTHENTICATED RECORD</span>
+            <div className="flex items-center gap-1.5 text-emerald-800 font-extrabold text-[9.5px] sm:text-[10px]">
+              <ShieldCheck size={13} className="text-emerald-600 shrink-0" />
+              <span className="truncate tracking-wide">AUTHENTICATED DIGITAL RECORD</span>
             </div>
-            <p className="text-[8px] sm:text-[8.5px] text-slate-400 font-medium truncate">
-              Passbook: <strong className="text-slate-600">{appPortalUrl.replace(/^https?:\/\//, '')}</strong>
+            <p className="text-[8px] sm:text-[8.5px] text-slate-500 font-mono font-medium truncate">
+              Passbook: <strong className="text-slate-700">{appPortalUrl.replace(/^https?:\/\//, '')}</strong>
             </p>
           </div>
 
           <div className="text-right flex flex-col items-end shrink-0">
-            <div className="w-16 sm:w-18 h-3 sm:h-3.5 border-b border-slate-400 border-dashed" />
-            <span className="text-[7.5px] sm:text-[8px] font-bold text-slate-600 uppercase mt-0.5">
-              Authorized Signatory
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100/70 border border-emerald-300 text-[8.5px] sm:text-[9px] font-mono font-bold text-emerald-800">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>LEDGER CONFIRMED</span>
+            </div>
+            <span className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 mt-0.5 font-semibold">
+              Ref #{receiptNo}
             </span>
           </div>
         </div>
-
       </div>
 
       {/* Bottom Security Bar */}
@@ -688,20 +710,20 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-      <div className="bg-slate-900 border-t sm:border border-slate-800 text-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-0 sm:my-auto flex flex-col max-h-[94dvh] sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-150">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+      <div className="bg-white border-t sm:border border-slate-200/90 text-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-0 sm:my-auto flex flex-col max-h-[94dvh] sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-150">
         
-        {/* Top Actions Header (Modern Dark Slate / Emerald Header matching App) */}
-        <div className="px-5 py-3.5 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 flex items-center justify-between shrink-0">
+        {/* Top Actions Header (Light Theme Header matching App) */}
+        <div className="px-5 py-3.5 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/80 flex items-center justify-center shrink-0 shadow-xs">
               <FileCheck size={18} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-black text-white tracking-tight font-display truncate">
+              <h3 className="text-sm font-black text-slate-900 tracking-tight font-display truncate">
                 Payment Receipt
               </h3>
-              <p className="text-[11px] text-slate-400 font-mono font-medium truncate">
+              <p className="text-[11px] text-slate-500 font-mono font-medium truncate">
                 {receiptNo} · {monthLabel}
               </p>
             </div>
@@ -710,33 +732,33 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* Scrollable Receipt Preview Area */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-slate-950/50 flex flex-col items-center justify-start min-h-0">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-slate-100/70 flex flex-col items-center justify-start min-h-0">
           
           {/* Status / Toast alert if any */}
           {shareStatus && (
-            <div className="w-full max-w-[480px] mb-3 px-3.5 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 shadow-xs">
-              <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+            <div className="w-full max-w-[480px] mb-3 px-3.5 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 shadow-xs">
+              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
               <span>{shareStatus}</span>
             </div>
           )}
 
           {copiedToast && (
-            <div className="w-full max-w-[480px] mb-3 px-3.5 py-2 bg-teal-500/15 border border-teal-500/30 text-teal-300 text-xs font-semibold rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 shadow-xs">
-              <Check size={16} className="text-teal-400 shrink-0" />
+            <div className="w-full max-w-[480px] mb-3 px-3.5 py-2 bg-teal-50 border border-teal-200 text-teal-800 text-xs font-semibold rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 shadow-xs">
+              <Check size={16} className="text-teal-600 shrink-0" />
               <span>Receipt image copied to clipboard! (Paste into WhatsApp)</span>
             </div>
           )}
 
           {/* Receipt UI Preview Container */}
           <div className="w-full flex justify-center py-1">
-            <div ref={previewRef} className="w-full max-w-[480px] rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl shrink-0 bg-white">
+            <div ref={previewRef} className="w-full max-w-[480px] rounded-2xl overflow-hidden border border-slate-200/90 shadow-xl shrink-0 bg-white">
               {renderReceiptCard(false)}
             </div>
           </div>
@@ -744,14 +766,14 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         </div>
 
         {/* Modal Action Controls Bar (Mobile Optimized Thumb-Friendly Bottom Bar) */}
-        <div className="p-3 sm:p-4 bg-slate-900 border-t border-slate-800 space-y-2.5 shrink-0">
+        <div className="p-3 sm:p-4 bg-white border-t border-slate-200 space-y-2.5 shrink-0">
           
           {/* Primary Action Button: Prominent WhatsApp / Share Button */}
           <button
             type="button"
             onClick={handleSharePng}
             disabled={isGenerating}
-            className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
             <Share2 size={18} />
             <span>{isGenerating ? 'Generating Image...' : 'Share Receipt via WhatsApp'}</span>
@@ -763,9 +785,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               type="button"
               onClick={handleDownloadPng}
               disabled={isGenerating}
-              className="py-2.5 px-2 bg-slate-800 hover:bg-slate-700/80 active:scale-95 text-slate-200 border border-slate-700/80 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              className="py-2.5 px-2 bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
             >
-              <Download size={15} className="text-slate-400 shrink-0" />
+              <Download size={15} className="text-slate-500 shrink-0" />
               <span className="truncate">Download PNG</span>
             </button>
 
@@ -773,9 +795,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               type="button"
               onClick={handleCopyImage}
               disabled={isGenerating}
-              className="py-2.5 px-2 bg-slate-800 hover:bg-slate-700/80 active:scale-95 text-slate-200 border border-slate-700/80 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              className="py-2.5 px-2 bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
             >
-              <Copy size={15} className="text-slate-400 shrink-0" />
+              <Copy size={15} className="text-slate-500 shrink-0" />
               <span className="truncate">Copy Image</span>
             </button>
 
@@ -783,9 +805,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               type="button"
               onClick={handlePrint}
               disabled={isGenerating}
-              className="py-2.5 px-2 bg-slate-800 hover:bg-slate-700/80 active:scale-95 text-slate-200 border border-slate-700/80 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              className="py-2.5 px-2 bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
             >
-              <Printer size={15} className="text-slate-400 shrink-0" />
+              <Printer size={15} className="text-slate-500 shrink-0" />
               <span className="truncate">Print</span>
             </button>
           </div>
@@ -807,7 +829,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           pointerEvents: 'none',
         }}
       >
-        <div ref={exportRef} style={{ width: '480px', height: 'auto', overflow: 'visible', backgroundColor: '#ffffff' }}>
+        <div ref={exportRef} style={{ width: '480px', height: 'auto', overflow: 'visible', backgroundColor: '#f1f5f9' }}>
           {renderReceiptCard(true)}
         </div>
       </div>
