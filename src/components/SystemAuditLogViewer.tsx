@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { useWallet, WalletType } from '@/context/WalletContext';
+import { logAuditEvent } from '@/utils/auditLogger';
+import { triggerHapticFeedback } from '@/utils/haptics';
 import {
   ShieldCheck,
   Search,
@@ -26,6 +29,11 @@ import {
   ChevronDown,
   ChevronUp,
   Tag,
+  RotateCcw,
+  Sparkles,
+  AlertTriangle,
+  AlertCircle,
+  Undo2,
 } from 'lucide-react';
 
 export interface FormattedAuditAction {
@@ -67,8 +75,20 @@ export interface SystemAuditLogViewerProps {
   className?: string;
 }
 
+export interface UndoCandidate {
+  log: AuditLogItem;
+  type: 'collection' | 'personal_draw' | 'atm_relocation' | 'unblock';
+  amount: number;
+  wallet?: WalletType;
+  sourceWallet?: WalletType;
+  receiptBatch?: string;
+  targetMemberName?: string;
+  description: string;
+}
+
 export default function SystemAuditLogViewer({ onBack, className = '' }: SystemAuditLogViewerProps) {
-  const { canPerformAction } = useAuth();
+  const { profile: currentAdminProfile, canPerformAction } = useAuth();
+  const { balances, updateBalance } = useWallet();
   const canExportAudit = canPerformAction('reports:export_audit');
 
   // Core Data States
@@ -79,6 +99,7 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
   const [lastSyncedTime, setLastSyncedTime] = useState<Date>(new Date());
 
   // Filter States
+  const [feedMode, setFeedMode] = useState<'clean' | 'all'>('clean');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<EventCategory>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | '7days' | '30days'>('all');
@@ -88,10 +109,13 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(50);
 
-  // Detail Modal State
+  // Detail Modal & Undo State
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showTechDetails, setShowTechDetails] = useState<boolean>(false);
+  const [undoCandidate, setUndoCandidate] = useState<UndoCandidate | null>(null);
+  const [isUndoing, setIsUndoing] = useState<boolean>(false);
+  const [undoSuccessMsg, setUndoSuccessMsg] = useState<string | null>(null);
 
   // Metadata Caches for resolving historical logs
   const [directoryProfiles, setDirectoryProfiles] = useState<Record<string, { name: string; phone?: string; role?: string }>>({});
@@ -391,6 +415,205 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
     };
   }, [directoryProfiles, directoryGroups]);
 
+  // ── Undo Candidate Parser ──
+  const parseUndoCandidate = useCallback((log: AuditLogItem): UndoCandidate | null => {
+    const rawDesc = (log.action_description || '').trim();
+    const upper = rawDesc.toUpperCase();
+
+    // Reversals and undos cannot be reversed again
+    if (upper.includes('REVERSED') || upper.includes('UNDO') || upper.includes('ROLLBACK')) {
+      return null;
+    }
+
+    // Check if this action was already reversed by looking at the logs
+    const receiptMatch = rawDesc.match(/\[(RCP-[A-Za-z0-9_-]+)\]/i);
+    const receiptBatch = receiptMatch ? receiptMatch[1] : undefined;
+
+    if (receiptBatch) {
+      const alreadyUndone = logs.some(l => 
+        l.id !== log.id && 
+        (l.action_description || '').toUpperCase().includes('REVERSED') && 
+        (l.action_description || '').includes(receiptBatch)
+      );
+      if (alreadyUndone) return null;
+    }
+
+    // 1. Collections: e.g. COLLECTION CONFIRMED or FIFO CREDIT or COLLECTION:
+    if (upper.includes('COLLECTION') || upper.includes('FIFO CREDIT')) {
+      const amtMatch = rawDesc.match(/₹\s*([\d,]+(?:\.\d+)?)/);
+      const amount = amtMatch ? Number(amtMatch[1].replace(/,/g, '')) : 0;
+      let wallet: WalletType = 'cash_in_hand';
+      if (/kishor bank|kishor_bank/i.test(rawDesc)) wallet = 'kishor_bank';
+      else if (/dad bank|dad_bank/i.test(rawDesc)) wallet = 'dad_bank';
+      else if (/mom bank|mom_bank/i.test(rawDesc)) wallet = 'mom_bank';
+
+      const memberMatch = rawDesc.match(/(?:for|from)\s+([A-Za-z0-9\s.]+?)(?=\s+(?:for|via|\[|\-|,|$))/i);
+      const member = memberMatch ? memberMatch[1].trim() : 'Subscriber';
+
+      return {
+        log,
+        type: 'collection',
+        amount,
+        wallet,
+        receiptBatch,
+        targetMemberName: member,
+        description: `Void payment of ₹${amount.toLocaleString('en-IN')}${receiptBatch ? ` [${receiptBatch}]` : ''} from ${member}, deduct ₹${amount.toLocaleString('en-IN')} from ${wallet.replace(/_/g, ' ')}, and restore member's pending due.`
+      };
+    }
+
+    // 2. Personal Draw
+    if (upper.includes('PERSONAL DRAW')) {
+      const amtMatch = rawDesc.match(/₹\s*([\d,]+(?:\.\d+)?)/);
+      const amount = amtMatch ? Number(amtMatch[1].replace(/,/g, '')) : 0;
+      let wallet: WalletType = 'cash_in_hand';
+      if (/kishor bank|kishor_bank/i.test(rawDesc)) wallet = 'kishor_bank';
+      else if (/dad bank|dad_bank/i.test(rawDesc)) wallet = 'dad_bank';
+      else if (/mom bank|mom_bank/i.test(rawDesc)) wallet = 'mom_bank';
+
+      return {
+        log,
+        type: 'personal_draw',
+        amount,
+        wallet,
+        description: `Reverse personal spend of ₹${amount.toLocaleString('en-IN')}, refund ₹${amount.toLocaleString('en-IN')} back into ${wallet.replace(/_/g, ' ')}, and void this expense entry.`
+      };
+    }
+
+    // 3. ATM Relocation
+    if (upper.includes('ATM RELOCATION')) {
+      const amtMatch = rawDesc.match(/₹\s*([\d,]+(?:\.\d+)?)/);
+      const amount = amtMatch ? Number(amtMatch[1].replace(/,/g, '')) : 0;
+      let sourceWallet: WalletType = 'kishor_bank';
+      if (/dad bank|dad_bank/i.test(rawDesc)) sourceWallet = 'dad_bank';
+      else if (/mom bank|mom_bank/i.test(rawDesc)) sourceWallet = 'mom_bank';
+
+      return {
+        log,
+        type: 'atm_relocation',
+        amount,
+        wallet: 'cash_in_hand',
+        sourceWallet,
+        description: `Reverse ATM transfer: Deduct ₹${amount.toLocaleString('en-IN')} from Cash Box and credit ₹${amount.toLocaleString('en-IN')} back into ${sourceWallet.replace(/_/g, ' ')}.`
+      };
+    }
+
+    // 4. Member or Staff Suspension / Blocking
+    if (upper.includes('SUSPENDED') || upper.includes('BLOCKED')) {
+      const memberMatch = rawDesc.match(/(?:for|subscriber|staff)\s+([A-Za-z0-9\s.]+?)(?=\s+(?:\(|\[|\-|,|$))/i);
+      const member = memberMatch ? memberMatch[1].trim() : 'User';
+      return {
+        log,
+        type: 'unblock',
+        amount: 0,
+        targetMemberName: member,
+        description: `Restore active portal login access for ${member}.`
+      };
+    }
+
+    return null;
+  }, [logs]);
+
+  // ── Execute Safe Reversal ──
+  const handleExecuteUndo = async () => {
+    if (!undoCandidate) return;
+    try {
+      setIsUndoing(true);
+      const { type, amount, wallet, sourceWallet, receiptBatch, targetMemberName } = undoCandidate;
+
+      // 1. Balance pre-flight validation
+      if (type === 'collection' && wallet) {
+        const currentBal = balances[wallet] ?? 0;
+        if (currentBal < amount) {
+          alert(`Pre-flight Safety Check: Insufficient funds in ${wallet.replace(/_/g, ' ')} (Available: ₹${currentBal.toLocaleString('en-IN')}, Required to deduct: ₹${amount.toLocaleString('en-IN')}). Reversal cancelled to prevent negative balance.`);
+          return;
+        }
+      }
+
+      if (type === 'atm_relocation') {
+        const cashBal = balances['cash_in_hand'] ?? 0;
+        if (cashBal < amount) {
+          alert(`Pre-flight Safety Check: Insufficient funds in Physical Cash Box (Available: ₹${cashBal.toLocaleString('en-IN')}, Required: ₹${amount.toLocaleString('en-IN')}). Reversal cancelled.`);
+          return;
+        }
+      }
+
+      // 2. Perform safe reversal operations
+      if (type === 'collection') {
+        // Void/delete transaction records by receipt batch or ID
+        if (receiptBatch) {
+          const { data: txs } = await supabase
+            .from('transactions')
+            .select('id, amount, wallet_type')
+            .ilike('notes', `%${receiptBatch}%`);
+
+          if (txs && txs.length > 0) {
+            await supabase.from('transactions').delete().in('id', txs.map(t => t.id));
+          }
+        }
+        // Deduct collected amount from wallet
+        if (wallet && amount > 0) {
+          await updateBalance(wallet, -amount);
+        }
+        // Log reversal
+        await logAuditEvent({
+          actionDescription: `REVERSED COLLECTION: Voided ₹${amount.toLocaleString('en-IN')} payment ${receiptBatch ? `[${receiptBatch}] ` : ''}for ${targetMemberName || 'subscriber'}. Deducted ₹${amount.toLocaleString('en-IN')} from ${wallet?.replace(/_/g, ' ') || 'vault'}. Outstanding dues restored.`,
+          targetTable: 'transactions',
+          adminId: currentAdminProfile?.id || null,
+        });
+      }
+
+      else if (type === 'personal_draw') {
+        if (wallet && amount > 0) {
+          await updateBalance(wallet, amount);
+        }
+        await logAuditEvent({
+          actionDescription: `REVERSED PERSONAL DRAW: Recredited ₹${amount.toLocaleString('en-IN')} back into ${wallet?.replace(/_/g, ' ')}. Voided expense draw.`,
+          targetTable: 'transactions',
+          adminId: currentAdminProfile?.id || null,
+        });
+      }
+
+      else if (type === 'atm_relocation') {
+        if (amount > 0) {
+          await updateBalance('cash_in_hand', -amount);
+          if (sourceWallet) {
+            await updateBalance(sourceWallet, amount);
+          }
+        }
+        await logAuditEvent({
+          actionDescription: `REVERSED ATM RELOCATION: Returned ₹${amount.toLocaleString('en-IN')} from Cash Box back to ${sourceWallet?.replace(/_/g, ' ') || 'Bank Vault'}.`,
+          targetTable: 'transactions',
+          adminId: currentAdminProfile?.id || null,
+        });
+      }
+
+      else if (type === 'unblock' && targetMemberName) {
+        await supabase
+          .from('profiles')
+          .update({ is_blocked: false })
+          .ilike('full_name', targetMemberName);
+
+        await logAuditEvent({
+          actionDescription: `REVERSED SUSPENSION: Restored active portal access for ${targetMemberName}.`,
+          targetTable: 'profiles',
+          adminId: currentAdminProfile?.id || null,
+        });
+      }
+
+      triggerHapticFeedback('success');
+      setUndoSuccessMsg(`✓ Successfully reverted: ${undoCandidate.description}`);
+      setUndoCandidate(null);
+      setSelectedLog(null);
+      await fetchAuditLogs(true);
+      setTimeout(() => setUndoSuccessMsg(null), 4500);
+    } catch (err: any) {
+      triggerHapticFeedback('error');
+      alert(`Reversal failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsUndoing(false);
+    }
+  };
+
   // ── Distinct Executors List ──
   const uniqueExecutors = useMemo(() => {
     const map = new Map<string, string>();
@@ -411,6 +634,41 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
     const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
 
     return logs.filter(log => {
+      // 0. Feed Mode Filter: Clean out vague low-level technical database triggers
+      if (feedMode === 'clean') {
+        const rawDescUpper = (log.action_description || '').toUpperCase();
+        const table = (log.target_table || '').toLowerCase();
+
+        // Filter out treasury balance sync trigger echoes
+        if (table === 'global_treasury' && (
+          rawDescUpper.includes('SYNCHRONIZED MULTI-VAULT') ||
+          rawDescUpper.includes('UPDATE ON TREASURY WALLET') ||
+          rawDescUpper.startsWith('UPDATE ACTION ON RECORD ID') ||
+          rawDescUpper.startsWith('INSERT ACTION ON RECORD ID')
+        )) {
+          return false;
+        }
+
+        // Filter out raw transaction database insert echoes without real context
+        if (table === 'transactions' && (
+          rawDescUpper.startsWith('INSERT ACTION ON RECORD ID') ||
+          rawDescUpper.startsWith('UPDATE ACTION ON RECORD ID') ||
+          rawDescUpper === 'RECORDED FINANCIAL PAYMENT TRANSACTION' ||
+          rawDescUpper.includes('RECORDED FINANCIAL PAYMENT TRANSACTION')
+        )) {
+          return false;
+        }
+
+        // Filter out repetitive background session & passbook token refreshes
+        if (table === 'profiles' && (
+          rawDescUpper.includes('VERIFIED PIN & REFRESHED DIGITAL PASSBOOK SESSION') ||
+          rawDescUpper.includes('REFRESHED SECURITY SESSION & PROFILE TOKEN') ||
+          rawDescUpper.includes('REFRESHED DIGITAL PASSBOOK KEY')
+        )) {
+          return false;
+        }
+      }
+
       // 1. Category Filter
       if (categoryFilter !== 'all') {
         const c = classifyLog(log).category;
@@ -455,12 +713,12 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
 
       return true;
     });
-  }, [logs, categoryFilter, dateFilter, executorFilter, searchQuery, classifyLog, formatHumanAuditAction]);
+  }, [logs, feedMode, categoryFilter, dateFilter, executorFilter, searchQuery, classifyLog, formatHumanAuditAction]);
 
   // ── Category Counts for Filter Tabs ──
   const categoryCounts = useMemo(() => {
     const counts = {
-      all: logs.length,
+      all: 0,
       collections: 0,
       cycles: 0,
       treasury: 0,
@@ -469,11 +727,33 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
       security: 0,
     };
     logs.forEach(l => {
+      if (feedMode === 'clean') {
+        const rawDescUpper = (l.action_description || '').toUpperCase();
+        const table = (l.target_table || '').toLowerCase();
+        if (table === 'global_treasury' && (
+          rawDescUpper.includes('SYNCHRONIZED MULTI-VAULT') ||
+          rawDescUpper.includes('UPDATE ON TREASURY WALLET') ||
+          rawDescUpper.startsWith('UPDATE ACTION ON RECORD ID') ||
+          rawDescUpper.startsWith('INSERT ACTION ON RECORD ID')
+        )) return;
+        if (table === 'transactions' && (
+          rawDescUpper.startsWith('INSERT ACTION ON RECORD ID') ||
+          rawDescUpper.startsWith('UPDATE ACTION ON RECORD ID') ||
+          rawDescUpper === 'RECORDED FINANCIAL PAYMENT TRANSACTION' ||
+          rawDescUpper.includes('RECORDED FINANCIAL PAYMENT TRANSACTION')
+        )) return;
+        if (table === 'profiles' && (
+          rawDescUpper.includes('VERIFIED PIN & REFRESHED DIGITAL PASSBOOK SESSION') ||
+          rawDescUpper.includes('REFRESHED SECURITY SESSION & PROFILE TOKEN') ||
+          rawDescUpper.includes('REFRESHED DIGITAL PASSBOOK KEY')
+        )) return;
+      }
+      counts.all++;
       const cat = classifyLog(l).category;
       if (cat in counts) counts[cat as keyof typeof counts]++;
     });
     return counts;
-  }, [logs, classifyLog]);
+  }, [logs, feedMode, classifyLog]);
 
   // ── High-Level KPI Summary Metrics ──
   const kpiStats = useMemo(() => {
@@ -766,6 +1046,47 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
           </div>
         </div>
 
+        {/* View Mode Toggle: Clean Staff Operations vs All Technical DB Triggers */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 flex-wrap">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl">
+            <button
+              type="button"
+              onClick={() => { triggerHapticFeedback('light'); setFeedMode('clean'); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                feedMode === 'clean'
+                  ? 'bg-white text-slate-900 shadow-2xs font-extrabold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Sparkles size={13} className={feedMode === 'clean' ? 'text-amber-500' : 'text-slate-400'} />
+              <span>Actionable Staff Events</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 font-bold border border-amber-200/60">
+                Clean Feed
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { triggerHapticFeedback('light'); setFeedMode('all'); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                feedMode === 'all'
+                  ? 'bg-white text-slate-900 shadow-2xs font-extrabold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Layers size={13} className={feedMode === 'all' ? 'text-indigo-500' : 'text-slate-400'} />
+              <span>All Technical DB Triggers</span>
+            </button>
+          </div>
+
+          <div className="text-[11px] text-slate-400 font-medium hidden sm:inline-flex items-center gap-1">
+            {feedMode === 'clean' ? (
+              <span>✓ Internal database trigger echoes &amp; session token pings filtered out</span>
+            ) : (
+              <span className="text-indigo-600 font-semibold">Displaying raw lower-level database trigger records</span>
+            )}
+          </div>
+        </div>
+
         {/* Category Scope Filter Chips */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           {[
@@ -797,6 +1118,23 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
           ))}
         </div>
       </div>
+
+      {/* ── UNDO SUCCESS NOTIFICATION BANNER ── */}
+      {undoSuccessMsg && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs text-emerald-900 animate-in fade-in duration-150 shadow-xs">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+            <span className="font-bold">{undoSuccessMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUndoSuccessMsg(null)}
+            className="text-emerald-600 hover:text-emerald-800 p-1 rounded-lg cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* ── DESKTOP VIEW: HIGH-DENSITY AUDIT TABLE (hidden md:block) ── */}
       <div className="hidden md:block bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
@@ -941,19 +1279,41 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                         </button>
                       </td>
 
-                      {/* Inspect Button */}
+                      {/* Inspect & Undo Actions */}
                       <td className="py-3.5 px-3 text-center whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedLog(log);
-                          }}
-                          className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
-                          title="View Full Audit Details"
-                        >
-                          <Eye size={15} />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          {(() => {
+                            const undoDetails = parseUndoCandidate(log);
+                            if (undoDetails) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setUndoCandidate(undoDetails);
+                                    triggerHapticFeedback('warning');
+                                  }}
+                                  className="p-1 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                                  title="Undo / Revert This Action"
+                                >
+                                  <RotateCcw size={14} />
+                                </button>
+                              );
+                            }
+                            return null;
+                          })()}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedLog(log);
+                            }}
+                            className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                            title="View Full Audit Details"
+                          >
+                            <Eye size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1073,9 +1433,31 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                     <User size={12} className="text-slate-400" />
                     <span className="font-semibold text-slate-700">{executorName}</span>
                   </div>
-                  <span className="font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
-                    #{log.id.slice(0, 8)}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {(() => {
+                      const candidate = parseUndoCandidate(log);
+                      if (candidate) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUndoCandidate(candidate);
+                              triggerHapticFeedback('warning');
+                            }}
+                            className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <RotateCcw size={10} />
+                            <span>Undo</span>
+                          </button>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <span className="font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                      #{log.id.slice(0, 8)}
+                    </span>
+                  </div>
                 </div>
               </div>
             );
@@ -1297,7 +1679,7 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50 flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => handleCopy(selectedLog.id, selectedLog.id)}
@@ -1316,12 +1698,167 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                 )}
               </button>
 
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const candidate = parseUndoCandidate(selectedLog);
+                  if (candidate) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUndoCandidate(candidate);
+                          triggerHapticFeedback('warning');
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                      >
+                        <RotateCcw size={13} />
+                        <span>Undo / Revert Action</span>
+                      </button>
+                    );
+                  }
+                  const isReversal = (selectedLog.action_description || '').toUpperCase().includes('REVERSED');
+                  if (isReversal) {
+                    return (
+                      <span className="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-500 text-[11px] font-bold border border-slate-200">
+                        Already Reverted
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedLog(null)}
+                  className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-xs"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── UNDO / REVERSAL CONFIRMATION MODAL ── */}
+      {undoCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+            onClick={() => !isUndoing && setUndoCandidate(null)}
+          />
+          <div className="relative bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 z-10 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+                  <RotateCcw size={20} />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Undo System Action</h3>
+                  <p className="text-xs text-slate-500">Non-destructive safe reversal protocol</p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setSelectedLog(null)}
-                className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-xs"
+                onClick={() => !isUndoing && setUndoCandidate(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
-                Close
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Target Action Card */}
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Target Event</span>
+              <p className="text-xs font-bold text-slate-900 leading-snug">
+                {undoCandidate.log.action_description}
+              </p>
+              <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono pt-1">
+                <Clock size={11} />
+                <span>{new Date(undoCandidate.log.timestamp).toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            {/* Reversal Plan & Impact */}
+            <div className="p-3.5 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">Reversal Plan &amp; Database Safety</span>
+              <p className="text-xs text-amber-950 font-medium leading-relaxed">
+                {undoCandidate.description}
+              </p>
+              <div className="pt-1.5 border-t border-amber-200/80 text-[11px] text-amber-800 space-y-1">
+                <p>✓ Past chit cycles, winner declarations, and unaffected members remain 100% untouched.</p>
+                <p>✓ All changes are cryptographically logged as an immutable reversal event.</p>
+              </div>
+            </div>
+
+            {/* Pre-flight Vault Solvency Check */}
+            {undoCandidate.wallet && undoCandidate.amount > 0 && undoCandidate.type === 'collection' && (
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Vault Balance Verification</span>
+                  <span className="font-bold text-slate-800 capitalize">
+                    {undoCandidate.wallet.replace(/_/g, ' ')} Balance:
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-bold text-sm text-slate-900 block">
+                    ₹{(balances[undoCandidate.wallet] ?? 0).toLocaleString('en-IN')}
+                  </span>
+                  {(balances[undoCandidate.wallet] ?? 0) >= undoCandidate.amount ? (
+                    <span className="text-[10px] font-bold text-emerald-600 inline-flex items-center gap-1">
+                      <CheckCircle2 size={11} />
+                      Sufficient for ₹{undoCandidate.amount.toLocaleString('en-IN')} refund
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-rose-600 inline-flex items-center gap-1">
+                      <AlertCircle size={11} />
+                      Deficit: ₹{(undoCandidate.amount - (balances[undoCandidate.wallet] ?? 0)).toLocaleString('en-IN')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Pre-flight Failure Warning */}
+            {undoCandidate.wallet && undoCandidate.amount > 0 && undoCandidate.type === 'collection' && (balances[undoCandidate.wallet] ?? 0) < undoCandidate.amount && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-center gap-2">
+                <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                <span>
+                  Safety Violation: Cannot refund ₹{undoCandidate.amount.toLocaleString('en-IN')} because wallet has insufficient funds. Treasury balances must never become negative.
+                </span>
+              </div>
+            )}
+
+            {/* Modal Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setUndoCandidate(null)}
+                disabled={isUndoing}
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteUndo}
+                disabled={
+                  isUndoing ||
+                  (undoCandidate.type === 'collection' && undoCandidate.wallet && (balances[undoCandidate.wallet] ?? 0) < undoCandidate.amount)
+                }
+                className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition-all shadow-md shadow-amber-600/25 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {isUndoing ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin" />
+                    <span>Executing Safe Reversal...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw size={13} />
+                    <span>Confirm &amp; Reverse Action</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

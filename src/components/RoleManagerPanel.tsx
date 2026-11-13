@@ -246,6 +246,7 @@ interface RoleManagerPanelProps {
   setIsCreateModalOpen?: (open: boolean) => void;
   onExportPolicy?: () => void;
   onOpenAuditLogs?: () => void;
+  onAddAuditLog?: (desc: string) => void;
 }
 
 export default function RoleManagerPanel({
@@ -254,6 +255,7 @@ export default function RoleManagerPanel({
   setIsCreateModalOpen: externalSetIsCreateModalOpen,
   onExportPolicy,
   onOpenAuditLogs,
+  onAddAuditLog,
 }: RoleManagerPanelProps) {
   const { profile: currentAdminProfile } = useAuth();
   const [roles, setRoles] = useState<CustomRoleRecord[]>([]);
@@ -469,6 +471,10 @@ export default function RoleManagerPanel({
       // Broadcast changes across all connected staff sessions in real-time
       await broadcastRoleUpdate(activeRole.id);
 
+      if (onAddAuditLog) {
+        onAddAuditLog(`UPDATED ROLE PERMISSIONS: Modified access matrix for role "${activeRole.name}"`);
+      }
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
       await fetchData();
@@ -501,6 +507,10 @@ export default function RoleManagerPanel({
       if (error) throw error;
 
       await broadcastRoleUpdate(cloneId);
+
+      if (onAddAuditLog) {
+        onAddAuditLog(`CLONED ROLE: Created new role "${cloneName}" from template "${activeRole.name}"`);
+      }
 
       setSelectedRoleId(cloneId);
       await fetchData();
@@ -537,6 +547,10 @@ export default function RoleManagerPanel({
 
       const { error } = await supabase.from('custom_roles').delete().eq('id', activeRole.id);
       if (error) throw error;
+
+      if (onAddAuditLog) {
+        onAddAuditLog(`DELETED ROLE: Removed custom role "${activeRole.name}" (reassigned ${assignedCount} users to Subscriber)`);
+      }
 
       setSelectedRoleId('subscriber');
       await fetchData();

@@ -119,6 +119,10 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
   const [isResettingPassword, setIsResettingPassword] = useState<boolean>(false);
   const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
 
+  // Presence and Last Seen state
+  const [onlineStaffIds, setOnlineStaffIds] = useState<Set<string>>(new Set());
+  const [lastSeenMap, setLastSeenMap] = useState<Record<string, string>>({});
+
   // Helper: Resolve true email (prioritize Supabase auth user email for admin, then profile email, or reschedule_acknowledgments)
   const resolveStaffEmail = (staff: StaffProfile): string | null => {
     if (staff.id === currentAdminProfile?.id || staff.role === 'admin') {
@@ -185,11 +189,86 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
       }
 
       setStaffMembers(staffOnly);
+
+      // Query latest audit log timestamps per staff member for last seen status
+      try {
+        const { data: latestLogs } = await supabase
+          .from('security_audit_logs')
+          .select('admin_id, timestamp')
+          .not('admin_id', 'is', null)
+          .order('timestamp', { ascending: false })
+          .limit(100);
+
+        if (latestLogs && latestLogs.length > 0) {
+          const map: Record<string, string> = {};
+          latestLogs.forEach((log: any) => {
+            if (log.admin_id && !map[log.admin_id]) {
+              map[log.admin_id] = log.timestamp;
+            }
+          });
+          setLastSeenMap(map);
+        }
+      } catch {
+        // Non-blocking metadata enrichment
+      }
     } catch (err) {
       console.error('Failed to load staff accounts:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Realtime Presence Tracker for live online status
+  useEffect(() => {
+    if (!currentAdminProfile?.id) return;
+
+    const presenceChannel = supabase.channel('staff_presence_stream', {
+      config: { presence: { key: currentAdminProfile.id } },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const activeIds = new Set<string>();
+        Object.keys(state).forEach((key) => {
+          activeIds.add(key);
+          const entries = state[key] as any[];
+          if (entries && entries.length > 0 && entries[0].userId) {
+            activeIds.add(entries[0].userId);
+          }
+        });
+        // Active session user is always online
+        activeIds.add(currentAdminProfile.id);
+        setOnlineStaffIds(activeIds);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            userId: currentAdminProfile.id,
+            userName: currentAdminProfile.fullName,
+            onlineAt: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [currentAdminProfile?.id, currentAdminProfile?.fullName]);
+
+  // Helper: Format relative last active time
+  const formatLastActive = (timestamp?: string) => {
+    if (!timestamp) return 'Offline';
+    const now = Date.now();
+    const diffMs = now - new Date(timestamp).getTime();
+    if (diffMs < 0) return 'Just now';
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `Last active ${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `Last active ${diffHours}h ago`;
+    const dt = new Date(timestamp);
+    return `Last active ${dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
   };
 
   useEffect(() => {
@@ -568,6 +647,10 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
 
       if (error) throw error;
 
+      if (onAddAuditLog) {
+        onAddAuditLog(`PASSWORD RESET: Dispatched credentials reset email to ${targetEmail} for ${staff.full_name}`);
+      }
+
       setResetSuccessMsg(`Password reset link dispatched to ${targetEmail}`);
       triggerHapticFeedback('success');
       setTimeout(() => {
@@ -768,11 +851,24 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                               <span className="font-bold text-slate-900 block truncate">
                                 {staff.full_name}
                               </span>
-                              {isSelf && (
-                                <span className="text-[10px] font-bold text-brand-600 bg-brand-50 px-1.5 py-0.2 rounded">
-                                  You (Active Session)
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {isSelf ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/80">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span>Online Now (Active Session)</span>
+                                  </span>
+                                ) : onlineStaffIds.has(staff.id) ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/80">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    <span>Online Now</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                                    <span>{formatLastActive(lastSeenMap[staff.id])}</span>
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -932,6 +1028,24 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                           <span className="font-bold text-slate-900 block truncate text-sm">
                             {staff.full_name}
                           </span>
+                          <div className="flex items-center gap-1.5 mt-0.5 mb-1">
+                            {isSelf ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/80">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span>Online Now (You)</span>
+                              </span>
+                            ) : onlineStaffIds.has(staff.id) ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/80">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                <span>Online Now</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                                <span>{formatLastActive(lastSeenMap[staff.id])}</span>
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[11px] text-slate-500 font-mono block">
                             +91 {staff.phone_number || '—'}
                           </span>
@@ -1062,6 +1176,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
           <RoleManagerPanel 
             onOpenAuditLogs={onOpenAuditLogs}
             onRoleUpdated={fetchStaffData}
+            onAddAuditLog={onAddAuditLog}
           />
         </div>
       )}

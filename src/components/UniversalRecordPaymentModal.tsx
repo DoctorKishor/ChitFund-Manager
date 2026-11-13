@@ -8,6 +8,7 @@ import { triggerHapticFeedback } from '@/utils/haptics';
 import PassbookScannerModal from '@/components/PassbookScannerModal';
 import { PaymentReceiptModal } from '@/components/PaymentReceiptModal';
 import { searchSubscribersFuzzy } from '@/utils/fuzzySearch';
+import { logAuditEvent } from '@/utils/auditLogger';
 import {
   X,
   Check,
@@ -919,17 +920,19 @@ export default function UniversalRecordPaymentModal({
       const balRes = await updateBalance(effectiveWallet, totalCollectionAmount);
       if (balRes && !balRes.success) {
         console.warn('Treasury balance sync note:', balRes.error);
-        await supabase.from('security_audit_logs').insert({
-          action_description: `TREASURY UPDATE NOTE: Collection ₹${totalCollectionAmount.toLocaleString('en-IN')} recorded in batch [${batchId}], but automated treasury wallet credit had a note: ${balRes.error}`,
-          target_table: 'global_treasury',
+        await logAuditEvent({
+          actionDescription: `TREASURY UPDATE NOTE: Collection ₹${totalCollectionAmount.toLocaleString('en-IN')} recorded in batch [${batchId}], but automated treasury wallet credit had a note: ${balRes.error}`,
+          targetTable: 'global_treasury',
+          adminId: currentAdminProfile?.id || null,
         });
         alert(`Note: Payment transaction recorded successfully, but treasury balance sync reported: ${balRes.error}`);
       }
 
       // 6. Security Audit Log
-      await supabase.from('security_audit_logs').insert({
-        action_description: `COLLECTION CONFIRMED: Received ₹${totalCollectionAmount.toLocaleString('en-IN')} via ${effectiveWalletLabel} from ${selectedMember.fullName} for ${calculatedItemsList.length} chit item(s) [${batchId}]`,
-        target_table: 'transactions',
+      await logAuditEvent({
+        actionDescription: `COLLECTION CONFIRMED: Received ₹${totalCollectionAmount.toLocaleString('en-IN')} via ${effectiveWalletLabel} from ${selectedMember.fullName} for ${calculatedItemsList.length} chit item(s) [${batchId}]`,
+        targetTable: 'transactions',
+        adminId: currentAdminProfile?.id || null,
       });
 
       triggerHapticFeedback('success');

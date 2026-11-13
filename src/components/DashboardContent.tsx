@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useWallet, WalletType } from '../context/WalletContext';
 import { useOrganization } from '../context/OrganizationContext';
 import { supabase } from '../utils/supabase/client';
+import { logAuditEvent } from '@/utils/auditLogger';
 import LiveAuctionEngine from './LiveAuctionEngine';
 import CashVaultLedger from './CashVaultLedger';
 import MemberMatrix from './MemberMatrix';
@@ -179,6 +180,29 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const canExportChecklist = canPerformAction('reports:export_checklist');
   const { balances, updateBalance } = useWallet();
   const { organizationName, organizationInitials, organizationTagline } = useOrganization();
+
+  // Dynamic Audit Log State (Loaded from Supabase + live updates)
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+
+  // Central Persistent System Audit Logger (Ensures all staff actions are saved to Supabase security_audit_logs)
+  const recordSystemAuditLog = useCallback(async (desc: string, table: string = 'profiles') => {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    setAuditLogs(prev => [
+      {
+        timestamp: `Today, ${timeStr}`,
+        table,
+        desc,
+        executor: profile?.fullName ? `${profile.fullName} (${profile.role || 'Admin'})` : 'Admin',
+      },
+      ...prev,
+    ]);
+    await logAuditEvent({
+      actionDescription: desc,
+      targetTable: table,
+      adminId: profile?.id || null,
+    });
+  }, [profile]);
 
   // Group Creation & Enrollment States
   const [newGroupName, setNewGroupName] = useState('');
@@ -784,17 +808,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         );
       }
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'group_members',
-          desc: `ASSIGNED TICKET #${ticketNum}: Set subscriber to "${newName}" (${newPhone})`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`ASSIGNED TICKET #${ticketNum}: Set subscriber to "${newName}" (${newPhone})`, 'group_members');
     } catch (err: any) {
       alert(`Error reassigning member: ${err.message}`);
     }
@@ -835,17 +849,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         );
       }
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'group_members',
-          desc: `SPLIT POOL CONFIGURED: ${payers.length} co-payers saved for ticket`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`SPLIT POOL CONFIGURED: ${payers.length} co-payers saved for ticket`, 'group_members');
 
       setSplitModalTicket(null);
     } catch (err: any) {
@@ -888,17 +892,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         );
       }
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'group_members',
-          desc: exitMonth ? `MEMBER EXIT SCHEDULED: Stops paying from Month ${exitMonth}` : `MEMBER RE-INSTATED: Cleared exit status`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(exitMonth ? `MEMBER EXIT SCHEDULED: Stops paying from Month ${exitMonth}` : `MEMBER RE-INSTATED: Cleared exit status`, 'group_members');
 
       setExitModalTicket(null);
     } catch (err: any) {
@@ -975,17 +969,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         );
       }
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'group_members',
-          desc: `TICKET TRANSFERRED: Handed over to "${targetProfile.name}" starting from Month ${startMonth}`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`TICKET TRANSFERRED: Handed over to "${targetProfile.name}" starting from Month ${startMonth}`, 'group_members');
 
       setTransferModalTicket(null);
     } catch (err: any) {
@@ -1028,17 +1012,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         );
       }
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'group_members',
-          desc: amount ? `CUSTOM DUE SET: ₹${amount.toLocaleString('en-IN')}/mo on ticket` : `CUSTOM DUE CLEARED: Reset to baseline installment`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(amount ? `CUSTOM DUE SET: ₹${amount.toLocaleString('en-IN')}/mo on ticket` : `CUSTOM DUE CLEARED: Reset to baseline installment`, 'group_members');
 
       setCustomAmountModalTicket(null);
     } catch (err: any) {
@@ -1335,22 +1309,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       }
 
       // 5. Audit log
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      await supabase.from('security_audit_logs').insert({
-        action_description: `PERMANENTLY PURGED CHIT GROUP: "${deletingGroup.name}" (Pool ₹${deletingGroup.totalValue?.toLocaleString('en-IN')}) with all enrolled tickets and logs`,
-        target_table: 'chit_groups',
-      });
-
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'chit_groups',
-          desc: `PERMANENTLY PURGED CHIT GROUP: "${deletingGroup.name}" (Pool ₹${deletingGroup.totalValue?.toLocaleString('en-IN')}) with all enrolled tickets and logs`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`PERMANENTLY PURGED CHIT GROUP: "${deletingGroup.name}" (Pool ₹${deletingGroup.totalValue?.toLocaleString('en-IN')}) with all enrolled tickets and logs`, 'chit_groups');
 
       // Update state
       setLocalGroups(prev => prev.filter(g => g.id !== deletingGroup.id));
@@ -1458,8 +1417,6 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const selectedFifoMember = fifoMembers.find(m => m.id === selectedMemberId) ?? null;
   const selectedMemberTotalDue = selectedFifoMember ? getMemberTotalDue(selectedFifoMember) : 0;
 
-  // Dynamic Audit Log State (Loaded from Supabase + live updates)
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [reportsInitialSubtab, setReportsInitialSubtab] = useState<ReportSubtab>('monthly');
 
   // Load initial audit logs from Supabase
@@ -2269,17 +2226,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
       // 5. Update audit logs with allocation summary
       const summaryStr = allocations.map(a => `M${a.month}: ₹${a.amount.toLocaleString('en-IN')}`).join(', ');
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'transactions',
-          desc: `COLLECTION: Received ₹${amt.toLocaleString('en-IN')} via ${paymentWalletType.replace(/_/g, ' ')} from ${recordingPaymentMember.name} (Ticket #${recordingPaymentMember.ticket}) — [${summaryStr}]`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`COLLECTION: Received ₹${amt.toLocaleString('en-IN')} via ${paymentWalletType.replace(/_/g, ' ')} from ${recordingPaymentMember.name} (Ticket #${recordingPaymentMember.ticket}) [${batchId}] — [${summaryStr}]`, 'transactions');
 
       const finishedPaymentMember = recordingPaymentMember;
       setRecordingPaymentMember(null);
@@ -2427,17 +2374,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       }
 
       // 4. Audit log
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'transactions',
-          desc: `PAYMENT EDITED: Updated receipt #${editingTransaction.id.slice(0, 8)} to ₹${newAmt.toLocaleString('en-IN')} (${newWallet.replace(/_/g, ' ')})`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`PAYMENT EDITED: Updated receipt #${editingTransaction.id.slice(0, 8)} to ₹${newAmt.toLocaleString('en-IN')} (${newWallet.replace(/_/g, ' ')})`, 'transactions');
 
       setEditingTransaction(null);
       setQuickPaymentAmount('');
@@ -2491,17 +2428,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       await updateBalance(tx.wallet_type as any, balanceDelta);
 
       // 3. Audit log
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'transactions',
-          desc: `PAYMENT DELETED: Voided ₹${amt.toLocaleString('en-IN')} from ${tx.wallet_type?.replace(/_/g, ' ')}`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`PAYMENT DELETED: Voided ₹${amt.toLocaleString('en-IN')} from ${tx.wallet_type?.replace(/_/g, ' ')}`, 'transactions');
 
       if (editingTransaction?.id === tx.id) {
         setEditingTransaction(null);
@@ -2678,17 +2605,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       }
 
       // 3. Audit Log
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'transactions',
-          desc: `PRIZE SETTLEMENT: Paid ${formatCurrency(netCashAmount)} net cash to ${winnerName} for Month ${selectedDashboardMonth} via ${disbursePayoutWallet.replace(/_/g, ' ')}${deductionSummaryStr}`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`PRIZE SETTLEMENT: Paid ${formatCurrency(netCashAmount)} net cash to ${winnerName} for Month ${selectedDashboardMonth} via ${disbursePayoutWallet.replace(/_/g, ' ')}${deductionSummaryStr}`, 'transactions');
 
       setShowDisbursePayoutModal(false);
       setDisbursePayoutAmount('');
@@ -2811,17 +2728,7 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
       // Update Cash in Hand treasury balance
       await updateBalance('cash_in_hand', totalToCollect);
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'transactions',
-          desc: `BULK COLLECTION: Marked all ${pendingMembers.length} members paid for Month ${selectedDashboardMonth} (₹${totalToCollect.toLocaleString('en-IN')} to Cash in Hand)`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`BULK COLLECTION: Marked all ${pendingMembers.length} members paid for Month ${selectedDashboardMonth} (₹${totalToCollect.toLocaleString('en-IN')} to Cash in Hand)`, 'transactions');
 
       await fetchDashboardData(activeDashboardGroupId);
     } catch (err: any) {
@@ -2929,17 +2836,7 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
         return;
       }
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'chit_groups',
-          desc: `ADVANCED CYCLE: Group "${activeGroup.name}" advanced from Month ${currentMonth} to Month ${nextMonth}`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`ADVANCED CYCLE: Group "${activeGroup.name}" advanced from Month ${currentMonth} to Month ${nextMonth}`, 'chit_groups');
 
       await fetchGroups();
       setSelectedDashboardMonth(nextMonth);
@@ -2979,17 +2876,7 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
         return;
       }
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'chit_groups',
-          desc: `REVERTED CYCLE: "${activeGroup.name}" rolled back from Month ${currentMonth} to Month ${prevMonth} by Admin`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`REVERTED CYCLE: "${activeGroup.name}" rolled back from Month ${currentMonth} to Month ${prevMonth} by Admin`, 'chit_groups');
 
       await fetchGroups();
       setSelectedDashboardMonth(prevMonth);
@@ -3315,22 +3202,7 @@ Thank you for your prompt payment! 🙏`;
       }
 
       // Add audit log
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      await supabase.from('security_audit_logs').insert({
-        action_description: `NEW SUBSCRIBER REGISTERED: "${cleanName}" (${cleanPhone}) — enrolled in Ticket #${targetSlot !== -1 ? targetSlot + 1 : 'N/A'}`,
-        target_table: 'profiles',
-      });
-
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'profiles',
-          desc: `NEW SUBSCRIBER REGISTERED: "${cleanName}" (${cleanPhone}) — enrolled in Ticket #${targetSlot !== -1 ? targetSlot + 1 : 'N/A'}`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`NEW SUBSCRIBER REGISTERED: "${cleanName}" (${cleanPhone}) — enrolled in Ticket #${targetSlot !== -1 ? targetSlot + 1 : 'N/A'}`, 'profiles');
 
       // Reset modal state
       setNewMemberName('');
@@ -3506,17 +3378,7 @@ Thank you for your prompt payment! 🙏`;
       ));
       setActualCollections(prev => prev + amountNum);
 
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      setAuditLogs(prev => [
-        {
-          timestamp: `Today, ${timeStr}`,
-          table: 'transactions',
-          desc: `FIFO CREDIT ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} — oldest arrears cleared first`,
-          executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin',
-        },
-        ...prev,
-      ]);
+      recordSystemAuditLog(`FIFO CREDIT ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} — oldest arrears cleared first`, 'transactions');
 
       setSelectedMemberId(null);
       setPaymentAmount('');
@@ -5397,38 +5259,14 @@ Thank you for your prompt payment! 🙏`;
             setReportsInitialSubtab('system_log');
             if (setActiveTab) setActiveTab('reports');
           }}
-          onAddAuditLog={(desc) => {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            setAuditLogs(prev => [
-              {
-                timestamp: `Today, ${timeStr}`,
-                table: 'profiles',
-                desc,
-                executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
-              },
-              ...prev
-            ]);
-          }} 
+          onAddAuditLog={(desc) => recordSystemAuditLog(desc, 'profiles')} 
         />
       );
 
     case 'communication':
       return (
         <CommunicationBroadcastCenter 
-          onAddAuditLog={(desc) => {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            setAuditLogs(prev => [
-              {
-                timestamp: `Today, ${timeStr}`,
-                table: 'chit_groups',
-                desc,
-                executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
-              },
-              ...prev
-            ]);
-          }}
+          onAddAuditLog={(desc) => recordSystemAuditLog(desc, 'chit_groups')}
         />
       );
 
@@ -5447,19 +5285,7 @@ Thank you for your prompt payment! 🙏`;
             setReportsInitialSubtab('system_log');
             if (setActiveTab) setActiveTab('reports');
           }}
-          onAddAuditLog={(desc) => {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            setAuditLogs(prev => [
-              {
-                timestamp: `Today, ${timeStr}`,
-                table: 'profiles',
-                desc,
-                executor: profile?.fullName ? `${profile.fullName} (Admin)` : 'Admin'
-              },
-              ...prev
-            ]);
-          }} 
+          onAddAuditLog={(desc) => recordSystemAuditLog(desc, 'profiles')} 
         />
       );
 

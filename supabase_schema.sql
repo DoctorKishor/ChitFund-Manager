@@ -306,11 +306,11 @@ begin
           changes := array_append(changes, 'Refreshed digital passbook key');
         end if;
         
-        if array_length(changes, 1) > 0 then
-          log_description := 'Updated ' || coalesce(new.full_name, old.full_name, 'Member') || ' (' || array_to_string(changes, ', ') || ')';
-        else
-          log_description := 'Refreshed security session & profile token for ' || coalesce(new.full_name, old.full_name, 'Member');
+        if array_length(changes, 1) is null or array_length(changes, 1) = 0 then
+          -- Skip background session and token refresh noise to prevent log clutter
+          return new;
         end if;
+        log_description := 'Updated ' || coalesce(new.full_name, old.full_name, 'Member') || ' (' || array_to_string(changes, ', ') || ')';
       end;
     elsif TG_OP = 'DELETE' then
       log_description := 'Deleted member profile: ' || coalesce(old.full_name, 'Member') || ' (' || coalesce(old.phone_number, '') || ')';
@@ -611,10 +611,38 @@ create policy "Allow auction_logs write access to admin/manager" on public.aucti
   using (public.is_admin_or_manager())
   with check (public.is_admin_or_manager());
 
--- G. Security Audit Logs Policies (Admins/Managers read-only, write is system-only)
+-- G. Security Audit Logs Policies (Admins/Managers have audit review and append access)
 create policy "Allow security_audit_logs SELECT access to admin/manager" on public.security_audit_logs
   for select
   using (public.is_admin_or_manager());
+
+create policy if not exists "Allow security_audit_logs INSERT access to admin/manager" on public.security_audit_logs
+  for insert
+  with check (public.is_admin_or_manager());
+
+-- Secure RPC to log system audit events directly
+create or replace function public.log_system_audit_event(
+  p_action_description text,
+  p_target_table text,
+  p_admin_id uuid default null
+)
+returns uuid as $$
+declare
+  v_log_id uuid;
+  v_caller_id uuid;
+begin
+  v_caller_id := coalesce(p_admin_id, auth.uid());
+  if v_caller_id is null then
+    select id into v_caller_id from public.profiles where role = 'admin' order by created_at asc limit 1;
+  end if;
+
+  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
+  values (v_caller_id, p_action_description, p_target_table, now())
+  returning id into v_log_id;
+
+  return v_log_id;
+end;
+$$ language plpgsql security definer set search_path = public;
 
 -- ==========================================
 -- 5. Passbook Inventory & Token Authentication

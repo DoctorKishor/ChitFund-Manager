@@ -5,6 +5,7 @@ import { useWallet, WalletType } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase/client';
 import { triggerHapticFeedback } from '@/utils/haptics';
+import { logAuditEvent } from '@/utils/auditLogger';
 import { 
   Wallet, 
   Landmark, 
@@ -605,16 +606,18 @@ export default function CashVaultLedger() {
           p_user_id: profile?.id || null,
         });
 
-        await supabase.from('security_audit_logs').insert({
-          action_description: `ATM TX RECORD FAILURE: Transaction insert failed (${error.message}). Auto-reversed debit of ₹${amount} back to ${sourceName}.`,
-          target_table: 'transactions',
+        await logAuditEvent({
+          actionDescription: `ATM TX RECORD FAILURE: Transaction insert failed (${error.message}). Auto-reversed debit of ₹${amount} back to ${sourceName}.`,
+          targetTable: 'transactions',
+          adminId: profile?.id || null,
         });
         throw error;
       }
 
-      await supabase.from('security_audit_logs').insert({
-        action_description: `ATM RELOCATION TRIGGERED: ₹${amount.toLocaleString('en-IN')} debited from ${sourceName}. Pending physical cash box confirmation.`,
-        target_table: 'transactions',
+      await logAuditEvent({
+        actionDescription: `ATM RELOCATION TRIGGERED: ₹${amount.toLocaleString('en-IN')} debited from ${sourceName}. Pending physical cash box confirmation.`,
+        targetTable: 'transactions',
+        adminId: profile?.id || null,
       });
 
       setRelocateAmount('');
@@ -670,9 +673,10 @@ export default function CashVaultLedger() {
         throw error;
       }
 
-      await supabase.from('security_audit_logs').insert({
-        action_description: `ATM RELOCATION CONFIRMED: ₹${amount.toLocaleString('en-IN')} verified & credited into Physical Cash Box (Source: ${sourceName}).`,
-        target_table: 'transactions',
+      await logAuditEvent({
+        actionDescription: `ATM RELOCATION CONFIRMED: ₹${amount.toLocaleString('en-IN')} verified & credited into Physical Cash Box (Source: ${sourceName}).`,
+        targetTable: 'transactions',
+        adminId: profile?.id || null,
       });
 
       triggerHapticFeedback('success');
@@ -911,9 +915,10 @@ export default function CashVaultLedger() {
 
       if (txErr) console.warn('Transfer transaction recording note:', txErr);
 
-      await supabase.from('security_audit_logs').insert({
-        action_description: `INTER-VAULT TRANSFER: ₹${amount.toLocaleString('en-IN')} moved from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name}.`,
-        target_table: 'transactions',
+      await logAuditEvent({
+        actionDescription: `INTER-VAULT TRANSFER: ₹${amount.toLocaleString('en-IN')} moved from ${WALLET_META[transferSource].name} to ${WALLET_META[transferDest].name}.`,
+        targetTable: 'transactions',
+        adminId: profile?.id || null,
       });
 
       setTransferAmount('');
