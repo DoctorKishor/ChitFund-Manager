@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth, broadcastRoleUpdate } from '@/context/AuthContext';
+import { triggerHapticFeedback } from '@/utils/haptics';
 import { CustomRoleRecord, MainTabId, PermissionAction } from '@/utils/rbac';
 import {
   Shield,
@@ -267,6 +268,7 @@ export default function RoleManagerPanel({
 
   // Editing state for active role
   const [editName, setEditName] = useState<string>('');
+  const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [editColor, setEditColor] = useState<string>('#F59E0B');
   const [allowedTabs, setAllowedTabs] = useState<string[]>([]);
   const [allowedActions, setAllowedActions] = useState<string[]>([]);
@@ -347,6 +349,7 @@ export default function RoleManagerPanel({
 
   const syncRoleState = (role: CustomRoleRecord) => {
     setEditName(role.name);
+    setIsEditingName(false);
     setEditColor(role.color || '#4F46E5');
     setAllowedTabs(role.allowed_tabs || []);
     setAllowedActions(role.allowed_actions || []);
@@ -361,6 +364,7 @@ export default function RoleManagerPanel({
 
   const selectRole = (role: CustomRoleRecord) => {
     setSelectedRoleId(role.id);
+    setIsEditingName(false);
     syncRoleState(role);
   };
 
@@ -445,9 +449,55 @@ export default function RoleManagerPanel({
   const handleResetDefaults = () => {
     if (!activeRole) return;
     setEditName(activeRole.name);
+    setIsEditingName(false);
     setAllowedTabs(activeRole.allowed_tabs || []);
     setAllowedActions(activeRole.allowed_actions || []);
     setEditColor(activeRole.color || '#4F46E5');
+  };
+
+  // Dedicated handler to save Role Name
+  const handleSaveRoleName = async (nameToSave?: string) => {
+    if (!activeRole || activeRole.is_system) return;
+    const targetName = (nameToSave !== undefined ? nameToSave : editName).trim();
+    if (!targetName) {
+      alert('Role name cannot be empty.');
+      return;
+    }
+    if (targetName === activeRole.name) {
+      setIsEditingName(false);
+      return;
+    }
+    try {
+      setIsSaving(true);
+      triggerHapticFeedback('light');
+      const { error } = await supabase
+        .from('custom_roles')
+        .update({
+          name: targetName,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', activeRole.id);
+
+      if (error) throw error;
+
+      await broadcastRoleUpdate(activeRole.id);
+
+      if (onAddAuditLog) {
+        onAddAuditLog(`RENAMED ROLE: Changed role name from "${activeRole.name}" to "${targetName}"`);
+      }
+
+      triggerHapticFeedback('success');
+      setEditName(targetName);
+      setIsEditingName(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+      await fetchData();
+      if (onRoleUpdated) onRoleUpdated();
+    } catch (err: any) {
+      alert(`Failed to save role name: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Save Role Changes to Supabase
@@ -456,10 +506,11 @@ export default function RoleManagerPanel({
     try {
       setIsSaving(true);
       const isPrivileged = activeRole.id !== 'subscriber';
+      const targetName = (!activeRole.is_system && editName.trim()) ? editName.trim() : activeRole.name;
       const { error } = await supabase
         .from('custom_roles')
         .update({
-          name: editName ? editName.trim() : activeRole.name,
+          name: targetName,
           color: editColor,
           is_privileged: isPrivileged,
           allowed_tabs: activeRole.id === 'admin' ? activeRole.allowed_tabs : allowedTabs,
@@ -474,9 +525,14 @@ export default function RoleManagerPanel({
       await broadcastRoleUpdate(activeRole.id);
 
       if (onAddAuditLog) {
-        onAddAuditLog(`UPDATED ROLE PERMISSIONS: Modified access matrix for role "${activeRole.name}"`);
+        if (targetName !== activeRole.name) {
+          onAddAuditLog(`UPDATED ROLE: Renamed to "${targetName}" and updated permissions`);
+        } else {
+          onAddAuditLog(`UPDATED ROLE PERMISSIONS: Modified access matrix for role "${activeRole.name}"`);
+        }
       }
 
+      setIsEditingName(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
       await fetchData();
@@ -997,17 +1053,75 @@ export default function RoleManagerPanel({
                       {ROLE_EMOJIS[activeRole?.id || ''] || '💳'}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="font-display font-bold text-lg text-slate-900 leading-tight truncate">
-                          {activeRole?.name}
-                        </h2>
-                        <span className="text-[11px] font-bold py-0.5 px-2.5 bg-amber-50 text-amber-800 border border-amber-200/80 rounded-full whitespace-nowrap">
-                          {activeRole?.is_system ? 'Protected System Role' : 'Custom Field Role'}
-                        </span>
-                        <span className="text-xs text-slate-400 font-mono">
-                          ID: {activeRole?.id}
-                        </span>
-                      </div>
+                      {isEditingName ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveRoleName();
+                              }
+                              if (e.key === 'Escape') {
+                                setEditName(activeRole?.name || '');
+                                setIsEditingName(false);
+                              }
+                            }}
+                            disabled={isSaving}
+                            className="px-2.5 py-1 text-sm font-bold text-slate-900 border border-brand-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white shadow-2xs"
+                            placeholder="Enter role name..."
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveRoleName()}
+                            disabled={isSaving}
+                            className="px-3 py-1 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1 active:scale-95"
+                          >
+                            <Check size={13} strokeWidth={2.5} />
+                            <span>Save</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditName(activeRole?.name || '');
+                              setIsEditingName(false);
+                            }}
+                            disabled={isSaving}
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h2 className="font-display font-bold text-lg text-slate-900 leading-tight truncate">
+                            {editName || activeRole?.name}
+                          </h2>
+                          {!activeRole?.is_system && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditName(activeRole?.name || '');
+                                setIsEditingName(true);
+                              }}
+                              className="px-2 py-0.5 rounded-md text-slate-400 hover:text-brand-600 hover:bg-brand-50 border border-transparent hover:border-brand-200 transition-colors cursor-pointer flex items-center gap-1 text-xs font-medium"
+                              title="Edit Role Name"
+                            >
+                              <Edit3 size={13} />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                          <span className="text-[11px] font-bold py-0.5 px-2.5 bg-amber-50 text-amber-800 border border-amber-200/80 rounded-full whitespace-nowrap">
+                            {activeRole?.is_system ? 'Protected System Role' : 'Custom Field Role'}
+                          </span>
+                          <span className="text-xs text-slate-400 font-mono">
+                            ID: {activeRole?.id}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1432,7 +1546,7 @@ export default function RoleManagerPanel({
                     onClick={() => selectRole(role)}
                     className="flex-shrink-0 px-3 py-1.5 bg-brand-600 text-white font-bold rounded-full shadow-xs flex items-center gap-1.5 ring-2 ring-brand-200 cursor-pointer"
                   >
-                    <span>{emoji} {role.name}</span>
+                    <span>{emoji} {editName || role.name}</span>
                     {count > 0 && (
                       <span className="text-[10px] bg-brand-700 text-brand-100 px-1.5 py-0.2 rounded-full font-mono">
                         {count}
@@ -1462,50 +1576,102 @@ export default function RoleManagerPanel({
         </div>
 
         {/* Main Scrollable Content */}
-        <div className="flex-1 px-4 py-4 space-y-4 pb-28">
+        <div className="flex-1 px-4 py-4 space-y-4 pb-48">
 
           {/* Active Role Header Banner (Optimized for Mobile with Clean Visual Hierarchy) */}
           <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-card space-y-3.5">
-            {/* Top Row: Role Avatar + Full Name + Role Tag + Edit Button */}
-            <div className="flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div
-                  className="w-11 h-11 rounded-2xl font-bold flex items-center justify-center text-xl shadow-xs shrink-0"
-                  style={{ backgroundColor: `${editColor}18`, color: editColor }}
-                >
-                  {ROLE_EMOJIS[activeRole?.id || ''] || '💳'}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <h2 className="text-sm font-bold text-slate-900 leading-snug">
-                      {activeRole?.name}
-                    </h2>
-                    <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60 shrink-0">
-                      {activeRole?.is_system ? 'System Role' : 'Custom Role'}
-                    </span>
+            {/* Top Row: Role Avatar + Full Name / Inline Editor + Role Tag + Edit Button */}
+            {isEditingName ? (
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-10 h-10 rounded-xl font-bold flex items-center justify-center text-lg shadow-xs shrink-0"
+                    style={{ backgroundColor: `${editColor}18`, color: editColor }}
+                  >
+                    {ROLE_EMOJIS[activeRole?.id || ''] || '💳'}
                   </div>
-                  <p className="text-[10.5px] text-slate-400 font-mono mt-0.5 truncate">
-                    ID: {activeRole?.id}
-                  </p>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSaveRoleName();
+                      }
+                      if (e.key === 'Escape') {
+                        setEditName(activeRole?.name || '');
+                        setIsEditingName(false);
+                      }
+                    }}
+                    disabled={isSaving}
+                    className="flex-1 px-3 py-1.5 text-sm font-bold text-slate-900 border border-brand-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
+                    placeholder="Enter role name..."
+                    autoFocus
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditName(activeRole?.name || '');
+                      setIsEditingName(false);
+                    }}
+                    disabled={isSaving}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveRoleName()}
+                    disabled={isSaving}
+                    className="px-4 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                  >
+                    <Check size={13} strokeWidth={2.5} />
+                    <span>{isSaving ? 'Saving...' : 'Save Name'}</span>
+                  </button>
                 </div>
               </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div
+                    className="w-11 h-11 rounded-2xl font-bold flex items-center justify-center text-xl shadow-xs shrink-0"
+                    style={{ backgroundColor: `${editColor}18`, color: editColor }}
+                  >
+                    {ROLE_EMOJIS[activeRole?.id || ''] || '💳'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h2 className="text-sm font-bold text-slate-900 leading-snug">
+                        {editName || activeRole?.name}
+                      </h2>
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60 shrink-0">
+                        {activeRole?.is_system ? 'System Role' : 'Custom Role'}
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-400 font-mono mt-0.5 truncate">
+                      ID: {activeRole?.id}
+                    </p>
+                  </div>
+                </div>
 
-              {!activeRole?.is_system && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newTitle = prompt('Edit Role Name:', activeRole?.name);
-                    if (newTitle && newTitle.trim()) {
-                      setEditName(newTitle.trim());
-                    }
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-brand-700 border border-slate-200 text-xs font-bold transition-all cursor-pointer shrink-0 active:scale-95 flex items-center gap-1 shadow-2xs"
-                >
-                  <Edit3 size={12} className="text-brand-600" />
-                  <span>Edit Name</span>
-                </button>
-              )}
-            </div>
+                {!activeRole?.is_system && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditName(activeRole?.name || '');
+                      setIsEditingName(true);
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-brand-700 border border-slate-200 text-xs font-bold transition-all cursor-pointer shrink-0 active:scale-95 flex items-center gap-1 shadow-2xs"
+                  >
+                    <Edit3 size={12} className="text-brand-600" />
+                    <span>Edit Name</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Accent Color Palette Selector Bar (Clean Dedicated Row) */}
             <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-100">
@@ -1688,12 +1854,12 @@ export default function RoleManagerPanel({
 
         </div>
 
-        {/* Sticky Bottom Save Changes Action Bar */}
-        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-4 py-3 safe-bottom z-40 shadow-nav flex items-center justify-between gap-3">
+        {/* Sticky Bottom Save Changes Action Bar (Floats above MobileBottomNav) */}
+        <div className="fixed bottom-[max(4.25rem,calc(env(safe-area-inset-bottom)+3.75rem))] left-3 right-3 max-w-md mx-auto bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl px-3.5 py-2.5 z-40 shadow-xl flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
           >
             Discard
           </button>
@@ -1701,7 +1867,7 @@ export default function RoleManagerPanel({
             type="button"
             onClick={handleSaveRole}
             disabled={isSaving}
-            className="flex-1 py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold shadow-md shadow-brand-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer"
+            className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold shadow-md shadow-brand-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer"
           >
             {saveSuccess ? (
               <>
