@@ -467,12 +467,12 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         <div className="flex items-center justify-between gap-2.5">
           
           {/* Logo & Brand Name */}
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-bold flex items-center justify-center text-xs sm:text-sm shadow-sm shrink-0 border border-emerald-500/30">
               {activeOrgInitials}
             </div>
-            <div className="min-w-0">
-              <h2 className="text-xs sm:text-sm font-bold tracking-wider uppercase text-slate-900 leading-tight truncate">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xs sm:text-sm font-bold tracking-wider uppercase text-slate-900 leading-tight line-clamp-2">
                 {activeOrgName}
               </h2>
               <p className="text-[9.5px] text-emerald-700 font-semibold tracking-widest uppercase mt-0.5 truncate">
@@ -618,9 +618,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           {/* Row 4: Past Pending Dues for this Particular Chit Group */}
           <div className="flex justify-between items-center gap-2 px-3.5 py-2">
             <div className="pr-1 min-w-0">
-              <span className="text-[11px] font-medium text-slate-600 block truncate">Past Pending Dues ({groupName})</span>
+              <span className="text-[11px] font-medium text-slate-600 block">Past Pending Dues</span>
               {pastPendingDues > 0 && pastPendingMonths.length > 0 ? (
-                <span className="text-[9.5px] text-amber-700 font-mono font-medium block truncate">
+                <span className="text-[9.5px] text-amber-700 font-mono font-medium block">
                   Pending in: {pastPendingMonths.map(m => `Month ${m}`).join(', ')}
                 </span>
               ) : null}
@@ -646,11 +646,11 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
             </span>
           </div>
 
-          {/* Optional Note (Clean) */}
+          {/* Optional Note (Full Text, Never Truncated) */}
           {cleanNotes && (
-            <div className="flex justify-between items-center gap-2 px-3.5 py-2 bg-amber-50/30">
-              <span className="text-[11px] font-medium text-slate-500 shrink-0">Note</span>
-              <span className="text-[11px] text-slate-700 italic truncate max-w-[250px] font-medium text-right">
+            <div className="flex justify-between items-start gap-3 px-3.5 py-2 bg-amber-50/30">
+              <span className="text-[11px] font-medium text-slate-500 shrink-0 mt-0.5">Note</span>
+              <span className="text-[11px] text-slate-700 italic font-medium text-right break-words leading-relaxed flex-1">
                 {cleanNotes}
               </span>
             </div>
@@ -676,25 +676,21 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         />
       </div>
 
-      {/* ── TICKET STUB / DIGITAL SECURITY COUNTERFOIL (NO SIGNATORY NEEDED) ── */}
+      {/* ── TICKET STUB / DIGITAL SECURITY COUNTERFOIL (NO SIGNATORY OR CONFIRMED BADGE) ── */}
       <div className="px-3.5 sm:px-4 py-2.5 bg-slate-50/70 border-t border-slate-100">
-        <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500">
-          <div className="space-y-0.5 min-w-0">
+        <div className="flex items-center justify-between gap-3 text-[10px] text-slate-500">
+          <div className="space-y-0.5 min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-[10.5px]">
               <ShieldCheck size={13} className="text-emerald-600 shrink-0" />
-              <span className="truncate tracking-wide">AUTHENTICATED DIGITAL RECORD</span>
+              <span className="tracking-wide">AUTHENTICATED DIGITAL RECORD</span>
             </div>
-            <p className="text-[9.5px] text-slate-500 font-mono font-medium truncate">
+            <p className="text-[9.5px] text-slate-500 font-mono font-medium">
               Passbook: <strong className="text-slate-700">{appPortalUrl.replace(/^https?:\/\//, '')}</strong>
             </p>
           </div>
 
-          <div className="text-right flex flex-col items-end shrink-0">
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100/70 border border-emerald-300 text-[9.5px] font-bold text-emerald-800">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>LEDGER CONFIRMED</span>
-            </div>
-            <span className="text-[9.5px] font-mono text-slate-400 mt-0.5 font-medium">
+          <div className="text-right shrink-0">
+            <span className="text-[10px] font-mono text-slate-400 font-semibold block">
               Ref #{receiptNo}
             </span>
           </div>
