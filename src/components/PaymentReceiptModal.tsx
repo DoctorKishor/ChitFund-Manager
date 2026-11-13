@@ -236,7 +236,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
     transaction.wallet_type === 'cash' || 
     String(transaction.wallet_type).toLowerCase().includes('cash');
 
-  const walletDisplay = isCash ? 'CASH IN HAND' : 'ONLINE TRANSFER';
+  const walletDisplay = isCash ? 'Cash in Hand' : 'Online Transfer';
   const groupName = group?.name || 'Chit Group';
   const amountInWords = numberToWordsINR(effectiveTotalPaid);
 
@@ -468,14 +468,14 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           
           {/* Logo & Brand Name */}
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-black flex items-center justify-center text-xs sm:text-sm shadow-sm shrink-0 border border-emerald-500/30">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-bold flex items-center justify-center text-xs sm:text-sm shadow-sm shrink-0 border border-emerald-500/30">
               {activeOrgInitials}
             </div>
             <div className="min-w-0">
-              <h2 className="text-[11px] sm:text-sm font-black tracking-wider uppercase text-slate-900 leading-tight truncate">
+              <h2 className="text-xs sm:text-sm font-bold tracking-wider uppercase text-slate-900 leading-tight truncate">
                 {activeOrgName}
               </h2>
-              <p className="text-[8.5px] sm:text-[9.5px] text-emerald-700 font-bold tracking-widest uppercase mt-0.5 truncate">
+              <p className="text-[9.5px] text-emerald-700 font-semibold tracking-widest uppercase mt-0.5 truncate">
                 {activeOrgTagline}
               </p>
             </div>
@@ -483,10 +483,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
           {/* Paid Tag Badge */}
           <div className="shrink-0 text-right">
-            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-300 px-2 sm:px-2.5 py-0.5 rounded-lg text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider shadow-2xs">
+            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider">
               <CheckCircle2 size={11} className="text-emerald-600" /> PAID
             </span>
-            <p className="text-[8.5px] sm:text-[9.5px] font-mono text-slate-500 mt-0.5 font-bold">
+            <p className="text-[10px] font-mono text-slate-500 mt-0.5 font-semibold">
               {receiptNo}
             </p>
           </div>
@@ -494,11 +494,11 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         </div>
 
         {/* Sub-header Banner */}
-        <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-between text-[9px] sm:text-[9.5px] text-slate-600">
-          <span className="font-extrabold text-slate-800 tracking-wider flex items-center gap-1 truncate">
+        <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-600">
+          <span className="font-bold text-slate-800 tracking-wider flex items-center gap-1.5 truncate">
             <Sparkles size={11} className="text-emerald-600 shrink-0" /> OFFICIAL PAYMENT RECEIPT
           </span>
-          <span className="font-mono text-slate-500 font-semibold shrink-0 ml-1">{dateFormatted} · {timeFormatted}</span>
+          <span className="font-mono text-slate-500 font-medium shrink-0 ml-1">{dateFormatted} · {timeFormatted}</span>
         </div>
       </div>
 
@@ -506,29 +506,29 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       <div className="p-3 sm:p-4 space-y-2.5 sm:space-y-3 bg-white">
         
         {/* Subscriber & Group Grid */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 p-2.5 sm:p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 p-2.5 sm:p-3 bg-slate-50 border border-slate-200 rounded-xl">
           <div className="min-w-0">
-            <span className="text-[8.5px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
               Subscriber Name
             </span>
-            <span className="font-extrabold text-slate-900 text-xs sm:text-sm block truncate mt-0.5">
+            <span className="font-bold text-slate-900 text-xs sm:text-sm block truncate mt-0.5">
               {memberName}
             </span>
             {memberPhone && (
-              <span className="text-[9.5px] sm:text-[10px] text-slate-500 font-mono block font-semibold mt-0.5 truncate">
+              <span className="text-[10px] text-slate-500 font-mono block font-medium mt-0.5 truncate">
                 +91 {memberPhone}
               </span>
             )}
           </div>
 
           <div className="text-right min-w-0">
-            <span className="text-[8.5px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
               Ticket & Group
             </span>
-            <span className="font-extrabold text-indigo-700 text-xs sm:text-sm block mt-0.5 truncate">
+            <span className="font-bold text-indigo-700 text-xs sm:text-sm block mt-0.5 truncate">
               Ticket #{ticketNum}
             </span>
-            <span className="text-[9.5px] sm:text-[10px] text-slate-600 font-bold block truncate mt-0.5">
+            <span className="text-[10px] text-slate-600 font-medium block truncate mt-0.5">
               {groupName} · {isMultiMonth ? 'Combined' : `M${month === 0 ? '0' : month}`}
             </span>
           </div>
@@ -536,32 +536,32 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
         {/* Hero Amount Paid Box */}
         <div className="p-2.5 sm:p-3 bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-teal-50 border border-emerald-300 rounded-xl text-center relative overflow-hidden shadow-2xs">
-          <div className="text-[9px] sm:text-[9.5px] font-black text-emerald-800 uppercase tracking-widest mb-0.5">
+          <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest mb-0.5">
             Amount Received
           </div>
           <div className="text-xl sm:text-3xl font-black text-emerald-700 tracking-tight my-0.5 font-mono">
             {formatCurrency(effectiveTotalPaid)}
           </div>
-          <div className="text-[9.5px] sm:text-[10px] font-bold text-emerald-900 italic truncate px-1">
+          <div className="text-[10.5px] font-medium text-emerald-900 italic truncate px-1">
             {amountInWords}
           </div>
         </div>
 
-        {/* Detailed Payment & Group Dues Breakdown Matrix */}
-        <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs shadow-2xs">
+        {/* Detailed Payment & Group Dues Breakdown Matrix (100% Uniform Fonts & Sizes) */}
+        <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-2xs">
           
           {/* Row 1: Payment Applied For Month */}
-          <div className="flex justify-between items-center gap-2 px-3 sm:px-3.5 py-2 bg-slate-50/70">
-            <span className="text-slate-600 font-semibold text-[10.5px] sm:text-[11px] shrink-0">Payment Applied For</span>
-            <span className="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 sm:px-2.5 py-0.5 rounded-lg text-[10.5px] sm:text-[11px] shadow-2xs truncate text-right">
+          <div className="flex justify-between items-center gap-2 px-3.5 py-2 bg-slate-50/70">
+            <span className="text-[11px] font-medium text-slate-600 shrink-0">Payment Applied For</span>
+            <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md truncate text-right shrink-0">
               {monthLabel}
             </span>
           </div>
 
           {/* Row 2: Payment Mode */}
-          <div className="flex justify-between items-center gap-2 px-3 sm:px-3.5 py-2">
-            <span className="text-slate-600 font-semibold text-[10.5px] sm:text-[11px] shrink-0">Payment Mode</span>
-            <span className="font-bold text-slate-800 font-mono bg-slate-100 px-2 sm:px-2.5 py-0.5 rounded text-[10px] sm:text-[10.5px]">
+          <div className="flex justify-between items-center gap-2 px-3.5 py-2">
+            <span className="text-[11px] font-medium text-slate-600 shrink-0">Payment Mode</span>
+            <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-md text-right shrink-0">
               {walletDisplay}
             </span>
           </div>
@@ -569,7 +569,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           {/* Row 3: Itemized Settlement Breakdown for Multi-Month or Single Month Due */}
           {isMultiMonth && activeAllocations && activeAllocations.length > 0 ? (
             <div className="divide-y divide-slate-100">
-              <div className="px-3 sm:px-3.5 py-1.5 bg-slate-100/80 text-[9px] sm:text-[9.5px] font-black text-slate-700 uppercase tracking-wider flex justify-between items-center">
+              <div className="px-3.5 py-1.5 bg-slate-100/80 text-[10px] font-bold text-slate-600 uppercase tracking-wider flex justify-between items-center">
                 <span>Month Settled</span>
                 <span>Amount Applied</span>
               </div>
@@ -579,19 +579,19 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
                 const isAdv = alloc.type === 'advance';
                 const typeTag = isArr ? 'Past Arrear' : isAdv ? 'Advance Pre-paid' : 'Current Month';
                 return (
-                  <div key={idx} className="flex justify-between items-center gap-2 px-3 sm:px-3.5 py-2 bg-slate-50/40">
+                  <div key={idx} className="flex justify-between items-center gap-2 px-3.5 py-2 bg-slate-50/40">
                     <div className="min-w-0">
-                      <span className="text-slate-800 font-bold block text-[10.5px] sm:text-[11px] truncate">{mLabel}</span>
-                      <span className={`text-[8.5px] sm:text-[9px] font-semibold block ${isArr ? 'text-amber-700' : isAdv ? 'text-indigo-600' : 'text-slate-500'}`}>
+                      <span className="text-[11px] font-medium text-slate-800 block truncate">{mLabel}</span>
+                      <span className={`text-[9.5px] font-medium block ${isArr ? 'text-amber-700' : isAdv ? 'text-indigo-600' : 'text-slate-500'}`}>
                         {typeTag}
                       </span>
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="font-extrabold text-emerald-700 font-mono text-[11px] sm:text-[11.5px] block">
+                      <span className="font-semibold text-emerald-700 font-mono text-[11px] block">
                         +{formatCurrency(alloc.amount)}
                       </span>
-                      <span className={`text-[8.5px] sm:text-[9px] px-1.5 py-0.5 rounded font-bold ${
-                        isArr ? 'bg-amber-100 text-amber-800' : isAdv ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800'
+                      <span className={`text-[9.5px] px-2 py-0.5 rounded-md font-semibold border ${
+                        isArr ? 'bg-amber-50 text-amber-800 border-amber-200' : isAdv ? 'bg-indigo-50 text-indigo-800 border-indigo-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                       }`}>
                         {isArr ? 'Arrear Settled' : isAdv ? 'Advance Pre-paid' : 'Applied'}
                       </span>
@@ -601,11 +601,11 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               })}
             </div>
           ) : (
-            <div className="flex justify-between items-center gap-2 px-3 sm:px-3.5 py-2 bg-slate-50/40">
-              <span className="text-slate-700 font-bold text-[10.5px] sm:text-[11px] shrink-0">
+            <div className="flex justify-between items-center gap-2 px-3.5 py-2 bg-slate-50/40">
+              <span className="text-[11px] font-medium text-slate-600 shrink-0">
                 Month {month === 0 ? '0' : month} Pending Due
               </span>
-              <span className={`font-extrabold text-[10.5px] sm:text-[11px] px-2 py-0.5 rounded border text-right shrink-0 ${
+              <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border text-right shrink-0 ${
                 isCleared 
                   ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
                   : 'text-amber-700 bg-amber-50 border-amber-200'
@@ -616,16 +616,16 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           )}
 
           {/* Row 4: Past Pending Dues for this Particular Chit Group */}
-          <div className="flex justify-between items-center gap-2 px-3 sm:px-3.5 py-2">
+          <div className="flex justify-between items-center gap-2 px-3.5 py-2">
             <div className="pr-1 min-w-0">
-              <span className="text-slate-700 font-bold block text-[10.5px] sm:text-[11px] truncate">Past Pending Dues ({groupName})</span>
+              <span className="text-[11px] font-medium text-slate-600 block truncate">Past Pending Dues ({groupName})</span>
               {pastPendingDues > 0 && pastPendingMonths.length > 0 ? (
-                <span className="text-[8.5px] sm:text-[9px] text-amber-700 font-mono font-medium block truncate">
+                <span className="text-[9.5px] text-amber-700 font-mono font-medium block truncate">
                   Pending in: {pastPendingMonths.map(m => `Month ${m}`).join(', ')}
                 </span>
               ) : null}
             </div>
-            <span className={`font-extrabold text-[10.5px] sm:text-[11px] px-2 py-0.5 rounded border shrink-0 text-right ${
+            <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border shrink-0 text-right ${
               pastPendingDues === 0 
                 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
                 : 'text-amber-700 bg-amber-50 border-amber-200'
@@ -635,9 +635,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           </div>
 
           {/* Row 5: Total Group Outstanding Balance */}
-          <div className="flex justify-between items-center gap-2 px-3 sm:px-3.5 py-2 bg-slate-100/80 border-t border-slate-200">
-            <span className="text-slate-900 font-extrabold text-[11px] sm:text-[11.5px] shrink-0">Total Outstanding</span>
-            <span className={`font-black text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded border text-right shrink-0 ${
+          <div className="flex justify-between items-center gap-2 px-3.5 py-2 bg-slate-100/80 border-t border-slate-200">
+            <span className="text-[11px] font-bold text-slate-900 shrink-0">Total Outstanding</span>
+            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md border text-right shrink-0 ${
               totalGroupOutstanding === 0 
                 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
                 : 'text-rose-600 bg-rose-50 border-rose-200'
@@ -648,9 +648,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
           {/* Optional Note (Clean) */}
           {cleanNotes && (
-            <div className="flex justify-between items-center gap-2 px-3 sm:px-3.5 py-1.5 bg-amber-50/40 text-[9.5px] sm:text-[10px]">
-              <span className="text-slate-400 font-semibold shrink-0">Note</span>
-              <span className="text-slate-700 italic truncate max-w-[240px] font-medium text-right">
+            <div className="flex justify-between items-center gap-2 px-3.5 py-2 bg-amber-50/30">
+              <span className="text-[11px] font-medium text-slate-500 shrink-0">Note</span>
+              <span className="text-[11px] text-slate-700 italic truncate max-w-[250px] font-medium text-right">
                 {cleanNotes}
               </span>
             </div>
@@ -678,23 +678,23 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
       {/* ── TICKET STUB / DIGITAL SECURITY COUNTERFOIL (NO SIGNATORY NEEDED) ── */}
       <div className="px-3.5 sm:px-4 py-2.5 bg-slate-50/70 border-t border-slate-100">
-        <div className="flex items-center justify-between gap-2 text-[8.5px] sm:text-[9px] text-slate-500">
+        <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500">
           <div className="space-y-0.5 min-w-0">
-            <div className="flex items-center gap-1.5 text-emerald-800 font-extrabold text-[9.5px] sm:text-[10px]">
+            <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-[10.5px]">
               <ShieldCheck size={13} className="text-emerald-600 shrink-0" />
               <span className="truncate tracking-wide">AUTHENTICATED DIGITAL RECORD</span>
             </div>
-            <p className="text-[8px] sm:text-[8.5px] text-slate-500 font-mono font-medium truncate">
+            <p className="text-[9.5px] text-slate-500 font-mono font-medium truncate">
               Passbook: <strong className="text-slate-700">{appPortalUrl.replace(/^https?:\/\//, '')}</strong>
             </p>
           </div>
 
           <div className="text-right flex flex-col items-end shrink-0">
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100/70 border border-emerald-300 text-[8.5px] sm:text-[9px] font-mono font-bold text-emerald-800">
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100/70 border border-emerald-300 text-[9.5px] font-bold text-emerald-800">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>LEDGER CONFIRMED</span>
             </div>
-            <span className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 mt-0.5 font-semibold">
+            <span className="text-[9.5px] font-mono text-slate-400 mt-0.5 font-medium">
               Ref #{receiptNo}
             </span>
           </div>
@@ -702,7 +702,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       </div>
 
       {/* Bottom Security Bar */}
-      <div className="bg-slate-100 px-4 py-1.5 border-t border-slate-200 text-center text-[7.5px] sm:text-[8px] text-slate-500 font-mono font-medium">
+      <div className="bg-slate-100 px-4 py-1.5 border-t border-slate-200 text-center text-[9px] text-slate-500 font-mono font-medium">
         Computer-generated digital receipt · Registered on Supabase Ledger
       </div>
 
