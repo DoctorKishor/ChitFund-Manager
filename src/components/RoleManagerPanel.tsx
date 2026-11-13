@@ -347,6 +347,39 @@ export default function RoleManagerPanel({
     return roles.find((r) => r.id === selectedRoleId) || roles[0];
   }, [roles, selectedRoleId]);
 
+  // Check if active role has pending unsaved changes
+  const hasChanges = useMemo(() => {
+    if (!activeRole) return false;
+
+    // Check name change
+    const originalName = (activeRole.name || '').trim();
+    const currentName = (editName || '').trim();
+    if (currentName !== originalName) return true;
+
+    // Check color change
+    const originalColor = (activeRole.color || '#4F46E5').toLowerCase();
+    const currentColor = (editColor || '#4F46E5').toLowerCase();
+    if (currentColor !== originalColor) return true;
+
+    // Check tabs change
+    const originalTabs = activeRole.allowed_tabs || [];
+    const currentTabs = allowedTabs || [];
+    if (currentTabs.length !== originalTabs.length) return true;
+    const sortedOriginalTabs = [...originalTabs].sort();
+    const sortedCurrentTabs = [...currentTabs].sort();
+    if (sortedCurrentTabs.some((tab, idx) => tab !== sortedOriginalTabs[idx])) return true;
+
+    // Check actions change
+    const originalActions = activeRole.allowed_actions || [];
+    const currentActions = allowedActions || [];
+    if (currentActions.length !== originalActions.length) return true;
+    const sortedOriginalActions = [...originalActions].sort();
+    const sortedCurrentActions = [...currentActions].sort();
+    if (sortedCurrentActions.some((act, idx) => act !== sortedOriginalActions[idx])) return true;
+
+    return false;
+  }, [activeRole, editName, editColor, allowedTabs, allowedActions]);
+
   const syncRoleState = (role: CustomRoleRecord) => {
     setEditName(role.name);
     setIsEditingName(false);
@@ -448,11 +481,13 @@ export default function RoleManagerPanel({
   // Reset to active role defaults
   const handleResetDefaults = () => {
     if (!activeRole) return;
+    triggerHapticFeedback('light');
     setEditName(activeRole.name);
     setIsEditingName(false);
     setAllowedTabs(activeRole.allowed_tabs || []);
     setAllowedActions(activeRole.allowed_actions || []);
     setEditColor(activeRole.color || '#4F46E5');
+    setSaveSuccess(false);
   };
 
   // Dedicated handler to save Role Name
@@ -1163,6 +1198,12 @@ export default function RoleManagerPanel({
                     <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium">
                       {assignedPersonnel.length} Assigned Staff
                     </span>
+                    {hasChanges && (
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-semibold border border-amber-200 text-xs flex items-center gap-1.5 animate-in fade-in duration-150">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        Unsaved Changes
+                      </span>
+                    )}
                   </div>
 
                   {/* Action Buttons Toolbar */}
@@ -1185,33 +1226,37 @@ export default function RoleManagerPanel({
                       <Download className="w-3.5 h-3.5 text-slate-400" />
                       <span>Export</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleResetDefaults}
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer"
-                    >
-                      Reset Defaults
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveRole}
-                      disabled={isSaving}
-                      className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-brand-500/25 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-                    >
-                      {saveSuccess ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-300" strokeWidth={2.5} />
-                          <span>Saved!</span>
-                        </>
-                      ) : isSaving ? (
-                        <span>Saving...</span>
-                      ) : (
-                        <>
-                          <Save className="w-3.5 h-3.5" />
-                          <span>Save Changes</span>
-                        </>
-                      )}
-                    </button>
+                    {(hasChanges || isSaving || saveSuccess) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleResetDefaults}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer animate-in fade-in duration-150"
+                        >
+                          Reset Defaults
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveRole}
+                          disabled={isSaving}
+                          className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-brand-500/25 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 animate-in fade-in duration-150"
+                        >
+                          {saveSuccess ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-300" strokeWidth={2.5} />
+                              <span>Saved!</span>
+                            </>
+                          ) : isSaving ? (
+                            <span>Saving...</span>
+                          ) : (
+                            <>
+                              <Save className="w-3.5 h-3.5" />
+                              <span>Save Changes</span>
+                            </>
+                          )}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1854,34 +1899,36 @@ export default function RoleManagerPanel({
 
         </div>
 
-        {/* Sticky Bottom Save Changes Action Bar (Floats above MobileBottomNav) */}
-        <div className="fixed bottom-[max(4.25rem,calc(env(safe-area-inset-bottom)+3.75rem))] left-3 right-3 max-w-md mx-auto bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl px-3.5 py-2.5 z-40 shadow-xl flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={handleResetDefaults}
-            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
-          >
-            Discard
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveRole}
-            disabled={isSaving}
-            className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold shadow-md shadow-brand-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer"
-          >
-            {saveSuccess ? (
-              <>
-                <Check className="w-4 h-4 text-emerald-300" strokeWidth={2.5} />
-                <span>Saved!</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>{isSaving ? 'Saving...' : 'Save Permission Changes'}</span>
-              </>
-            )}
-          </button>
-        </div>
+        {/* Sticky Bottom Save Changes Action Bar (Floats above MobileBottomNav on mobile) */}
+        {(hasChanges || isSaving || saveSuccess) && (
+          <div className="fixed bottom-[max(4.25rem,calc(env(safe-area-inset-bottom)+3.75rem))] left-3 right-3 max-w-md mx-auto bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl px-3.5 py-2.5 z-40 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <button
+              type="button"
+              onClick={handleResetDefaults}
+              className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveRole}
+              disabled={isSaving}
+              className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold shadow-md shadow-brand-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer"
+            >
+              {saveSuccess ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-300" strokeWidth={2.5} />
+                  <span>Saved!</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>{isSaving ? 'Saving...' : 'Save Permission Changes'}</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
 
       </div>
 
