@@ -7,11 +7,6 @@ import { useAuth, RolePreviewAuthProvider, broadcastRoleUpdate } from '@/context
 import { CustomRoleRecord, MainTabId, PermissionAction } from '@/utils/rbac';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import DashboardContent from './DashboardContent';
-import MemberMatrix from './MemberMatrix';
-import LiveAuctionEngine from './LiveAuctionEngine';
-import CashVaultLedger from './CashVaultLedger';
-import ReportsCenter from './ReportsCenter';
-import CommunicationBroadcastCenter from './CommunicationBroadcastCenter';
 import Sidebar from './Sidebar';
 import MobileBottomNav from './MobileBottomNav';
 import FontSizeSwitcher from './FontSizeSwitcher';
@@ -94,6 +89,104 @@ interface ComponentInfo {
   targetEl?: HTMLElement;
   rect?: { top: number; left: number; width: number; height: number };
 }
+
+const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
+  {
+    id: 'admin',
+    name: 'Administrator',
+    description: 'Full unrestricted system control, treasury vaults, role assignment & audit logs',
+    color: '#9333ea',
+    is_system: true,
+    is_privileged: true,
+    allowed_tabs: ['dashboard', 'chits', 'members', 'auctions', 'cash', 'reports', 'communication', 'users', 'settings'],
+    allowed_actions: [
+      'dashboard:view_kpis', 'dashboard:quick_actions', 'dashboard:launch_month0', 'dashboard:advance_month', 'dashboard:revert_month', 'dashboard:view_reserves',
+      'chits:view', 'chits:create', 'chits:edit', 'chits:launch_month0', 'chits:reschedule_auction', 'chits:configure_laaba_seetu', 'chits:swap_ticket', 'chits:delete',
+      'members:view', 'members:enroll', 'members:edit', 'members:collect', 'members:waive_penalties', 'members:suspend', 'members:pair_qr', 'members:revoke_qr', 'members:batch_qr', 'members:reset_mpin', 'members:export', 'members:delete',
+      'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:override_floor', 'auctions:edit_historical', 'auctions:disburse', 'auctions:issue_receipt',
+      'treasury:view', 'treasury:view_cash_box', 'treasury:view_banks', 'treasury:collect_cash', 'treasury:move_money', 'treasury:confirm_atm', 'treasury:deposit', 'treasury:recover_float', 'treasury:personal_draw', 'treasury:settle_draw', 'treasury:delete_transaction', 'treasury:reconcile',
+      'reports:view', 'reports:view_pnl', 'reports:export', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_audit_logs', 'reports:export_audit',
+      'communication:view', 'communication:broadcast', 'communication:pre_auction', 'communication:post_auction', 'communication:due_alerts', 'communication:custom', 'communication:manage_templates',
+      'system:manage_users', 'system:manage_staff', 'system:manage_roles', 'system:branding', 'system:maintenance_mode', 'system:reset_database'
+    ],
+  },
+  {
+    id: 'manager',
+    name: 'Manager',
+    description: 'Operational management, member enrollment, live bidding arena & WhatsApp dispatch',
+    color: '#2563eb',
+    is_system: true,
+    is_privileged: true,
+    allowed_tabs: ['dashboard', 'chits', 'members', 'auctions', 'communication', 'reports'],
+    allowed_actions: [
+      'dashboard:view_kpis', 'dashboard:quick_actions', 'dashboard:advance_month', 'dashboard:view_reserves',
+      'chits:view', 'chits:create', 'chits:edit', 'chits:reschedule_auction', 'chits:configure_laaba_seetu', 'chits:swap_ticket',
+      'members:view', 'members:enroll', 'members:edit', 'members:collect', 'members:suspend', 'members:pair_qr', 'members:revoke_qr', 'members:batch_qr', 'members:reset_mpin', 'members:export',
+      'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:disburse', 'auctions:issue_receipt',
+      'treasury:view_cash_box', 'treasury:collect_cash', 'treasury:recover_float',
+      'communication:view', 'communication:broadcast', 'communication:pre_auction', 'communication:post_auction', 'communication:due_alerts', 'communication:custom', 'communication:manage_templates',
+      'reports:view', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters'
+    ],
+  },
+  {
+    id: 'collections_agent',
+    name: 'Collections Agent',
+    description: 'Ground field agent: offline collections, booklet QR scanner pairing & payment broadcast',
+    color: '#f59e0b',
+    is_system: false,
+    is_privileged: true,
+    allowed_tabs: ['dashboard', 'members', 'communication'],
+    allowed_actions: [
+      'dashboard:quick_actions',
+      'members:view', 'members:collect', 'members:pair_qr',
+      'treasury:collect_cash',
+      'communication:view', 'communication:broadcast', 'communication:due_alerts'
+    ],
+  },
+  {
+    id: 'auction_clerk',
+    name: 'Auction Clerk',
+    description: 'Assists organizer during monthly live bidding sessions by recording shouted proxy discounts',
+    color: '#a855f7',
+    is_system: false,
+    is_privileged: true,
+    allowed_tabs: ['dashboard', 'chits', 'members', 'auctions'],
+    allowed_actions: [
+      'chits:view',
+      'members:view',
+      'auctions:view', 'auctions:bid', 'auctions:issue_receipt'
+    ],
+  },
+  {
+    id: 'auditor',
+    name: 'Auditor / CA',
+    description: 'Read-only financial auditor access for balance sheets, ledger downloads & dividend statements',
+    color: '#0d9488',
+    is_system: false,
+    is_privileged: true,
+    allowed_tabs: ['dashboard', 'chits', 'members', 'cash', 'reports'],
+    allowed_actions: [
+      'dashboard:view_kpis', 'dashboard:view_reserves',
+      'chits:view',
+      'members:view', 'members:export',
+      'auctions:view',
+      'treasury:view', 'treasury:view_cash_box',
+      'reports:view', 'reports:view_pnl', 'reports:export', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_audit_logs', 'reports:export_audit'
+    ],
+  },
+  {
+    id: 'subscriber',
+    name: 'Subscriber',
+    description: 'Member portal: personal enrolled chits, ledger & live auction bidding room',
+    color: '#10b981',
+    is_system: true,
+    is_privileged: false,
+    allowed_tabs: ['dashboard', 'chits', 'members', 'auctions'],
+    allowed_actions: [
+      'chits:view', 'members:view', 'auctions:view', 'auctions:bid'
+    ],
+  },
+];
 
 const ALL_TABS: { id: MainTabId; label: string; icon: any; desc: string }[] = [
   { id: 'dashboard', label: 'Overview', icon: LayoutDashboard, desc: 'Financial KPI cards, cycle progress & recent receipts' },
@@ -206,19 +299,107 @@ const ALL_ACTIONS: ActionMeta[] = [
   { key: 'system:reset_database', label: 'Clear Test Data / Factory Reset', desc: 'Delete sample data, reset balances, and start fresh', category: 'Portal Settings Tab', icon: Trash2 },
 ];
 
+// Intelligent Action Text Matching Rules
+const ACTION_MATCH_RULES: { key: PermissionAction; match: (lower: string) => boolean }[] = [
+  // 1. Overview Dashboard
+  { key: 'dashboard:view_kpis', match: (t) => t.includes('total collected') || t.includes('target:') || t.includes('to collect') || t.includes('financial overview') },
+  { key: 'dashboard:quick_actions', match: (t) => t.includes('quick action') || t.includes('speed dial') || t.includes('floating action') },
+  { key: 'dashboard:launch_month0', match: (t) => t.includes('confirm launch & roll to month 1') || t.includes('confirm launch') },
+  { key: 'dashboard:advance_month', match: (t) => t.includes('conclude & advance month') || t.includes('conclude & advance') },
+  { key: 'dashboard:revert_month', match: (t) => t.includes('revert to m') || t.includes('revert month') || t.includes('roll back active cycle') },
+  { key: 'dashboard:view_reserves', match: (t) => t.includes('kai iruppu') || t.includes('history (') || (t.includes('breakdown') && t.includes('reserve')) },
+
+  // 2. Chits & Groups Tab
+  { key: 'chits:create', match: (t) => t.includes('create group') || t.includes('new scheme') || t.includes('new chit') || t.includes('create chit') },
+  { key: 'chits:edit', match: (t) => t.includes('edit chit') || t.includes('edit rules') || t.includes('edit group') || t.includes('bidding cap') },
+  { key: 'chits:launch_month0', match: (t) => t.includes('launch month (organizer profit)') },
+  { key: 'chits:reschedule_auction', match: (t) => t.includes('reschedule') || t.includes('postpone auction') },
+  { key: 'chits:configure_laaba_seetu', match: (t) => t.includes('laaba seetu') || t.includes('free month') || t.includes('bonus discount pool') },
+  { key: 'chits:swap_ticket', match: (t) => t.includes('swap ticket') || t.includes('swap / replace') || t.includes('replace ticket') || t.includes('swap member') },
+  { key: 'chits:delete', match: (t) => t.includes('recycle bin') || t.includes('delete scheme') || t.includes('delete chit') || t.includes('archive scheme') || t.includes('delete / archive') },
+  { key: 'chits:view', match: (t) => t.includes('view chit') || t.includes('scheme list') || t.includes('all schemes') },
+
+  // 3. Members Directory Tab
+  { key: 'members:enroll', match: (t) => t.includes('enroll') || t.includes('add member') || t.includes('new subscriber') || t.includes('register member') },
+  { key: 'members:collect', match: (t) => t.includes('record payment') || t.includes('collect payment') || t.includes('quick collect') || t.includes('+ collect') || t.includes('pay installment') || t === 'record' },
+  { key: 'members:edit', match: (t) => t.includes('edit member') || t.includes('edit information') || t.includes('edit profile') },
+  { key: 'members:delete', match: (t) => t.includes('delete member') || t.includes('archive member') || t.includes('delete subscriber') },
+  { key: 'members:suspend', match: (t) => t.includes('suspend') || t.includes('block member') || t.includes('lockout standing') || t.includes('in good standing') },
+  { key: 'members:pair_qr', match: (t) => t.includes('pair qr') || t.includes('scan passbook') || t.includes('scan qr') || t.includes('link passbook') || t.includes('re-bind qr') },
+  { key: 'members:revoke_qr', match: (t) => t.includes('revoke') || t.includes('lost booklet') || t.includes('unlink') || t.includes('unlink qr') },
+  { key: 'members:batch_qr', match: (t) => t.includes('batch qr') || t.includes('print qr') || t.includes('qr sheets') || t.includes('print sticker') },
+  { key: 'members:reset_mpin', match: (t) => t.includes('reset pin') || t.includes('reset mpin') || t.includes('default 1234') },
+  { key: 'members:export', match: (t) => t.includes('export member') || t.includes('download roster') || t.includes('download members') },
+  { key: 'members:waive_penalties', match: (t) => t.includes('waive fine') || t.includes('waive penalty') || t.includes('adjust dues') || t.includes('waive') },
+  { key: 'members:view', match: (t) => t.includes('members directory') || t.includes('subscriber registry') || t.includes('view members') },
+
+  // 4. Auctions & Bidding Tab
+  { key: 'auctions:conduct', match: (t) => t.includes('start auction') || t.includes('conduct auction') || t.includes('live arena') || t.includes('begin live') || t.includes('begin auction') },
+  { key: 'auctions:bid', match: (t) => t.includes('place bid') || t.includes('proxy bid') || t.includes('shout bid') || t.includes('shout') },
+  { key: 'auctions:conclude', match: (t) => t.includes('declare winner') || t.includes('close auction') },
+  { key: 'auctions:override_floor', match: (t) => t.includes('override') || t.includes('early live auction') || t.includes('floor limit') },
+  { key: 'auctions:edit_historical', match: (t) => t.includes('edit past auction') || t.includes('fix auction') || t.includes('past auction results') },
+  { key: 'auctions:disburse', match: (t) => t.includes('confirm & disburse') || t.includes('disburse pot') || t.includes('disburse payout') || t.includes('prize money') },
+  { key: 'auctions:issue_receipt', match: (t) => t.includes('winner voucher') || t.includes('issue receipt') || t.includes('payout receipt') || t.includes('settlement receipt') },
+  { key: 'auctions:view', match: (t) => t.includes('view live auction') || t.includes('live auction arena') || t.includes('auction countdown') },
+
+  // 5. Treasury Tab
+  { key: 'treasury:confirm_atm', match: (t) => t.includes('confirm atm') || t.includes('atm cash') || t.includes('atm withdrawal') },
+  { key: 'treasury:personal_draw', match: (t) => t.includes('personal draw') || t.includes('log spend') || t.includes('cash spend') || t.includes('petty cash') },
+  { key: 'treasury:move_money', match: (t) => t.includes('move money') || t.includes('bank transfer') || t.includes('inter-vault') || t.includes('relocation') },
+  { key: 'treasury:reconcile', match: (t) => t.includes('count notes') || t.includes('denomination') || t.includes('reconcil') || t.includes('cash note counter') },
+  { key: 'treasury:deposit', match: (t) => t.includes('deposit reserve') || t.includes('deposit owner') || t.includes('extra funds') },
+  { key: 'treasury:recover_float', match: (t) => t.includes('collect field cash') || t.includes('recover float') || t.includes('staff float') },
+  { key: 'treasury:settle_draw', match: (t) => t.includes('repay personal') || t.includes('settle draw') || t.includes('repay advance') },
+  { key: 'treasury:delete_transaction', match: (t) => t.includes('delete transaction') || t.includes('cancel transaction') || t.includes('reverse payment') },
+  { key: 'treasury:view_cash_box', match: (t) => t.includes('cash box') || t.includes('cash in hand') },
+  { key: 'treasury:view_banks', match: (t) => t.includes('bank balances') || t.includes('kishor bank') || t.includes('dad bank') || t.includes('mom bank') },
+  { key: 'treasury:collect_cash', match: (t) => t.includes('accept cash') || t.includes('receive cash') },
+  { key: 'treasury:view', match: (t) => t.includes('all cash & bank') || t.includes('treasury balances') },
+
+  // 6. Reports & Analytics Tab
+  { key: 'reports:export_checklist', match: (t) => t.includes('checklist') || t.includes('print register') || t.includes('collection sheet') || t.includes('collection checklist') },
+  { key: 'reports:export_audit', match: (t) => t.includes('export activity') || t.includes('download activity') || t.includes('export audit') },
+  { key: 'reports:export_ledger', match: (t) => t.includes('passbook ledger') || t.includes('download passbook') || t.includes('statement pdf') },
+  { key: 'reports:view_defaulters', match: (t) => t.includes('defaulter') || t.includes('overdue dues') || t.includes('unpaid installment') },
+  { key: 'reports:view_audit_logs', match: (t) => t.includes('audit log') || t.includes('system activity') || t.includes('activity log') },
+  { key: 'reports:view_pnl', match: (t) => t.includes('profit & loss') || t.includes('p&l') || t.includes('organizer earnings') },
+  { key: 'reports:export', match: (t) => t.includes('download reports') || t.includes('export csv') || t.includes('export excel') },
+  { key: 'reports:view', match: (t) => t.includes('reports & analytics') || t.includes('view reports') },
+
+  // 7. Communication Tab
+  { key: 'communication:broadcast', match: (t) => t.includes('broadcast') || t.includes('send receipt') || t.includes('whatsapp receipt') },
+  { key: 'communication:due_alerts', match: (t) => t.includes('due reminder') || t.includes('send reminder') || t.includes('whatsapp alert') || t.includes('remind all') || t === 'remind' },
+  { key: 'communication:pre_auction', match: (t) => t.includes('pre-auction') || t.includes('auction reminder') },
+  { key: 'communication:post_auction', match: (t) => t.includes('post-auction') || t.includes('auction result') },
+  { key: 'communication:custom', match: (t) => t.includes('custom message') || t.includes('custom announcement') },
+  { key: 'communication:manage_templates', match: (t) => t.includes('message template') || t.includes('edit template') },
+  { key: 'communication:view', match: (t) => t.includes('message history') || t.includes('view messages') },
+
+  // 8. Roles & Staff Tab
+  { key: 'system:manage_users', match: (t) => t.includes('member login') || t.includes('subscriber login') || t.includes('subscriber account') },
+  { key: 'system:manage_staff', match: (t) => t.includes('staff account') || t.includes('staff directory') || t.includes('manage staff') },
+  { key: 'system:manage_roles', match: (t) => t.includes('edit role') || t.includes('role permissions') || t.includes('manage roles') },
+
+  // 9. Portal Settings Tab
+  { key: 'system:branding', match: (t) => t.includes('branding') || t.includes('business name') || t.includes('logo') },
+  { key: 'system:maintenance_mode', match: (t) => t.includes('maintenance') || t.includes('lock app') || t.includes('lockout') },
+  { key: 'system:reset_database', match: (t) => t.includes('clear test data') || t.includes('factory reset') || t.includes('reset database') },
+];
+
 // Helper: Intelligent DOM Element Component Resolver
 function resolveComponentFromDOM(
   el: HTMLElement,
   allowedTabs: MainTabId[],
   allowedActions: PermissionAction[]
 ): ComponentInfo | null {
-  // Walk up parents (up to 5 levels) to find nearest recognizable component container or button
+  // Walk up parents (up to 6 levels) to find nearest recognizable component container or button
   let cur: HTMLElement | null = el;
   let steps = 0;
 
   while (cur && steps < 6 && cur !== cur.ownerDocument?.body) {
-    // 1. Direct permission key attribute
-    const attrKey = cur.getAttribute('data-permission-key') || cur.getAttribute('data-action-key');
+    // 1. Direct permission key attribute (Highest Priority)
+    const attrKey = cur.getAttribute('data-permission-key') || cur.getAttribute('data-action-key') || cur.getAttribute('data-action');
     if (attrKey) {
       const match = ALL_ACTIONS.find((a) => a.key === attrKey);
       if (match) {
@@ -230,24 +411,6 @@ function resolveComponentFromDOM(
           desc: match.desc,
           icon: match.icon,
           isEnabled: allowedActions.includes(match.key),
-          targetEl: cur,
-        };
-      }
-    }
-
-    // 1. Direct explicit data-action check (High Priority)
-    const explicitAction = cur.getAttribute('data-action') as PermissionAction | null;
-    if (explicitAction) {
-      const a = ALL_ACTIONS.find((x) => x.key === explicitAction);
-      if (a) {
-        return {
-          type: 'action',
-          key: a.key,
-          name: a.label,
-          category: a.category,
-          desc: a.desc,
-          icon: a.icon,
-          isEnabled: allowedActions.includes(a.key),
           targetEl: cur,
         };
       }
@@ -272,205 +435,32 @@ function resolveComponentFromDOM(
     }
 
     // 3. Match button / link / card text patterns
-    const isClickable = cur.tagName === 'BUTTON' || cur.tagName === 'A' || cur.getAttribute('role') === 'button' || cur.classList.contains('cursor-pointer');
-    const text = (cur.innerText || cur.getAttribute('aria-label') || cur.getAttribute('title') || '').trim();
+    const isClickable = cur.tagName === 'BUTTON' || cur.tagName === 'A' || cur.getAttribute('role') === 'button' || cur.classList.contains('cursor-pointer') || cur.onclick !== null;
+    const rawText = (cur.innerText || cur.textContent || cur.getAttribute('aria-label') || cur.getAttribute('title') || '').trim();
 
-    if (isClickable && text.length > 0) {
-      const lower = text.toLowerCase();
+    if (isClickable && rawText.length > 0) {
+      const lower = rawText.toLowerCase();
 
-      // Collect / Payment
-      if (lower.includes('record payment') || lower.includes('collect payment') || lower.includes('quick collect') || lower.includes('+ collect') || lower.includes('pay installment') || lower === 'record') {
-        const a = ALL_ACTIONS.find((x) => x.key === 'members:collect')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
+      // Check against granular action match rules
+      for (const rule of ACTION_MATCH_RULES) {
+        if (rule.match(lower)) {
+          const a = ALL_ACTIONS.find((x) => x.key === rule.key);
+          if (a) {
+            return {
+              type: 'action',
+              key: a.key,
+              name: a.label,
+              category: a.category,
+              desc: a.desc,
+              icon: a.icon,
+              isEnabled: allowedActions.includes(a.key),
+              targetEl: cur,
+            };
+          }
+        }
       }
 
-      // Member Enrollment
-      if (lower.includes('enroll') || lower.includes('add member') || lower.includes('new subscriber') || lower.includes('register member')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'members:enroll')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Member Edit
-      if (lower.includes('edit member') || lower.includes('edit information')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'members:edit')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Member Delete / Archive
-      if (lower.includes('archive / delete') || lower.includes('archive member') || lower.includes('delete subscriber') || lower.includes('delete member')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'members:delete')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Member Suspend
-      if (lower.includes('suspend') || lower.includes('lockout standing') || lower.includes('in good standing')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'members:suspend')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // QR Passbook Pairing
-      if (lower.includes('pair qr') || lower.includes('scan passbook') || lower.includes('scan qr') || lower.includes('link passbook') || lower.includes('re-bind qr')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'members:pair_qr')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Revoke QR
-      if (lower.includes('revoke') || lower.includes('lost booklet') || lower.includes('unlink')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'members:revoke_qr')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Batch QR Printing
-      if (lower.includes('batch qr') || lower.includes('print qr') || lower.includes('qr sheets') || lower.includes('print sticker')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'members:batch_qr')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Reset MPIN
-      if (lower.includes('reset pin') || lower.includes('reset mpin')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'members:reset_mpin')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Export Members
-      if (lower.includes('export member') || lower.includes('export csv') || lower.includes('download roster') || lower.includes('export pdf')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'members:export')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Create Chit Group
-      if (lower.includes('create group') || lower.includes('new scheme') || lower.includes('new chit') || lower.includes('create chit')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'chits:create')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Edit Chit Rules
-      if (lower.includes('edit chit') || lower.includes('edit rules') || lower.includes('edit group')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'chits:edit')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Delete Chit Scheme
-      if (lower.includes('move to recycle bin') || lower.includes('delete scheme') || lower.includes('delete chit') || lower.includes('archive scheme')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'chits:delete')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Revert Month
-      if (lower.includes('revert to m') || lower.includes('revert month') || lower.includes('roll back active cycle')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'dashboard:revert_month');
-        if (a) return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Kai Iruppu Reserves History
-      if (lower.includes('history (') || (lower.includes('breakdown') && lower.includes('kai iruppu'))) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'dashboard:view_reserves');
-        if (a) return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Launch Month 0
-      if (lower.includes('month 0') || lower.includes('launch month') || lower.includes('organizer profit') || lower.includes('confirm launch')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'dashboard:launch_month0') || ALL_ACTIONS.find((x) => x.key === 'chits:launch_month0')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Reschedule Auction
-      if (lower.includes('reschedule') || lower.includes('postpone auction')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'chits:reschedule_auction')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Auction Start / Conduct
-      if (lower.includes('start auction') || lower.includes('conduct auction') || lower.includes('live arena') || lower.includes('begin live') || lower.includes('begin auction') || lower.includes('end live stream')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'auctions:conduct')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Floor Override
-      if (lower.includes('admin override') || lower.includes('early live auction') || lower.includes('start live auction now')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'auctions:override_floor')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Place Proxy Bid
-      if (lower.includes('place bid') || lower.includes('proxy bid') || lower.includes('shout bid') || lower.includes('shout')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'auctions:bid')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Conclude Auction / Advance Month
-      if (lower.includes('conclude') || lower.includes('award pot') || lower.includes('advance month') || lower.includes('close month')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'dashboard:advance_month') || ALL_ACTIONS.find((x) => x.key === 'auctions:conclude')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Disburse Payout
-      if (lower.includes('confirm & disburse') || lower.includes('disburse pot') || lower.includes('disburse payout')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'auctions:disburse')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Issue Receipt / Voucher
-      if (lower.includes('download pdf report') || lower.includes('pdf report') || lower.includes('winner voucher') || lower.includes('issue receipt')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'auctions:issue_receipt')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // ATM Relocation
-      if (lower.includes('atm') || lower.includes('relocation') || lower.includes('withdraw cash')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'treasury:confirm_atm')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Personal Draw / Spend
-      if (lower.includes('personal draw') || lower.includes('log spend') || lower.includes('cash spend')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'treasury:personal_draw')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Inter-vault Transfer
-      if (lower.includes('transfer') || lower.includes('move money') || lower.includes('inter-vault')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'treasury:move_money')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Reconcile Notes
-      if (lower.includes('count notes') || lower.includes('denomination') || lower.includes('reconcil')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'treasury:reconcile')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // WhatsApp Broadcast
-      if (lower.includes('broadcast') || lower.includes('send reminder') || lower.includes('whatsapp alert') || lower.includes('remind all') || lower === 'remind') {
-        const a = ALL_ACTIONS.find((x) => x.key === 'communication:broadcast') || ALL_ACTIONS.find((x) => x.key === 'communication:due_alerts')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Printable Checklist Booklet
-      if (lower.includes('checklist') || lower.includes('print register') || lower.includes('collection sheet')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'reports:export_checklist')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Export Audit Logs
-      if (lower.includes('export csv') || lower.includes('export json') || lower.includes('audit log')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'reports:export_audit')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Branding
-      if (lower.includes('save organization branding') || lower.includes('branding')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'system:branding')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Maintenance Mode
-      if (lower.includes('engage lockout') || lower.includes('restore access') || lower.includes('maintenance')) {
-        const a = ALL_ACTIONS.find((x) => x.key === 'system:maintenance_mode')!;
-        return { type: 'action', key: a.key, name: a.label, category: a.category, desc: a.desc, icon: a.icon, isEnabled: allowedActions.includes(a.key), targetEl: cur };
-      }
-
-      // Navigation tab items check
+      // Check against navigation tab labels
       for (const t of ALL_TABS) {
         if (lower === t.label.toLowerCase() || lower.startsWith(t.label.toLowerCase())) {
           return {
@@ -533,9 +523,21 @@ function IsolatedPreviewFrame({
       doc.head.prepend(meta);
     }
 
+    // Mirror HTML & Body classes / inline styles from parent window (for Next.js font variables & dark/light theme)
+    if (document.documentElement.className && doc.documentElement.className !== document.documentElement.className) {
+      doc.documentElement.className = document.documentElement.className;
+    }
+    if (document.body.className && doc.body.className !== document.body.className) {
+      doc.body.className = document.body.className;
+    }
+    const htmlStyle = document.documentElement.getAttribute('style');
+    if (htmlStyle) {
+      doc.documentElement.setAttribute('style', htmlStyle);
+    }
+
     // Copy all style and link tags from main window
     document.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-      const href = (node as any).href || (node as any).getAttribute?.('data-href') || node.textContent?.slice(0, 40);
+      const href = (node as any).href || (node as any).getAttribute?.('data-href') || node.textContent?.slice(0, 80);
       if (href && doc.head.querySelector(`[data-sync-key="${encodeURIComponent(href)}"]`)) {
         return; // Avoid duplicating
       }
@@ -587,16 +589,52 @@ function IsolatedPreviewFrame({
     }
   }, [syncStyles, viewportMode]);
 
-  // Handle Figma-like inspection hover and click inside the iframe document
+  // Handle Figma-like inspection hover, click, and event forwarding inside iframe
   useEffect(() => {
     if (!iframeDoc) return;
+
+    // 1. Forward mouse and touch movement to parent window so drag sliders (like SlideToConfirm) never lose tracking
+    const forwardMouseEvent = (e: MouseEvent) => {
+      if (e.target !== iframeDoc.body && e.target !== iframeDoc.documentElement) {
+        window.dispatchEvent(new MouseEvent(e.type, {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          screenX: e.screenX,
+          screenY: e.screenY,
+          bubbles: true,
+          cancelable: true,
+        }));
+      }
+    };
+
+    const forwardTouchEvent = (e: TouchEvent) => {
+      if (e.touches && e.touches.length > 0) {
+        window.dispatchEvent(new TouchEvent(e.type, {
+          touches: Array.from(e.touches) as any,
+          targetTouches: Array.from(e.targetTouches) as any,
+          changedTouches: Array.from(e.changedTouches) as any,
+          bubbles: true,
+          cancelable: true,
+        }));
+      }
+    };
+
+    iframeDoc.addEventListener('mousemove', forwardMouseEvent, { passive: true });
+    iframeDoc.addEventListener('mouseup', forwardMouseEvent, { passive: true });
+    iframeDoc.addEventListener('touchmove', forwardTouchEvent, { passive: true });
+    iframeDoc.addEventListener('touchend', forwardTouchEvent, { passive: true });
 
     if (canvasTool === 'inspect') {
       iframeDoc.body.classList.add('cf-inspect-active');
     } else {
       iframeDoc.body.classList.remove('cf-inspect-active');
       setHoveredComponent(null);
-      return;
+      return () => {
+        iframeDoc.removeEventListener('mousemove', forwardMouseEvent);
+        iframeDoc.removeEventListener('mouseup', forwardMouseEvent);
+        iframeDoc.removeEventListener('touchmove', forwardTouchEvent);
+        iframeDoc.removeEventListener('touchend', forwardTouchEvent);
+      };
     }
 
     let currentHighlightedEl: HTMLElement | null = null;
@@ -634,6 +672,21 @@ function IsolatedPreviewFrame({
       setHoveredComponent(null);
     };
 
+    const handleScroll = () => {
+      if (currentHighlightedEl) {
+        const r = currentHighlightedEl.getBoundingClientRect();
+        setHoveredComponent((prev) => prev ? {
+          ...prev,
+          rect: {
+            top: r.top,
+            left: r.left,
+            width: r.width,
+            height: r.height,
+          },
+        } : null);
+      }
+    };
+
     const handleClick = (e: MouseEvent) => {
       if (canvasTool !== 'inspect') return;
       e.preventDefault();
@@ -650,14 +703,20 @@ function IsolatedPreviewFrame({
 
     iframeDoc.addEventListener('mouseover', handleMouseOver);
     iframeDoc.addEventListener('mouseleave', handleMouseLeave);
+    iframeDoc.addEventListener('scroll', handleScroll, { passive: true, capture: true });
     iframeDoc.addEventListener('click', handleClick, true);
 
     return () => {
       if (currentHighlightedEl) {
         currentHighlightedEl.classList.remove('cf-figma-highlight');
       }
+      iframeDoc.removeEventListener('mousemove', forwardMouseEvent);
+      iframeDoc.removeEventListener('mouseup', forwardMouseEvent);
+      iframeDoc.removeEventListener('touchmove', forwardTouchEvent);
+      iframeDoc.removeEventListener('touchend', forwardTouchEvent);
       iframeDoc.removeEventListener('mouseover', handleMouseOver);
       iframeDoc.removeEventListener('mouseleave', handleMouseLeave);
+      iframeDoc.removeEventListener('scroll', handleScroll, true);
       iframeDoc.removeEventListener('click', handleClick, true);
     };
   }, [iframeDoc, canvasTool, allowedTabs, allowedActions, onSelectComponent]);
@@ -676,8 +735,9 @@ function IsolatedPreviewFrame({
         <div
           className="absolute z-50 pointer-events-none transition-all duration-75"
           style={{
-            top: `${Math.max(8, hoveredComponent.rect.top - 36)}px`,
-            left: `${Math.max(8, hoveredComponent.rect.left)}px`,
+            top: `${hoveredComponent.rect.top < 44 ? hoveredComponent.rect.top + (hoveredComponent.rect.height || 36) + 8 : Math.max(8, hoveredComponent.rect.top - 36)}px`,
+            left: `${Math.max(8, Math.min(hoveredComponent.rect.left, (iframeRef.current?.clientWidth || 390) - 290))}px`,
+            maxWidth: 'calc(100% - 16px)',
           }}
         >
           <div className="bg-slate-900/95 backdrop-blur-md text-white border border-brand-500/80 rounded-lg px-2.5 py-1 text-xs font-bold shadow-2xl flex items-center gap-2 pointer-events-auto">
@@ -720,12 +780,17 @@ export default function RoleAppPreviewModal({
   onRoleUpdated,
 }: RoleAppPreviewModalProps) {
   const { profile: currentAdminProfile } = useAuth();
-  const [allRoles, setAllRoles] = useState<CustomRoleRecord[]>([]);
+  const [allRoles, setAllRoles] = useState<CustomRoleRecord[]>(DEFAULT_SYSTEM_ROLES);
   const [selectedRoleId, setSelectedRoleId] = useState<string>(initialRoleId);
   const [viewportMode, setViewportMode] = useState<'desktop' | 'mobile'>('mobile');
   const [canvasTool, setCanvasTool] = useState<CanvasTool>('navigate');
   const [ghostMode, setGhostMode] = useState<boolean>(false);
-  const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(true);
+  const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
   const [inspectorSubtab, setInspectorSubtab] = useState<'controls' | 'hidden'>('controls');
   const [previewTab, setPreviewTab] = useState<MainTabId>('dashboard');
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState<boolean>(false);
@@ -835,6 +900,27 @@ export default function RoleAppPreviewModal({
     } else {
       handleToggleAction(comp.key as PermissionAction);
     }
+  };
+
+  // Bulk enable all actions in category
+  const handleEnableAllCategoryActions = (items: ActionMeta[]) => {
+    triggerHapticFeedback('light');
+    setAllowedActions((prev) => {
+      const keys = items.map((i) => i.key);
+      const set = new Set([...prev, ...keys]);
+      return Array.from(set);
+    });
+    setToastMessage({ text: `Enabled all actions in section`, isRestore: true });
+  };
+
+  // Bulk clear all actions in category
+  const handleClearCategoryActions = (items: ActionMeta[]) => {
+    triggerHapticFeedback('light');
+    setAllowedActions((prev) => {
+      const keys = new Set(items.map((i) => i.key));
+      return prev.filter((k) => !keys.has(k));
+    });
+    setToastMessage({ text: `Disabled actions in section`, isRestore: false });
   };
 
   // 4. Save and Broadcast Changes to Live Staff in Real-Time
@@ -1605,15 +1691,15 @@ export default function RoleAppPreviewModal({
                             return (
                               <div key={category} className="space-y-2">
                                 <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/80">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider truncate">
                                       {category}
                                     </span>
                                     {tabId && (
                                       <button
                                         type="button"
                                         onClick={() => handleToggleTab(tabId)}
-                                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full border transition-all cursor-pointer shrink-0 ${
                                           isTabEnabled
                                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100'
                                             : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
@@ -1624,9 +1710,31 @@ export default function RoleAppPreviewModal({
                                       </button>
                                     )}
                                   </div>
-                                  <span className="text-[10px] text-slate-500 font-mono">
-                                    {enabledCount}/{items.length} active
-                                  </span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {isTabEnabled && (
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEnableAllCategoryActions(items)}
+                                          className="text-[9px] font-bold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                                          title="Enable all actions under this category"
+                                        >
+                                          All
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleClearCategoryActions(items)}
+                                          className="text-[9px] font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                                          title="Clear all actions under this category"
+                                        >
+                                          Clear
+                                        </button>
+                                      </div>
+                                    )}
+                                    <span className="text-[10px] text-slate-500 font-mono">
+                                      {enabledCount}/{items.length} active
+                                    </span>
+                                  </div>
                                 </div>
 
                                 {isTabEnabled ? (
