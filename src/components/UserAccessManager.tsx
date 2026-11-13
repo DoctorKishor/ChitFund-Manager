@@ -75,8 +75,9 @@ const ROLE_COLORS: Record<string, { bg: string; text: string; border: string }> 
 
 export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: UserAccessManagerProps) {
   const { profile: currentAdminProfile, user: currentAdminUser, canPerformAction } = useAuth();
-  const canManageStaff = canPerformAction('system:manage_staff');
-  const canManageRoles = canPerformAction('system:manage_roles');
+  const isSuperAdmin = currentAdminProfile?.role === 'admin' || currentAdminProfile?.role?.toLowerCase() === 'admin';
+  const canManageStaff = isSuperAdmin || canPerformAction('system:manage_staff');
+  const canManageRoles = isSuperAdmin || canPerformAction('system:manage_roles');
   const [activeSubtab, setActiveSubtab] = useState<'staff' | 'roles'>('staff');
   const [staffMembers, setStaffMembers] = useState<StaffProfile[]>([]);
   const [availableRoles, setAvailableRoles] = useState<CustomRole[]>([]);
@@ -743,7 +744,7 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
           <span>Staff Directory ({staffMembers.length})</span>
         </button>
 
-        {(canManageRoles || currentAdminProfile?.role === 'admin') && (
+        {(canManageRoles || isSuperAdmin) && (
           <button
             type="button"
             data-action="system:manage_roles"

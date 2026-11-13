@@ -107,10 +107,10 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
   // Fallback to permitted subtab if active subtab is restricted
   useEffect(() => {
     if (activeSubtab === 'monthly' && !canExportChecklist) {
-      if (canViewDefaulters) setActiveSubtab('defaulters');
-      else if (canExportLedger) setActiveSubtab('member');
-      else if (canViewPnl) setActiveSubtab('overview');
-      else if (canViewAuditLogs) setActiveSubtab('system_log');
+      if (canViewDefaulters) handleSelectSubtab('defaulters');
+      else if (canExportLedger) handleSelectSubtab('member');
+      else if (canViewPnl) handleSelectSubtab('overview');
+      else if (canViewAuditLogs) handleSelectSubtab('system_log');
     }
   }, [activeSubtab, canExportChecklist, canViewDefaulters, canExportLedger, canViewPnl, canViewAuditLogs]);
 
@@ -2419,7 +2419,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                 <nav className="flex items-center gap-1.5 min-w-max">
                   {canExportChecklist && (
                     <button
-                      onClick={() => setActiveSubtab('monthly')}
+                      onClick={() => handleSelectSubtab('monthly')}
                       className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
                         activeSubtab === 'monthly'
                           ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-2xs'
@@ -2432,7 +2432,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
 
                   {canViewDefaulters && (
                     <button
-                      onClick={() => setActiveSubtab('defaulters')}
+                      onClick={() => handleSelectSubtab('defaulters')}
                       className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
                         activeSubtab === 'defaulters'
                           ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
@@ -2449,7 +2449,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                   {canViewPnl && (
                     <>
                       <button
-                        onClick={() => setActiveSubtab('period')}
+                        onClick={() => handleSelectSubtab('period')}
                         className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
                           activeSubtab === 'period'
                             ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
@@ -2460,7 +2460,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                       </button>
 
                       <button
-                        onClick={() => setActiveSubtab('earnings')}
+                        onClick={() => handleSelectSubtab('earnings')}
                         className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
                           activeSubtab === 'earnings'
                             ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
@@ -2471,7 +2471,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                       </button>
 
                       <button
-                        onClick={() => setActiveSubtab('payouts')}
+                        onClick={() => handleSelectSubtab('payouts')}
                         className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
                           activeSubtab === 'payouts'
                             ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
@@ -2485,7 +2485,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
 
                   {canExportLedger && (
                     <button
-                      onClick={() => setActiveSubtab('member')}
+                      onClick={() => handleSelectSubtab('member')}
                       className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
                         activeSubtab === 'member'
                           ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
@@ -3205,7 +3205,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
           <div className="px-4 py-3.5 flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <button 
-                onClick={() => setActiveSubtab('monthly')}
+                onClick={() => handleSelectSubtab('monthly')}
                 className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 active:scale-95 transition-all cursor-pointer"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3262,7 +3262,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
           <div className="px-3 pb-2 overflow-x-auto no-scrollbar flex items-center space-x-1.5 text-xs border-t border-slate-100 pt-1.5">
             {canExportChecklist && (
               <button
-                onClick={() => setActiveSubtab('monthly')}
+                onClick={() => handleSelectSubtab('monthly')}
                 className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
                   activeSubtab === 'monthly' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
                 }`}
@@ -3272,7 +3272,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
             )}
             {canViewDefaulters && (
               <button
-                onClick={() => setActiveSubtab('defaulters')}
+                onClick={() => handleSelectSubtab('defaulters')}
                 className={`flex-shrink-0 px-3 py-1 rounded-xl flex items-center gap-1 cursor-pointer transition-all ${
                   activeSubtab === 'defaulters' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
                 }`}
@@ -3283,7 +3283,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
             {canViewPnl && (
               <>
                 <button
-                  onClick={() => setActiveSubtab('period')}
+                  onClick={() => handleSelectSubtab('period')}
                   className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
                     activeSubtab === 'period' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
                   }`}
@@ -3291,7 +3291,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                   Period Analysis
                 </button>
                 <button
-                  onClick={() => setActiveSubtab('earnings')}
+                  onClick={() => handleSelectSubtab('earnings')}
                   className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
                     activeSubtab === 'earnings' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
                   }`}
@@ -3299,7 +3299,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                   Pool &amp; Earnings
                 </button>
                 <button
-                  onClick={() => setActiveSubtab('payouts')}
+                  onClick={() => handleSelectSubtab('payouts')}
                   className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
                     activeSubtab === 'payouts' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
                   }`}
@@ -3310,7 +3310,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
             )}
             {canExportLedger && (
               <button
-                onClick={() => setActiveSubtab('member')}
+                onClick={() => handleSelectSubtab('member')}
                 className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
                   activeSubtab === 'member' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
                 }`}
