@@ -77,11 +77,18 @@ export interface SystemAuditLogViewerProps {
 
 export interface UndoCandidate {
   log: AuditLogItem;
-  type: 'collection' | 'personal_draw' | 'atm_relocation' | 'unblock';
+  type: 'collection' | 'personal_draw' | 'atm_relocation' | 'transfer' | 'advance_cycle' | 'unblock';
   amount: number;
   wallet?: WalletType;
   sourceWallet?: WalletType;
+  destWallet?: WalletType;
   receiptBatch?: string;
+  isBulkCollection?: boolean;
+  bulkMonth?: number;
+  isPendingAtm?: boolean;
+  groupName?: string;
+  fromMonth?: number;
+  toMonth?: number;
   targetMemberName?: string;
   description: string;
 }
@@ -425,8 +432,17 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
       return null;
     }
 
-    // Check if this action was already reversed by looking at the logs
-    const receiptMatch = rawDesc.match(/\[(RCP-[A-Za-z0-9_-]+)\]/i);
+    // 1. Check if this action was already reversed by log ID reference (Ref #...)
+    const shortLogId = log.id.slice(0, 8);
+    const alreadyUndoneById = logs.some(l => 
+      l.id !== log.id && 
+      (l.action_description || '').toUpperCase().includes('REVERSED') && 
+      (l.action_description || '').includes(shortLogId)
+    );
+    if (alreadyUndoneById) return null;
+
+    // 2. Check if this action was already reversed by receipt batch
+    const receiptMatch = rawDesc.match(/\[((?:RCP|BATCH)-[A-Za-z0-9_-]+)\]/i);
     const receiptBatch = receiptMatch ? receiptMatch[1] : undefined;
 
     if (receiptBatch) {
@@ -438,7 +454,7 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
       if (alreadyUndone) return null;
     }
 
-    // 1. Collections: e.g. COLLECTION CONFIRMED or FIFO CREDIT or COLLECTION:
+    // 3. Collections: e.g. COLLECTION CONFIRMED, BULK COLLECTION, FIFO CREDIT, or COLLECTION:
     if (upper.includes('COLLECTION') || upper.includes('FIFO CREDIT')) {
       const amtMatch = rawDesc.match(/₹\s*([\d,]+(?:\.\d+)?)/);
       const amount = amtMatch ? Number(amtMatch[1].replace(/,/g, '')) : 0;
@@ -447,8 +463,16 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
       else if (/dad bank|dad_bank/i.test(rawDesc)) wallet = 'dad_bank';
       else if (/mom bank|mom_bank/i.test(rawDesc)) wallet = 'mom_bank';
 
+      const isBulk = upper.includes('BULK COLLECTION');
+      const bulkMonthMatch = rawDesc.match(/Month\s+(\d+)/i);
+      const bulkMonth = bulkMonthMatch ? parseInt(bulkMonthMatch[1], 10) : undefined;
+
       const memberMatch = rawDesc.match(/(?:for|from)\s+([A-Za-z0-9\s.]+?)(?=\s+(?:for|via|\[|\-|,|$))/i);
-      const member = memberMatch ? memberMatch[1].trim() : 'Subscriber';
+      const member = isBulk ? 'All Pending Members' : (memberMatch ? memberMatch[1].trim() : 'Subscriber');
+
+      const descText = isBulk
+        ? `Void bulk collection of ₹${amount.toLocaleString('en-IN')}${receiptBatch ? ` [${receiptBatch}]` : ''} for Month ${bulkMonth ?? ''}, deduct ₹${amount.toLocaleString('en-IN')} from ${wallet.replace(/_/g, ' ')}, and restore pending dues for all members.`
+        : `Void payment of ₹${amount.toLocaleString('en-IN')}${receiptBatch ? ` [${receiptBatch}]` : ''} from ${member}, deduct ₹${amount.toLocaleString('en-IN')} from ${wallet.replace(/_/g, ' ')}, and restore member's pending due.`;
 
       return {
         log,
@@ -456,12 +480,14 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
         amount,
         wallet,
         receiptBatch,
+        isBulkCollection: isBulk,
+        bulkMonth,
         targetMemberName: member,
-        description: `Void payment of ₹${amount.toLocaleString('en-IN')}${receiptBatch ? ` [${receiptBatch}]` : ''} from ${member}, deduct ₹${amount.toLocaleString('en-IN')} from ${wallet.replace(/_/g, ' ')}, and restore member's pending due.`
+        description: descText
       };
     }
 
-    // 2. Personal Draw
+    // 4. Personal Draw
     if (upper.includes('PERSONAL DRAW')) {
       const amtMatch = rawDesc.match(/₹\s*([\d,]+(?:\.\d+)?)/);
       const amount = amtMatch ? Number(amtMatch[1].replace(/,/g, '')) : 0;
@@ -475,29 +501,100 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
         type: 'personal_draw',
         amount,
         wallet,
-        description: `Reverse personal spend of ₹${amount.toLocaleString('en-IN')}, refund ₹${amount.toLocaleString('en-IN')} back into ${wallet.replace(/_/g, ' ')}, and void this expense entry.`
+        description: `Reverse personal spend of ₹${amount.toLocaleString('en-IN')}, refund ₹${amount.toLocaleString('en-IN')} back into ${wallet.replace(/_/g, ' ')}, and void this expense entry from recent transactions.`
       };
     }
 
-    // 3. ATM Relocation
+    // 5. ATM Relocation: Triggered (Pending) vs Confirmed
     if (upper.includes('ATM RELOCATION')) {
       const amtMatch = rawDesc.match(/₹\s*([\d,]+(?:\.\d+)?)/);
       const amount = amtMatch ? Number(amtMatch[1].replace(/,/g, '')) : 0;
-      let sourceWallet: WalletType = 'kishor_bank';
-      if (/dad bank|dad_bank/i.test(rawDesc)) sourceWallet = 'dad_bank';
-      else if (/mom bank|mom_bank/i.test(rawDesc)) sourceWallet = 'mom_bank';
 
+      let sourceWallet: WalletType = 'kishor_bank';
+      if (/dad\s*bank/i.test(rawDesc)) sourceWallet = 'dad_bank';
+      else if (/mom\s*bank/i.test(rawDesc)) sourceWallet = 'mom_bank';
+      else if (/cash\s*(?:in\s*hand|box)/i.test(rawDesc) && !rawDesc.toLowerCase().includes('credited into physical cash box')) sourceWallet = 'cash_in_hand';
+
+      const isPendingAtm = upper.includes('TRIGGERED') || upper.includes('PENDING');
+
+      if (isPendingAtm) {
+        return {
+          log,
+          type: 'atm_relocation',
+          amount,
+          sourceWallet,
+          isPendingAtm: true,
+          description: `Cancel pending ATM withdrawal of ₹${amount.toLocaleString('en-IN')}: Refund ₹${amount.toLocaleString('en-IN')} back to ${sourceWallet.replace(/_/g, ' ')} and void the pending cash-box verification alert. (Cash Box is unaffected as physical notes were never deposited).`
+        };
+      }
+
+      // Confirmed ATM relocation
       return {
         log,
         type: 'atm_relocation',
         amount,
         wallet: 'cash_in_hand',
         sourceWallet,
-        description: `Reverse ATM transfer: Deduct ₹${amount.toLocaleString('en-IN')} from Cash Box and credit ₹${amount.toLocaleString('en-IN')} back into ${sourceWallet.replace(/_/g, ' ')}.`
+        isPendingAtm: false,
+        description: `Reverse completed ATM cash inflow: Deduct ₹${amount.toLocaleString('en-IN')} from Physical Cash Box, credit ₹${amount.toLocaleString('en-IN')} back to ${sourceWallet.replace(/_/g, ' ')}, and void this ATM transaction.`
       };
     }
 
-    // 4. Member or Staff Suspension / Blocking
+    // 6. Inter-Vault Transfer
+    if (upper.includes('INTER-VAULT TRANSFER') || (upper.includes('TRANSFER') && upper.includes('MOVED FROM'))) {
+      const amtMatch = rawDesc.match(/₹\s*([\d,]+(?:\.\d+)?)/);
+      const amount = amtMatch ? Number(amtMatch[1].replace(/,/g, '')) : 0;
+
+      let sourceWallet: WalletType = 'kishor_bank';
+      let destWallet: WalletType = 'cash_in_hand';
+
+      const moveMatch = rawDesc.match(/moved from\s+([^to]+?)\s+to\s+([^.]+)/i);
+      if (moveMatch) {
+        const srcStr = moveMatch[1].toLowerCase();
+        const dstStr = moveMatch[2].toLowerCase();
+
+        if (srcStr.includes('cash')) sourceWallet = 'cash_in_hand';
+        else if (srcStr.includes('dad')) sourceWallet = 'dad_bank';
+        else if (srcStr.includes('mom')) sourceWallet = 'mom_bank';
+        else if (srcStr.includes('kishor')) sourceWallet = 'kishor_bank';
+
+        if (dstStr.includes('cash')) destWallet = 'cash_in_hand';
+        else if (dstStr.includes('dad')) destWallet = 'dad_bank';
+        else if (dstStr.includes('mom')) destWallet = 'mom_bank';
+        else if (dstStr.includes('kishor')) destWallet = 'kishor_bank';
+      }
+
+      return {
+        log,
+        type: 'transfer',
+        amount,
+        sourceWallet,
+        destWallet,
+        description: `Reverse inter-vault transfer: Deduct ₹${amount.toLocaleString('en-IN')} from ${destWallet.replace(/_/g, ' ')}, refund ₹${amount.toLocaleString('en-IN')} back to ${sourceWallet.replace(/_/g, ' ')}, and void both transfer transactions.`
+      };
+    }
+
+    // 7. Cycle Advancement
+    if (upper.includes('ADVANCED CYCLE') && upper.includes('ADVANCED FROM MONTH')) {
+      const grpMatch = rawDesc.match(/Group\s+"([^"]+)"\s+advanced from Month\s+(\d+)\s+to Month\s+(\d+)/i);
+      if (grpMatch) {
+        const groupName = grpMatch[1];
+        const fromMonth = parseInt(grpMatch[2], 10);
+        const toMonth = parseInt(grpMatch[3], 10);
+
+        return {
+          log,
+          type: 'advance_cycle',
+          amount: 0,
+          groupName,
+          fromMonth,
+          toMonth,
+          description: `Roll back "${groupName}" from Month ${toMonth} to Month ${fromMonth}. Active cycle pointer will be reverted.`
+        };
+      }
+    }
+
+    // 8. Member or Staff Suspension / Blocking
     if (upper.includes('SUSPENDED') || upper.includes('BLOCKED')) {
       const memberMatch = rawDesc.match(/(?:for|subscriber|staff)\s+([A-Za-z0-9\s.]+?)(?=\s+(?:\(|\[|\-|,|$))/i);
       const member = memberMatch ? memberMatch[1].trim() : 'User';
@@ -518,9 +615,10 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
     if (!undoCandidate) return;
     try {
       setIsUndoing(true);
-      const { type, amount, wallet, sourceWallet, receiptBatch, targetMemberName } = undoCandidate;
+      const { type, amount, wallet, sourceWallet, destWallet, receiptBatch, isBulkCollection, bulkMonth, isPendingAtm, groupName, fromMonth, toMonth, targetMemberName } = undoCandidate;
+      const refTag = `Ref #${undoCandidate.log.id.slice(0, 8)}`;
 
-      // 1. Balance pre-flight validation
+      // 1. Balance pre-flight validations
       if (type === 'collection' && wallet) {
         const currentBal = balances[wallet] ?? 0;
         if (currentBal < amount) {
@@ -529,7 +627,7 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
         }
       }
 
-      if (type === 'atm_relocation') {
+      if (type === 'atm_relocation' && !isPendingAtm) {
         const cashBal = balances['cash_in_hand'] ?? 0;
         if (cashBal < amount) {
           alert(`Pre-flight Safety Check: Insufficient funds in Physical Cash Box (Available: ₹${cashBal.toLocaleString('en-IN')}, Required: ₹${amount.toLocaleString('en-IN')}). Reversal cancelled.`);
@@ -537,9 +635,17 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
         }
       }
 
+      if (type === 'transfer' && destWallet) {
+        const destBal = balances[destWallet] ?? 0;
+        if (destBal < amount) {
+          alert(`Pre-flight Safety Check: Insufficient funds in ${destWallet.replace(/_/g, ' ')} (Available: ₹${destBal.toLocaleString('en-IN')}, Required: ₹${amount.toLocaleString('en-IN')}). Reversal cancelled.`);
+          return;
+        }
+      }
+
       // 2. Perform safe reversal operations
       if (type === 'collection') {
-        // Void/delete transaction records by receipt batch or ID
+        // Void/delete transaction records by receipt batch, bulk, or timestamp match
         if (receiptBatch) {
           const { data: txs } = await supabase
             .from('transactions')
@@ -549,14 +655,72 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
           if (txs && txs.length > 0) {
             await supabase.from('transactions').delete().in('id', txs.map(t => t.id));
           }
+        } else if (isBulkCollection && bulkMonth !== undefined) {
+          const { data: bulkTxs } = await supabase
+            .from('transactions')
+            .select('id')
+            .eq('type', 'collection')
+            .eq('cycle_month', bulkMonth)
+            .ilike('notes', '%Bulk Mark All Paid%');
+
+          if (bulkTxs && bulkTxs.length > 0) {
+            await supabase.from('transactions').delete().in('id', bulkTxs.map(t => t.id));
+          }
+        } else {
+          // Unbatched single collection fallback
+          let memberProfileId: string | null = null;
+          if (targetMemberName) {
+            const foundProfile = Object.entries(directoryProfiles).find(
+              ([_, p]) => p.name.toLowerCase().trim() === targetMemberName.toLowerCase().trim()
+            );
+            if (foundProfile) memberProfileId = foundProfile[0];
+          }
+
+          const logTime = new Date(undoCandidate.log.timestamp);
+          const windowStart = new Date(logTime.getTime() - 45 * 60 * 1000).toISOString();
+          const windowEnd = new Date(logTime.getTime() + 45 * 60 * 1000).toISOString();
+
+          let q = supabase
+            .from('transactions')
+            .select('id')
+            .eq('type', 'collection')
+            .eq('amount', amount);
+
+          if (wallet) q = q.eq('wallet_type', wallet);
+          if (memberProfileId) q = q.eq('profile_id', memberProfileId);
+          q = q.gte('created_at', windowStart).lte('created_at', windowEnd);
+
+          const { data: matchedTxs } = await q.order('created_at', { ascending: false }).limit(1);
+
+          if (matchedTxs && matchedTxs.length > 0) {
+            await supabase.from('transactions').delete().eq('id', matchedTxs[0].id);
+          } else {
+            let fallbackQ = supabase
+              .from('transactions')
+              .select('id')
+              .eq('type', 'collection')
+              .eq('amount', amount);
+            if (wallet) fallbackQ = fallbackQ.eq('wallet_type', wallet);
+            if (memberProfileId) fallbackQ = fallbackQ.eq('profile_id', memberProfileId);
+            const { data: fallbackTxs } = await fallbackQ.order('created_at', { ascending: false }).limit(1);
+            if (fallbackTxs && fallbackTxs.length > 0) {
+              await supabase.from('transactions').delete().eq('id', fallbackTxs[0].id);
+            }
+          }
         }
+
         // Deduct collected amount from wallet
         if (wallet && amount > 0) {
-          await updateBalance(wallet, -amount);
+          const balRes = await updateBalance(wallet, -amount);
+          if (!balRes.success) {
+            alert(`Failed to deduct ₹${amount.toLocaleString('en-IN')} from ${wallet.replace(/_/g, ' ')}: ${balRes.error}`);
+            return;
+          }
         }
+
         // Log reversal
         await logAuditEvent({
-          actionDescription: `REVERSED COLLECTION: Voided ₹${amount.toLocaleString('en-IN')} payment ${receiptBatch ? `[${receiptBatch}] ` : ''}for ${targetMemberName || 'subscriber'}. Deducted ₹${amount.toLocaleString('en-IN')} from ${wallet?.replace(/_/g, ' ') || 'vault'}. Outstanding dues restored.`,
+          actionDescription: `REVERSED COLLECTION (${refTag}): Voided ₹${amount.toLocaleString('en-IN')} payment ${receiptBatch ? `[${receiptBatch}] ` : ''}for ${targetMemberName || 'subscriber'}. Deducted ₹${amount.toLocaleString('en-IN')} from ${wallet?.replace(/_/g, ' ') || 'vault'}. Outstanding dues restored.`,
           targetTable: 'transactions',
           adminId: currentAdminProfile?.id || null,
         });
@@ -564,25 +728,182 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
 
       else if (type === 'personal_draw') {
         if (wallet && amount > 0) {
-          await updateBalance(wallet, amount);
+          const balRes = await updateBalance(wallet, amount);
+          if (!balRes.success) {
+            alert(`Failed to refund ${wallet.replace(/_/g, ' ')}: ${balRes.error}`);
+            return;
+          }
         }
+
+        // Delete the personal draw transaction from transactions table
+        const logTime = new Date(undoCandidate.log.timestamp);
+        const windowStart = new Date(logTime.getTime() - 45 * 60 * 1000).toISOString();
+        const windowEnd = new Date(logTime.getTime() + 45 * 60 * 1000).toISOString();
+
+        let q = supabase
+          .from('transactions')
+          .select('id')
+          .eq('type', 'personal_draw')
+          .eq('amount', amount);
+        if (wallet) q = q.eq('wallet_type', wallet);
+        q = q.gte('created_at', windowStart).lte('created_at', windowEnd);
+
+        const { data: drawTxs } = await q.order('created_at', { ascending: false }).limit(1);
+
+        if (drawTxs && drawTxs.length > 0) {
+          await supabase.from('transactions').delete().eq('id', drawTxs[0].id);
+        } else {
+          let fallbackQ = supabase
+            .from('transactions')
+            .select('id')
+            .eq('type', 'personal_draw')
+            .eq('amount', amount);
+          if (wallet) fallbackQ = fallbackQ.eq('wallet_type', wallet);
+          const { data: fbTxs } = await fallbackQ.order('created_at', { ascending: false }).limit(1);
+          if (fbTxs && fbTxs.length > 0) {
+            await supabase.from('transactions').delete().eq('id', fbTxs[0].id);
+          }
+        }
+
         await logAuditEvent({
-          actionDescription: `REVERSED PERSONAL DRAW: Recredited ₹${amount.toLocaleString('en-IN')} back into ${wallet?.replace(/_/g, ' ')}. Voided expense draw.`,
+          actionDescription: `REVERSED PERSONAL DRAW (${refTag}): Recredited ₹${amount.toLocaleString('en-IN')} back into ${wallet?.replace(/_/g, ' ')}. Voided expense draw.`,
           targetTable: 'transactions',
           adminId: currentAdminProfile?.id || null,
         });
       }
 
       else if (type === 'atm_relocation') {
-        if (amount > 0) {
-          await updateBalance('cash_in_hand', -amount);
-          if (sourceWallet) {
-            await updateBalance(sourceWallet, amount);
+        const refWallet = sourceWallet || 'kishor_bank';
+
+        if (isPendingAtm) {
+          // Pending ATM: only source bank was debited; cash box was never credited.
+          // Refund source bank:
+          const balRes = await updateBalance(refWallet, amount);
+          if (!balRes.success) {
+            alert(`Failed to refund ${refWallet.replace(/_/g, ' ')}: ${balRes.error}`);
+            return;
           }
+
+          // Delete the pending transaction from transactions
+          const { data: pendingTxs } = await supabase
+            .from('transactions')
+            .select('id')
+            .eq('type', 'atm_withdrawal')
+            .eq('status', 'pending_verification')
+            .eq('amount', amount)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (pendingTxs && pendingTxs.length > 0) {
+            await supabase.from('transactions').delete().eq('id', pendingTxs[0].id);
+          }
+
+          await logAuditEvent({
+            actionDescription: `REVERSED PENDING ATM (${refTag}): Cancelled pending withdrawal of ₹${amount.toLocaleString('en-IN')}. Refunded ₹${amount.toLocaleString('en-IN')} back to ${refWallet.replace(/_/g, ' ')}. Voided pending verification ticket.`,
+            targetTable: 'transactions',
+            adminId: currentAdminProfile?.id || null,
+          });
+        } else {
+          // Confirmed ATM: Cash Box was credited; deduct Cash Box and refund bank
+          const debitRes = await updateBalance('cash_in_hand', -amount);
+          if (!debitRes.success) {
+            alert(`Failed to deduct from Cash Box: ${debitRes.error}`);
+            return;
+          }
+
+          const creditRes = await updateBalance(refWallet, amount);
+          if (!creditRes.success) {
+            await updateBalance('cash_in_hand', amount);
+            alert(`Failed to refund ${refWallet.replace(/_/g, ' ')}: ${creditRes.error}`);
+            return;
+          }
+
+          const { data: compTxs } = await supabase
+            .from('transactions')
+            .select('id')
+            .eq('type', 'atm_withdrawal')
+            .eq('status', 'completed')
+            .eq('amount', amount)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (compTxs && compTxs.length > 0) {
+            await supabase.from('transactions').delete().eq('id', compTxs[0].id);
+          }
+
+          await logAuditEvent({
+            actionDescription: `REVERSED ATM RELOCATION (${refTag}): Deducted ₹${amount.toLocaleString('en-IN')} from Cash Box and refunded back to ${refWallet.replace(/_/g, ' ')}.`,
+            targetTable: 'transactions',
+            adminId: currentAdminProfile?.id || null,
+          });
         }
+      }
+
+      else if (type === 'transfer' && destWallet && sourceWallet) {
+        const debitRes = await updateBalance(destWallet, -amount);
+        if (!debitRes.success) {
+          alert(`Failed to deduct from ${destWallet.replace(/_/g, ' ')}: ${debitRes.error}`);
+          return;
+        }
+
+        const creditRes = await updateBalance(sourceWallet, amount);
+        if (!creditRes.success) {
+          await updateBalance(destWallet, amount);
+          alert(`Failed to refund ${sourceWallet.replace(/_/g, ' ')}: ${creditRes.error}`);
+          return;
+        }
+
+        const logTime = new Date(undoCandidate.log.timestamp);
+        const windowStart = new Date(logTime.getTime() - 45 * 60 * 1000).toISOString();
+        const windowEnd = new Date(logTime.getTime() + 45 * 60 * 1000).toISOString();
+
+        const { data: txs } = await supabase
+          .from('transactions')
+          .select('id')
+          .in('type', ['transfer', 'transfer_in'])
+          .eq('amount', amount)
+          .gte('created_at', windowStart)
+          .lte('created_at', windowEnd);
+
+        if (txs && txs.length > 0) {
+          await supabase.from('transactions').delete().in('id', txs.map(t => t.id));
+        }
+
         await logAuditEvent({
-          actionDescription: `REVERSED ATM RELOCATION: Returned ₹${amount.toLocaleString('en-IN')} from Cash Box back to ${sourceWallet?.replace(/_/g, ' ') || 'Bank Vault'}.`,
+          actionDescription: `REVERSED INTER-VAULT TRANSFER (${refTag}): Returned ₹${amount.toLocaleString('en-IN')} from ${destWallet.replace(/_/g, ' ')} back to ${sourceWallet.replace(/_/g, ' ')}. Voided transfer records.`,
           targetTable: 'transactions',
+          adminId: currentAdminProfile?.id || null,
+        });
+      }
+
+      else if (type === 'advance_cycle' && groupName && fromMonth !== undefined) {
+        const { data: grpData, error: grpFetchErr } = await supabase
+          .from('chit_groups')
+          .select('id, current_month')
+          .eq('name', groupName)
+          .single();
+
+        if (grpFetchErr || !grpData) {
+          alert(`Could not find group "${groupName}". Reversal aborted.`);
+          return;
+        }
+
+        const { error: updateErr } = await supabase
+          .from('chit_groups')
+          .update({
+            current_month: fromMonth,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', grpData.id);
+
+        if (updateErr) {
+          alert(`Failed to roll back group cycle: ${updateErr.message}`);
+          return;
+        }
+
+        await logAuditEvent({
+          actionDescription: `REVERSED CYCLE ADVANCE (${refTag}): Rolled back group "${groupName}" from Month ${toMonth} to Month ${fromMonth}.`,
+          targetTable: 'chit_groups',
           adminId: currentAdminProfile?.id || null,
         });
       }
@@ -594,7 +915,7 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
           .ilike('full_name', targetMemberName);
 
         await logAuditEvent({
-          actionDescription: `REVERSED SUSPENSION: Restored active portal access for ${targetMemberName}.`,
+          actionDescription: `REVERSED SUSPENSION (${refTag}): Restored active portal access for ${targetMemberName}.`,
           targetTable: 'profiles',
           adminId: currentAdminProfile?.id || null,
         });
@@ -1791,7 +2112,7 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
               </div>
             </div>
 
-            {/* Pre-flight Vault Solvency Check */}
+            {/* Pre-flight Vault Solvency Check: Collections */}
             {undoCandidate.wallet && undoCandidate.amount > 0 && undoCandidate.type === 'collection' && (
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
                 <div>
@@ -1807,7 +2128,7 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                   {(balances[undoCandidate.wallet] ?? 0) >= undoCandidate.amount ? (
                     <span className="text-[10px] font-bold text-emerald-600 inline-flex items-center gap-1">
                       <CheckCircle2 size={11} />
-                      Sufficient for ₹{undoCandidate.amount.toLocaleString('en-IN')} refund
+                      Sufficient for ₹{undoCandidate.amount.toLocaleString('en-IN')} deduction
                     </span>
                   ) : (
                     <span className="text-[10px] font-bold text-rose-600 inline-flex items-center gap-1">
@@ -1819,12 +2140,116 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
               </div>
             )}
 
+            {/* Pre-flight Vault Solvency Check: Confirmed ATM Relocation */}
+            {undoCandidate.type === 'atm_relocation' && !undoCandidate.isPendingAtm && undoCandidate.amount > 0 && (
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Cash Box Solvency Verification</span>
+                  <span className="font-bold text-slate-800">
+                    Physical Cash Box Balance:
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-bold text-sm text-slate-900 block">
+                    ₹{(balances['cash_in_hand'] ?? 0).toLocaleString('en-IN')}
+                  </span>
+                  {(balances['cash_in_hand'] ?? 0) >= undoCandidate.amount ? (
+                    <span className="text-[10px] font-bold text-emerald-600 inline-flex items-center gap-1">
+                      <CheckCircle2 size={11} />
+                      Sufficient for ₹{undoCandidate.amount.toLocaleString('en-IN')} deduction
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-rose-600 inline-flex items-center gap-1">
+                      <AlertCircle size={11} />
+                      Deficit: ₹{(undoCandidate.amount - (balances['cash_in_hand'] ?? 0)).toLocaleString('en-IN')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Pending ATM Relocation Info (No Cash Box Check Required) */}
+            {undoCandidate.type === 'atm_relocation' && undoCandidate.isPendingAtm && (
+              <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl text-xs text-emerald-900 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-700 block">Pending Relocation Refund</span>
+                  <span className="font-bold text-slate-800">
+                    Source: {undoCandidate.sourceWallet?.replace(/_/g, ' ') || 'Bank Vault'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-bold text-sm text-emerald-700 block">
+                    +₹{undoCandidate.amount.toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-[10px] text-slate-500">Will be refunded to bank</span>
+                </div>
+              </div>
+            )}
+
+            {/* Pre-flight Vault Solvency Check: Inter-Vault Transfer */}
+            {undoCandidate.type === 'transfer' && undoCandidate.destWallet && undoCandidate.amount > 0 && (
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Destination Vault Verification</span>
+                  <span className="font-bold text-slate-800 capitalize">
+                    {undoCandidate.destWallet.replace(/_/g, ' ')} Balance:
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-bold text-sm text-slate-900 block">
+                    ₹{(balances[undoCandidate.destWallet] ?? 0).toLocaleString('en-IN')}
+                  </span>
+                  {(balances[undoCandidate.destWallet] ?? 0) >= undoCandidate.amount ? (
+                    <span className="text-[10px] font-bold text-emerald-600 inline-flex items-center gap-1">
+                      <CheckCircle2 size={11} />
+                      Sufficient for ₹{undoCandidate.amount.toLocaleString('en-IN')} deduction
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-rose-600 inline-flex items-center gap-1">
+                      <AlertCircle size={11} />
+                      Deficit: ₹{(undoCandidate.amount - (balances[undoCandidate.destWallet] ?? 0)).toLocaleString('en-IN')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Personal Draw Recredit Info */}
+            {undoCandidate.type === 'personal_draw' && undoCandidate.wallet && (
+              <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl text-xs text-emerald-900 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-700 block">Expense Recredit</span>
+                  <span className="font-bold text-slate-800 capitalize">
+                    Destination: {undoCandidate.wallet.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-bold text-sm text-emerald-700 block">
+                    +₹{undoCandidate.amount.toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-[10px] text-slate-500">Will be re-credited</span>
+                </div>
+              </div>
+            )}
+
+            {/* Cycle Advance Rollback Info */}
+            {undoCandidate.type === 'advance_cycle' && (
+              <div className="p-3 bg-indigo-50/70 border border-indigo-200/80 rounded-2xl text-xs text-indigo-900">
+                <span className="text-[10px] uppercase font-bold text-indigo-700 block">Cycle Rollback</span>
+                <span className="font-bold text-slate-800">
+                  {undoCandidate.groupName}: Month {undoCandidate.toMonth} → Month {undoCandidate.fromMonth}
+                </span>
+              </div>
+            )}
+
             {/* Pre-flight Failure Warning */}
-            {undoCandidate.wallet && undoCandidate.amount > 0 && undoCandidate.type === 'collection' && (balances[undoCandidate.wallet] ?? 0) < undoCandidate.amount && (
+            {((undoCandidate.type === 'collection' && undoCandidate.wallet && (balances[undoCandidate.wallet] ?? 0) < undoCandidate.amount) ||
+              (undoCandidate.type === 'atm_relocation' && !undoCandidate.isPendingAtm && (balances['cash_in_hand'] ?? 0) < undoCandidate.amount) ||
+              (undoCandidate.type === 'transfer' && undoCandidate.destWallet && (balances[undoCandidate.destWallet] ?? 0) < undoCandidate.amount)) && (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-center gap-2">
                 <AlertTriangle size={16} className="text-rose-600 shrink-0" />
                 <span>
-                  Safety Violation: Cannot refund ₹{undoCandidate.amount.toLocaleString('en-IN')} because wallet has insufficient funds. Treasury balances must never become negative.
+                  Safety Violation: Cannot proceed with reversal because the target vault has insufficient balance. Multi-vault treasury balances must never become negative.
                 </span>
               </div>
             )}
@@ -1844,7 +2269,9 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                 onClick={handleExecuteUndo}
                 disabled={
                   isUndoing ||
-                  (undoCandidate.type === 'collection' && undoCandidate.wallet && (balances[undoCandidate.wallet] ?? 0) < undoCandidate.amount)
+                  (undoCandidate.type === 'collection' && undoCandidate.wallet && (balances[undoCandidate.wallet] ?? 0) < undoCandidate.amount) ||
+                  (undoCandidate.type === 'atm_relocation' && !undoCandidate.isPendingAtm && (balances['cash_in_hand'] ?? 0) < undoCandidate.amount) ||
+                  (undoCandidate.type === 'transfer' && undoCandidate.destWallet && (balances[undoCandidate.destWallet] ?? 0) < undoCandidate.amount)
                 }
                 className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition-all shadow-md shadow-amber-600/25 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
               >

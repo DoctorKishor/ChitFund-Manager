@@ -2706,6 +2706,8 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
     try {
       setIsMarkingAllPaid(true);
 
+      const batchId = `BATCH-${Date.now().toString(36).toUpperCase()}`;
+
       const txsToInsert = pendingMembers.map(p => ({
         group_id: activeDashboardGroupId,
         profile_id: p.member.profileId || null,
@@ -2715,7 +2717,7 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
         status: 'completed',
         amount: p.unpaidAmount,
         cycle_month: selectedDashboardMonth,
-        notes: `Month ${selectedDashboardMonth} collection payment - Ticket #${p.member.ticket} (${p.member.name}) [Bulk Mark All Paid]`,
+        notes: `Month ${selectedDashboardMonth} collection payment - Ticket #${p.member.ticket} (${p.member.name}) [Bulk Mark All Paid] [Batch:${batchId}]`,
         created_by: profile?.id || null,
       }));
 
@@ -2728,7 +2730,7 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
       // Update Cash in Hand treasury balance
       await updateBalance('cash_in_hand', totalToCollect);
 
-      recordSystemAuditLog(`BULK COLLECTION: Marked all ${pendingMembers.length} members paid for Month ${selectedDashboardMonth} (₹${totalToCollect.toLocaleString('en-IN')} to Cash in Hand)`, 'transactions');
+      recordSystemAuditLog(`BULK COLLECTION: Marked all ${pendingMembers.length} members paid for Month ${selectedDashboardMonth} (₹${totalToCollect.toLocaleString('en-IN')} to Cash in Hand) [${batchId}]`, 'transactions');
 
       await fetchDashboardData(activeDashboardGroupId);
     } catch (err: any) {
@@ -3352,7 +3354,8 @@ Thank you for your prompt payment! 🙏`;
       // 1. Insert a permanent Supabase transaction record so payment survives refresh
       // Determine the earliest unpaid month from the ledger for cycle_month
       const earliestUnpaidMonth = member.ledger.find(e => e.original - e.paid > 0)?.month ?? selectedDashboardMonth ?? 1;
-      const fifoNote = `[FIFO] ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} — oldest arrears cleared first`;
+      const batchId = `RCP-${Date.now().toString(36).toUpperCase()}`;
+      const fifoNote = `[FIFO] ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} — oldest arrears cleared first [Batch:${batchId}]`;
       const { error: txErr } = await supabase.from('transactions').insert({
         profile_id: member.id || null,
         wallet_type: targetWallet,
@@ -3378,7 +3381,7 @@ Thank you for your prompt payment! 🙏`;
       ));
       setActualCollections(prev => prev + amountNum);
 
-      recordSystemAuditLog(`FIFO CREDIT ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} — oldest arrears cleared first`, 'transactions');
+      recordSystemAuditLog(`FIFO CREDIT: Received ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} [${batchId}] — oldest arrears cleared first`, 'transactions');
 
       setSelectedMemberId(null);
       setPaymentAmount('');

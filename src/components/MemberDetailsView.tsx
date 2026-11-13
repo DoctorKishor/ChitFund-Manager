@@ -955,9 +955,11 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
 
         const monthTag = `Month ${targetCycleMonth}`;
         const defaultNote = `Collection payment - Ticket #${targetEnroll?.ticket_number || 1} (${memberProfile?.full_name})${monthTag ? ` - ${monthTag}` : ''}`;
-        const finalNote = paymentNote.trim() 
+        const userNote = paymentNote.trim() 
           ? (monthTag && !paymentNote.toLowerCase().includes('month') ? `${paymentNote.trim()} (${monthTag})` : paymentNote.trim())
           : defaultNote;
+        const batchId = `RCP-${Date.now().toString(36).toUpperCase()}`;
+        const finalNote = `${userNote} [Batch:${batchId}]`;
 
         const { error: insertErr } = await supabase
           .from('transactions')
@@ -987,7 +989,7 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         }
 
         if (onAddAuditLog) {
-          onAddAuditLog(`COLLECTION CONFIRMED: Received ₹${amt.toLocaleString('en-IN')} via ${paymentWalletType.replace(/_/g, ' ')} from ${memberProfile?.full_name || 'Member'}`);
+          onAddAuditLog(`COLLECTION CONFIRMED: Received ₹${amt.toLocaleString('en-IN')} via ${paymentWalletType.replace(/_/g, ' ')} from ${memberProfile?.full_name || 'Member'} [${batchId}]`);
         }
       }
 
