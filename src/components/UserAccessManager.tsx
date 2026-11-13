@@ -687,9 +687,6 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
                   Admin Only
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Staff workforce identities, work email credentials, and RBAC permissions.
-              </p>
             </div>
           </div>
         </div>

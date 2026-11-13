@@ -176,10 +176,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   allocations: propAllocations,
   totalCollectedAmount: propTotalCollectedAmount,
 }) => {
-  const { 
-    organizationName: globalOrgName, 
-    organizationTagline: globalOrgTagline, 
-    organizationInitials: globalOrgInitials 
+  const {
+    organizationName: globalOrgName,
+    organizationTagline: globalOrgTagline,
+    organizationInitials: globalOrgInitials
   } = useOrganization();
 
   const previewRef = useRef<HTMLDivElement>(null);
@@ -192,7 +192,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
   const parsedBatch = parseBatchMetadata(transaction.notes);
   const activeAllocations = (propAllocations && propAllocations.length > 0)
-    ? propAllocations 
+    ? propAllocations
     : (parsedBatch?.allocations && parsedBatch.allocations.length > 0)
       ? parsedBatch.allocations
       : null;
@@ -205,17 +205,17 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
   const rawPaidAmount = Number(transaction.amount || 0);
   const effectiveTotalPaid = propTotalCollectedAmount || parsedBatch?.totalAmount || (activeAllocations ? activeAllocations.reduce((sum, a) => sum + Number(a.amount || 0), 0) : rawPaidAmount);
-  
+
   const calculatedDue = totalDue || Number(group?.monthly_installment || 0);
   const remainingBalance = Math.max(0, calculatedDue - rawPaidAmount);
   const isCleared = remainingBalance === 0;
   const totalGroupOutstanding = isMultiMonth ? pastPendingDues : (remainingBalance + pastPendingDues);
 
   const receiptNo = parsedBatch?.batchId || extractReceiptNumber(transaction);
-  const monthLabel = isMultiMonth 
+  const monthLabel = isMultiMonth
     ? `Multi-Month Settlement (${activeAllocations!.map(a => `M${a.month}`).join(' + ')})`
     : getReceiptMonthLabel(group?.start_date, month, transaction.created_at);
-  
+
   const txDate = transaction.created_at ? new Date(transaction.created_at) : new Date();
   const dateFormatted = txDate.toLocaleDateString('en-IN', {
     day: 'numeric',
@@ -231,9 +231,9 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   const memberName = member?.name || 'Subscriber';
   const ticketNum = member?.ticket ?? '?';
   const memberPhone = member?.phone || '';
-  const isCash = !transaction.wallet_type || 
-    transaction.wallet_type === 'cash_in_hand' || 
-    transaction.wallet_type === 'cash' || 
+  const isCash = !transaction.wallet_type ||
+    transaction.wallet_type === 'cash_in_hand' ||
+    transaction.wallet_type === 'cash' ||
     String(transaction.wallet_type).toLowerCase().includes('cash');
 
   const walletDisplay = isCash ? 'Cash in Hand' : 'Online Transfer';
@@ -249,8 +249,8 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   const filename = `Receipt_${receiptNo}_${cleanMemberName}_${isMultiMonth ? 'Combined' : `Month${month}`}.png`;
 
   // Base portal URL
-  const appPortalUrl = typeof window !== 'undefined' 
-    ? window.location.origin 
+  const appPortalUrl = typeof window !== 'undefined'
+    ? window.location.origin
     : process.env.NEXT_PUBLIC_APP_URL || 'https://chitfund.app';
 
   // Helper to generate unclipped, full-page pixel-perfect PNG dataUrl
@@ -297,7 +297,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       link.download = filename;
       link.href = dataUrl;
       link.click();
-      
+
       triggerHapticFeedback('success');
       setShareStatus('Receipt PNG Downloaded!');
       setTimeout(() => setShareStatus(null), 3000);
@@ -374,10 +374,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
         const settlementSection = isMultiMonth && activeAllocations
           ? `*Settlement Breakdown:*\n` + activeAllocations.map(a => {
-              const mName = getReceiptMonthLabel(group?.start_date, a.month, transaction.created_at);
-              const tag = a.type === 'arrear' ? 'Past Arrear' : a.type === 'advance' ? 'Advance Pre-paid' : 'Current Month';
-              return `  • ${mName} (${tag}): ${formatCurrency(a.amount)}`;
-            }).join('\n') + '\n'
+            const mName = getReceiptMonthLabel(group?.start_date, a.month, transaction.created_at);
+            const tag = a.type === 'arrear' ? 'Past Arrear' : a.type === 'advance' ? 'Advance Pre-paid' : 'Current Month';
+            return `  • ${mName} (${tag}): ${formatCurrency(a.amount)}`;
+          }).join('\n') + '\n'
           : `*Month ${month === 0 ? '0' : month} Pending Due:* ${isCleared ? 'No Pending (Cleared)' : `${formatCurrency(remainingBalance)} Pending`}\n`;
 
         const msg = `*CHIT FUNDS PAYMENT RECEIPT*\n` +
@@ -394,11 +394,11 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           `*Past Pending Dues (${groupName}):* ${pastPendingDues > 0 ? `${formatCurrency(pastPendingDues)} (Pending in M${pastPendingMonths.join(', M')})` : 'No Past Pending (Cleared)'}\n` +
           `*Total Group Outstanding:* ${totalGroupOutstanding === 0 ? 'No Pending (Fully Cleared)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}\n\n` +
           `_Official digital receipt attached. Registered on Supabase Ledger._`;
-        
-        const waUrl = cleanPhone 
+
+        const waUrl = cleanPhone
           ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
           : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-        
+
         window.open(waUrl, '_blank');
         setShareStatus('Receipt image downloaded & WhatsApp opened!');
         setTimeout(() => setShareStatus(null), 4000);
@@ -461,11 +461,11 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   // Shared Receipt Visual Template Component (Full-page, Crisp Light Luxury Theme)
   const renderReceiptCard = (isExport: boolean = false) => (
     <div className={`${isExport ? 'w-[480px] min-w-[480px]' : 'w-full max-w-[480px]'} bg-white text-slate-900 shadow-xl overflow-hidden font-sans border border-slate-200/90 rounded-2xl relative`}>
-      
+
       {/* ── TOP LIGHT LUXURY HEADER ── */}
       <div className="bg-gradient-to-b from-slate-50 via-slate-50/90 to-white text-slate-900 px-3.5 sm:px-4 py-3 sm:py-3.5 border-b-2 border-emerald-500">
         <div className="flex items-center justify-between gap-2.5">
-          
+
           {/* Logo & Brand Name */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-bold flex items-center justify-center text-xs sm:text-sm shadow-sm shrink-0 border border-emerald-500/30">
@@ -504,7 +504,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
       {/* ── BODY CONTENT ── */}
       <div className="p-3 sm:p-4 space-y-2.5 sm:space-y-3 bg-white">
-        
+
         {/* Subscriber & Group Grid */}
         <div className="grid grid-cols-2 gap-2 sm:gap-3 p-2.5 sm:p-3 bg-slate-50 border border-slate-200 rounded-xl">
           <div className="min-w-0">
@@ -549,7 +549,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
         {/* Detailed Payment & Group Dues Breakdown Matrix (100% Uniform Fonts & Sizes) */}
         <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 shadow-2xs">
-          
+
           {/* Row 1: Payment Applied For Month */}
           <div className="flex justify-between items-center gap-2 px-3.5 py-2 bg-slate-50/70">
             <span className="text-[11px] font-medium text-slate-600 shrink-0">Payment Applied For</span>
@@ -590,9 +590,8 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
                       <span className="font-semibold text-emerald-700 font-mono text-[11px] block">
                         +{formatCurrency(alloc.amount)}
                       </span>
-                      <span className={`text-[9.5px] px-2 py-0.5 rounded-md font-semibold border ${
-                        isArr ? 'bg-amber-50 text-amber-800 border-amber-200' : isAdv ? 'bg-indigo-50 text-indigo-800 border-indigo-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      }`}>
+                      <span className={`text-[9.5px] px-2 py-0.5 rounded-md font-semibold border ${isArr ? 'bg-amber-50 text-amber-800 border-amber-200' : isAdv ? 'bg-indigo-50 text-indigo-800 border-indigo-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        }`}>
                         {isArr ? 'Arrear Settled' : isAdv ? 'Advance Pre-paid' : 'Applied'}
                       </span>
                     </div>
@@ -605,11 +604,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
               <span className="text-[11px] font-medium text-slate-600 shrink-0">
                 Month {month === 0 ? '0' : month} Pending Due
               </span>
-              <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border text-right shrink-0 ${
-                isCleared 
-                  ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+              <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border text-right shrink-0 ${isCleared
+                  ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                   : 'text-amber-700 bg-amber-50 border-amber-200'
-              }`}>
+                }`}>
                 {isCleared ? 'Cleared' : `${formatCurrency(remainingBalance)} Pending`}
               </span>
             </div>
@@ -625,11 +623,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
                 </span>
               ) : null}
             </div>
-            <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border shrink-0 text-right ${
-              pastPendingDues === 0 
-                ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+            <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border shrink-0 text-right ${pastPendingDues === 0
+                ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                 : 'text-amber-700 bg-amber-50 border-amber-200'
-            }`}>
+              }`}>
               {pastPendingDues === 0 ? 'No Past Pending' : `${formatCurrency(pastPendingDues)} Pending`}
             </span>
           </div>
@@ -637,11 +634,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           {/* Row 5: Total Group Outstanding Balance */}
           <div className="flex justify-between items-center gap-2 px-3.5 py-2 bg-slate-100/80 border-t border-slate-200">
             <span className="text-[11px] font-bold text-slate-900 shrink-0">Total Outstanding</span>
-            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md border text-right shrink-0 ${
-              totalGroupOutstanding === 0 
-                ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md border text-right shrink-0 ${totalGroupOutstanding === 0
+                ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                 : 'text-rose-600 bg-rose-50 border-rose-200'
-            }`}>
+              }`}>
               {totalGroupOutstanding === 0 ? '₹0 (All Cleared)' : `${formatCurrency(totalGroupOutstanding)} Total Pending`}
             </span>
           </div>
@@ -661,8 +657,8 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       {/* ── REALISTIC PERFORATED TICKET TEAR LINE WITH NOTCHES ── */}
       <div className="relative py-2.5 bg-white flex items-center justify-between select-none">
         {/* Left Circular Ticket Notch (Cuts inward into left card edge) */}
-        <div 
-          className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 border border-slate-300 shadow-inner z-10" 
+        <div
+          className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 border border-slate-300 shadow-inner z-10"
           aria-hidden="true"
         />
 
@@ -670,8 +666,8 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         <div className="w-full border-t-2 border-dotted border-slate-300 mx-4" />
 
         {/* Right Circular Ticket Notch (Cuts inward into right card edge) */}
-        <div 
-          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 border border-slate-300 shadow-inner z-10" 
+        <div
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 border border-slate-300 shadow-inner z-10"
           aria-hidden="true"
         />
       </div>
@@ -708,7 +704,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
       <div className="bg-white border-t sm:border border-slate-200/90 text-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-0 sm:my-auto flex flex-col max-h-[94dvh] sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-150">
-        
+
         {/* Top Actions Header (Light Theme Header matching App) */}
         <div className="px-5 py-3.5 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -736,7 +732,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
         {/* Scrollable Receipt Preview Area */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-slate-100/70 flex flex-col items-center justify-start min-h-0">
-          
+
           {/* Status / Toast alert if any */}
           {shareStatus && (
             <div className="w-full max-w-[480px] mb-3 px-3.5 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 shadow-xs">
@@ -763,7 +759,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
         {/* Modal Action Controls Bar (Mobile Optimized Thumb-Friendly Bottom Bar) */}
         <div className="p-3 sm:p-4 bg-white border-t border-slate-200 space-y-2.5 shrink-0">
-          
+
           {/* Primary Action Button: Prominent WhatsApp / Share Button */}
           <button
             type="button"

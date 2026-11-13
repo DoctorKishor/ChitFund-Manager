@@ -25,7 +25,8 @@ import {
   UserCheck,
   UserX,
   Eye,
-  Layers
+  Layers,
+  Edit3
 } from 'lucide-react';
 import RoleAppPreviewModal from './RoleAppPreviewModal';
 
@@ -1463,74 +1464,88 @@ export default function RoleManagerPanel({
         {/* Main Scrollable Content */}
         <div className="flex-1 px-4 py-4 space-y-4 pb-28">
 
-          {/* Active Role Header Banner */}
-          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-card">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3 min-w-0">
+          {/* Active Role Header Banner (Optimized for Mobile with Clean Visual Hierarchy) */}
+          <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-card space-y-3.5">
+            {/* Top Row: Role Avatar + Full Name + Role Tag + Edit Button */}
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div
-                  className="w-12 h-12 rounded-2xl font-bold flex items-center justify-center text-xl shadow-xs shrink-0"
-                  style={{ backgroundColor: `${editColor}20`, color: editColor }}
+                  className="w-11 h-11 rounded-2xl font-bold flex items-center justify-center text-xl shadow-xs shrink-0"
+                  style={{ backgroundColor: `${editColor}18`, color: editColor }}
                 >
                   {ROLE_EMOJIS[activeRole?.id || ''] || '💳'}
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-sm font-bold text-slate-900 leading-tight truncate">{activeRole?.name}</h2>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 whitespace-nowrap">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h2 className="text-sm font-bold text-slate-900 leading-snug">
+                      {activeRole?.name}
+                    </h2>
+                    <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60 shrink-0">
                       {activeRole?.is_system ? 'System Role' : 'Custom Role'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5 font-mono truncate">role_{activeRole?.id}</p>
+                  <p className="text-[10.5px] text-slate-400 font-mono mt-0.5 truncate">
+                    ID: {activeRole?.id}
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-full border border-slate-200/80">
-                  {COLOR_PRESETS.map((p) => {
-                    const isActive = editColor.toLowerCase() === p.hex.toLowerCase();
-                    return (
-                      <button
-                        key={p.name}
-                        type="button"
-                        onClick={() => setEditColor(p.hex)}
-                        title={p.name}
-                        className={`w-3.5 h-3.5 rounded-full transition-all hover:scale-110 cursor-pointer ${p.bgClass} ${
-                          isActive ? 'ring-2 ring-brand-500 ring-offset-1 scale-110' : ''
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-                {!activeRole?.is_system && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newTitle = prompt('Edit Role Name:', activeRole?.name);
-                      if (newTitle && newTitle.trim()) {
-                        setEditName(newTitle.trim());
-                      }
-                    }}
-                    className="text-brand-600 text-xs font-semibold hover:underline cursor-pointer"
-                  >
-                    Edit Name
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">Assigned Personnel:</span>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900">
-                  {assignedPersonnel.length} Staff Member{assignedPersonnel.length === 1 ? '' : 's'}
-                </span>
+
+              {!activeRole?.is_system && (
                 <button
                   type="button"
-                  onClick={() => setIsPreviewModalOpen(true)}
-                  className="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-brand-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer active:scale-95"
+                  onClick={() => {
+                    const newTitle = prompt('Edit Role Name:', activeRole?.name);
+                    if (newTitle && newTitle.trim()) {
+                      setEditName(newTitle.trim());
+                    }
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-brand-700 border border-slate-200 text-xs font-bold transition-all cursor-pointer shrink-0 active:scale-95 flex items-center gap-1 shadow-2xs"
                 >
-                  <Eye className="w-3 h-3 text-brand-600" />
-                  <span>Preview</span>
+                  <Edit3 size={12} className="text-brand-600" />
+                  <span>Edit Name</span>
                 </button>
+              )}
+            </div>
+
+            {/* Accent Color Palette Selector Bar (Clean Dedicated Row) */}
+            <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-100">
+              <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
+                Accent Theme Color
+              </span>
+              <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-full border border-slate-200/80">
+                {COLOR_PRESETS.map((p) => {
+                  const isActive = editColor.toLowerCase() === p.hex.toLowerCase();
+                  return (
+                    <button
+                      key={p.name}
+                      type="button"
+                      onClick={() => setEditColor(p.hex)}
+                      title={p.name}
+                      className={`w-4 h-4 rounded-full transition-all hover:scale-110 cursor-pointer ${p.bgClass} ${
+                        isActive ? 'ring-2 ring-brand-500 ring-offset-1 scale-110' : 'opacity-75 hover:opacity-100'
+                      }`}
+                    />
+                  );
+                })}
               </div>
+            </div>
+
+            {/* Bottom Row: Assigned Personnel Count + Preview App Button */}
+            <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5 text-slate-600 min-w-0">
+                <span className="font-medium text-slate-500">Assigned:</span>
+                <span className="font-bold text-slate-900 truncate">
+                  {assignedPersonnel.length} Staff Member{assignedPersonnel.length === 1 ? '' : 's'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPreviewModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/90 hover:bg-indigo-100 text-brand-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs transition-all shrink-0"
+              >
+                <Eye size={13} className="text-brand-600" />
+                <span>Live Preview</span>
+              </button>
             </div>
           </div>
 
