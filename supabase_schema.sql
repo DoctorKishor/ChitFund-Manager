@@ -1124,26 +1124,34 @@ begin
   end if;
 
   select role into caller_role from public.profiles where id = v_caller_id;
-  if caller_role is distinct from 'admin' then
+  if lower(coalesce(caller_role, '')) not in ('admin', 'administrator') and not public.is_admin_or_manager() then
     raise exception 'Unauthorized: Only an administrator can execute a database reset.';
   end if;
 
-  -- 2. Clear transactional and auction history
+  -- 3. Clear foreign keys pointing to records being purged
+  update public.system_settings set updated_by = null;
+  update public.group_members set transferred_from = null;
+
+  -- 4. Clear transactional and auction history
   delete from public.transactions;
   delete from public.auction_logs;
   
-  -- 3. Clear memberships and chit groups
+  -- 5. Clear memberships and chit groups
   delete from public.group_members;
   delete from public.chit_groups;
   
-  -- 4. Clear passbook inventory if any
+  -- 6. Clear passbook inventory if any
   delete from public.passbook_inventory;
 
-  -- 5. Delete test non-auth profiles, but PRESERVE authenticated admin users
-  delete from public.profiles 
-  where id not in (select id from auth.users);
+  -- 7. Reset audit logs before deleting profiles to prevent foreign key or trigger constraint locks
+  delete from public.security_audit_logs;
 
-  -- 6. Reset all 4 treasury vaults to zero balance
+  -- 8. Delete test non-auth profiles (subscribers), but PRESERVE authenticated staff/admin users
+  delete from public.profiles 
+  where id not in (select id from auth.users)
+    and (role is null or role = 'subscriber');
+
+  -- 9. Reset all 4 treasury vaults to zero balance
   update public.global_treasury 
   set current_balance = 0, 
       pending_verification_balance = 0,
@@ -1159,8 +1167,7 @@ begin
   on conflict (wallet_type) do update 
   set current_balance = 0, pending_verification_balance = 0;
 
-  -- 7. Reset audit logs and record the purge event
-  delete from public.security_audit_logs;
+  -- 10. Record the purge event
   insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
   values (v_caller_id, 'SYSTEM RESET: Full test database cleared. All chit groups, transactions, auctions, and test members wiped.', 'all', timezone('utc'::text, now()));
 
@@ -1172,6 +1179,8 @@ begin
   return result;
 end;
 $$;
+
+grant execute on function public.reset_test_database(text) to authenticated, anon;
 
 -- ==========================================
 -- 10. Atomic Mutation RPC Functions

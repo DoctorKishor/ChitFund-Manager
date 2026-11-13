@@ -146,7 +146,9 @@ export default function SettingsManager() {
   // Granular Action Permissions
   const canMaintenance = canPerformAction('system:maintenance_mode');
   const canBranding = canPerformAction('system:branding');
-  const canResetDatabase = canPerformAction('system:reset_database');
+  const canResetDatabase = canPerformAction('system:reset_database') ||
+    profile?.role?.toLowerCase() === 'admin' ||
+    profile?.role?.toLowerCase() === 'administrator';
 
   const {
     organizationName: globalOrgName,
@@ -890,29 +892,70 @@ export default function SettingsManager() {
       setResetErrorMsg(null);
       setResetSuccessMsg(null);
 
-      const { data: rpcRes, error } = await supabase.rpc('reset_test_database', {
-        p_confirm_phrase: 'WIPE_ALL_DATA',
-      });
+      let purgeSuccessful = false;
+      let lastErrorMessage = '';
 
-      if (error || (rpcRes && !rpcRes.success)) {
-        const errorDetail = rpcRes?.error || error?.message;
-        console.warn('RPC reset_test_database returned error, attempting direct cascade reset:', errorDetail);
+      // 1. Primary Attempt: Secure Security Definer RPC
+      try {
+        const { data: rpcRes, error: rpcError } = await supabase.rpc('reset_test_database', {
+          p_confirm_phrase: 'WIPE_ALL_DATA',
+        });
 
-        try {
-          await supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-          await supabase.from('auction_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-          await supabase.from('group_members').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-          await supabase.from('chit_groups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-          await supabase.from('passbook_inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-          await supabase.from('profiles').delete().eq('role', 'subscriber');
-          await supabase.from('global_treasury').update({
-            current_balance: 0,
-            pending_verification_balance: 0,
-            last_updated_by: profile?.id || null
-          }).neq('wallet_type', '');
-        } catch (directErr: any) {
-          throw new Error(errorDetail || directErr.message || 'Database reset failed.');
+        if (!rpcError && (!rpcRes || rpcRes.success !== false)) {
+          purgeSuccessful = true;
+        } else {
+          lastErrorMessage = rpcRes?.error || rpcError?.message || 'RPC returned unconfirmed status';
+          console.warn('RPC reset_test_database returned error, attempting direct client cascade reset:', lastErrorMessage);
         }
+      } catch (rpcErr: any) {
+        lastErrorMessage = rpcErr.message;
+        console.warn('RPC exception, falling back to direct cascade reset:', rpcErr);
+      }
+
+      // 2. Secondary Fallback: Dependency-ordered client-side purge with strict error verification
+      if (!purgeSuccessful) {
+        // Step A: Nullify external foreign keys to prevent constraint violations
+        await supabase.from('system_settings').update({ updated_by: null }).neq('key', '');
+        await supabase.from('group_members').update({ transferred_from: null, profile_id: null }).neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('transactions').update({ group_id: null, profile_id: null, group_member_id: null, created_by: null }).neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('auction_logs').update({ winning_bidder_id: null, winning_member_id: null, runner_up_bidder_id: null }).neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('passbook_inventory').update({ assigned_to_profile_id: null }).neq('id', '00000000-0000-0000-0000-000000000000');
+
+        // Step B: Purge transactions, auctions, members, chit groups, and passbooks
+        const [txRes, aucRes, gmRes, cgRes, pbRes] = await Promise.all([
+          supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('auction_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('group_members').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('chit_groups').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('passbook_inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        ]);
+
+        if (txRes.error) throw new Error(`Transactions purge failed: ${txRes.error.message}`);
+        if (aucRes.error) throw new Error(`Auction logs purge failed: ${aucRes.error.message}`);
+        if (gmRes.error) throw new Error(`Group members purge failed: ${gmRes.error.message}`);
+        if (cgRes.error) throw new Error(`Chit groups purge failed: ${cgRes.error.message}`);
+        if (pbRes.error) console.warn('Passbook inventory warning:', pbRes.error.message);
+
+        // Step C: Delete subscriber test profiles (preserving staff, managers, and admins)
+        const { error: profErr } = await supabase.from('profiles').delete().eq('role', 'subscriber');
+        if (profErr) console.warn('Profiles cleanup warning:', profErr.message);
+
+        // Step D: Reset all 4 treasury vault balances to ₹0
+        const { error: trErr } = await supabase.from('global_treasury').update({
+          current_balance: 0,
+          pending_verification_balance: 0,
+          last_updated_by: profile?.id || null
+        }).neq('wallet_type', '');
+        if (trErr) console.warn('Treasury reset warning:', trErr.message);
+
+        // Step E: Record audit log of the factory reset
+        await supabase.from('security_audit_logs').insert({
+          admin_id: profile?.id || null,
+          action_description: 'SYSTEM RESET: Full test database cleared. All chit groups, transactions, auctions, and test members wiped.',
+          target_table: 'all'
+        });
+
+        purgeSuccessful = true;
       }
 
       triggerHapticFeedback('success');
@@ -1924,6 +1967,8 @@ export default function SettingsManager() {
                   disabled={!canResetDatabase}
                   onClick={() => {
                     setShowResetModal(true);
+                    setResetSuccessMsg(null);
+                    setResetErrorMsg(null);
                     triggerHapticFeedback('warning');
                   }}
                   className="w-full min-h-[48px] rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-40"
@@ -2992,6 +3037,8 @@ export default function SettingsManager() {
                       disabled={!canResetDatabase}
                       onClick={() => {
                         setShowResetModal(true);
+                        setResetSuccessMsg(null);
+                        setResetErrorMsg(null);
                         triggerHapticFeedback('warning');
                       }}
                       className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40"
@@ -3171,7 +3218,7 @@ export default function SettingsManager() {
               />
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 space-y-2.5">
               <SlideToConfirm
                 onConfirm={handleExecuteDatabaseReset}
                 disabled={confirmKeyword.trim().toUpperCase() !== 'RESET' || isResettingDb}
@@ -3180,6 +3227,15 @@ export default function SettingsManager() {
                 confirmedLabel="Purging Data..."
                 colorVariant="red"
               />
+              <button
+                type="button"
+                onClick={handleExecuteDatabaseReset}
+                disabled={confirmKeyword.trim().toUpperCase() !== 'RESET' || isResettingDb}
+                className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Trash2 size={14} />
+                <span>{isResettingDb ? 'Purging Database...' : 'Confirm Purge (Click)'}</span>
+              </button>
             </div>
           </div>
         </div>

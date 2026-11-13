@@ -232,14 +232,15 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
  */
 export function canAccessTab(role: UserRole | undefined, tab: MainTabId, customRole?: CustomRoleRecord | null): boolean {
   if (!role) return false;
-  if (role === 'admin') return true;
-  if (customRole && (customRole.id === role || customRole.id === role.toLowerCase())) {
+  const normalizedRole = role.toLowerCase();
+  if (normalizedRole === 'admin' || normalizedRole === 'administrator') return true;
+  if (customRole && (customRole.id === role || customRole.id === normalizedRole)) {
     if (customRole.allowed_tabs && Array.isArray(customRole.allowed_tabs)) {
       return customRole.allowed_tabs.includes(tab);
     }
   }
   const allowed = TAB_PERMISSIONS[tab];
-  return allowed ? allowed.includes(role) : false;
+  return allowed ? allowed.includes(role) || allowed.includes(normalizedRole) : false;
 }
 
 /**
@@ -247,9 +248,10 @@ export function canAccessTab(role: UserRole | undefined, tab: MainTabId, customR
  */
 export function canAccessTreasurySubtab(role: UserRole | undefined, subtab: CashHandlingSubtab): boolean {
   if (!role) return false;
-  if (role === 'admin') return true;
+  const normalizedRole = role.toLowerCase();
+  if (normalizedRole === 'admin' || normalizedRole === 'administrator') return true;
   const allowed = TREASURY_SUBTAB_PERMISSIONS[subtab];
-  return allowed ? allowed.includes(role) : false;
+  return allowed ? allowed.includes(role) || allowed.includes(normalizedRole) : false;
 }
 
 /**
@@ -257,13 +259,14 @@ export function canAccessTreasurySubtab(role: UserRole | undefined, subtab: Cash
  */
 export function hasPermission(role: UserRole | undefined, action: PermissionAction, customRole?: CustomRoleRecord | null): boolean {
   if (!role) return false;
-  if (role === 'admin') return true;
-  if (customRole && (customRole.id === role || customRole.id === role.toLowerCase())) {
+  const normalizedRole = role.toLowerCase();
+  if (normalizedRole === 'admin' || normalizedRole === 'administrator') return true;
+  if (customRole && (customRole.id === role || customRole.id === normalizedRole)) {
     if (customRole.allowed_actions && Array.isArray(customRole.allowed_actions)) {
       return customRole.allowed_actions.includes(action);
     }
   }
   const allowed = ACTION_PERMISSIONS[action];
-  return allowed ? allowed.includes(role) : false;
+  return allowed ? allowed.includes(role) || allowed.includes(normalizedRole) : false;
 }
 
