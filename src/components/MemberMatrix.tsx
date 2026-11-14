@@ -1142,6 +1142,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               full_name: cleanName,
               phone_number: cleanPhone,
               role: 'subscriber',
+              passbook_token: null,
             });
 
           if (error) throw error;
@@ -1156,6 +1157,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
       setIsAddModalOpen(false);
       await fetchData();
+      window.dispatchEvent(new CustomEvent('chitfund:members_updated'));
     } catch (err: any) {
       console.error('Error saving member:', err);
       alert('Database error: ' + err.message);
@@ -1207,6 +1209,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
       }
 
       await fetchData();
+      window.dispatchEvent(new CustomEvent('chitfund:members_updated'));
     } catch (err: any) {
       console.error('Error archiving member:', err);
       alert('Error archiving member: ' + err.message);

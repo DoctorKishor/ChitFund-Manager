@@ -423,7 +423,8 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, phone_number')
+        .select('id, full_name, phone_number, is_deleted')
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (data && data.length > 0) {
@@ -434,6 +435,8 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
             phone: p.phone_number,
           }))
         );
+      } else if (data && data.length === 0) {
+        setMasterDirectory([]);
       } else if (profile?.id) {
         // Fallback for Phone+PIN Admin login (when direct table queries hit anon RLS)
         try {
@@ -1348,12 +1351,28 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
         fetchPendingAtmRelocations();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        fetchProfiles();
+      })
       .subscribe();
+
+    const handleMembersUpdated = () => {
+      fetchProfiles();
+    };
+    window.addEventListener('chitfund:members_updated', handleMembersUpdated);
 
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('chitfund:members_updated', handleMembersUpdated);
     };
   }, []);
+
+  // Auto-sync directory whenever entering chit wizard, step 2, or editing group members
+  useEffect(() => {
+    if (activeTab === 'groups' || showWizard || wizardStep === 2 || editingGroup) {
+      fetchProfiles();
+    }
+  }, [activeTab, showWizard, wizardStep, editingGroup]);
 
   // Auction Schedule Configuration Modal state for Chits Directory cards
   const [scheduleModalGroup, setScheduleModalGroup] = useState<any | null>(null);
@@ -3110,6 +3129,7 @@ Thank you for your prompt payment! 🙏`;
       setTargetSlotForAssign(null);
       setShowCreateMemberModal(false);
       triggerHapticFeedback('success');
+      window.dispatchEvent(new CustomEvent('chitfund:members_updated'));
     } catch (err: any) {
       alert(`Error enrolling member: ${err.message}`);
     } finally {
@@ -3155,6 +3175,7 @@ Thank you for your prompt payment! 🙏`;
           full_name: cleanName,
           phone_number: normalizedDigits,
           role: 'subscriber',
+          passbook_token: null,
         })
         .select()
         .single();
@@ -3215,6 +3236,7 @@ Thank you for your prompt payment! 🙏`;
       setTargetSlotForAssign(null);
       setShowCreateMemberModal(false);
       triggerHapticFeedback('success');
+      window.dispatchEvent(new CustomEvent('chitfund:members_updated'));
     } catch (err: any) {
       alert(`Error creating member: ${err.message}`);
     } finally {
@@ -6805,9 +6827,15 @@ Thank you for your prompt payment! 🙏`;
                     </div>
 
                     {(() => {
-                      const filteredMembers = masterDirectory.filter(
-                        m => m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) || m.phone.includes(memberSearchQuery)
-                      );
+                      const filteredMembers = masterDirectory.filter(m => {
+                        const q = memberSearchQuery.trim().toLowerCase();
+                        if (!q) return true;
+                        const nameMatch = (m.name || '').toLowerCase().includes(q);
+                        const cleanDigits = q.replace(/\D/g, '');
+                        const phoneDigits = (m.phone || '').replace(/\D/g, '');
+                        const phoneMatch = (m.phone || '').toLowerCase().includes(q) || (cleanDigits.length > 0 && phoneDigits.includes(cleanDigits));
+                        return nameMatch || phoneMatch;
+                      });
                       const totalItems = 1 + filteredMembers.length;
 
                       return (
@@ -7057,7 +7085,11 @@ Thank you for your prompt payment! 🙏`;
                         </div>
                       ) : (
                         masterDirectory.map((member, i) => {
-                          const isAlreadyAdded = enrollments.some(e => e.name.toLowerCase() === member.name.toLowerCase());
+                          const isAlreadyAdded = enrollments.some(e => 
+                            (member.id && e.id && e.id === member.id) ||
+                            (e.name && member.name && e.name.toLowerCase() === member.name.toLowerCase()) ||
+                            (e.phone && member.phone && e.phone.replace(/\D/g, '') === member.phone.replace(/\D/g, ''))
+                          );
 
                           return (
                             <button
