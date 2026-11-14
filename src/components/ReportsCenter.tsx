@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useWallet } from '@/context/WalletContext';
@@ -218,25 +218,150 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     }
   };
 
+  const fetchReportsData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      // 1. Fetch active chit groups (excluding drafts)
+      const { data: groups, error: groupsErr } = await supabase
+        .from('chit_groups')
+        .select('*')
+        .neq('status', 'draft')
+        .order('created_at', { ascending: true });
+
+      if (groupsErr) {
+        console.error('Error fetching chit_groups:', groupsErr);
+      }
+
+      if (groups && groups.length > 0) {
+        setChitGroups(groups);
+        setSelectedGroupId(prev => {
+          if (prev && groups.some(g => g.id === prev)) return prev;
+          return groups[0].id;
+        });
+        setSelectedMonth(prev => {
+          if (prev !== undefined && prev !== null) return prev;
+          const currM = groups[0].current_month !== undefined ? Number(groups[0].current_month) : 0;
+          return Math.max(0, currM);
+        });
+      } else {
+        setChitGroups([]);
+        setSelectedGroupId('');
+        setSelectedMonth(0);
+      }
+
+      // 2. Fetch all group members joined with profiles
+      const { data: members, error: membersErr } = await supabase
+        .from('group_members')
+        .select(`
+          id,
+          profile_id,
+          group_id,
+          ticket_number,
+          alias_name,
+          custom_installment,
+          has_won_regular,
+          physical_book_synced,
+          profiles:profile_id (
+            id,
+            full_name,
+            phone_number,
+            role
+          )
+        `)
+        .order('ticket_number', { ascending: true });
+
+      if (membersErr) {
+        console.error('Error fetching group_members:', membersErr);
+      }
+
+      if (members) {
+        setGroupMembers(members);
+      }
+
+      // 3. Fetch transactions
+      const { data: txs, error: txsErr } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (txsErr) {
+        console.error('Error fetching transactions:', txsErr);
+      }
+
+      if (txs) {
+        setTransactions(txs);
+      }
+
+      // 4. Fetch auction logs
+      const { data: auctions } = await supabase
+        .from('auction_logs')
+        .select(`
+          id,
+          group_id,
+          month,
+          winning_bidder_id,
+          winning_discount,
+          is_laaba_seetu,
+          profiles:winning_bidder_id (
+            id,
+            full_name
+          )
+        `);
+
+      if (auctions) {
+        setAuctionLogs(auctions);
+      }
+    } catch (err) {
+      console.error('Error fetching reports data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
+    fetchReportsData();
     fetchSystemAuditLogs();
 
-    const channelName = `reports_security_audit_channel_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const channelName = `reports_realtime_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
       .channel(channelName)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'security_audit_logs' },
-        () => {
-          fetchSystemAuditLogs();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        fetchReportsData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chit_groups' }, () => {
+        fetchReportsData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
+        fetchReportsData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'auction_logs' }, () => {
+        fetchReportsData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'security_audit_logs' }, () => {
+        fetchSystemAuditLogs();
+      })
       .subscribe();
+
+    const handleRealtimeUpdate = () => {
+      fetchReportsData();
+    };
+
+    window.addEventListener('chitfund:payment_recorded', handleRealtimeUpdate);
+    window.addEventListener('chitfund:treasury_updated', handleRealtimeUpdate);
+    window.addEventListener('chitfund:members_updated', handleRealtimeUpdate);
+    window.addEventListener('chitfund:group_updated', handleRealtimeUpdate);
+    window.addEventListener('chitfund:auction_updated', handleRealtimeUpdate);
 
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('chitfund:payment_recorded', handleRealtimeUpdate);
+      window.removeEventListener('chitfund:treasury_updated', handleRealtimeUpdate);
+      window.removeEventListener('chitfund:members_updated', handleRealtimeUpdate);
+      window.removeEventListener('chitfund:group_updated', handleRealtimeUpdate);
+      window.removeEventListener('chitfund:auction_updated', handleRealtimeUpdate);
     };
-  }, []);
+  }, [fetchReportsData]);
 
   const filteredAuditLogs = useMemo(() => {
     return systemAuditLogs.filter(log => {
@@ -261,106 +386,6 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     return { total, txCount, groupCount, treasuryCount };
   }, [systemAuditLogs]);
 
-  // Fetch initial data
-  useEffect(() => {
-    const fetchReportsData = async () => {
-      try {
-        setLoading(true);
-
-        // 1. Fetch active chit groups (excluding drafts)
-        const { data: groups, error: groupsErr } = await supabase
-          .from('chit_groups')
-          .select('*')
-          .neq('status', 'draft')
-          .order('created_at', { ascending: true });
-
-        if (groupsErr) {
-          console.error('Error fetching chit_groups:', groupsErr);
-        }
-
-        if (groups && groups.length > 0) {
-          setChitGroups(groups);
-          setSelectedGroupId(groups[0].id);
-          const currM = groups[0].current_month !== undefined ? Number(groups[0].current_month) : 0;
-          setSelectedMonth(Math.max(0, currM));
-        } else {
-          setChitGroups([]);
-          setSelectedGroupId('');
-          setSelectedMonth(0);
-        }
-
-        // 2. Fetch all group members joined with profiles
-        const { data: members, error: membersErr } = await supabase
-          .from('group_members')
-          .select(`
-            id,
-            profile_id,
-            group_id,
-            ticket_number,
-            alias_name,
-            custom_installment,
-            has_won_regular,
-            physical_book_synced,
-            profiles:profile_id (
-              id,
-              full_name,
-              phone_number,
-              role
-            )
-          `)
-          .order('ticket_number', { ascending: true });
-
-        if (membersErr) {
-          console.error('Error fetching group_members:', membersErr);
-        }
-
-        if (members) {
-          setGroupMembers(members);
-        }
-
-        // 3. Fetch transactions
-        const { data: txs, error: txsErr } = await supabase
-          .from('transactions')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (txsErr) {
-          console.error('Error fetching transactions:', txsErr);
-        }
-
-        if (txs) {
-          setTransactions(txs);
-        }
-
-        // 4. Fetch auction logs
-        const { data: auctions } = await supabase
-          .from('auction_logs')
-          .select(`
-            id,
-            group_id,
-            month,
-            winning_bidder_id,
-            winning_discount,
-            is_laaba_seetu,
-            profiles:winning_bidder_id (
-              id,
-              full_name
-            )
-          `);
-
-        if (auctions) {
-          setAuctionLogs(auctions);
-        }
-      } catch (err) {
-        console.error('Error fetching reports data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchReportsData();
-  }, []);
-
   const selectedGroup = useMemo(() => {
     return chitGroups.find(g => g.id === selectedGroupId) || chitGroups[0] || null;
   }, [chitGroups, selectedGroupId]);
@@ -373,13 +398,14 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     const months = [];
     let baseYear = new Date().getFullYear();
     let baseMonth = new Date().getMonth();
-    if (selectedGroup?.start_date) {
-      if (typeof selectedGroup.start_date === 'string' && selectedGroup.start_date.includes('-')) {
-        const parts = selectedGroup.start_date.split('-');
+    const gStart = selectedGroup?.start_date || selectedGroup?.startDate;
+    if (gStart) {
+      if (typeof gStart === 'string' && gStart.includes('-')) {
+        const parts = gStart.split('-');
         baseYear = parseInt(parts[0], 10);
         baseMonth = parseInt(parts[1], 10) - 1;
       } else {
-        const parsed = new Date(selectedGroup.start_date);
+        const parsed = new Date(gStart);
         if (!isNaN(parsed.getTime())) {
           baseYear = parsed.getFullYear();
           baseMonth = parsed.getMonth();
@@ -599,8 +625,9 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         
         // Compute overdue starting month
         let sinceDateLabel = activeMonthInfo.dateLabel;
-        if (selectedGroup.start_date) {
-          const parsed = new Date(selectedGroup.start_date);
+        const gStart = selectedGroup.start_date || selectedGroup.startDate;
+        if (gStart) {
+          const parsed = new Date(gStart);
           if (!isNaN(parsed.getTime())) {
             const overdueStartMonth = Math.max(0, selectedMonth - monthsOverdue + 1);
             const targetDate = new Date(parsed.getFullYear(), parsed.getMonth() + overdueStartMonth, 1);
@@ -733,8 +760,9 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
 
       // Start date string
       let dateLabel = "Launch";
-      if (g.start_date) {
-        const parsed = new Date(g.start_date);
+      const gStart = g.start_date || g.startDate;
+      if (gStart) {
+        const parsed = new Date(gStart);
         if (!isNaN(parsed.getTime())) {
           const targetDate = new Date(parsed.getFullYear(), parsed.getMonth() + currentM, 1);
           dateLabel = `${targetDate.toLocaleDateString('en-US', { month: 'short' })} '${targetDate.getFullYear().toString().slice(-2)}`;
@@ -1204,8 +1232,9 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       }
 
       let dateLabel = `M${a.month}`;
-      if (selectedGroup.start_date) {
-        const parsed = new Date(selectedGroup.start_date);
+      const gStart = selectedGroup.start_date || selectedGroup.startDate;
+      if (gStart) {
+        const parsed = new Date(gStart);
         if (!isNaN(parsed.getTime())) {
           const targetDate = new Date(parsed.getFullYear(), parsed.getMonth() + Number(a.month), 1);
           dateLabel = `${targetDate.toLocaleDateString('en-US', { month: 'short' })} '${targetDate.getFullYear().toString().slice(-2)} M${a.month}`;
@@ -1406,8 +1435,9 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     }
 
     let winningDateLabel = `M${wonMonth}`;
-    if (selectedGroup.start_date) {
-      const parsed = new Date(selectedGroup.start_date);
+    const gStart = selectedGroup.start_date || selectedGroup.startDate;
+    if (gStart) {
+      const parsed = new Date(gStart);
       if (!isNaN(parsed.getTime())) {
         const targetDate = new Date(parsed.getFullYear(), parsed.getMonth() + wonMonth, 1);
         winningDateLabel = `${targetDate.toLocaleDateString('en-US', { month: 'short' })} ${targetDate.getFullYear().toString().slice(-2)} (M${wonMonth})`;
@@ -1429,8 +1459,9 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
 
     for (let m = 1; m <= displayMonthsCount; m++) {
       let dateLabel = `M${m}`;
-      if (selectedGroup.start_date) {
-        const parsed = new Date(selectedGroup.start_date);
+      const gStart = selectedGroup.start_date || selectedGroup.startDate;
+      if (gStart) {
+        const parsed = new Date(gStart);
         if (!isNaN(parsed.getTime())) {
           const targetDate = new Date(parsed.getFullYear(), parsed.getMonth() + m, 1);
           dateLabel = `${targetDate.toLocaleDateString('en-US', { month: 'short' })} ${targetDate.getFullYear().toString().slice(-2)} M${m}`;
@@ -1515,8 +1546,9 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     const totalElapsedMonths = Math.max(1, currentM);
 
     let baseStartDate = new Date();
-    if (selectedGroup.start_date) {
-      const parsed = new Date(selectedGroup.start_date);
+    const gStart = selectedGroup.start_date || selectedGroup.startDate;
+    if (gStart) {
+      const parsed = new Date(gStart);
       if (!isNaN(parsed.getTime())) {
         baseStartDate = parsed;
       }
@@ -2110,15 +2142,23 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         code: `M${m}`
       };
 
-      // Filter all collection transactions for this group & month
-      const txsForMonth = transactions.filter(
-        t => t.group_id === selectedGroup.id && Number(t.month) === m && t.type === 'collection'
-      );
+      // Filter all collection transactions for this group & month (checking cycle_month & notes fallback)
+      const txsForMonth = transactions.filter(t => {
+        if (t.group_id !== selectedGroup.id || t.type !== 'collection') return false;
+        const txCycle = t.cycle_month !== null && t.cycle_month !== undefined 
+          ? Number(t.cycle_month) 
+          : (t.month !== undefined ? Number(t.month) : null);
+        if (txCycle !== null && !isNaN(txCycle)) {
+          return txCycle === m;
+        }
+        const monthPattern = new RegExp(`\\bMonth\\s+${m}\\b|\\bM${m}\\b`, 'i');
+        return t.notes ? monthPattern.test(t.notes) : false;
+      });
       const cashCollected = txsForMonth
-        .filter(t => t.payment_method === 'cash')
+        .filter(t => t.wallet_type === 'cash_in_hand' || t.payment_method === 'cash')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
       const upiCollected = txsForMonth
-        .filter(t => t.payment_method !== 'cash')
+        .filter(t => t.wallet_type !== 'cash_in_hand' && t.payment_method !== 'cash')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
       const totalCollected = cashCollected + upiCollected;
 

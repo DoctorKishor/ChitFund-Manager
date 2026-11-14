@@ -531,6 +531,38 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
   useEffect(() => {
     fetchData();
     fetchCustomRoles();
+
+    const channelName = `realtime_member_matrix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chit_groups' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    const handleRealtimeUpdate = () => {
+      fetchData();
+    };
+
+    window.addEventListener('chitfund:payment_recorded', handleRealtimeUpdate);
+    window.addEventListener('chitfund:members_updated', handleRealtimeUpdate);
+    window.addEventListener('chitfund:group_updated', handleRealtimeUpdate);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('chitfund:payment_recorded', handleRealtimeUpdate);
+      window.removeEventListener('chitfund:members_updated', handleRealtimeUpdate);
+      window.removeEventListener('chitfund:group_updated', handleRealtimeUpdate);
+    };
   }, []);
 
   // ── Role display helper ──

@@ -129,19 +129,23 @@ function parseBatchMetadata(notes?: string | null): { batchId?: string; totalAmo
 // Helper to get formatted Calendar Month label for a chit group month
 function getReceiptMonthLabel(startDateStr: string | null | undefined, monthNumber: number, txDateStr?: string | null): string {
   try {
-    if (startDateStr) {
-      let bYear: number;
-      let bMonth: number;
-      if (startDateStr.includes('-')) {
-        const parts = startDateStr.split('-');
+    const rawStart = startDateStr?.trim();
+    if (rawStart) {
+      let bYear: number | undefined;
+      let bMonth: number | undefined;
+      if (rawStart.includes('-')) {
+        const parts = rawStart.split('-');
         bYear = parseInt(parts[0], 10);
         bMonth = parseInt(parts[1], 10) - 1;
       } else {
-        const base = new Date(startDateStr);
-        bYear = base.getFullYear();
-        bMonth = base.getMonth();
+        const base = new Date(rawStart);
+        if (!isNaN(base.getTime())) {
+          bYear = base.getFullYear();
+          bMonth = base.getMonth();
+        }
       }
-      if (!isNaN(bYear) && !isNaN(bMonth)) {
+      if (bYear !== undefined && bMonth !== undefined && !isNaN(bYear) && !isNaN(bMonth)) {
+        // Month 0 (Launch) is exactly the start month (+0). Month 1 is +1, Month 2 is +2.
         const targetDate = new Date(bYear, bMonth + monthNumber, 1);
         const monthName = targetDate.toLocaleString('en-IN', { month: 'long' });
         const year = targetDate.getFullYear();
@@ -152,10 +156,10 @@ function getReceiptMonthLabel(startDateStr: string | null | undefined, monthNumb
     // Fallback
   }
 
+  // Fallback if startDate is not available: use the transaction date as the baseline for this payment's cycle
   const fallbackDate = txDateStr ? new Date(txDateStr) : new Date();
   const validDate = !isNaN(fallbackDate.getTime()) ? fallbackDate : new Date();
-  // If Month 1 is validDate, Month 0 was -1 month, Month 2 is +1 month
-  const targetFallback = new Date(validDate.getFullYear(), validDate.getMonth() + (monthNumber <= 0 ? -1 : monthNumber - 1), 1);
+  const targetFallback = new Date(validDate.getFullYear(), validDate.getMonth() + monthNumber, 1);
   const monthName = targetFallback.toLocaleString('en-IN', { month: 'long' });
   const year = targetFallback.getFullYear();
   return monthNumber === 0 ? `${monthName} ${year} · Month 0 (Launch)` : `${monthName} ${year} · Month ${monthNumber}`;
@@ -215,9 +219,10 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   const totalGroupOutstanding = isMultiMonth ? pastPendingDues : (remainingBalance + pastPendingDues);
 
   const receiptNo = parsedBatch?.batchId || extractReceiptNumber(transaction);
+  const groupStartDate = group?.start_date || group?.startDate;
   const monthLabel = isMultiMonth
     ? `Multi-Month Settlement (${activeAllocations!.map(a => `M${a.month}`).join(' + ')})`
-    : getReceiptMonthLabel(group?.start_date, month, transaction.created_at);
+    : getReceiptMonthLabel(groupStartDate, month, transaction.created_at);
 
   const txDate = transaction.created_at ? new Date(transaction.created_at) : new Date();
   const dateFormatted = txDate.toLocaleDateString('en-IN', {
@@ -381,7 +386,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
 
         const settlementSection = isMultiMonth && activeAllocations
           ? `*Settlement Breakdown:*\n` + activeAllocations.map(a => {
-            const mName = getReceiptMonthLabel(group?.start_date, a.month, transaction.created_at);
+            const mName = getReceiptMonthLabel(groupStartDate, a.month, transaction.created_at);
             const tag = a.type === 'arrear' ? 'Past Arrear' : a.type === 'advance' ? 'Advance Pre-paid' : 'Current Month';
             return `  • ${mName} (${tag}): ${formatCurrency(a.amount)}`;
           }).join('\n') + '\n'
@@ -581,7 +586,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
                 <span>Amount Applied</span>
               </div>
               {activeAllocations.map((alloc, idx) => {
-                const mLabel = getReceiptMonthLabel(group?.start_date, alloc.month, transaction.created_at);
+                const mLabel = getReceiptMonthLabel(groupStartDate, alloc.month, transaction.created_at);
                 const isArr = alloc.type === 'arrear';
                 const isAdv = alloc.type === 'advance';
                 const typeTag = isArr ? 'Past Arrear' : isAdv ? 'Advance Pre-paid' : 'Current Month';

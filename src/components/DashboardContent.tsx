@@ -396,18 +396,30 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
             id: g.id,
             name: g.name,
             totalValue: Number(g.total_value),
+            total_value: Number(g.total_value),
             currentMonth: (g.current_month !== undefined && g.current_month !== null) ? Number(g.current_month) : 0,
+            current_month: (g.current_month !== undefined && g.current_month !== null) ? Number(g.current_month) : 0,
             duration: g.duration_months,
+            duration_months: g.duration_months,
             memberCount: g.member_count || g.duration_months,
+            member_count: g.member_count || g.duration_months,
+            monthly_installment: Math.round(Number(g.total_value) / (g.member_count || g.duration_months || 1)),
             kaiIruppuPool: Number(g.kai_iruppu_pool || 0),
+            kai_iruppu_pool: Number(g.kai_iruppu_pool || 0),
             status: g.status || 'active',
             startDate: g.start_date || '',
+            start_date: g.start_date || '',
             active: g.status !== 'completed',
             auctionDayOfMonth: g.auction_day_of_month !== undefined && g.auction_day_of_month !== null ? Number(g.auction_day_of_month) : 10,
+            auction_day_of_month: g.auction_day_of_month !== undefined && g.auction_day_of_month !== null ? Number(g.auction_day_of_month) : 10,
             auctionTime: g.auction_time || '19:00',
+            auction_time: g.auction_time || '19:00',
             nextAuctionDate: g.next_auction_date || null,
+            next_auction_date: g.next_auction_date || null,
             nextAuctionTime: g.next_auction_time || g.auction_time || '19:00',
+            next_auction_time: g.next_auction_time || g.auction_time || '19:00',
             deletedAt: g.deleted_at || null,
+            deleted_at: g.deleted_at || null,
           }))
         );
       }
@@ -1344,27 +1356,6 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     fetchGroups();
     fetchProfiles();
     fetchPendingAtmRelocations();
-
-    const channelName = `realtime_atm_dashboard_channel_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
-        fetchPendingAtmRelocations();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        fetchProfiles();
-      })
-      .subscribe();
-
-    const handleMembersUpdated = () => {
-      fetchProfiles();
-    };
-    window.addEventListener('chitfund:members_updated', handleMembersUpdated);
-
-    return () => {
-      supabase.removeChannel(channel);
-      window.removeEventListener('chitfund:members_updated', handleMembersUpdated);
-    };
   }, []);
 
   // Auto-sync directory whenever entering chit wizard, step 2, or editing group members
@@ -1936,11 +1927,93 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     }
   };
 
+  const activeDashboardGroupIdRef = useRef(activeDashboardGroupId);
+  useEffect(() => {
+    activeDashboardGroupIdRef.current = activeDashboardGroupId;
+  }, [activeDashboardGroupId]);
+
   useEffect(() => {
     if (activeDashboardGroupId) {
       fetchDashboardData(activeDashboardGroupId);
     }
   }, [activeDashboardGroupId]);
+
+  // Comprehensive Realtime synchronization across all tabs and events
+  useEffect(() => {
+    const channelName = `realtime_dashboard_global_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        fetchPendingAtmRelocations();
+        fetchGroups();
+        if (activeDashboardGroupIdRef.current) {
+          fetchDashboardData(activeDashboardGroupIdRef.current);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chit_groups' }, () => {
+        fetchGroups();
+        if (activeDashboardGroupIdRef.current) {
+          fetchDashboardData(activeDashboardGroupIdRef.current);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
+        fetchGroups();
+        if (activeDashboardGroupIdRef.current) {
+          fetchDashboardData(activeDashboardGroupIdRef.current);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'auction_logs' }, () => {
+        fetchGroups();
+        if (activeDashboardGroupIdRef.current) {
+          fetchDashboardData(activeDashboardGroupIdRef.current);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        fetchProfiles();
+        if (activeDashboardGroupIdRef.current) {
+          fetchDashboardData(activeDashboardGroupIdRef.current);
+        }
+      })
+      .subscribe();
+
+    const handleMembersUpdated = () => {
+      fetchProfiles();
+      fetchGroups();
+      if (activeDashboardGroupIdRef.current) {
+        fetchDashboardData(activeDashboardGroupIdRef.current);
+      }
+    };
+
+    const handlePaymentOrTreasuryRecorded = () => {
+      fetchPendingAtmRelocations();
+      fetchGroups();
+      if (activeDashboardGroupIdRef.current) {
+        fetchDashboardData(activeDashboardGroupIdRef.current);
+      }
+    };
+
+    const handleGroupOrAuctionUpdated = () => {
+      fetchGroups();
+      if (activeDashboardGroupIdRef.current) {
+        fetchDashboardData(activeDashboardGroupIdRef.current);
+      }
+    };
+
+    window.addEventListener('chitfund:members_updated', handleMembersUpdated);
+    window.addEventListener('chitfund:payment_recorded', handlePaymentOrTreasuryRecorded);
+    window.addEventListener('chitfund:treasury_updated', handlePaymentOrTreasuryRecorded);
+    window.addEventListener('chitfund:group_updated', handleGroupOrAuctionUpdated);
+    window.addEventListener('chitfund:auction_updated', handleGroupOrAuctionUpdated);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('chitfund:members_updated', handleMembersUpdated);
+      window.removeEventListener('chitfund:payment_recorded', handlePaymentOrTreasuryRecorded);
+      window.removeEventListener('chitfund:treasury_updated', handlePaymentOrTreasuryRecorded);
+      window.removeEventListener('chitfund:group_updated', handleGroupOrAuctionUpdated);
+      window.removeEventListener('chitfund:auction_updated', handleGroupOrAuctionUpdated);
+    };
+  }, []);
 
   // Helper: compute total collections paid by member for a specific month (with multi-ticket separation)
   const getMemberPaidAmountForMonth = (ticketMemberId: string, month: number, fallbackProfileId?: string) => {
@@ -1970,13 +2043,14 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const getDashboardMonthLabel = (group: any, monthNum: number) => {
     let baseYear = new Date().getFullYear();
     let baseMonth = new Date().getMonth();
-    if (group?.startDate) {
-      if (typeof group.startDate === 'string' && group.startDate.includes('-')) {
-        const parts = group.startDate.split('-');
+    const gStartDate = group?.startDate || group?.start_date;
+    if (gStartDate) {
+      if (typeof gStartDate === 'string' && gStartDate.includes('-')) {
+        const parts = gStartDate.split('-');
         baseYear = parseInt(parts[0], 10);
         baseMonth = parseInt(parts[1], 10) - 1;
       } else {
-        const parsed = new Date(group.startDate);
+        const parsed = new Date(gStartDate);
         if (!isNaN(parsed.getTime())) {
           baseYear = parsed.getFullYear();
           baseMonth = parsed.getMonth();
@@ -3897,7 +3971,7 @@ Thank you for your prompt payment! 🙏`;
                       >
                         <span>
                           {selectedDashboardMonth === 0 
-                            ? (isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M1') 
+                            ? (isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M0') 
                             : (isClosingMonth ? 'Closing...' : 'Close Month Cycle')}
                         </span>
                         <ArrowRight size={14} />
@@ -4683,7 +4757,7 @@ Thank you for your prompt payment! 🙏`;
                       className="w-full py-3 px-4 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-40 cursor-pointer"
                     >
                       <span>
-                        {selectedDashboardMonth === 0 ? 'Confirm Launch & Roll to Month 1' : 'Conclude & Advance Month'}
+                        {selectedDashboardMonth === 0 ? 'Confirm Launch & Roll to Month 0' : 'Conclude & Advance Month'}
                       </span>
                       <ArrowRight size={15} className="shrink-0" />
                     </button>
@@ -5520,7 +5594,7 @@ Thank you for your prompt payment! 🙏`;
                     }`}
                   >
                     <Rocket size={14} />
-                    <span>Confirm Launch &amp; Roll to M1</span>
+                    <span>Confirm Launch &amp; Roll to M0</span>
                   </button>
                 </div>
               )}
@@ -6322,7 +6396,7 @@ Thank you for your prompt payment! 🙏`;
                                 }`}
                               >
                                 <Rocket size={14} className="shrink-0" />
-                                <span className="whitespace-nowrap">Confirm Launch &amp; Roll to M1</span>
+                                <span className="whitespace-nowrap">Confirm Launch &amp; Roll to M0</span>
                               </button>
                             </div>
                           ) : (
@@ -7234,7 +7308,40 @@ Thank you for your prompt payment! 🙏`;
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-600">
-                          {newGroupAuctionDay}th of next month · {formatTime12h(newGroupAuctionTime)}. Winning discount accumulates into <code>kai_iruppu_pool</code>.
+                          {(() => {
+                            try {
+                              let year: number;
+                              let month: number;
+                              if (newGroupStartDate.includes('-')) {
+                                const parts = newGroupStartDate.split('-');
+                                year = parseInt(parts[0], 10);
+                                month = parseInt(parts[1], 10) - 1;
+                              } else {
+                                const d = new Date(newGroupStartDate);
+                                year = d.getFullYear();
+                                month = d.getMonth();
+                              }
+                              const day = Number(newGroupAuctionDay) || 10;
+                              const m1Date = new Date(year, month + 1, day);
+                              const dateFormatted = m1Date.toLocaleDateString('en-IN', {
+                                weekday: 'short',
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              });
+                              return (
+                                <>
+                                  <strong className="text-slate-900 font-semibold">{dateFormatted} · {formatTime12h(newGroupAuctionTime)}</strong>. Winning discount accumulates into <code>kai_iruppu_pool</code>.
+                                </>
+                              );
+                            } catch {
+                              return (
+                                <>
+                                  <strong className="text-slate-900 font-semibold">{newGroupAuctionDay}th of next month · {formatTime12h(newGroupAuctionTime)}</strong>. Winning discount accumulates into <code>kai_iruppu_pool</code>.
+                                </>
+                              );
+                            }
+                          })()}
                         </p>
                       </div>
 

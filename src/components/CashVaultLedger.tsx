@@ -217,10 +217,22 @@ export default function CashVaultLedger() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
         fetchData();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'global_treasury' }, () => {
+        fetchData();
+      })
       .subscribe();
+
+    const handleRealtimeUpdate = () => {
+      fetchData();
+    };
+
+    window.addEventListener('chitfund:payment_recorded', handleRealtimeUpdate);
+    window.addEventListener('chitfund:treasury_updated', handleRealtimeUpdate);
 
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('chitfund:payment_recorded', handleRealtimeUpdate);
+      window.removeEventListener('chitfund:treasury_updated', handleRealtimeUpdate);
     };
   }, []);
 

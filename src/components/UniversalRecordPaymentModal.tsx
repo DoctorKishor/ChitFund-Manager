@@ -1001,6 +1001,7 @@ export default function UniversalRecordPaymentModal({
           total_value: firstGroup.totalValue,
           monthly_installment: firstGroup.effectiveInstallment || firstGroup.baseInstallment,
           start_date: firstGroup.startDate || null,
+          startDate: firstGroup.startDate || null,
           memberCount: firstGroup.memberCount,
           durationMonths: firstGroup.durationMonths,
         },
@@ -1032,6 +1033,12 @@ export default function UniversalRecordPaymentModal({
         if (onOpenReceiptModal) {
           onOpenReceiptModal(receiptPayload);
         }
+      }
+
+      // Dispatch global realtime synchronization events
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chitfund:payment_recorded', { detail: { groupId: firstGroup.groupId } }));
+        window.dispatchEvent(new CustomEvent('chitfund:treasury_updated'));
       }
 
       if (onPaymentSuccess) {
