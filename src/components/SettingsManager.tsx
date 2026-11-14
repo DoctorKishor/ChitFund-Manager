@@ -970,25 +970,48 @@ export default function SettingsManager() {
 
       // 3. Step E: UNCONDITIONAL Audit Logs & Activity Feed Purge
       // Always runs to guarantee 0 remaining audit trails regardless of RPC or fallback route
+      let auditPurged = false;
       try {
-        await supabase.rpc('purge_all_audit_logs');
+        const { data, error } = await supabase.rpc('purge_all_audit_logs', { p_confirm: 'WIPE_ALL_DATA' });
+        if (!error && data?.success !== false) {
+          auditPurged = true;
+        }
       } catch (e) {
-        console.warn('RPC purge_all_audit_logs fallback to client batch loop:', e);
+        console.warn('RPC purge_all_audit_logs with param warning:', e);
       }
 
-      for (let attempt = 0; attempt < 15; attempt++) {
-        const { count } = await supabase
-          .from('security_audit_logs')
-          .select('*', { count: 'exact', head: true });
-        if (!count || count === 0) break;
+      if (!auditPurged) {
+        try {
+          const { data, error } = await supabase.rpc('purge_all_audit_logs');
+          if (!error && data?.success !== false) {
+            auditPurged = true;
+          }
+        } catch (e) {
+          console.warn('RPC purge_all_audit_logs zero-arg warning:', e);
+        }
+      }
 
-        const { error: auditErr } = await supabase
-          .from('security_audit_logs')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
-        if (auditErr) {
-          console.warn('Audit logs purge batch warning:', auditErr.message);
-          break;
+      if (!auditPurged) {
+        let lastCount = -1;
+        for (let attempt = 0; attempt < 15; attempt++) {
+          const { count } = await supabase
+            .from('security_audit_logs')
+            .select('*', { count: 'exact', head: true });
+          if (!count || count === 0) {
+            auditPurged = true;
+            break;
+          }
+          if (count === lastCount) break;
+          lastCount = count;
+
+          const { error: auditErr } = await supabase
+            .from('security_audit_logs')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000');
+          if (auditErr) {
+            console.warn('Audit logs purge batch warning:', auditErr.message);
+            break;
+          }
         }
       }
 
@@ -1023,25 +1046,48 @@ export default function SettingsManager() {
       setResetErrorMsg(null);
       setResetSuccessMsg(null);
 
+      let auditPurged = false;
       try {
-        await supabase.rpc('purge_all_audit_logs');
+        const { data, error } = await supabase.rpc('purge_all_audit_logs', { p_confirm: 'PURGE_LOGS' });
+        if (!error && data?.success !== false) {
+          auditPurged = true;
+        }
       } catch (e) {
-        console.warn('purge_all_audit_logs RPC fallback:', e);
+        console.warn('purge_all_audit_logs RPC with param warning:', e);
       }
 
-      for (let attempt = 0; attempt < 15; attempt++) {
-        const { count } = await supabase
-          .from('security_audit_logs')
-          .select('*', { count: 'exact', head: true });
-        if (!count || count === 0) break;
+      if (!auditPurged) {
+        try {
+          const { data, error } = await supabase.rpc('purge_all_audit_logs');
+          if (!error && data?.success !== false) {
+            auditPurged = true;
+          }
+        } catch (e) {
+          console.warn('purge_all_audit_logs zero-arg warning:', e);
+        }
+      }
 
-        const { error: auditErr } = await supabase
-          .from('security_audit_logs')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
-        if (auditErr) {
-          console.warn('Audit purge batch warning:', auditErr.message);
-          break;
+      if (!auditPurged) {
+        let lastCount = -1;
+        for (let attempt = 0; attempt < 15; attempt++) {
+          const { count } = await supabase
+            .from('security_audit_logs')
+            .select('*', { count: 'exact', head: true });
+          if (!count || count === 0) {
+            auditPurged = true;
+            break;
+          }
+          if (count === lastCount) break;
+          lastCount = count;
+
+          const { error: auditErr } = await supabase
+            .from('security_audit_logs')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000');
+          if (auditErr) {
+            console.warn('Audit purge batch warning:', auditErr.message);
+            break;
+          }
         }
       }
 

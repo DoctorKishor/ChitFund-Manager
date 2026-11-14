@@ -1180,27 +1180,57 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
     if (!isAdmin) return;
     try {
       setIsPurgingLogs(true);
+      let purgeSuccess = false;
+
+      // 1. Primary Attempt: Security Definer RPC with confirmation
       try {
-        await supabase.rpc('purge_all_audit_logs');
+        const { data, error } = await supabase.rpc('purge_all_audit_logs', { p_confirm: 'PURGE_LOGS' });
+        if (!error && data?.success !== false) {
+          purgeSuccess = true;
+        }
       } catch (e) {
-        console.warn('purge_all_audit_logs fallback to client loop:', e);
+        console.warn('RPC purge_all_audit_logs with param warning:', e);
       }
 
-      for (let attempt = 0; attempt < 15; attempt++) {
-        const { count } = await supabase
-          .from('security_audit_logs')
-          .select('*', { count: 'exact', head: true });
-        if (!count || count === 0) break;
+      // 2. Secondary Attempt: Zero-arg RPC
+      if (!purgeSuccess) {
+        try {
+          const { data, error } = await supabase.rpc('purge_all_audit_logs');
+          if (!error && data?.success !== false) {
+            purgeSuccess = true;
+          }
+        } catch (e) {
+          console.warn('RPC purge_all_audit_logs zero-arg warning:', e);
+        }
+      }
 
-        const { error } = await supabase
-          .from('security_audit_logs')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
-        if (error) break;
+      // 3. Fallback: Direct batch delete
+      if (!purgeSuccess) {
+        let lastCount = -1;
+        for (let attempt = 0; attempt < 15; attempt++) {
+          const { count } = await supabase
+            .from('security_audit_logs')
+            .select('*', { count: 'exact', head: true });
+          if (!count || count === 0) {
+            purgeSuccess = true;
+            break;
+          }
+          if (count === lastCount) {
+            // Rows did not decrease; direct delete is restricted by RLS
+            break;
+          }
+          lastCount = count;
+
+          const { error } = await supabase
+            .from('security_audit_logs')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000');
+          if (error) break;
+        }
       }
 
       setShowPurgeModal(false);
-      triggerHapticFeedback('success');
+      triggerHapticFeedback(purgeSuccess ? 'success' : 'warning');
       await fetchAuditLogs();
       window.dispatchEvent(new CustomEvent('chitfund:audit_updated'));
     } catch (err) {
