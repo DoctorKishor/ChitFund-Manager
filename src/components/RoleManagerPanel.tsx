@@ -153,6 +153,7 @@ const CATEGORIES: PermissionCategory[] = [
       { key: 'treasury:recover_float', label: 'Collect Field Cash from Staff', desc: 'Take collected cash from field agents and deposit into main box' },
       { key: 'treasury:personal_draw', label: 'Log Expenses & Personal Spends', desc: 'Record petty cash expenses like petrol, maintenance, or owner draws' },
       { key: 'treasury:settle_draw', label: 'Repay Personal Advance / Spends', desc: 'Record repayment of borrowed money back into the cash box' },
+      { key: 'treasury:withdraw_organizer_profit', label: 'Take / Withdraw Organizer Profit', desc: 'Withdraw realized Month 0 launch profits out of the physical cash box or bank into personal ownership' },
       { key: 'treasury:delete_transaction', label: 'Delete / Cancel Wrong Transaction', desc: 'Cancel or reverse an accidental payment or expense entry' },
       { key: 'treasury:reconcile', label: 'Cash Note Counter (₹500, ₹200, ₹100)', desc: 'Count physical currency notes and match with cash box balance' },
     ],

@@ -37,8 +37,10 @@ import {
   ExternalLink,
   Send,
   FileText,
-  ChevronRight
+  ChevronRight,
+  Crown
 } from 'lucide-react';
+import WithdrawOrganizerProfitModal from './WithdrawOrganizerProfitModal';
 
 export type CashHandlingSubtab = 
   | 'overview' 
@@ -99,6 +101,7 @@ export default function CashVaultLedger() {
   const canMoveMoney = canPerformAction('treasury:move_money');
   const canConfirmAtm = canPerformAction('treasury:confirm_atm');
   const canPersonalDraw = canPerformAction('treasury:personal_draw');
+  const canWithdrawProfit = canPerformAction('treasury:withdraw_organizer_profit');
   const canSettleDraw = canPerformAction('treasury:settle_draw');
   const canReconcile = canPerformAction('treasury:reconcile');
   const { securityConfig } = useSystemSettings();
@@ -112,9 +115,11 @@ export default function CashVaultLedger() {
   // Supabase Data State
   const [loading, setLoading] = useState<boolean>(true);
   const [recentTransactions, setRecentTransactions] = useState<TreasuryTx[]>([]);
+  const [chitGroups, setChitGroups] = useState<any[]>([]);
 
   // Active Modal Dialog States
   const [activeModal, setActiveModal] = useState<'none' | 'atm' | 'spend' | 'deposit' | 'transfer' | 'denominations' | 'settle' | 'recover'>('none');
+  const [showWithdrawProfitModal, setShowWithdrawProfitModal] = useState<boolean>(false);
 
   // Form State: External Cash Deposit / Float Inflow
   const [depositDest, setDepositDest] = useState<WalletType>('cash_in_hand');
@@ -192,14 +197,29 @@ export default function CashVaultLedger() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: txs } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const [{ data: txs }, { data: grps }] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(500),
+        supabase
+          .from('chit_groups')
+          .select('id, name, total_value, duration_months, current_month')
+          .order('created_at', { ascending: false })
+      ]);
 
       if (txs) {
         setRecentTransactions(txs);
+      }
+      if (grps) {
+        setChitGroups(grps.map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          totalValue: Number(g.total_value),
+          duration: g.duration_months,
+          currentMonth: g.current_month,
+        })));
       }
     } catch (e) {
       console.error('Error loading cash ledger data:', e);
@@ -328,6 +348,10 @@ export default function CashVaultLedger() {
 
     if (type === 'payout') {
       return { isCredit: false, badgeLabel: '🏆 Prize Disbursal (-)', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200/60' };
+    }
+
+    if (type === 'organizer_profit' || notes.includes('organizer profit')) {
+      return { isCredit: false, badgeLabel: '👑 Organizer Profit (-)', badgeColor: 'bg-amber-50 text-amber-900 border-amber-300 font-bold' };
     }
 
     if (type === 'personal_draw') {
@@ -554,6 +578,7 @@ export default function CashVaultLedger() {
         else if (ledgerTypeFilter === 'atm') matchesType = tx.type === 'atm_withdrawal';
         else if (ledgerTypeFilter === 'draw') matchesType = tx.type === 'personal_draw' && !notes.includes('float recovery');
         else if (ledgerTypeFilter === 'float') matchesType = notes.includes('[floating deposit') || notes.includes('float recovery');
+        else if (ledgerTypeFilter === 'organizer_profit') matchesType = tx.type === 'organizer_profit' || notes.includes('organizer profit');
       }
 
       const q = ledgerSearch.toLowerCase().trim();
@@ -1150,39 +1175,49 @@ export default function CashVaultLedger() {
         </section>
 
         {/* Mobile Quick Action Buttons Grid */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className={`grid ${canWithdrawProfit ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5`}>
           <button 
             type="button"
             disabled={!canMoveMoney}
             onClick={() => canMoveMoney && setActiveModal('transfer')}
-            className={`h-12 px-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-0.5 text-center group transition-all ${
+            className={`h-12 px-1 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-0.5 text-center group transition-all ${
               canMoveMoney ? 'text-slate-800 hover:bg-slate-50 active:scale-95 cursor-pointer' : 'text-slate-400 opacity-60 cursor-not-allowed'
             }`}
           >
             <ArrowRightLeft className={`w-4 h-4 ${canMoveMoney ? 'text-brand-600' : 'text-slate-400'}`} />
-            <span className="text-[10px] font-bold tracking-tight leading-none">Inter-Vault</span>
+            <span className="text-[9.5px] font-bold tracking-tight leading-none">Transfer</span>
           </button>
           <button 
             type="button"
             disabled={!canPersonalDraw}
             onClick={() => canPersonalDraw && setActiveModal('spend')}
-            className={`h-12 px-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-0.5 text-center group transition-all ${
+            className={`h-12 px-1 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-0.5 text-center group transition-all ${
               canPersonalDraw ? 'text-slate-800 hover:bg-slate-50 active:scale-95 cursor-pointer' : 'text-slate-400 opacity-60 cursor-not-allowed'
             }`}
           >
             <Coins className={`w-4 h-4 ${canPersonalDraw ? 'text-amber-600' : 'text-slate-400'}`} />
-            <span className="text-[10px] font-bold tracking-tight leading-none">Personal Draw</span>
+            <span className="text-[9.5px] font-bold tracking-tight leading-none">Petty Draw</span>
           </button>
+          {canWithdrawProfit && (
+            <button 
+              type="button"
+              onClick={() => setShowWithdrawProfitModal(true)}
+              className="h-12 px-1 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-300 shadow-xs flex flex-col items-center justify-center gap-0.5 text-center group transition-all active:scale-95 cursor-pointer"
+            >
+              <Crown className="w-4 h-4 text-amber-600" />
+              <span className="text-[9.5px] font-bold tracking-tight leading-none">Take Profit</span>
+            </button>
+          )}
           <button 
             type="button"
             disabled={!canMoveMoney}
             onClick={() => canMoveMoney && setActiveModal('atm')}
-            className={`h-12 px-2 rounded-2xl shadow-xs flex flex-col items-center justify-center gap-0.5 text-white text-center group transition-all ${
+            className={`h-12 px-1 rounded-2xl shadow-xs flex flex-col items-center justify-center gap-0.5 text-white text-center group transition-all ${
               canMoveMoney ? 'bg-brand-500 hover:bg-brand-600 active:scale-95 cursor-pointer' : 'bg-slate-300 opacity-60 cursor-not-allowed'
             }`}
           >
             <Plus className="w-4 h-4 text-white" />
-            <span className="text-[10px] font-bold text-white tracking-tight leading-none">ATM Relocate</span>
+            <span className="text-[9.5px] font-bold text-white tracking-tight leading-none">ATM Cash</span>
           </button>
         </div>
 
@@ -1740,6 +1775,17 @@ export default function CashVaultLedger() {
               <Coins className="w-3.5 h-3.5 text-amber-600" />
               <span>Log Personal Draw</span>
             </button>
+            {canWithdrawProfit && (
+              <button 
+                type="button"
+                onClick={() => setShowWithdrawProfitModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 transition-all cursor-pointer active:scale-95 shadow-2xs whitespace-nowrap"
+                title="Withdraw Month 0 launch profits from rotational cash box"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-600" />
+                <span>Take Profit</span>
+              </button>
+            )}
             <button 
               type="button"
               disabled={!canMoveMoney}
@@ -2330,6 +2376,7 @@ export default function CashVaultLedger() {
                   <option value="transfer">Vault Transfer</option>
                   <option value="atm">ATM Relocation</option>
                   <option value="draw">Personal Draw (-)</option>
+                  <option value="organizer_profit">👑 Organizer Profit (-)</option>
                   <option value="float">Float Inflow (+)</option>
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2 pointer-events-none" />
@@ -2385,6 +2432,7 @@ export default function CashVaultLedger() {
                          tx.type === 'payout' ? 'Month Winner Prize Pot Payout' :
                          tx.type === 'atm_withdrawal' ? 'ATM Withdrawal for Safe Cash' :
                          tx.type === 'personal_draw' ? 'Personal Draw Expense' :
+                         tx.type === 'organizer_profit' ? 'Organizer Profit Payout' :
                          'Inter-Vault Liquidity Balancing'}
                       </div>
                       <p className="text-[11px] text-slate-500 truncate">
@@ -3013,6 +3061,16 @@ export default function CashVaultLedger() {
           </div>
         </div>
       )}
+
+      {/* ── WITHDRAW ORGANIZER PROFIT MODAL (Realized Month 0 Launch Earnings) ── */}
+      <WithdrawOrganizerProfitModal
+        isOpen={showWithdrawProfitModal}
+        onClose={() => setShowWithdrawProfitModal(false)}
+        groups={chitGroups}
+        onSuccess={() => {
+          fetchData();
+        }}
+      />
 
     </div>
   );

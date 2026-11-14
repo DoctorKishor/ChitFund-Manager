@@ -58,7 +58,8 @@ import {
   Zap,
   ArrowRight,
   Rocket,
-  ChevronDown
+  ChevronDown,
+  Crown
 } from 'lucide-react';
 
 interface RoleAppPreviewModalProps {
@@ -104,7 +105,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
       'chits:view', 'chits:create', 'chits:edit', 'chits:launch_month0', 'chits:reschedule_auction', 'chits:configure_laaba_seetu', 'chits:swap_ticket', 'chits:delete',
       'members:view', 'members:enroll', 'members:edit', 'members:collect', 'members:waive_penalties', 'members:suspend', 'members:pair_qr', 'members:revoke_qr', 'members:batch_qr', 'members:reset_mpin', 'members:export', 'members:delete',
       'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:override_floor', 'auctions:edit_historical', 'auctions:disburse', 'auctions:issue_receipt',
-      'treasury:view', 'treasury:view_cash_box', 'treasury:view_banks', 'treasury:collect_cash', 'treasury:move_money', 'treasury:confirm_atm', 'treasury:deposit', 'treasury:recover_float', 'treasury:personal_draw', 'treasury:settle_draw', 'treasury:delete_transaction', 'treasury:reconcile',
+      'treasury:view', 'treasury:view_cash_box', 'treasury:view_banks', 'treasury:collect_cash', 'treasury:move_money', 'treasury:confirm_atm', 'treasury:deposit', 'treasury:recover_float', 'treasury:personal_draw', 'treasury:settle_draw', 'treasury:withdraw_organizer_profit', 'treasury:delete_transaction', 'treasury:reconcile',
       'reports:view', 'reports:view_pnl', 'reports:export', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_receipts', 'reports:view_audit_logs', 'reports:export_audit',
       'communication:view', 'communication:broadcast', 'communication:pre_auction', 'communication:post_auction', 'communication:due_alerts', 'communication:custom', 'communication:manage_templates',
       'system:manage_users', 'system:manage_staff', 'system:manage_roles', 'system:branding', 'system:maintenance_mode', 'system:reset_database'
@@ -267,6 +268,7 @@ const ALL_ACTIONS: ActionMeta[] = [
   { key: 'treasury:recover_float', label: 'Collect Field Cash from Staff', desc: 'Take collected cash from field agents and deposit into main box', category: 'Treasury Tab', icon: RotateCcw },
   { key: 'treasury:personal_draw', label: 'Log Expenses & Personal Spends', desc: 'Record petty cash expenses like petrol, maintenance, or owner draws', category: 'Treasury Tab', icon: DollarSign },
   { key: 'treasury:settle_draw', label: 'Repay Personal Advance / Spends', desc: 'Record repayment of borrowed money back into the cash box', category: 'Treasury Tab', icon: Check },
+  { key: 'treasury:withdraw_organizer_profit', label: 'Take / Withdraw Organizer Profit', desc: 'Withdraw realized Month 0 launch profits out of the physical cash box or bank into personal ownership', category: 'Treasury Tab', icon: Crown },
   { key: 'treasury:delete_transaction', label: 'Delete / Cancel Wrong Transaction', desc: 'Cancel or reverse an accidental payment or expense entry', category: 'Treasury Tab', icon: Trash2 },
   { key: 'treasury:reconcile', label: 'Cash Note Counter (₹500, ₹200, ₹100)', desc: 'Count physical currency notes and match with cash box balance', category: 'Treasury Tab', icon: Layers },
 
@@ -347,6 +349,7 @@ const ACTION_MATCH_RULES: { key: PermissionAction; match: (lower: string) => boo
 
   // 5. Treasury Tab
   { key: 'treasury:confirm_atm', match: (t) => t.includes('confirm atm') || t.includes('atm cash') || t.includes('atm withdrawal') },
+  { key: 'treasury:withdraw_organizer_profit', match: (t) => t.includes('organizer profit') || t.includes('take profit') || t.includes('withdraw profit') },
   { key: 'treasury:personal_draw', match: (t) => t.includes('personal draw') || t.includes('log spend') || t.includes('cash spend') || t.includes('petty cash') },
   { key: 'treasury:move_money', match: (t) => t.includes('move money') || t.includes('bank transfer') || t.includes('inter-vault') || t.includes('relocation') },
   { key: 'treasury:reconcile', match: (t) => t.includes('count notes') || t.includes('denomination') || t.includes('reconcil') || t.includes('cash note counter') },

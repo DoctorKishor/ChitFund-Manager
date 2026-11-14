@@ -16,6 +16,7 @@ import AuctionScheduleModal from './AuctionScheduleModal';
 import UniversalRecordPaymentModal from './UniversalRecordPaymentModal';
 import QuickPersonalDrawModal from './QuickPersonalDrawModal';
 import QuickAtmWithdrawalModal from './QuickAtmWithdrawalModal';
+import WithdrawOrganizerProfitModal from './WithdrawOrganizerProfitModal';
 import PaymentChecklistPrintModal from './PaymentChecklistPrintModal';
 import { PaymentReceiptModal } from './PaymentReceiptModal';
 import LiveAuditLogWidget from './LiveAuditLogWidget';
@@ -177,6 +178,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const canConfigureLaabaSeetu = canPerformAction('chits:configure_laaba_seetu');
   const canCollect = canPerformAction('members:collect') || canPerformAction('treasury:collect_cash');
   const canPersonalDraw = canPerformAction('treasury:personal_draw');
+  const canWithdrawProfit = canPerformAction('treasury:withdraw_organizer_profit');
   const canBroadcastReminders = canPerformAction('communication:due_alerts') || canPerformAction('communication:broadcast');
   const canAtmRelocate = canPerformAction('treasury:confirm_atm') || canPerformAction('treasury:move_money');
   const canExportChecklist = canPerformAction('reports:export_checklist');
@@ -1568,6 +1570,8 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   const [showQuickPersonalDrawModal, setShowQuickPersonalDrawModal] = useState<boolean>(false);
   const [showQuickAtmModal, setShowQuickAtmModal] = useState<boolean>(false);
+  const [showWithdrawProfitModal, setShowWithdrawProfitModal] = useState<boolean>(false);
+  const [withdrawProfitGroupId, setWithdrawProfitGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     const handleOpenQuickCollectEvent = () => handleOpenRecordPayment(null);
@@ -5665,6 +5669,22 @@ Thank you for your prompt payment! 🙏`;
                       <span>Print Checklist</span>
                     </button>
 
+                    {canWithdrawProfit && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHapticFeedback('light');
+                          setWithdrawProfitGroupId(selectedWorkspaceGroup.id);
+                          setShowWithdrawProfitModal(true);
+                        }}
+                        className="border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                        title="Withdraw Month 0 launch profits from rotational cash box"
+                      >
+                        <Crown size={13} className="text-amber-600" />
+                        <span>Take Profit</span>
+                      </button>
+                    )}
+
                     <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200">
                       Total: {workspaceMembers.length} / {selectedWorkspaceGroup.duration} Tickets
                     </span>
@@ -6348,11 +6368,28 @@ Thank you for your prompt payment! 🙏`;
 
                             {/* Cycle Progress Bar */}
                             {g.currentMonth === 0 ? (
-                              <div className="flex items-center gap-1.5 py-1 px-2.5 rounded-xl bg-amber-50 border border-amber-200 min-w-0">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
-                                <span className="text-[9.5px] sm:text-[10px] font-bold text-amber-900 uppercase tracking-wider whitespace-nowrap truncate">
-                                  Launch Month — Organizer Profit Phase
-                                </span>
+                              <div className="flex items-center justify-between py-1 px-2.5 rounded-xl bg-amber-50 border border-amber-200 min-w-0">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                                  <span className="text-[9.5px] sm:text-[10px] font-bold text-amber-900 uppercase tracking-wider whitespace-nowrap truncate">
+                                    Launch Month — Organizer Profit Phase
+                                  </span>
+                                </div>
+                                {canWithdrawProfit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      triggerHapticFeedback('light');
+                                      setWithdrawProfitGroupId(g.id);
+                                      setShowWithdrawProfitModal(true);
+                                    }}
+                                    className="text-[9.5px] font-bold text-amber-900 bg-amber-200/90 hover:bg-amber-300 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer shrink-0 ml-1.5"
+                                    title="Take profit from cash box"
+                                  >
+                                    <Crown size={11} className="text-amber-700" />
+                                    <span>Take Profit</span>
+                                  </button>
+                                )}
                               </div>
                             ) : (
                               <div className="space-y-1">
@@ -10137,6 +10174,23 @@ Thank you for your prompt payment! 🙏`;
         isOpen={showQuickAtmModal}
         onClose={() => setShowQuickAtmModal(false)}
         onSuccess={() => {
+          if (activeDashboardGroupId) {
+            fetchDashboardData(activeDashboardGroupId);
+          }
+        }}
+      />
+
+      {/* 3B. Dedicated Withdraw Organizer Profit Modal (Realized Month 0 Launch Earnings) */}
+      <WithdrawOrganizerProfitModal
+        isOpen={showWithdrawProfitModal}
+        onClose={() => {
+          setShowWithdrawProfitModal(false);
+          setWithdrawProfitGroupId(null);
+        }}
+        groups={localGroups}
+        preselectedGroupId={withdrawProfitGroupId}
+        onSuccess={() => {
+          fetchGroups();
           if (activeDashboardGroupId) {
             fetchDashboardData(activeDashboardGroupId);
           }

@@ -66,6 +66,7 @@ export type PermissionAction =
   | 'treasury:recover_float'
   | 'treasury:personal_draw'
   | 'treasury:settle_draw'
+  | 'treasury:withdraw_organizer_profit'
   | 'treasury:delete_transaction'
   | 'treasury:reconcile'
 
@@ -195,6 +196,7 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
   'treasury:recover_float': ['admin', 'manager'],
   'treasury:personal_draw': ['admin'],
   'treasury:settle_draw': ['admin'],
+  'treasury:withdraw_organizer_profit': ['admin'],
   'treasury:delete_transaction': ['admin'],
   'treasury:reconcile': ['admin'],
 
