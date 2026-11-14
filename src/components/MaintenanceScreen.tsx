@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useMaintenance } from '@/context/MaintenanceContext';
 import { useAuth } from '@/context/AuthContext';
 import AuthScreen from '@/components/AuthScreen';
+import AppLogo from '@/components/AppLogo';
 import {
   Wrench,
   ShieldCheck,
@@ -60,9 +61,7 @@ export default function MaintenanceScreen() {
       {/* ── TOP HEADER LOGO ── */}
       <header className="w-full max-w-4xl flex items-center justify-between z-10 pt-2">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center font-black text-white text-sm shadow-lg shadow-amber-500/20">
-            CF
-          </div>
+          <AppLogo size={40} />
           <div>
             <span className="font-extrabold text-sm tracking-tight text-white block">Chit Fund Manager</span>
             <span className="text-[10px] text-amber-400/90 font-mono font-semibold uppercase tracking-wider">

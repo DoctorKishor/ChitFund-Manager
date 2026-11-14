@@ -1,80 +1,155 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { WifiOff, RefreshCw, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { WifiOff, RefreshCw, ShieldAlert, ArrowRight, Lock } from 'lucide-react';
+import AppLogo from '@/components/AppLogo';
 
 export default function NetworkStatusBanner() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isChecking, setIsChecking] = useState<boolean>(false);
+  const [pingFailed, setPingFailed] = useState<boolean>(false);
+
+  const checkConnectivity = useCallback(async () => {
+    setIsChecking(true);
+    setPingFailed(false);
+    try {
+      // 1. Check navigator.onLine first
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        setIsOnline(false);
+        setPingFailed(true);
+        return false;
+      }
+
+      // 2. Perform live network ping with no-store cache to verify real data throughput
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const res = await fetch(`/api-health.json?_t=${Date.now()}`, {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller.signal,
+      }).catch(() => null);
+
+      clearTimeout(timeoutId);
+
+      if (res && (res.status === 200 || res.ok)) {
+        setIsOnline(true);
+        setPingFailed(false);
+        return true;
+      } else {
+        // Fallback to checking online status
+        if (navigator.onLine) {
+          setIsOnline(true);
+          return true;
+        }
+        setIsOnline(false);
+        setPingFailed(true);
+        return false;
+      }
+    } catch {
+      if (navigator.onLine) {
+        setIsOnline(true);
+        return true;
+      }
+      setIsOnline(false);
+      setPingFailed(true);
+      return false;
+    } finally {
+      setIsChecking(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    setIsOnline(navigator.onLine);
+    // Initial check
+    if (!navigator.onLine) {
+      setIsOnline(false);
+    }
 
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnlineEvent = () => {
+      checkConnectivity();
+    };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    const handleOfflineEvent = () => {
+      setIsOnline(false);
+      setPingFailed(true);
+    };
+
+    window.addEventListener('online', handleOnlineEvent);
+    window.addEventListener('offline', handleOfflineEvent);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnlineEvent);
+      window.removeEventListener('offline', handleOfflineEvent);
     };
-  }, []);
-
-  const handleRetryConnection = async () => {
-    setIsChecking(true);
-    try {
-      // Check live connection via ping or fetch
-      const res = await fetch('/api/health-check', { method: 'HEAD', cache: 'no-store' }).catch(() => null);
-      if (res || navigator.onLine) {
-        setIsOnline(true);
-      } else {
-        setIsOnline(false);
-      }
-    } finally {
-      setIsChecking(false);
-    }
-  };
+  }, [checkConnectivity]);
 
   if (isOnline) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-5 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4 max-h-[90dvh] overflow-y-auto my-auto">
-        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
-          <WifiOff size={32} />
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="offline-barrier-title"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[#090D1A]/90 backdrop-blur-xl animate-in fade-in duration-200 select-none overflow-y-auto"
+    >
+      <div className="bg-[#111827] border border-rose-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl shadow-rose-950/40 text-center space-y-5 my-auto ring-1 ring-white/10 relative overflow-hidden">
+        {/* Subtle Top Crimson Ambient Glow */}
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-rose-600/15 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Brand App Logo & Offline Indicator */}
+        <div className="flex flex-col items-center justify-center relative z-10">
+          <AppLogo size={64} className="mb-3.5" />
+          
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/35 text-rose-400 text-[11px] font-bold uppercase tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            <span>Active Network Required</span>
+          </div>
         </div>
 
-        <div>
-          <h3 className="text-lg font-bold text-white tracking-tight">No Internet Connection</h3>
-          <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-            ChitFund Manager requires an active network connection to safeguard treasury balances, auction bids, and live member ledger sync.
+        {/* Barrier Heading & Explanation */}
+        <div className="space-y-2 relative z-10">
+          <h2 id="offline-barrier-title" className="text-xl sm:text-2xl font-black text-white tracking-tight font-display">
+            No Internet Connection
+          </h2>
+          <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+            Chit Funds Manager requires an active network connection to safeguard live treasury balances, live bidding auctions, and encrypted member ledgers.
           </p>
         </div>
 
-        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400">
-          Please reconnect to mobile data or Wi-Fi to continue.
+        {/* Security / Offline Notice Box */}
+        <div className="p-3.5 rounded-2xl bg-[#0B0F19] border border-slate-800 text-left space-y-1 relative z-10">
+          <div className="flex items-center gap-2 text-slate-300 text-xs font-bold">
+            <Lock size={13} className="text-amber-400 shrink-0" />
+            <span>Offline Security Barrier Active</span>
+          </div>
+          <p className="text-[11px] text-slate-500 leading-normal pl-5">
+            Offline access is restricted to prevent ledger desynchronization. Please connect to Wi-Fi or mobile data to unlock your workspace.
+          </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleRetryConnection}
-          disabled={isChecking}
-          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-rose-600/25 transition-all active:scale-[0.98]"
-        >
-          {isChecking ? (
-            <>
-              <RefreshCw className="animate-spin" size={15} /> Checking Network...
-            </>
-          ) : (
-            <>
-              <RefreshCw size={15} /> Retry Connection
-            </>
-          )}
-        </button>
+        {/* Action Button */}
+        <div className="pt-1 relative z-10">
+          <button
+            type="button"
+            onClick={() => checkConnectivity()}
+            disabled={isChecking}
+            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 via-rose-700 to-indigo-700 hover:from-rose-500 hover:to-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isChecking ? (
+              <>
+                <RefreshCw className="animate-spin" size={15} />
+                <span>Checking Connection...</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw size={15} />
+                <span>Retry Connection</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { MaintenanceProvider } from "@/context/MaintenanceContext";
 import { OrganizationProvider } from "@/context/OrganizationContext";
 import { SystemSettingsProvider } from "@/context/SystemSettingsContext";
-import ServiceWorkerCleanup from "@/components/ServiceWorkerCleanup";
+import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import NetworkStatusBanner from "@/components/NetworkStatusBanner";
 
 const inter = Inter({
@@ -20,15 +20,27 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#2A1DB8",
+  themeColor: "#0B0F19",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
-  title: "Chit Funds Manager - Midnight Workspace",
+  title: "Chit Funds Manager",
   description: "Enterprise Chit Fund Management & Digital Banking Treasury",
+  applicationName: "Chit Funds Manager",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -47,7 +59,7 @@ export default function RootLayout({
       className={`${inter.variable} ${plusJakartaSans.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-slate-50 text-slate-800 flex flex-col selection:bg-brand-500 selection:text-white">
-        <ServiceWorkerCleanup />
+        <ServiceWorkerRegistration />
         <NetworkStatusBanner />
         <AuthProvider>
           <OrganizationProvider>

@@ -18,6 +18,7 @@ import {
   Settings,
   ShieldCheck
 } from 'lucide-react';
+import AppLogo from '@/components/AppLogo';
 
 interface SidebarProps {
   activeTab: string;
@@ -73,11 +74,9 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
               {/* Header */}
               <div className="h-20 flex items-center justify-between px-6 border-b border-[#27264E] bg-[#1D1D41]">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#9C2CF3] to-[#3A6FF9] flex items-center justify-center font-black text-white shadow-lg shadow-[#6359E9]/30 text-base">
-                    CF
-                  </div>
+                  <AppLogo size={40} />
                   <div>
-                    <span className="font-extrabold text-xl text-white tracking-tight block leading-none">
+                    <span className="font-extrabold text-xl text-white tracking-tight block leading-none font-display">
                       ChitFunds<span className="text-[#64CFF6]">.</span>
                     </span>
                     <span className="text-[10px] text-[#AEABD8] font-semibold tracking-wider uppercase">Fintech Portal</span>
@@ -159,9 +158,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
           <div className="h-16 px-5 border-b border-slate-100 flex items-center justify-between">
             {!isCollapsed && (
               <div className="flex items-center space-x-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-md shadow-brand-500/20 text-white font-black text-sm tracking-tight font-display">
-                  CF
-                </div>
+                <AppLogo size={36} />
                 <div>
                   <div className="font-display font-bold text-base text-slate-900 tracking-tight leading-none flex items-center gap-0.5">
                     ChitFunds<span className="text-brand-600">.Admin</span>
@@ -170,8 +167,8 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen = false, s
               </div>
             )}
             {isCollapsed && (
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-md shadow-brand-500/20 text-white font-black text-sm tracking-tight font-display mx-auto">
-                CF
+              <div className="mx-auto">
+                <AppLogo size={36} />
               </div>
             )}
             <button 

@@ -9,6 +9,7 @@ import DashboardContent from '@/components/DashboardContent';
 import AuthScreen from '@/components/AuthScreen';
 import SubscriberPortal from '@/components/SubscriberPortal';
 import MaintenanceScreen from '@/components/MaintenanceScreen';
+import AppLogo from '@/components/AppLogo';
 import { useAuth } from '@/context/AuthContext';
 import { useMaintenance } from '@/context/MaintenanceContext';
 import { AlertTriangle, Wrench, Menu } from 'lucide-react';
@@ -43,9 +44,7 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-[#F4F6FB] flex items-center justify-center text-[#151B26] px-4 selection:bg-[#2A1DB8] selection:text-white">
         <div className="flex flex-col items-center gap-3 animate-in fade-in duration-200">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#1C128A] via-[#2A1DB8] to-[#3424CA] flex items-center justify-center font-black text-white text-lg shadow-xl shadow-[#2A1DB8]/20 animate-pulse">
-            CF
-          </div>
+          <AppLogo size={56} className="animate-pulse" />
           <div className="flex items-center gap-2 mt-2">
             <div className="w-4 h-4 border-2 border-[#2A1DB8] border-t-transparent rounded-full animate-spin" />
             <span className="text-xs text-[#636F85] font-semibold tracking-tight">Verifying Session...</span>

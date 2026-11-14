@@ -23,6 +23,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import PassbookScannerModal from './PassbookScannerModal';
+import AppLogo from '@/components/AppLogo';
 
 interface AuthScreenProps {
   onSuccess?: () => void;
@@ -229,8 +230,8 @@ export default function AuthScreen({ onSuccess }: AuthScreenProps) {
           
           {/* Brand Header */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-700 to-violet-700 text-white font-black text-xl mb-3 shadow-lg shadow-indigo-600/25 ring-4 ring-indigo-50">
-              CF
+            <div className="flex justify-center mb-3.5">
+              <AppLogo size={60} />
             </div>
             
             <h1 className="text-2xl font-black tracking-tight text-slate-900 font-display">
