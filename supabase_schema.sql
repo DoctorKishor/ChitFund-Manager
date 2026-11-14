@@ -663,6 +663,28 @@ begin
 end;
 $$ language plpgsql security definer set search_path = public;
 
+-- Secure RPC to purge all security audit logs completely (Admin only)
+create or replace function public.purge_all_audit_logs()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  if not public.is_admin_or_manager() then
+    raise exception 'Unauthorized: Only an administrator can purge audit logs.';
+  end if;
+
+  perform set_config('app.skip_audit_log', 'true', true);
+  delete from public.security_audit_logs;
+  perform set_config('app.skip_audit_log', 'false', true);
+
+  return jsonb_build_object('success', true, 'message', 'All security audit logs successfully cleared.');
+end;
+$$;
+
+grant execute on function public.purge_all_audit_logs() to authenticated, anon;
+
 -- ==========================================
 -- 5. Passbook Inventory & Token Authentication
 -- ==========================================

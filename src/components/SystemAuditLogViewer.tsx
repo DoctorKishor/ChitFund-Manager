@@ -34,6 +34,7 @@ import {
   AlertTriangle,
   AlertCircle,
   Undo2,
+  Trash2,
 } from 'lucide-react';
 
 export interface FormattedAuditAction {
@@ -123,6 +124,9 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
   const [undoCandidate, setUndoCandidate] = useState<UndoCandidate | null>(null);
   const [isUndoing, setIsUndoing] = useState<boolean>(false);
   const [undoSuccessMsg, setUndoSuccessMsg] = useState<string | null>(null);
+  const [showPurgeModal, setShowPurgeModal] = useState<boolean>(false);
+  const [isPurgingLogs, setIsPurgingLogs] = useState<boolean>(false);
+  const isAdmin = currentAdminProfile?.role === 'admin' || currentAdminProfile?.role === 'administrator';
 
   // Metadata Caches for resolving historical logs
   const [directoryProfiles, setDirectoryProfiles] = useState<Record<string, { name: string; phone?: string; role?: string }>>({});
@@ -1171,6 +1175,42 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
     downloadAnchor.remove();
   };
 
+  // ── Purge Logs Handler ──
+  const handlePurgeLogs = async () => {
+    if (!isAdmin) return;
+    try {
+      setIsPurgingLogs(true);
+      try {
+        await supabase.rpc('purge_all_audit_logs');
+      } catch (e) {
+        console.warn('purge_all_audit_logs fallback to client loop:', e);
+      }
+
+      for (let attempt = 0; attempt < 15; attempt++) {
+        const { count } = await supabase
+          .from('security_audit_logs')
+          .select('*', { count: 'exact', head: true });
+        if (!count || count === 0) break;
+
+        const { error } = await supabase
+          .from('security_audit_logs')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) break;
+      }
+
+      setShowPurgeModal(false);
+      triggerHapticFeedback('success');
+      await fetchAuditLogs();
+      window.dispatchEvent(new CustomEvent('chitfund:audit_updated'));
+    } catch (err) {
+      console.error('Failed to purge audit logs:', err);
+      triggerHapticFeedback('error');
+    } finally {
+      setIsPurgingLogs(false);
+    }
+  };
+
   // ── Format Relative Time ──
   const formatTimeAgo = (iso: string) => {
     const diff = Date.now() - new Date(iso).getTime();
@@ -1258,6 +1298,18 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                   <span>JSON</span>
                 </button>
               </>
+            )}
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowPurgeModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Purge all audit logs"
+              >
+                <Trash2 size={13} />
+                <span>Clear Logs</span>
+              </button>
             )}
           </div>
         </div>
@@ -2286,6 +2338,50 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
                     <span>Confirm &amp; Reverse Action</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PURGE AUDIT LOGS MODAL ── */}
+      {showPurgeModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-rose-600">
+                <Trash2 size={20} />
+                <h3 className="font-bold text-sm text-slate-900">Clear All Audit Logs</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPurgeModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to permanently delete all <strong className="font-mono text-slate-900">{totalDbCount}</strong> system activity events and audit logs? This action is permanent and cannot be undone.
+            </p>
+
+            <div className="pt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowPurgeModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isPurgingLogs}
+                onClick={handlePurgeLogs}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                <span>{isPurgingLogs ? 'Purging Logs...' : 'Yes, Purge Logs'}</span>
               </button>
             </div>
           </div>

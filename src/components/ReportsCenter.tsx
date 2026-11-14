@@ -283,6 +283,10 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
           setSelectedGroupId(groups[0].id);
           const currM = groups[0].current_month !== undefined ? Number(groups[0].current_month) : 0;
           setSelectedMonth(Math.max(0, currM));
+        } else {
+          setChitGroups([]);
+          setSelectedGroupId('');
+          setSelectedMonth(0);
         }
 
         // 2. Fetch all group members joined with profiles
@@ -362,8 +366,10 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
   }, [chitGroups, selectedGroupId]);
 
   // Generate Month list with Month 0 Launch parity (e.g. Sep '26 M0 Launch, Oct '26 M1 (1st Auction), Nov '26 M2)
-  const totalDuration = Number(selectedGroup?.duration_months) || 20;
+  const totalDuration = Number(selectedGroup?.duration_months) || 0;
   const monthList = useMemo(() => {
+    if (!selectedGroup || totalDuration === 0) return [];
+
     const months = [];
     let baseYear = new Date().getFullYear();
     let baseMonth = new Date().getMonth();
@@ -406,7 +412,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
   const activeMonthInfo = useMemo(() => {
     return monthList.find(m => m.num === selectedMonth) || {
       num: selectedMonth,
-      dateLabel: selectedMonth === 0 ? 'Launch Month' : `Month ${selectedMonth}`,
+      dateLabel: selectedMonth === 0 ? 'Month 0 Launch' : `Month ${selectedMonth}`,
       code: `M${selectedMonth}`,
     };
   }, [monthList, selectedMonth]);
@@ -427,9 +433,9 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       };
     }
 
-    const totalVal = Number(selectedGroup.total_value) || 200000;
-    const duration = Number(selectedGroup.duration_months) || 20;
-    const baseInst = Math.round(totalVal / duration);
+    const totalVal = Number(selectedGroup.total_value) || 0;
+    const duration = Number(selectedGroup.duration_months) || 1;
+    const baseInst = duration > 0 ? Math.round(totalVal / duration) : 0;
     const selectedMonthAuction = auctionLogs.find(
       a => a.group_id === selectedGroup.id && Number(a.month) === Number(selectedMonth)
     );
@@ -650,12 +656,12 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     let attentionCount = 0;
 
     const groupCards = chitGroups.map((g) => {
-      const totalVal = Number(g.total_value) || 200000;
-      const duration = Number(g.duration_months) || 20;
+      const totalVal = Number(g.total_value) || 0;
+      const duration = Number(g.duration_months) || 1;
       const currentM = Math.max(0, Number(g.current_month || 0));
       const members = groupMembers.filter(m => m.group_id === g.id);
       const memberCount = members.length > 0 ? members.length : duration;
-      const baseInst = Math.round(totalVal / duration);
+      const baseInst = duration > 0 ? Math.round(totalVal / duration) : 0;
       const isLaaba = currentM > 0 && (g.kai_iruppu_pool || 0) >= totalVal;
 
       const groupTxs = transactions.filter(t => t.group_id === g.id);
@@ -1057,9 +1063,9 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     let totalPenalties = 0;
 
     const byChitList = targetGroups.map(g => {
-      const totalVal = Number(g.total_value) || 200000;
-      const duration = Number(g.duration_months) || 20;
-      const baseInst = Math.round(totalVal / duration);
+      const totalVal = Number(g.total_value) || 0;
+      const duration = Number(g.duration_months) || 1;
+      const baseInst = duration > 0 ? Math.round(totalVal / duration) : 0;
       const currentM = Math.max(0, Number(g.current_month || 0));
 
       const gTxs = transactions.filter(t => {
@@ -1151,8 +1157,8 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       };
     }
 
-    const totalVal = Number(selectedGroup.total_value) || 200000;
-    const duration = Number(selectedGroup.duration_months) || 20;
+    const totalVal = Number(selectedGroup.total_value) || 0;
+    const duration = Number(selectedGroup.duration_months) || 1;
     const members = groupMembers.filter(m => m.group_id === selectedGroup.id);
     const memberCount = members.length > 0 ? members.length : duration;
 
@@ -1345,10 +1351,10 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       };
     }
 
-    const totalVal = Number(selectedGroup.total_value) || 200000;
-    const duration = Number(selectedGroup.duration_months) || 20;
+    const totalVal = Number(selectedGroup.total_value) || 0;
+    const duration = Number(selectedGroup.duration_months) || 1;
     const memberCount = activeGroupMembers.length > 0 ? activeGroupMembers.length : duration;
-    const monthlyInstallment = Number(selectedMember.custom_installment) || Math.round(totalVal / memberCount);
+    const monthlyInstallment = Number(selectedMember.custom_installment) || (memberCount > 0 ? Math.round(totalVal / memberCount) : 0);
     const currentM = Math.max(0, Number(selectedGroup.current_month || 0));
 
     // Check if won auction & prize payout status
@@ -1502,8 +1508,8 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       };
     }
 
-    const totalVal = Number(selectedGroup.total_value) || 200000;
-    const duration = Number(selectedGroup.duration_months) || 20;
+    const totalVal = Number(selectedGroup.total_value) || 0;
+    const duration = Number(selectedGroup.duration_months) || 1;
     const memberCount = activeGroupMembers.length > 0 ? activeGroupMembers.length : duration;
     const currentM = Math.max(0, Number(selectedGroup.current_month || 0));
     const totalElapsedMonths = Math.max(1, currentM);
@@ -2087,72 +2093,107 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
 
   // ── Multi-Cycle Ledger Rows (Month 0 Launch to Current/Total Duration) ──
   const allCyclesLedgerRows = useMemo(() => {
-    const currentM = selectedGroup?.current_month !== undefined ? Number(selectedGroup.current_month) : 2;
-    const totalVal = Number(selectedGroup?.total_value) || 200000;
-    const duration = Number(selectedGroup?.duration_months) || 20;
-    const totalMembers = groupMembers.filter(m => m.group_id === selectedGroup?.id).length || duration || 25;
-    
-    const rows = [];
-    const maxMonthToRender = Math.max(currentM, 2);
+    if (!selectedGroup || chitGroups.length === 0) return [];
 
-    for (let m = maxMonthToRender; m >= 0; m--) {
+    const currentM = selectedGroup.current_month !== undefined ? Number(selectedGroup.current_month) : 0;
+    const totalVal = Number(selectedGroup.total_value) || 0;
+    const duration = Number(selectedGroup.duration_months) || 1;
+    const groupEnrollments = groupMembers.filter(m => m.group_id === selectedGroup.id);
+    const totalMembers = groupEnrollments.length > 0 ? groupEnrollments.length : duration;
+
+    const rows = [];
+
+    for (let m = currentM; m >= 0; m--) {
       const monthInfo = monthList.find(item => item.num === m) || {
         num: m,
-        dateLabel: m === 0 ? "August 2024" : m === 1 ? "September 2024" : "October 2024",
+        dateLabel: `Month ${m}`,
         code: `M${m}`
       };
 
+      // Filter all collection transactions for this group & month
+      const txsForMonth = transactions.filter(
+        t => t.group_id === selectedGroup.id && Number(t.month) === m && t.type === 'collection'
+      );
+      const cashCollected = txsForMonth
+        .filter(t => t.payment_method === 'cash')
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+      const upiCollected = txsForMonth
+        .filter(t => t.payment_method !== 'cash')
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+      const totalCollected = cashCollected + upiCollected;
+
+      let breakdownStr = '₹0 Collected';
+      if (upiCollected > 0 && cashCollected > 0) {
+        breakdownStr = `₹${(upiCollected / 100000).toFixed(2)}L UPI · ₹${(cashCollected / 1000).toFixed(1)}K Cash`;
+      } else if (upiCollected > 0) {
+        breakdownStr = `₹${(upiCollected / 100000).toFixed(2)}L UPI`;
+      } else if (cashCollected > 0) {
+        breakdownStr = `₹${(cashCollected / 1000).toFixed(1)}K Cash`;
+      }
+
       if (m === 0) {
         // Month 0 Launch Month
+        const isPastOrSealed = currentM > 0;
+        const expected = totalVal;
+        const collected = isPastOrSealed ? (totalCollected > 0 ? totalCollected : totalVal) : totalCollected;
+        const shortfall = Math.max(0, expected - collected);
+        const velocity = expected > 0 ? Math.min(100, Math.round((collected / expected) * 100)) : 100;
+        const paidCount = new Set(txsForMonth.map(t => t.group_member_id || t.profile_id)).size;
+
         rows.push({
           cycleNum: 0,
           cycleTitle: `Cycle M0 (${monthInfo.dateLabel} Launch)`,
-          badgeText: 'Organizer Launch Pot',
+          badgeText: isPastOrSealed ? 'Organizer Profit Sealed' : 'Launch Collection Active',
           badgeColor: 'bg-slate-100 text-slate-600 border-slate-200/60',
           subLabel: 'Organizer Profit Initial Pot',
           dotColor: 'bg-slate-400',
-          expected: totalVal,
-          collected: totalVal,
-          breakdownText: '₹2.00L Initial Direct Deposit',
-          shortfall: 0,
-          shortfallSubtext: 'Zero overdue',
-          velocity: 100.0,
-          statusPill: 'Organizer Profit Sealed',
+          expected,
+          collected,
+          breakdownText: isPastOrSealed && breakdownStr === '₹0 Collected' ? `₹${(expected / 100000).toFixed(2)}L Direct Organizer Reserve` : breakdownStr,
+          shortfall,
+          shortfallSubtext: shortfall > 0 ? `₹${shortfall.toLocaleString('en-IN')} pending` : 'Zero overdue',
+          velocity,
+          statusPill: isPastOrSealed ? 'Organizer Profit Sealed' : `${paidCount} / ${totalMembers} Paid`,
           statusPillStyle: 'bg-slate-100 text-slate-700 border-slate-200',
           actionType: 'voucher',
-          isLive: false,
+          isLive: currentM === 0,
         });
       } else if (m === currentM) {
         // Active Live Cycle
         const expected = monthlyStats.expected > 0 ? monthlyStats.expected : totalVal;
-        const collected = monthlyStats.collected > 0 ? monthlyStats.collected : 0;
-        const shortfall = monthlyStats.pending > 0 ? monthlyStats.pending : 0;
-        const velocity = monthlyStats.expected > 0 ? monthlyStats.collectionPercent : 0;
-        const paidCount = monthlyStats.paidCount > 0 ? monthlyStats.paidCount : 0;
-        const overdueCount = monthlyStats.pendingCount > 0 ? monthlyStats.pendingCount : 0;
+        const collected = monthlyStats.collected > 0 ? monthlyStats.collected : totalCollected;
+        const shortfall = monthlyStats.pending > 0 ? monthlyStats.pending : Math.max(0, expected - collected);
+        const velocity = monthlyStats.expected > 0 ? monthlyStats.collectionPercent : (expected > 0 ? Math.round((collected / expected) * 100) : 0);
+        const paidCount = monthlyStats.paidCount > 0 ? monthlyStats.paidCount : new Set(txsForMonth.map(t => t.group_member_id || t.profile_id)).size;
+        const overdueCount = monthlyStats.pendingCount > 0 ? monthlyStats.pendingCount : Math.max(0, totalMembers - paidCount);
 
         rows.push({
           cycleNum: m,
           cycleTitle: `Cycle M${m} (${monthInfo.dateLabel})`,
           badgeText: 'Active Live Cycle',
           badgeColor: 'bg-brand-100/70 text-brand-700 border-brand-200/60',
-          subLabel: `Due: 25 ${monthInfo.dateLabel.split(' ')[0]} 2024`,
+          subLabel: selectedGroup.next_auction_date ? `Auction: ${new Date(selectedGroup.next_auction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : `Active Cycle Due`,
           dotColor: 'bg-brand-600 animate-pulse',
-          expected: expected,
-          collected: collected,
-          breakdownText: `₹${(collected * 0.68 / 100000).toFixed(2)}L UPI · ₹${(collected * 0.32 / 1000).toFixed(1)}K Cash`,
-          shortfall: shortfall,
+          expected,
+          collected,
+          breakdownText: breakdownStr,
+          shortfall,
           shortfallSubtext: `${overdueCount} overdue`,
-          velocity: velocity,
+          velocity,
           statusPill: `${paidCount} / ${totalMembers} Paid (${overdueCount} Pending)`,
           statusPillStyle: 'bg-amber-50 text-amber-800 border-amber-200',
           actionType: 'nudge',
           isLive: true,
         });
-      } else if (m < currentM) {
-        // Settled cycles
-        const auction = auctionLogs.find(a => a.group_id === selectedGroup?.id && Number(a.month) === m);
-        const winnerName = auction?.profiles?.full_name || (m === 1 ? 'Dr. Kishor' : 'Subscriber Winner');
+      } else {
+        // Settled cycles (m < currentM)
+        const auction = auctionLogs.find(a => a.group_id === selectedGroup.id && Number(a.month) === m);
+        const winnerName = auction?.profiles?.full_name || 'Subscriber Winner';
+        const expected = totalVal;
+        const collected = totalCollected > 0 ? totalCollected : totalVal;
+        const shortfall = Math.max(0, expected - collected);
+        const velocity = expected > 0 ? Math.min(100, Math.round((collected / expected) * 100)) : 100;
+        const paidCount = new Set(txsForMonth.map(t => t.group_member_id || t.profile_id)).size || totalMembers;
 
         rows.push({
           cycleNum: m,
@@ -2161,13 +2202,13 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
           badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
           subLabel: `Auction Winner: ${winnerName}`,
           dotColor: 'bg-emerald-500',
-          expected: totalVal,
-          collected: totalVal,
-          breakdownText: '₹1.60L UPI · ₹40.0K Cash',
-          shortfall: 0,
-          shortfallSubtext: 'Zero overdue',
-          velocity: 100.0,
-          statusPill: `${totalMembers} / ${totalMembers} Paid (Fully Reconciled)`,
+          expected,
+          collected,
+          breakdownText: totalCollected > 0 ? breakdownStr : `₹${(totalVal / 100000).toFixed(2)}L Reconciled`,
+          shortfall,
+          shortfallSubtext: shortfall > 0 ? `₹${shortfall.toLocaleString('en-IN')} pending` : 'Zero overdue',
+          velocity,
+          statusPill: `${paidCount} / ${totalMembers} Paid (Fully Reconciled)`,
           statusPillStyle: 'bg-emerald-50 text-emerald-700 border-emerald-200',
           actionType: 'receipts',
           isLive: false,
@@ -2176,7 +2217,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     }
 
     return rows;
-  }, [selectedGroup, groupMembers, monthList, monthlyStats, auctionLogs]);
+  }, [selectedGroup, chitGroups, groupMembers, monthList, monthlyStats, auctionLogs, transactions]);
 
   // Excel / CSV Export
   const handleExportExcel = () => {
@@ -2241,11 +2282,15 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                 onChange={(e) => setSelectedGroupId(e.target.value)}
                 className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-semibold pl-8 pr-7 py-1.5 rounded-xl border border-slate-200/70 transition-all focus:bg-white focus:border-brand-500 cursor-pointer"
               >
-                {chitGroups.map((g, idx) => (
-                  <option key={g.id} value={g.id}>
-                    Group {String.fromCharCode(65 + idx)}: {g.name} (₹{(Number(g.total_value) / 100000).toFixed(0)}L · {g.duration_months} Members)
-                  </option>
-                ))}
+                {chitGroups.length === 0 ? (
+                  <option value="">No Active Groups</option>
+                ) : (
+                  chitGroups.map((g, idx) => (
+                    <option key={g.id} value={g.id}>
+                      Group {String.fromCharCode(65 + idx)}: {g.name} (₹{(Number(g.total_value) / 100000).toFixed(0)}L · {g.duration_months} Members)
+                    </option>
+                  ))
+                )}
               </select>
               <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
@@ -2259,14 +2304,18 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}
                 className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-semibold px-3 pr-7 py-1.5 rounded-xl border border-slate-200/70 transition-all focus:bg-white focus:border-brand-500 cursor-pointer"
               >
-                {monthList.map((m) => {
-                  const isCurrent = m.num === (selectedGroup?.current_month !== undefined ? Number(selectedGroup.current_month) : 0);
-                  return (
-                    <option key={m.num} value={m.num}>
-                      Cycle: Month {m.num} {isCurrent ? '(Active Current)' : m.num === 0 ? '(Organizer Profit Launch)' : '(Settled)'}
-                    </option>
-                  );
-                })}
+                {monthList.length === 0 ? (
+                  <option value={0}>No Active Cycles</option>
+                ) : (
+                  monthList.map((m) => {
+                    const isCurrent = m.num === (selectedGroup?.current_month !== undefined ? Number(selectedGroup.current_month) : 0);
+                    return (
+                      <option key={m.num} value={m.num}>
+                        Cycle: Month {m.num} {isCurrent ? '(Active Current)' : m.num === 0 ? '(Organizer Profit Launch)' : '(Settled)'}
+                      </option>
+                    );
+                  })
+                )}
               </select>
               <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
@@ -2586,7 +2635,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                           Monthly Collection Ledger &amp; Dues Velocity
                         </h2>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          Consolidated breakdown across {portfolioStats.groupNamesSummary} · {selectedGroup?.duration_months || 20} Months Tenure
+                          Consolidated breakdown across {portfolioStats.groupNamesSummary || 'Active Schemes'} · {selectedGroup?.duration_months || 0} Months Tenure
                         </p>
                       </div>
                     </div>
@@ -2600,12 +2649,18 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                         onChange={(e) => setSelectedMonth(Number(e.target.value))}
                         className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-semibold px-3 pr-7 py-2 rounded-xl border border-slate-200/70 transition-all focus:bg-white focus:border-brand-500 cursor-pointer"
                       >
-                        <option value={selectedMonth}>All Cycles (M0 – M{Math.max(selectedMonth, 2)})</option>
-                        {monthList.map(m => (
-                          <option key={m.num} value={m.num}>
-                            Cycle M{m.num}: {m.dateLabel} {m.num === (selectedGroup?.current_month || 0) ? '(Active)' : m.num === 0 ? '(Launch)' : '(Reconciled)'}
-                          </option>
-                        ))}
+                        {selectedGroup ? (
+                          <>
+                            <option value={selectedMonth}>All Cycles (M0 – M{selectedGroup.current_month ?? 0})</option>
+                            {monthList.map(m => (
+                              <option key={m.num} value={m.num}>
+                                Cycle M{m.num}: {m.dateLabel} {m.num === (selectedGroup?.current_month || 0) ? '(Active)' : m.num === 0 ? '(Launch)' : '(Reconciled)'}
+                              </option>
+                            ))}
+                          </>
+                        ) : (
+                          <option value={0}>No Active Cycles</option>
+                        )}
                       </select>
                       <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
@@ -2649,7 +2704,20 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-xs">
-                      {allCyclesLedgerRows.map((row) => (
+                      {allCyclesLedgerRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-12 text-center text-slate-400">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                                <Calendar size={20} />
+                              </div>
+                              <p className="font-bold text-slate-700 text-sm">No active chit schemes found</p>
+                              <p className="text-xs text-slate-400 max-w-sm">Create and activate a chit group under Chits / Groups to monitor monthly collection velocity and member ledger dues.</p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        allCyclesLedgerRows.map((row) => (
                         <tr
                           key={row.cycleNum}
                           className={`transition-colors ${
@@ -2751,7 +2819,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                                     }}
                                     className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg border border-slate-200/80 transition-colors cursor-pointer"
                                   >
-                                    Receipts #01–${portfolioStats.totalTicketsCount}
+                                    Receipts #01–{portfolioStats.totalTicketsCount}
                                   </button>
                                   <button
                                     onClick={() => setSelectedMonth(row.cycleNum)}
@@ -2782,7 +2850,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      )))}
                     </tbody>
                   </table>
                 </div>
@@ -2812,56 +2880,66 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                     </span>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span className="text-xs text-slate-500 font-mono font-semibold">
-                      Next Cycle M${selectedMonth + 1} Auction: 01 Nov 2024, 08:00 PM
-                    </span>
-                  </div>
+                  {selectedGroup && allCyclesLedgerRows.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="text-xs text-slate-500 font-mono font-semibold">
+                        Next Cycle M{selectedMonth + 1} Auction: {selectedGroup.next_auction_date ? `${new Date(selectedGroup.next_auction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}${selectedGroup.next_auction_time ? `, ${selectedGroup.next_auction_time}` : ''}` : 'Schedule Pending'}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Member Breakdown Detail List for Active Month */}
-                <div className="p-6 border-t border-slate-100 bg-white">
-                  <div className="flex justify-between items-center pb-3">
-                    <span className="text-xs font-bold text-slate-800">
-                      Cycle M${selectedMonth} Member Ledger (${monthlyStats.memberRows.length} Subscribers)
-                    </span>
-                    <span className="text-xs text-slate-500 font-mono">
-                      ${monthlyStats.paidCount} Paid · ${monthlyStats.pendingCount} Pending
-                    </span>
-                  </div>
+                {selectedGroup && allCyclesLedgerRows.length > 0 && (
+                  <div className="p-6 border-t border-slate-100 bg-white">
+                    <div className="flex justify-between items-center pb-3">
+                      <span className="text-xs font-bold text-slate-800">
+                        Cycle M{selectedMonth} Member Ledger ({monthlyStats.memberRows.length} Subscribers)
+                      </span>
+                      <span className="text-xs text-slate-500 font-mono">
+                        {monthlyStats.paidCount} Paid · {monthlyStats.pendingCount} Pending
+                      </span>
+                    </div>
 
-                  <div className="divide-y divide-slate-100">
-                    {monthlyStats.memberRows.map((m, idx) => (
-                      <div key={m.id} className="py-3 flex items-center justify-between hover:bg-slate-50 px-3 rounded-xl transition-colors">
-                        <div className="flex items-center gap-3">
-                          <span className="w-5 text-xs font-mono font-semibold text-slate-400">{idx + 1}</span>
-                          <div>
-                            <span className="font-bold text-xs text-slate-900 block">{m.name}</span>
-                            <span className="text-[11px] text-slate-500 font-mono">
-                              Ticket #{m.ticket} {m.phone ? `· ${m.phone}` : ''}
-                            </span>
+                    <div className="divide-y divide-slate-100">
+                      {monthlyStats.memberRows.length === 0 ? (
+                        <div className="py-6 text-center text-xs text-slate-400">
+                          No subscribers enrolled in this scheme cycle yet.
+                        </div>
+                      ) : (
+                        monthlyStats.memberRows.map((m, idx) => (
+                          <div key={m.id} className="py-3 flex items-center justify-between hover:bg-slate-50 px-3 rounded-xl transition-colors">
+                            <div className="flex items-center gap-3">
+                              <span className="w-5 text-xs font-mono font-semibold text-slate-400">{idx + 1}</span>
+                              <div>
+                                <span className="font-bold text-xs text-slate-900 block">{m.name}</span>
+                                <span className="text-[11px] text-slate-500 font-mono">
+                                  Ticket #{m.ticket} {m.phone ? `· ${m.phone}` : ''}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-xs font-semibold text-slate-700">
+                                ₹{m.paidTotal.toLocaleString('en-IN')} / ₹{m.expectedUpToMonth.toLocaleString('en-IN')}
+                              </span>
+                              {m.isPaid ? (
+                                <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                                  Paid
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-0.5 rounded-full">
+                                  Late (-₹{m.pendingDue.toLocaleString('en-IN')})
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-xs font-semibold text-slate-700">
-                            ₹{m.paidTotal.toLocaleString('en-IN')} / ₹{m.expectedUpToMonth.toLocaleString('en-IN')}
-                          </span>
-                          {m.isPaid ? (
-                            <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                              Paid
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-0.5 rounded-full">
-                              Late (-₹{m.pendingDue.toLocaleString('en-IN')})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </section>
             )}
 
@@ -3440,13 +3518,13 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                 <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
                   <p className="text-[9px] text-slate-400 font-medium uppercase">Cash</p>
                   <p className="text-[11px] font-bold text-slate-800 font-mono">
-                    ₹{((balances?.cash_in_hand || 64500) / 1000).toFixed(1)}k
+                    ₹{((balances?.cash_in_hand || 0) / 1000).toFixed(1)}k
                   </p>
                 </div>
                 <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
                   <p className="text-[9px] text-slate-400 font-medium uppercase">Bank</p>
                   <p className="text-[11px] font-bold text-slate-800 font-mono">
-                    ₹{(((balances?.kishor_bank || 0) + (balances?.dad_bank || 0) + (balances?.mom_bank || 0) || 364000) / 100000).toFixed(2)}L
+                    ₹{(((balances?.kishor_bank || 0) + (balances?.dad_bank || 0) + (balances?.mom_bank || 0)) / 100000).toFixed(2)}L
                   </p>
                 </div>
                 <div className="p-1.5 bg-amber-50/60 rounded-lg border border-amber-200/70">
@@ -3467,11 +3545,17 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                   <span>📅</span> Month-by-Month Dues Ledger
                 </h3>
                 <span className="text-[10px] font-bold text-brand-600">
-                  {selectedMonth} / {selectedGroup?.duration_months || 20} Months
+                  {selectedMonth} / {selectedGroup?.duration_months || 0} Months
                 </span>
               </div>
 
-              {allCyclesLedgerRows.map((row) => (
+              {allCyclesLedgerRows.length === 0 ? (
+                <div className="p-6 bg-white rounded-2xl border border-slate-200 text-center space-y-1.5 shadow-card">
+                  <p className="text-xs font-bold text-slate-700">No Active Chit Schemes</p>
+                  <p className="text-[11px] text-slate-400">Create a chit group to view monthly collection ledger.</p>
+                </div>
+              ) : (
+                allCyclesLedgerRows.map((row) => (
                 <div
                   key={row.cycleNum}
                   className={`p-3.5 bg-white rounded-2xl shadow-card space-y-2.5 ${
@@ -3556,7 +3640,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                     </div>
                   )}
                 </div>
-              ))}
+              )))}
 
               {/* Ledger Summary Pill */}
               <div className="p-2.5 bg-slate-100/80 rounded-xl text-center text-[10px] font-medium text-slate-600 border border-slate-200/60">

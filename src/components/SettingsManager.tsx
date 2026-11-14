@@ -235,6 +235,8 @@ export default function SettingsManager() {
   const [isResettingDb, setIsResettingDb] = useState(false);
   const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
   const [resetErrorMsg, setResetErrorMsg] = useState<string | null>(null);
+  const [showClearAuditModal, setShowClearAuditModal] = useState(false);
+  const [isClearingAuditLogs, setIsClearingAuditLogs] = useState(false);
 
   // Disaster Recovery / Full Backup States
   const [isExportingBackup, setIsExportingBackup] = useState(false);
@@ -963,14 +965,31 @@ export default function SettingsManager() {
         }).neq('wallet_type', '');
         if (trErr) console.warn('Treasury reset warning:', trErr.message);
 
-        // Step E: Purge all audit logs completely so count is 0
+        purgeSuccessful = true;
+      }
+
+      // 3. Step E: UNCONDITIONAL Audit Logs & Activity Feed Purge
+      // Always runs to guarantee 0 remaining audit trails regardless of RPC or fallback route
+      try {
+        await supabase.rpc('purge_all_audit_logs');
+      } catch (e) {
+        console.warn('RPC purge_all_audit_logs fallback to client batch loop:', e);
+      }
+
+      for (let attempt = 0; attempt < 15; attempt++) {
+        const { count } = await supabase
+          .from('security_audit_logs')
+          .select('*', { count: 'exact', head: true });
+        if (!count || count === 0) break;
+
         const { error: auditErr } = await supabase
           .from('security_audit_logs')
           .delete()
           .neq('id', '00000000-0000-0000-0000-000000000000');
-        if (auditErr) console.warn('Audit logs purge warning:', auditErr.message);
-
-        purgeSuccessful = true;
+        if (auditErr) {
+          console.warn('Audit logs purge batch warning:', auditErr.message);
+          break;
+        }
       }
 
       // Notify other components & sync local state
@@ -988,6 +1007,55 @@ export default function SettingsManager() {
       triggerHapticFeedback('error');
     } finally {
       setIsResettingDb(false);
+    }
+  };
+
+  // Dedicated Clear Audit Trails Handler
+  const handleClearAuditTrails = async () => {
+    if (!canResetDatabase && profile?.role !== 'admin') {
+      setResetErrorMsg('Permission Restricted: Only administrators can purge security audit trails.');
+      triggerHapticFeedback('error');
+      return;
+    }
+
+    try {
+      setIsClearingAuditLogs(true);
+      setResetErrorMsg(null);
+      setResetSuccessMsg(null);
+
+      try {
+        await supabase.rpc('purge_all_audit_logs');
+      } catch (e) {
+        console.warn('purge_all_audit_logs RPC fallback:', e);
+      }
+
+      for (let attempt = 0; attempt < 15; attempt++) {
+        const { count } = await supabase
+          .from('security_audit_logs')
+          .select('*', { count: 'exact', head: true });
+        if (!count || count === 0) break;
+
+        const { error: auditErr } = await supabase
+          .from('security_audit_logs')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        if (auditErr) {
+          console.warn('Audit purge batch warning:', auditErr.message);
+          break;
+        }
+      }
+
+      window.dispatchEvent(new CustomEvent('chitfund:audit_updated'));
+      triggerHapticFeedback('success');
+      setResetSuccessMsg('All audit trails and system activity logs have been permanently cleared.');
+      setShowClearAuditModal(false);
+      await fetchDbStats();
+    } catch (err: any) {
+      console.error('Failed to clear audit logs:', err);
+      setResetErrorMsg(err.message || 'Failed to clear audit logs.');
+      triggerHapticFeedback('error');
+    } finally {
+      setIsClearingAuditLogs(false);
     }
   };
 
@@ -3031,9 +3099,25 @@ export default function SettingsManager() {
                       <div className="text-2xl font-black text-slate-900 font-mono">{dbStats.auctionLogsCount}</div>
                       <div className="text-xs text-slate-500 font-bold mt-0.5">Auction Logs</div>
                     </div>
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                      <div className="text-2xl font-black text-slate-900 font-mono">{dbStats.auditLogsCount}</div>
-                      <div className="text-xs text-slate-500 font-bold mt-0.5">Audit Trails</div>
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center flex flex-col justify-between">
+                      <div>
+                        <div className="text-2xl font-black text-slate-900 font-mono">{dbStats.auditLogsCount}</div>
+                        <div className="text-xs text-slate-500 font-bold mt-0.5">Audit Trails</div>
+                      </div>
+                      {dbStats.auditLogsCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowClearAuditModal(true);
+                            setResetSuccessMsg(null);
+                            setResetErrorMsg(null);
+                            triggerHapticFeedback('warning');
+                          }}
+                          className="mt-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Clear Trails
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3254,6 +3338,52 @@ export default function SettingsManager() {
               >
                 <Trash2 size={14} />
                 <span>{isResettingDb ? 'Purging Database...' : 'Confirm Purge (Click)'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          CLEAR AUDIT TRAILS CONFIRMATION MODAL
+          ═══════════════════════════════════════════════════════════════════ */}
+      {showClearAuditModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-rose-600">
+                <Trash2 size={20} />
+                <h3 className="font-bold text-sm text-slate-900">Clear All Audit Trails</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowClearAuditModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to permanently clear all <strong className="font-mono text-slate-900">{dbStats.auditLogsCount}</strong> administrative audit trails and system activity feed logs? This action is irreversible. All other subscriber and scheme data will remain completely intact.
+            </p>
+
+            <div className="pt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowClearAuditModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isClearingAuditLogs}
+                onClick={handleClearAuditTrails}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                <span>{isClearingAuditLogs ? 'Clearing Logs...' : 'Yes, Clear All Logs'}</span>
               </button>
             </div>
           </div>
