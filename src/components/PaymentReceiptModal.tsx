@@ -21,6 +21,7 @@ import {
 import { toPng } from 'html-to-image';
 import { triggerHapticFeedback } from '../utils/haptics';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useSystemSettings } from '@/context/SystemSettingsContext';
 import { extractReceiptNumber } from '@/utils/receiptNumber';
 
 export interface PaymentAllocationItem {
@@ -181,6 +182,8 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
     organizationTagline: globalOrgTagline,
     organizationInitials: globalOrgInitials
   } = useOrganization();
+  const { notifConfig, upiConfig } = useSystemSettings();
+  const activeReceiptFooter = notifConfig?.receiptFooterMessage || 'நன்றி! உங்கள் சேமிப்பு உங்கள் எதிர்காலம்.';
 
   const previewRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -236,7 +239,11 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
     transaction.wallet_type === 'cash' ||
     String(transaction.wallet_type).toLowerCase().includes('cash');
 
-  const walletDisplay = isCash ? 'Cash in Hand' : 'Online Transfer';
+  const walletDisplay = isCash
+    ? 'Cash in Hand'
+    : (upiConfig?.enabled && upiConfig?.vpa && transaction.wallet_type === 'kishor_bank')
+      ? `Online UPI (${upiConfig.vpa})`
+      : 'Online Transfer';
   const groupName = group?.name || 'Chit Group';
   const amountInWords = numberToWordsINR(effectiveTotalPaid);
 
@@ -692,6 +699,13 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Dynamic Receipt Custom Footer from Notification Preferences */}
+      {activeReceiptFooter && (
+        <div className="bg-emerald-50/60 px-4 py-2 border-t border-slate-200/80 text-center text-[10px] font-semibold text-emerald-900 leading-snug">
+          {activeReceiptFooter}
+        </div>
+      )}
 
       {/* Bottom Security Bar */}
       <div className="bg-slate-100 px-4 py-1.5 border-t border-slate-200 text-center text-[9px] text-slate-500 font-mono font-medium">

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth, UserRole } from '@/context/AuthContext';
 import { useMaintenance } from '@/context/MaintenanceContext';
+import { useSystemSettings } from '@/context/SystemSettingsContext';
 import { CustomRoleRecord } from '@/utils/rbac';
 import MemberDetailsView from './MemberDetailsView';
 import PassbookScannerModal from './PassbookScannerModal';
@@ -82,6 +83,8 @@ interface MemberMatrixProps {
 export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory', onOpenAuditLogs }: MemberMatrixProps) {
   const { profile: currentAdminProfile, canPerformAction } = useAuth();
   const { isMaintenanceMode, toggleMaintenanceMode } = useMaintenance();
+  const { securityConfig, chitRules } = useSystemSettings();
+  const defaultMpin = securityConfig?.defaultMemberMpin || '1234';
 
   // Permission guards
   const canEnroll = canPerformAction('members:enroll');
@@ -337,7 +340,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
               phone_number: prof.phone_number || '',
               role: prof.role || 'subscriber',
               passbook_token: prof.passbook_token || null,
-              mpin: prof.mpin || '1234',
+              mpin: prof.mpin || defaultMpin,
               is_blocked: prof.is_blocked || false,
               created_at: prof.created_at || new Date().toISOString(),
             });
@@ -348,7 +351,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
               phone_number: '',
               role: 'subscriber',
               passbook_token: null,
-              mpin: '1234',
+              mpin: defaultMpin,
               is_blocked: false,
               created_at: new Date().toISOString(),
             });
@@ -412,7 +415,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
                 phone_number: p?.phoneNumber || '',
                 role: p?.role || (pId === currentAdminProfile.id ? 'admin' : 'subscriber'),
                 passbook_token: p?.passbookToken || null,
-                mpin: p?.mpin || '1234',
+                mpin: p?.mpin || defaultMpin,
                 is_blocked: p?.isBlocked || false,
                 created_at: new Date().toISOString(),
               };
@@ -434,7 +437,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
                     phone_number: m.phoneNumber || '',
                     role: 'subscriber',
                     passbook_token: null,
-                    mpin: '1234',
+                    mpin: defaultMpin,
                     is_blocked: false,
                     created_at: new Date().toISOString(),
                   }],
@@ -510,7 +513,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
               role: p.role || 'subscriber',
               groups: assignedGroups,
               passbookToken: p.passbook_token || undefined,
-              mpin: p.mpin || '1234',
+              mpin: p.mpin || defaultMpin,
               isBlocked: p.is_blocked || false,
               rescheduleAcknowledgments: p.reschedule_acknowledgments || undefined,
               createdAt: p.created_at,
@@ -621,7 +624,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
     const outstandingDue = Math.max(0, totalExpected - totalPaid);
 
     const isPassbookLinked = !!member.passbookToken;
-    const isDefaultMpin = !member.mpin || member.mpin === '1234';
+    const isDefaultMpin = !member.mpin || member.mpin === defaultMpin;
 
     return {
       isWinner,
@@ -644,8 +647,8 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
     const customRolesCount = customRoles.filter((r) => !r.is_system).length;
     const qrLinkedCount = members.filter((m) => !!m.passbookToken).length;
     const blockedCount = members.filter((m) => !!m.isBlocked).length;
-    const customMpinCount = members.filter((m) => m.mpin && m.mpin !== '1234').length;
-    const pendingMpinCount = members.filter((m) => !m.mpin || m.mpin === '1234').length;
+    const customMpinCount = members.filter((m) => m.mpin && m.mpin !== defaultMpin).length;
+    const pendingMpinCount = members.filter((m) => !m.mpin || m.mpin === defaultMpin).length;
     const mpinPercent = total > 0 ? Math.round((customMpinCount / total) * 100) : 0;
     const totalTickets = members.reduce((sum, m) => sum + m.groups.length, 0);
     const dualTicketHolders = members.filter((m) => m.groups.length > 1).length;
@@ -697,9 +700,9 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       paired: scopedMembers.filter((m) => !!m.passbookToken).length,
       unpaired: scopedMembers.filter((m) => !m.passbookToken).length,
       blocked: scopedMembers.filter((m) => !!m.isBlocked).length,
-      pendingMpin: scopedMembers.filter((m) => !m.mpin || m.mpin === '1234').length,
+      pendingMpin: scopedMembers.filter((m) => !m.mpin || m.mpin === defaultMpin).length,
     };
-  }, [scopedMembers]);
+  }, [scopedMembers, defaultMpin]);
 
   // ── Filtered members list (scopedMembers + tableFilter) ──
   const filteredMembers = useMemo(() => {
@@ -707,7 +710,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       // Table Status filter
       if (tableFilter === 'paired' && !m.passbookToken) return false;
       if (tableFilter === 'unpaired' && m.passbookToken) return false;
-      if (tableFilter === 'pending_mpin' && (m.mpin && m.mpin !== '1234')) return false;
+      if (tableFilter === 'pending_mpin' && (m.mpin && m.mpin !== defaultMpin)) return false;
       if (tableFilter === 'blocked' && !m.isBlocked) return false;
       return true;
     });
@@ -807,15 +810,15 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
     return { totalPaid, outstandingDue, enrolledValue, prizeWon, prizeWonSub };
   }, [activeDrawerMember, allTransactions, allAuctionLogs]);
 
-  // ── Reset MPIN to Default 1234 ──
+  // ── Reset MPIN to Default (Governed by Portal Security Settings) ──
   const handleResetMpin = async (member: MemberRecord) => {
-    if (!confirm(`Reset quick login MPIN for "${member.fullName}" to default "1234"?`)) return;
+    if (!confirm(`Reset quick login MPIN for "${member.fullName}" to default "${defaultMpin}"?`)) return;
     try {
-      const { error } = await supabase.from('profiles').update({ mpin: '1234' }).eq('id', member.id);
+      const { error } = await supabase.from('profiles').update({ mpin: defaultMpin }).eq('id', member.id);
       if (error) throw error;
-      setMembers((prev) => prev.map((m) => (m.id === member.id ? { ...m, mpin: '1234' } : m)));
-      alert(`MPIN for ${member.fullName} has been reset to default 1234.`);
-      if (onAddAuditLog) onAddAuditLog(`MPIN RESET: Reset MPIN for ${member.fullName} to default 1234`);
+      setMembers((prev) => prev.map((m) => (m.id === member.id ? { ...m, mpin: defaultMpin } : m)));
+      alert(`MPIN for ${member.fullName} has been reset to default ${defaultMpin}.`);
+      if (onAddAuditLog) onAddAuditLog(`MPIN RESET: Reset MPIN for ${member.fullName} to default ${defaultMpin}`);
     } catch (err: any) {
       alert(`Failed to reset MPIN: ${err.message}`);
     }
@@ -829,7 +832,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       return;
     }
     const text = encodeURIComponent(
-      `Hello ${member.fullName},\n\nYour ChitFunds Portal quick login MPIN is set to default 1234.\n\nPlease log in to your account and set your personalized 4-digit security MPIN.`
+      `Hello ${member.fullName},\n\nYour ChitFunds Portal quick login MPIN is set to default ${defaultMpin}.\n\nPlease log in to your account and set your personalized 4-digit security MPIN.`
     );
     window.open(`https://wa.me/91${cleanPhone}?text=${text}`, '_blank');
   };
@@ -1007,7 +1010,7 @@ Welcome to your Chit Fund Member Portal.
 Access your digital passbook, payment ledger & live auction bidding anytime:
 🔗 *Passbook Direct Link*: ${scanUrl}
 👤 *Mobile Number*: ${cleanPhone}
-🔑 *Login PIN*: Use the default PIN *1234* and change it after your first login.
+🔑 *Login PIN*: Use the default PIN *${defaultMpin}* and change it after your first login.
 
 _(Point any camera at your physical pocket book QR sticker to log in instantly)_`;
 
@@ -1428,7 +1431,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     <>
                       <button
                         type="button"
-                        onClick={() => setIsInventoryOpen(true)}
+                        onClick={() => {
+                          setSelectedSubscribersForPrint(null);
+                          setQrCenterTab('batches');
+                          setIsQrCenterOpen(true);
+                        }}
                         className="inline-flex items-center gap-1 text-[11px] text-slate-600 hover:text-slate-900 font-semibold bg-slate-100 hover:bg-slate-200/80 px-2 py-1 rounded-lg transition-colors cursor-pointer"
                       >
                         <Layers size={13} className="text-slate-500" />
@@ -1471,7 +1478,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                   <span>{stats.total - stats.customMpinCount} pending self-service MPIN</span>
                   <span
                     onClick={() => {
-                      const firstPending = members.find(m => !m.mpin || m.mpin === '1234');
+                      const firstPending = members.find(m => !m.mpin || m.mpin === defaultMpin);
                       if (firstPending) handleNotifyMpin(firstPending);
                     }}
                     className="text-brand-600 font-semibold cursor-pointer hover:underline text-[11px]"
@@ -1745,7 +1752,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                 >
                                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Blocked
                                 </button>
-                              ) : (!member.mpin || member.mpin === '1234') ? (
+                              ) : (!member.mpin || member.mpin === defaultMpin) ? (
                                 <button
                                   type="button"
                                   onClick={() => handleNotifyMpin(member)}
@@ -1961,8 +1968,8 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           <div>
                             <p className="font-semibold text-slate-800">Quick Login MPIN</p>
                             <p className="text-[10px] text-slate-400">
-                              {(!activeDrawerMember.mpin || activeDrawerMember.mpin === '1234')
-                                ? 'Default PIN 1234 active'
+                              {(!activeDrawerMember.mpin || activeDrawerMember.mpin === defaultMpin)
+                                ? `Default PIN ${defaultMpin} active`
                                 : 'Initialized on member mobile device'}
                             </p>
                           </div>

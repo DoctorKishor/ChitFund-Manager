@@ -1106,6 +1106,22 @@ insert into public.system_settings (key, value)
 values ('maintenance_mode', '{"enabled": false, "message": "Scheduled upgrades in progress."}'::jsonb)
 on conflict (key) do nothing;
 
+insert into public.system_settings (key, value)
+values ('chit_rules_defaults', '{"defaultFloorDiscountPercent": 40, "defaultBidStep": 1000, "defaultAuctionTime": 15, "defaulterGraceDays": 5, "allowPartialPayments": true, "autoTriggerLaabaSeetu": true}'::jsonb)
+on conflict (key) do nothing;
+
+insert into public.system_settings (key, value)
+values ('upi_payment_gateway', '{"enabled": true, "vpa": "9943609010@ibl", "payeeName": "Dr. Kishor Anbazhakan", "defaultVault": "kishor_bank", "allowCustomAmount": true}'::jsonb)
+on conflict (key) do nothing;
+
+insert into public.system_settings (key, value)
+values ('notification_preferences', '{"defaultLanguage": "ta", "autoPromptReceipt": true, "preAuctionNoticeDays": 2, "organizerHelpdeskPhone": "9943609010", "receiptFooterMessage": "நன்றி! உங்கள் சேமிப்பு உங்கள் எதிர்காலம்."}'::jsonb)
+on conflict (key) do nothing;
+
+insert into public.system_settings (key, value)
+values ('portal_security_policy', '{"defaultMemberMpin": "1234", "cashBoxSafetyThreshold": 150000, "sessionInactivityMinutes": 60}'::jsonb)
+on conflict (key) do nothing;
+
 alter table public.system_settings enable row level security;
 
 create policy "Allow public read system_settings" on public.system_settings

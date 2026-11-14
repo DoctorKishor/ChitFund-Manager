@@ -469,6 +469,9 @@ export default function SettingsManager() {
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('chitfund_chit_rules_defaults', JSON.stringify(chitRules));
+        window.dispatchEvent(new CustomEvent('chitfund:settings_updated', {
+          detail: { key: 'chit_rules_defaults', value: chitRules }
+        }));
       }
 
       setRulesSuccessMsg('Chit mechanics and auction floor defaults saved successfully! Applied to upcoming groups and live bidding sessions.');
@@ -518,6 +521,9 @@ export default function SettingsManager() {
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('chitfund_upi_payment_gateway', JSON.stringify(payload));
+        window.dispatchEvent(new CustomEvent('chitfund:settings_updated', {
+          detail: { key: 'upi_payment_gateway', value: payload }
+        }));
       }
 
       setUpiSuccessMsg('UPI digital payment gateway configured! Dynamic QR codes and intent links updated across all receipts.');
@@ -571,6 +577,9 @@ export default function SettingsManager() {
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('chitfund_notification_preferences', JSON.stringify(payload));
+        window.dispatchEvent(new CustomEvent('chitfund:settings_updated', {
+          detail: { key: 'notification_preferences', value: payload }
+        }));
       }
 
       setNotifSuccessMsg('WhatsApp reminder & receipt automation settings saved! Default template language set to ' + (payload.defaultLanguage === 'ta' ? 'Tamil (தமிழ்)' : 'English') + '.');
@@ -613,6 +622,9 @@ export default function SettingsManager() {
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('chitfund_portal_security_policy', JSON.stringify(securityConfig));
+        window.dispatchEvent(new CustomEvent('chitfund:settings_updated', {
+          detail: { key: 'portal_security_policy', value: securityConfig }
+        }));
       }
 
       setSecuritySuccessMsg('Portal security policy updated! Default onboarding MPIN and cash box safety alerts applied.');

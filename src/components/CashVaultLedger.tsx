@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useWallet, WalletType } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
+import { useSystemSettings } from '../context/SystemSettingsContext';
 import { supabase } from '../utils/supabase/client';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import { logAuditEvent } from '@/utils/auditLogger';
@@ -100,6 +101,7 @@ export default function CashVaultLedger() {
   const canPersonalDraw = canPerformAction('treasury:personal_draw');
   const canSettleDraw = canPerformAction('treasury:settle_draw');
   const canReconcile = canPerformAction('treasury:reconcile');
+  const { securityConfig } = useSystemSettings();
   const activeAdminName = profile?.fullName || 'Admin';
 
   // Active filter for account cards & statement
@@ -1866,6 +1868,15 @@ export default function CashVaultLedger() {
               </div>
 
               <div className="relative z-10 my-3">
+                {balances.cash_in_hand > (securityConfig?.cashBoxSafetyThreshold || 150000) && (
+                  <div className="mb-2 px-2.5 py-1 rounded-xl bg-amber-500/25 border border-amber-400/50 text-amber-200 text-[10px] font-bold flex items-center justify-between shadow-xs">
+                    <span className="flex items-center gap-1.5">
+                      <span>⚠️</span>
+                      <span>Exceeds Safety Threshold (&gt; ₹{(securityConfig?.cashBoxSafetyThreshold || 150000).toLocaleString('en-IN')})</span>
+                    </span>
+                    <span className="text-[9px] uppercase tracking-wider text-amber-300 font-extrabold underline">Relocate</span>
+                  </div>
+                )}
                 <div className="flex items-baseline justify-between">
                   <div>
                     <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Available Balance</p>

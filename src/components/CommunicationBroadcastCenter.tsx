@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useSystemSettings } from '@/context/SystemSettingsContext';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import { computeNextAuctionDateTime, formatTime12h, getFirstSundayOnOrAfterDay } from '@/utils/auctionSchedule';
 import { Check, X, Edit3, Sparkles } from 'lucide-react';
@@ -411,6 +412,40 @@ const BROADCAST_VARIABLES: VariableDefinition[] = [
         year: 'numeric',
       }),
   },
+  {
+    key: 'upi_vpa',
+    label: 'UPI Virtual Payment Address',
+    category: 'org',
+    description: 'UPI VPA address configured in settings',
+    getValue: () => {
+      if (typeof window !== 'undefined') {
+        try {
+          const upi = JSON.parse(localStorage.getItem('chitfund_upi_payment_gateway') || '{}');
+          if (upi.vpa) return upi.vpa;
+        } catch (e) { /* ignore */ }
+      }
+      return '9943609010@ibl';
+    },
+  },
+  {
+    key: 'upi_pay_link',
+    label: 'UPI Direct Pay Link',
+    category: 'org',
+    description: 'Direct deep-link for instant UPI app payment',
+    getValue: (m) => {
+      let vpa = '9943609010@ibl';
+      let payee = 'Dr. Kishor Anbazhakan';
+      if (typeof window !== 'undefined') {
+        try {
+          const upi = JSON.parse(localStorage.getItem('chitfund_upi_payment_gateway') || '{}');
+          if (upi.vpa) vpa = upi.vpa;
+          if (upi.payeeName) payee = upi.payeeName;
+        } catch (e) { /* ignore */ }
+      }
+      const amt = m?.fixedInstallment || (m?.totalValue && m?.memberCount ? Math.round(m.totalValue / m.memberCount) : '');
+      return `upi://pay?pa=${vpa}&pn=${encodeURIComponent(payee)}&am=${amt}&cu=INR`;
+    },
+  },
 ];
 
 // Standard Verified Default Templates
@@ -562,11 +597,20 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
   const canManageTemplates = canPerformAction('communication:manage_templates');
   const canSendAdhoc = canPerformAction('communication:custom');
   const { organizationName } = useOrganization();
+  const { notifConfig, upiConfig } = useSystemSettings();
   const [groupsMetadata, setGroupsMetadata] = useState<Record<string, GroupMetadata>>({});
   const [activeGroupKey, setActiveGroupKey] = useState<string>('');
   
-  // Language & Template Mode State
-  const [language, setLanguage] = useState<'en' | 'ta'>('ta'); // Default to Tamil
+  // Language & Template Mode State (governed by notification preferences in Settings)
+  const [language, setLanguage] = useState<'en' | 'ta'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const notif = JSON.parse(localStorage.getItem('chitfund_notification_preferences') || '{}');
+        if (notif.defaultLanguage) return notif.defaultLanguage;
+      } catch (e) { /* ignore */ }
+    }
+    return notifConfig?.defaultLanguage || 'ta';
+  });
   const [templateType, setTemplateType] = useState<TemplateCategory>('pre-auction');
   const canSendCurrentBroadcast = 
     templateType === 'pre-auction' ? canPreAuction :
@@ -607,9 +651,14 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
 
   const [contactPhone, setContactPhone] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('chit_broadcast_phone') || profile?.phoneNumber || '+91 99436 09010';
+      return (
+        localStorage.getItem('chit_broadcast_phone') ||
+        notifConfig?.organizerHelpdeskPhone ||
+        profile?.phoneNumber ||
+        '+91 99436 09010'
+      );
     }
-    return profile?.phoneNumber || '+91 99436 09010';
+    return notifConfig?.organizerHelpdeskPhone || profile?.phoneNumber || '+91 99436 09010';
   });
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);

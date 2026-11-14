@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useWallet, WalletType } from '@/context/WalletContext';
 import { useAuth } from '@/context/AuthContext';
+import { useSystemSettings } from '@/context/SystemSettingsContext';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import PassbookScannerModal from '@/components/PassbookScannerModal';
 import { PaymentReceiptModal } from '@/components/PaymentReceiptModal';
@@ -89,6 +90,7 @@ export default function UniversalRecordPaymentModal({
 }: UniversalRecordPaymentModalProps) {
   const { balances, updateBalance } = useWallet();
   const { profile: currentAdminProfile } = useAuth();
+  const { chitRules, upiConfig, notifConfig } = useSystemSettings();
 
   // ── 1. Search / Member Selection State ──
   const [searchQuery, setSearchQuery] = useState('');
@@ -121,8 +123,8 @@ export default function UniversalRecordPaymentModal({
   // ── 3. Payment Mode State ──
   // Primary mode: 'cash' | 'online'
   const [paymentMode, setPaymentMode] = useState<'cash' | 'online'>('cash');
-  // If online, which specific bank vault:
-  const [onlineBank, setOnlineBank] = useState<WalletType>('kishor_bank');
+  // If online, which specific bank vault (default governed by UPI settings):
+  const [onlineBank, setOnlineBank] = useState<WalletType>(upiConfig?.defaultVault || 'kishor_bank');
 
   // ── 4. Advanced Options Accordion ──
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -161,7 +163,7 @@ export default function UniversalRecordPaymentModal({
       setCompletedPaymentSummary(null);
       setIsReceiptOpen(false);
       setPaymentMode('cash');
-      setOnlineBank('kishor_bank');
+      setOnlineBank(upiConfig?.defaultVault || 'kishor_bank');
       setShowAdvanced(false);
       setPaymentNote('');
       setReceiptFile(null);
@@ -849,6 +851,18 @@ export default function UniversalRecordPaymentModal({
       return;
     }
 
+    // Enforce Partial Payment Governance from Chit Rules Defaults
+    if (chitRules?.allowPartialPayments === false) {
+      const hasPartial = calculatedItemsList.some(item => {
+        const requiredDue = item.group.effectiveInstallment || item.group.baseInstallment || 0;
+        return requiredDue > 0 && item.amount < requiredDue;
+      });
+      if (hasPartial) {
+        alert('Partial payments are disabled by administrator in Chit Rules settings. Please collect the full installment due.');
+        return;
+      }
+    }
+
     try {
       setIsSubmitting(true);
       triggerHapticFeedback('light');
@@ -1001,7 +1015,7 @@ export default function UniversalRecordPaymentModal({
         })),
       };
 
-      // 8. Set Completed Summary (Smooth inline success screen, NO auto-popup receipt!)
+      // 8. Set Completed Summary
       setCompletedPaymentSummary({
         totalAmount: totalCollectionAmount,
         walletType: effectiveWallet,
@@ -1011,6 +1025,14 @@ export default function UniversalRecordPaymentModal({
         receiptPayload,
         allocationsSummary: activeSelectionsSummary,
       });
+
+      // Auto-prompt digital receipt if enabled in Notification Preferences
+      if (notifConfig?.autoPromptReceipt) {
+        setIsReceiptOpen(true);
+        if (onOpenReceiptModal) {
+          onOpenReceiptModal(receiptPayload);
+        }
+      }
 
       if (onPaymentSuccess) {
         onPaymentSuccess();
@@ -1806,6 +1828,13 @@ export default function UniversalRecordPaymentModal({
                             );
                           })}
                         </div>
+
+                        {upiConfig?.enabled && upiConfig?.vpa && (
+                          <div className="pt-1.5 text-[10px] text-indigo-700/90 flex items-center justify-between border-t border-indigo-200/60 font-mono">
+                            <span>UPI: <strong>{upiConfig.vpa}</strong></span>
+                            <span className="truncate max-w-[140px] text-right font-sans font-medium">{upiConfig.payeeName}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

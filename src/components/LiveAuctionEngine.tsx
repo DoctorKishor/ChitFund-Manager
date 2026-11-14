@@ -58,6 +58,7 @@ import { triggerHapticFeedback } from '@/utils/haptics';
 import { useAuth } from '@/context/AuthContext';
 import { useWallet, WalletType } from '@/context/WalletContext';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useSystemSettings } from '@/context/SystemSettingsContext';
 import { exportAuctionReportPdf, shareAuctionReportToWhatsApp } from '@/utils/auctionPdfExporter';
 import AuctionReportDocument, { AuctionReportData } from '@/components/AuctionReportDocument';
 import LiveViewersModal, { ActiveViewerInfo } from '@/components/LiveViewersModal';
@@ -155,6 +156,7 @@ export default function LiveAuctionEngine() {
   const canDisbursePayout = canPerformAction('auctions:disburse');
   const canIssueReceipt = canPerformAction('auctions:issue_receipt');
   const { organizationName, organizationTagline, organizationInitials } = useOrganization();
+  const { chitRules } = useSystemSettings();
 
   // 1. Initial State Data (Loaded from Supabase)
   const [allGroups, setAllGroups] = useState<ChitGroup[]>([]);
@@ -641,21 +643,35 @@ export default function LiveAuctionEngine() {
     return Math.max(10000, Math.round(group.totalValue * 0.1));
   }, [group]);
 
-  // Next Candidate Direct Target Tiles (Absolute amounts)
+  // Next Candidate Direct Target Tiles (Absolute amounts governed by system chit rules)
   const candidateTargetTiles = useMemo(() => {
     if (!group) return [];
-    const maxDiscountAllowed = Math.round(group.totalValue * 0.45);
+    const statutoryCapPct = (chitRules?.defaultFloorDiscountPercent ?? 40) / 100;
+    const maxDiscountAllowed = Math.round(group.totalValue * statutoryCapPct);
+    const step = chitRules?.defaultBidStep || 1000;
     const tiles: number[] = [];
 
     if (highestBid === 0) {
-      // When no bids yet, provide popular baseline targets
+      // When no bids yet, provide popular baseline targets scaled by step
       const typical = [10000, 15000, 20000, 25000, 26000, 27000, 28000, 29000, 30000, 32000, 35000, 40000];
       typical.forEach(amt => {
         if (amt <= maxDiscountAllowed) tiles.push(amt);
       });
     } else {
-      // When bids are active, give fine-grained relative bumps AND rounded whole-thousand targets
-      const deltas = [250, 500, 1000, 1500, 2000, 3000, 4000, 5000, 8000, 10000];
+      // When bids are active, give fine-grained relative bumps based on defaultBidStep
+      const deltas = [
+        Math.round(step * 0.25),
+        Math.round(step * 0.5),
+        step,
+        Math.round(step * 1.5),
+        step * 2,
+        step * 3,
+        step * 4,
+        step * 5,
+        step * 8,
+        step * 10,
+      ].filter(d => d > 0);
+
       deltas.forEach(d => {
         const nextAmt = highestBid + d;
         if (nextAmt <= maxDiscountAllowed && !tiles.includes(nextAmt)) {
@@ -663,9 +679,9 @@ export default function LiveAuctionEngine() {
         }
       });
       
-      // Also add next 3 whole-thousand ceiling targets (e.g. if bid is 28,500 -> 29,000, 30,000, 31,000)
-      const nextThousand = Math.ceil((highestBid + 1) / 1000) * 1000;
-      [nextThousand, nextThousand + 1000, nextThousand + 2000].forEach(amt => {
+      // Also add next 3 whole-step ceiling targets
+      const nextStepCeiling = Math.ceil((highestBid + 1) / step) * step;
+      [nextStepCeiling, nextStepCeiling + step, nextStepCeiling + step * 2].forEach(amt => {
         if (amt > highestBid && amt <= maxDiscountAllowed && !tiles.includes(amt)) {
           tiles.push(amt);
         }
@@ -673,7 +689,7 @@ export default function LiveAuctionEngine() {
     }
 
     return tiles.sort((a, b) => a - b).slice(0, 12);
-  }, [group, highestBid]);
+  }, [group, highestBid, chitRules]);
 
   // List of members to display on the board
   const displayedMembers = useMemo(() => {
@@ -851,8 +867,10 @@ export default function LiveAuctionEngine() {
       return;
     }
 
-    if (group && amount > group.totalValue * 0.45) {
-      alert(`Bid discount cannot exceed 45% of total chit value (Max allowed: ${formatCurrency(group.totalValue * 0.45)}).`);
+    const statutoryCapPct = (chitRules?.defaultFloorDiscountPercent ?? 40) / 100;
+    const maxDiscountCap = group ? Math.round(group.totalValue * statutoryCapPct) : 0;
+    if (group && amount > maxDiscountCap) {
+      alert(`Bid discount cannot exceed ${chitRules?.defaultFloorDiscountPercent ?? 40}% of total chit value (Max allowed: ${formatCurrency(maxDiscountCap)}).`);
       return;
     }
 
