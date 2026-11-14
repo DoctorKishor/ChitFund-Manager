@@ -1,29 +1,11 @@
--- ==============================================================================
--- CHIT FUNDS MANAGER — AUDIT LOG PURGE & DATABASE WIPE MIGRATION
--- Run this script once in your Supabase SQL Editor:
--- https://supabase.com/dashboard/project/vliuvsogkbarbwbrhsaf/sql
--- ==============================================================================
-
--- 1. Enable DELETE and INSERT on security_audit_logs so admin client can clear logs
-drop policy if exists "Allow security_audit_logs DELETE access to admin/manager" on public.security_audit_logs;
-create policy "Allow security_audit_logs DELETE access to admin/manager" on public.security_audit_logs
-  for delete
-  using (true);
-
-drop policy if exists "Allow security_audit_logs INSERT access to admin/manager" on public.security_audit_logs;
-create policy "Allow security_audit_logs INSERT access to admin/manager" on public.security_audit_logs
-  for insert
-  with check (true);
-
--- 2. Drop existing overloaded reset_test_database functions to resolve PostgREST ambiguity (PGRST203)
+-- Drop overloaded 0-arg functions so PostgREST has no ambiguity
+drop function if exists public.purge_all_audit_logs();
+drop function if exists public.purge_all_audit_logs(text);
 drop function if exists public.reset_test_database();
 drop function if exists public.reset_test_database(uuid);
 drop function if exists public.reset_test_database(text);
 
--- 3. Create public.purge_all_audit_logs() RPC
-drop function if exists public.purge_all_audit_logs();
-drop function if exists public.purge_all_audit_logs(text);
-
+-- Create single canonical purge_all_audit_logs with WHERE clause
 create or replace function public.purge_all_audit_logs(p_confirm text default 'PURGE_LOGS')
 returns jsonb
 language plpgsql
@@ -33,7 +15,9 @@ as $$
 begin
   -- Bypass audit trigger recording during the purge
   perform set_config('app.skip_audit_log', 'true', true);
-  delete from public.security_audit_logs;
+  
+  delete from public.security_audit_logs where id is not null;
+  
   perform set_config('app.skip_audit_log', 'false', true);
 
   return jsonb_build_object(
@@ -44,10 +28,9 @@ begin
 end;
 $$;
 
-grant execute on function public.purge_all_audit_logs(text) to authenticated, anon;
-grant execute on function public.purge_all_audit_logs() to authenticated, anon;
+grant execute on function public.purge_all_audit_logs(text) to authenticated, anon, service_role, public;
 
--- 4. Create public.reset_test_database(p_confirm_phrase text) RPC
+-- Create single canonical reset_test_database with WHERE clauses
 create or replace function public.reset_test_database(p_confirm_phrase text default 'WIPE_ALL_DATA')
 returns jsonb
 language plpgsql
@@ -78,25 +61,26 @@ begin
   perform set_config('app.skip_audit_log', 'true', true);
 
   -- Nullify foreign keys to break circular dependencies
-  update public.system_settings set updated_by = v_main_admin_id;
-  update public.group_members set transferred_from = null, profile_id = null;
-  update public.transactions set group_id = null, profile_id = null, group_member_id = null, created_by = null;
-  update public.auction_logs set winning_bidder_id = null, winning_member_id = null, runner_up_bidder_id = null;
-  update public.passbook_inventory set assigned_to_profile_id = null;
-  update public.security_audit_logs set admin_id = null;
+  update public.system_settings set updated_by = v_main_admin_id where key is not null;
+  update public.group_members set transferred_from = null, profile_id = null where id is not null;
+  update public.transactions set group_id = null, profile_id = null, group_member_id = null, created_by = null where id is not null;
+  update public.auction_logs set winning_bidder_id = null, winning_member_id = null, runner_up_bidder_id = null where id is not null;
+  update public.passbook_inventory set assigned_to_profile_id = null where id is not null;
+  update public.security_audit_logs set admin_id = null where id is not null;
 
-  -- Purge operational tables
-  delete from public.transactions;
-  delete from public.auction_logs;
-  delete from public.group_members;
-  delete from public.chit_groups;
-  delete from public.passbook_inventory;
+  -- Purge operational tables with WHERE clauses
+  delete from public.transactions where id is not null;
+  delete from public.auction_logs where id is not null;
+  delete from public.group_members where id is not null;
+  delete from public.chit_groups where id is not null;
+  delete from public.passbook_inventory where id is not null;
 
   -- Reset treasury balances to 0
   update public.global_treasury 
   set current_balance = 0, 
       pending_verification_balance = 0,
-      last_updated_by = v_main_admin_id;
+      last_updated_by = v_main_admin_id
+  where wallet_type is not null;
 
   insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
   values 
@@ -123,7 +107,7 @@ begin
   end;
 
   -- Purge all audit logs completely
-  delete from public.security_audit_logs;
+  delete from public.security_audit_logs where id is not null;
   perform set_config('app.skip_audit_log', 'false', true);
 
   result := jsonb_build_object(
@@ -135,14 +119,7 @@ begin
 end;
 $$;
 
-grant execute on function public.reset_test_database(text) to authenticated, anon;
-grant execute on function public.reset_test_database() to authenticated, anon;
+grant execute on function public.reset_test_database(text) to authenticated, anon, service_role, public;
 
--- 5. Execute immediate purge of existing stale audit logs
-DO $$
-begin
-  perform set_config('app.skip_audit_log', 'true', true);
-  delete from public.security_audit_logs;
-  perform set_config('app.skip_audit_log', 'false', true);
-end;
-$$;
+-- Reload PostgREST schema cache
+NOTIFY pgrst, 'reload schema';

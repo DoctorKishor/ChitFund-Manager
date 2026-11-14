@@ -674,15 +674,14 @@ set search_path = public, auth
 as $$
 begin
   perform set_config('app.skip_audit_log', 'true', true);
-  delete from public.security_audit_logs;
+  delete from public.security_audit_logs where id is not null;
   perform set_config('app.skip_audit_log', 'false', true);
 
-  return jsonb_build_object('success', true, 'message', 'All security audit logs successfully cleared.');
+  return jsonb_build_object('success', true, 'message', 'All security audit logs successfully cleared.', 'cleared_at', now());
 end;
 $$;
 
 grant execute on function public.purge_all_audit_logs(text) to authenticated, anon;
-grant execute on function public.purge_all_audit_logs() to authenticated, anon;
 
 -- ==========================================
 -- 5. Passbook Inventory & Token Authentication
@@ -1201,25 +1200,26 @@ begin
   perform set_config('app.skip_audit_log', 'true', true);
 
   -- 5. Nullify foreign keys to break circular dependencies
-  update public.system_settings set updated_by = v_main_admin_id;
-  update public.group_members set transferred_from = null, profile_id = null;
-  update public.transactions set group_id = null, profile_id = null, group_member_id = null, created_by = null;
-  update public.auction_logs set winning_bidder_id = null, winning_member_id = null, runner_up_bidder_id = null;
-  update public.passbook_inventory set assigned_to_profile_id = null;
-  update public.security_audit_logs set admin_id = null;
+  update public.system_settings set updated_by = v_main_admin_id where key is not null;
+  update public.group_members set transferred_from = null, profile_id = null where id is not null;
+  update public.transactions set group_id = null, profile_id = null, group_member_id = null, created_by = null where id is not null;
+  update public.auction_logs set winning_bidder_id = null, winning_member_id = null, runner_up_bidder_id = null where id is not null;
+  update public.passbook_inventory set assigned_to_profile_id = null where id is not null;
+  update public.security_audit_logs set admin_id = null where id is not null;
 
   -- 6. Purge operational ledger, bids, members, chits, and QR inventory
-  delete from public.transactions;
-  delete from public.auction_logs;
-  delete from public.group_members;
-  delete from public.chit_groups;
-  delete from public.passbook_inventory;
+  delete from public.transactions where id is not null;
+  delete from public.auction_logs where id is not null;
+  delete from public.group_members where id is not null;
+  delete from public.chit_groups where id is not null;
+  delete from public.passbook_inventory where id is not null;
 
   -- 7. Reset all 4 treasury vaults to exactly zero
   update public.global_treasury 
   set current_balance = 0, 
       pending_verification_balance = 0,
-      last_updated_by = v_main_admin_id;
+      last_updated_by = v_main_admin_id
+  where wallet_type is not null;
 
   insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
   values 
@@ -1250,7 +1250,7 @@ begin
   end;
 
   -- 10. Purge all audit logs completely (0 trails)
-  delete from public.security_audit_logs;
+  delete from public.security_audit_logs where id is not null;
 
   -- Reset audit trigger flag
   perform set_config('app.skip_audit_log', 'false', true);

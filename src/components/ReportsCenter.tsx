@@ -1096,8 +1096,8 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         if (explicitProfitTxs > 0) {
           groupOrganizerProfit = explicitProfitTxs;
         } else if (currentM > 0) {
-          // If group has advanced past launch, Organizer Profit is realized (up to collections or total value)
-          groupOrganizerProfit = m0Collections > 0 ? m0Collections : totalVal;
+          // If group has advanced past launch, Organizer Profit is realized based on actual Month 0 collections
+          groupOrganizerProfit = m0Collections;
         } else {
           // If group is still in Month 0, ONLY actual collections count as realized profit (never assume totalVal upfront)
           groupOrganizerProfit = m0Collections;
@@ -1367,7 +1367,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     const winningDiscount = Number(winAuction?.winning_discount || 0);
     const netPrizePot = winAuction 
       ? (Number(winAuction.net_payout) || (totalVal - winningDiscount))
-      : (totalVal - 5000);
+      : (hasWon ? totalVal : 0);
 
     // Find actual prize payout transactions for this member
     const winMonthPattern = winAuction ? new RegExp(`\\bMonth\\s+${winAuction.month}\\b|\\bM${winAuction.month}\\b|\\bM\\s*${winAuction.month}\\b`, 'i') : null;
@@ -2135,25 +2135,25 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         // Month 0 Launch Month
         const isPastOrSealed = currentM > 0;
         const expected = totalVal;
-        const collected = isPastOrSealed ? (totalCollected > 0 ? totalCollected : totalVal) : totalCollected;
+        const collected = totalCollected;
         const shortfall = Math.max(0, expected - collected);
-        const velocity = expected > 0 ? Math.min(100, Math.round((collected / expected) * 100)) : 100;
+        const velocity = expected > 0 ? Math.min(100, Math.round((collected / expected) * 100)) : 0;
         const paidCount = new Set(txsForMonth.map(t => t.group_member_id || t.profile_id)).size;
 
         rows.push({
           cycleNum: 0,
           cycleTitle: `Cycle M0 (${monthInfo.dateLabel} Launch)`,
-          badgeText: isPastOrSealed ? 'Organizer Profit Sealed' : 'Launch Collection Active',
+          badgeText: isPastOrSealed ? (shortfall === 0 ? 'Organizer Profit Sealed' : 'Launch Concluded (Arrears)') : 'Launch Collection Active',
           badgeColor: 'bg-slate-100 text-slate-600 border-slate-200/60',
           subLabel: 'Organizer Profit Initial Pot',
           dotColor: 'bg-slate-400',
           expected,
           collected,
-          breakdownText: isPastOrSealed && breakdownStr === '₹0 Collected' ? `₹${(expected / 100000).toFixed(2)}L Direct Organizer Reserve` : breakdownStr,
+          breakdownText: breakdownStr,
           shortfall,
           shortfallSubtext: shortfall > 0 ? `₹${shortfall.toLocaleString('en-IN')} pending` : 'Zero overdue',
           velocity,
-          statusPill: isPastOrSealed ? 'Organizer Profit Sealed' : `${paidCount} / ${totalMembers} Paid`,
+          statusPill: isPastOrSealed && shortfall === 0 ? 'Organizer Profit Sealed' : `${paidCount} / ${totalMembers} Paid`,
           statusPillStyle: 'bg-slate-100 text-slate-700 border-slate-200',
           actionType: 'voucher',
           isLive: currentM === 0,
@@ -2161,11 +2161,11 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       } else if (m === currentM) {
         // Active Live Cycle
         const expected = monthlyStats.expected > 0 ? monthlyStats.expected : totalVal;
-        const collected = monthlyStats.collected > 0 ? monthlyStats.collected : totalCollected;
-        const shortfall = monthlyStats.pending > 0 ? monthlyStats.pending : Math.max(0, expected - collected);
-        const velocity = monthlyStats.expected > 0 ? monthlyStats.collectionPercent : (expected > 0 ? Math.round((collected / expected) * 100) : 0);
-        const paidCount = monthlyStats.paidCount > 0 ? monthlyStats.paidCount : new Set(txsForMonth.map(t => t.group_member_id || t.profile_id)).size;
-        const overdueCount = monthlyStats.pendingCount > 0 ? monthlyStats.pendingCount : Math.max(0, totalMembers - paidCount);
+        const collected = totalCollected;
+        const shortfall = Math.max(0, expected - collected);
+        const velocity = expected > 0 ? Math.round((collected / expected) * 100) : 0;
+        const paidCount = new Set(txsForMonth.map(t => t.group_member_id || t.profile_id)).size;
+        const overdueCount = Math.max(0, totalMembers - paidCount);
 
         rows.push({
           cycleNum: m,
@@ -2190,26 +2190,26 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         const auction = auctionLogs.find(a => a.group_id === selectedGroup.id && Number(a.month) === m);
         const winnerName = auction?.profiles?.full_name || 'Subscriber Winner';
         const expected = totalVal;
-        const collected = totalCollected > 0 ? totalCollected : totalVal;
+        const collected = totalCollected;
         const shortfall = Math.max(0, expected - collected);
-        const velocity = expected > 0 ? Math.min(100, Math.round((collected / expected) * 100)) : 100;
-        const paidCount = new Set(txsForMonth.map(t => t.group_member_id || t.profile_id)).size || totalMembers;
+        const velocity = expected > 0 ? Math.min(100, Math.round((collected / expected) * 100)) : 0;
+        const paidCount = new Set(txsForMonth.map(t => t.group_member_id || t.profile_id)).size;
 
         rows.push({
           cycleNum: m,
           cycleTitle: `Cycle M${m} (${monthInfo.dateLabel})`,
-          badgeText: 'Reconciled & Settled',
-          badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+          badgeText: shortfall === 0 ? 'Reconciled & Settled' : 'Cycle Settled (Dues Pending)',
+          badgeColor: shortfall === 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' : 'bg-amber-50 text-amber-700 border-amber-200/60',
           subLabel: `Auction Winner: ${winnerName}`,
-          dotColor: 'bg-emerald-500',
+          dotColor: shortfall === 0 ? 'bg-emerald-500' : 'bg-amber-500',
           expected,
           collected,
-          breakdownText: totalCollected > 0 ? breakdownStr : `₹${(totalVal / 100000).toFixed(2)}L Reconciled`,
+          breakdownText: breakdownStr,
           shortfall,
           shortfallSubtext: shortfall > 0 ? `₹${shortfall.toLocaleString('en-IN')} pending` : 'Zero overdue',
           velocity,
-          statusPill: `${paidCount} / ${totalMembers} Paid (Fully Reconciled)`,
-          statusPillStyle: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+          statusPill: `${paidCount} / ${totalMembers} Paid ${shortfall === 0 ? '(Fully Reconciled)' : `(${totalMembers - paidCount} Pending)`}`,
+          statusPillStyle: shortfall === 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200',
           actionType: 'receipts',
           isLive: false,
         });

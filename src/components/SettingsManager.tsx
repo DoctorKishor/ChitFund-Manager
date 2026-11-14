@@ -972,7 +972,7 @@ export default function SettingsManager() {
       // Always runs to guarantee 0 remaining audit trails regardless of RPC or fallback route
       let auditPurged = false;
       try {
-        const { data, error } = await supabase.rpc('purge_all_audit_logs', { p_confirm: 'WIPE_ALL_DATA' });
+        const { data, error } = await supabase.rpc('purge_all_audit_logs', { p_confirm: 'PURGE_LOGS' });
         if (!error && data?.success !== false) {
           auditPurged = true;
         }
