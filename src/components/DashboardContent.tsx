@@ -1541,8 +1541,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     return () => clearTimeout(timer);
   }, [activeDashboardGroupId]);
 
-  // ── Floating Action Button (FAB) Speed-Dial States ───────────────────────────
-  const [isFabOpen, setIsFabOpen] = useState<boolean>(false);
+  // ── Universal Payment Modal States ───────────────────────────
   const [isUniversalPaymentOpen, setIsUniversalPaymentOpen] = useState<boolean>(false);
   const [universalPaymentMemberId, setUniversalPaymentMemberId] = useState<string | null>(null);
   const [universalPaymentGroupMemberId, setUniversalPaymentGroupMemberId] = useState<string | null>(null);
@@ -5216,21 +5215,6 @@ Thank you for your prompt payment! 🙏`;
           )}
         </div>
         {/* END: MOBILE VIEW */}
-
-            {/* Floating Quick Record FAB (Desktop Only) */}
-            {canCollect && (
-              <button
-                type="button"
-                data-action="members:collect"
-                onClick={() => handleOpenRecordPayment(null)}
-                className="hidden lg:flex fixed bottom-6 right-6 w-12 h-12 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white rounded-full shadow-lg shadow-brand-600/35 items-center justify-center transition-transform hover:scale-105 z-40 cursor-pointer"
-                data-purpose="floating-quick-action"
-                title="Quick Record Cash Entry"
-              >
-                <Plus size={22} className="stroke-[2.5]" />
-              </button>
-            )}
-
 
           </div>
         );
@@ -9973,131 +9957,6 @@ Thank you for your prompt payment! 🙏`;
           </div>
         );
       })()}
-
-      {/* ── FLOATING ACTION BUTTON (FAB) & SPEED-DIAL MENU (DESKTOP ONLY) ────── */}
-      {activeTab === 'dashboard' && canQuickActions && (canCollect || canPersonalDraw || canBroadcastReminders || canAtmRelocate) && (
-        <>
-          {/* Backdrop Blur Overlay when FAB is Open */}
-          {isFabOpen && (
-            <div
-              onClick={() => setIsFabOpen(false)}
-              className="hidden md:block fixed inset-0 bg-black/40 backdrop-blur-2xs z-40 animate-in fade-in duration-150"
-            />
-          )}
-
-          <div className="hidden md:flex fixed bottom-6 right-6 z-40 flex-col items-end gap-2.5 select-none">
-            {/* Speed Dial Menu Items */}
-            {isFabOpen && (
-              <div className="flex flex-col items-end gap-2 animate-in slide-in-from-bottom-3 duration-200">
-                
-                {/* 1. Quick Collect Payment (Primary Action) */}
-                {canCollect && (
-                  <button
-                    type="button"
-                    data-action="members:collect"
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setIsFabOpen(false);
-                      handleOpenRecordPayment(null);
-                    }}
-                    className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
-                  >
-                    <span className="text-xs font-bold tracking-tight text-white">
-                      Quick Collect Payment
-                    </span>
-                    <div className="w-8 h-8 rounded-xl bg-[#02B15A] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                      <Coins size={16} />
-                    </div>
-                  </button>
-                )}
-
-                {/* 2. Log Cash Spend / Personal Draw */}
-                {canPersonalDraw && (
-                  <button
-                    type="button"
-                    data-action="treasury:personal_draw"
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setIsFabOpen(false);
-                      setShowQuickPersonalDrawModal(true);
-                    }}
-                    className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
-                  >
-                    <span className="text-xs font-bold tracking-tight text-white">
-                      Log Cash Spend (Draw)
-                    </span>
-                    <div className="w-8 h-8 rounded-xl bg-[#E41414] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                      <MinusCircle size={16} />
-                    </div>
-                  </button>
-                )}
-
-                {/* 3. Send Dues Reminder */}
-                {canBroadcastReminders && (
-                  <button
-                    type="button"
-                    data-action="communication:due_alerts"
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setIsFabOpen(false);
-                      setRemindModalTab('individual');
-                      setShowRemindModal(true);
-                    }}
-                    className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
-                  >
-                    <span className="text-xs font-bold tracking-tight text-white">
-                      Send Dues Reminder
-                    </span>
-                    <div className="w-8 h-8 rounded-xl bg-[#6359E9] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                      <Send size={15} />
-                    </div>
-                  </button>
-                )}
-
-                {/* 4. ATM Cash Withdrawal */}
-                {canAtmRelocate && (
-                  <button
-                    type="button"
-                    data-action="treasury:confirm_atm"
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setIsFabOpen(false);
-                      setShowQuickAtmModal(true);
-                    }}
-                    className="flex items-center gap-2.5 bg-[#1D1D41] hover:bg-[#27264E] text-white border border-[#27264E] px-4 py-2.5 rounded-2xl shadow-xl transition-all active:scale-95 group cursor-pointer"
-                  >
-                    <span className="text-xs font-bold tracking-tight text-white">
-                      ATM Cash Withdrawal
-                    </span>
-                    <div className="w-8 h-8 rounded-xl bg-[#64CFF6] text-[#141332] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                      <Landmark size={15} />
-                    </div>
-                  </button>
-                )}
-
-              </div>
-            )}
-
-            {/* Main Primary FAB Trigger Button */}
-            <button
-              type="button"
-              data-permission-key="dashboard:quick_actions"
-              onClick={() => {
-                triggerHapticFeedback('light');
-                setIsFabOpen(prev => !prev);
-              }}
-              className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 cursor-pointer ${
-                isFabOpen
-                  ? 'bg-[#27264E] text-white rotate-45 ring-4 ring-[#6359E9]/30'
-                  : 'bg-gradient-to-tr from-[#6359E9] via-[#8C52FF] to-[#64CFF6] text-white ring-4 ring-[#6359E9]/40 hover:scale-105 shadow-[0_4px_25px_rgba(99,89,233,0.5)]'
-              }`}
-              title="Quick Actions & Collect"
-            >
-              <Plus size={26} className={`stroke-[2.5] transition-transform duration-200 ${isFabOpen ? 'rotate-90' : ''}`} />
-            </button>
-          </div>
-        </>
-      )}
 
       {/* ── QUICK ACTION MODALS ──────────────────────────────────────────────── */}
       
