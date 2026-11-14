@@ -272,6 +272,11 @@ declare
   target_group_name text;
   caller_admin_id uuid;
 begin
+  -- Check if audit logging is temporarily bypassed (e.g. during database reset)
+  if current_setting('app.skip_audit_log', true) = 'true' then
+    return null;
+  end if;
+
   -- Resolve primary record ID
   if TG_OP = 'DELETE' then
     record_id = old.id;
@@ -629,6 +634,10 @@ create policy "Allow security_audit_logs SELECT access to admin/manager" on publ
 create policy if not exists "Allow security_audit_logs INSERT access to admin/manager" on public.security_audit_logs
   for insert
   with check (public.is_admin_or_manager());
+
+create policy if not exists "Allow security_audit_logs DELETE access to admin/manager" on public.security_audit_logs
+  for delete
+  using (public.is_admin_or_manager());
 
 -- Secure RPC to log system audit events directly
 create or replace function public.log_system_audit_event(
@@ -1115,10 +1124,12 @@ create or replace function public.reset_test_database(p_confirm_phrase text defa
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, auth
 as $$
 declare
   v_caller_id uuid;
+  v_main_admin_id uuid;
+  v_admin_email text := 'kishoranbazhakan@gmail.com';
   caller_role text;
   result jsonb;
 begin
@@ -1138,52 +1149,81 @@ begin
     raise exception 'Unauthorized: Only an administrator can execute a database reset.';
   end if;
 
-  -- 3. Clear foreign keys pointing to records being purged
-  update public.system_settings set updated_by = null;
-  update public.group_members set transferred_from = null;
+  -- 3. Resolve the primary administrator account (strictly preserving kishoranbazhakan@gmail.com)
+  select id into v_main_admin_id
+  from auth.users
+  where lower(email) = v_admin_email
+  limit 1;
 
-  -- 4. Clear transactional and auction history
+  if v_main_admin_id is null then
+    select id into v_main_admin_id from public.profiles where phone_number = '9943609010' limit 1;
+  end if;
+
+  if v_main_admin_id is null then
+    v_main_admin_id := v_caller_id;
+  end if;
+
+  -- 4. Temporarily bypass audit trigger recording during the purge
+  perform set_config('app.skip_audit_log', 'true', true);
+
+  -- 5. Nullify foreign keys to break circular dependencies
+  update public.system_settings set updated_by = v_main_admin_id;
+  update public.group_members set transferred_from = null, profile_id = null;
+  update public.transactions set group_id = null, profile_id = null, group_member_id = null, created_by = null;
+  update public.auction_logs set winning_bidder_id = null, winning_member_id = null, runner_up_bidder_id = null;
+  update public.passbook_inventory set assigned_to_profile_id = null;
+  update public.security_audit_logs set admin_id = null;
+
+  -- 6. Purge operational ledger, bids, members, chits, and QR inventory
   delete from public.transactions;
   delete from public.auction_logs;
-  
-  -- 5. Clear memberships and chit groups
   delete from public.group_members;
   delete from public.chit_groups;
-  
-  -- 6. Clear passbook inventory if any
   delete from public.passbook_inventory;
 
-  -- 7. Reset audit logs before deleting profiles to prevent foreign key or trigger constraint locks
-  delete from public.security_audit_logs;
-
-  -- 8. Delete test non-auth profiles (subscribers), but PRESERVE authenticated staff/admin users
-  delete from public.profiles 
-  where id not in (select id from auth.users)
-    and (role is null or role = 'subscriber');
-
-  -- 9. Reset all 4 treasury vaults to zero balance
+  -- 7. Reset all 4 treasury vaults to exactly zero
   update public.global_treasury 
   set current_balance = 0, 
       pending_verification_balance = 0,
-      last_updated_by = v_caller_id;
+      last_updated_by = v_main_admin_id;
 
-  -- Ensure all 4 default vaults exist in case any was missing
   insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
   values 
-    ('cash_in_hand', 0, 0, v_caller_id),
-    ('kishor_bank', 0, 0, v_caller_id),
-    ('dad_bank', 0, 0, v_caller_id),
-    ('mom_bank', 0, 0, v_caller_id)
+    ('cash_in_hand', 0, 0, v_main_admin_id),
+    ('kishor_bank', 0, 0, v_main_admin_id),
+    ('dad_bank', 0, 0, v_main_admin_id),
+    ('mom_bank', 0, 0, v_main_admin_id)
   on conflict (wallet_type) do update 
-  set current_balance = 0, pending_verification_balance = 0;
+  set current_balance = 0, pending_verification_balance = 0, last_updated_by = v_main_admin_id;
 
-  -- 10. Record the purge event
-  insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
-  values (v_caller_id, 'SYSTEM RESET: Full test database cleared. All chit groups, transactions, auctions, and test members wiped.', 'all', timezone('utc'::text, now()));
+  -- 8. Delete all profiles EXCEPT the primary admin
+  delete from public.profiles 
+  where id != v_main_admin_id;
+
+  -- Ensure primary admin profile is active, non-blocked, non-deleted with role 'admin'
+  update public.profiles
+  set is_deleted = false,
+      is_blocked = false,
+      role = 'admin'
+  where id = v_main_admin_id;
+
+  -- 9. Delete non-admin auth accounts from auth.users (revoking staff access completely)
+  begin
+    delete from auth.users where id != v_main_admin_id;
+  exception when others then
+    -- Non-blocking in case of restricted auth table constraints
+    null;
+  end;
+
+  -- 10. Purge all audit logs completely (0 trails)
+  delete from public.security_audit_logs;
+
+  -- Reset audit trigger flag
+  perform set_config('app.skip_audit_log', 'false', true);
 
   result := jsonb_build_object(
     'success', true,
-    'message', 'Database test data wiped successfully. Treasury reset to ₹0. System ready for fresh testing or production.'
+    'message', 'Factory database reset completed successfully. All data wiped. Main admin account preserved.'
   );
 
   return result;

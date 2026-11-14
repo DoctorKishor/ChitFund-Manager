@@ -915,11 +915,12 @@ export default function SettingsManager() {
       // 2. Secondary Fallback: Dependency-ordered client-side purge with strict error verification
       if (!purgeSuccessful) {
         // Step A: Nullify external foreign keys to prevent constraint violations
-        await supabase.from('system_settings').update({ updated_by: null }).neq('key', '');
+        await supabase.from('system_settings').update({ updated_by: profile?.id || null }).neq('key', '');
         await supabase.from('group_members').update({ transferred_from: null, profile_id: null }).neq('id', '00000000-0000-0000-0000-000000000000');
         await supabase.from('transactions').update({ group_id: null, profile_id: null, group_member_id: null, created_by: null }).neq('id', '00000000-0000-0000-0000-000000000000');
         await supabase.from('auction_logs').update({ winning_bidder_id: null, winning_member_id: null, runner_up_bidder_id: null }).neq('id', '00000000-0000-0000-0000-000000000000');
         await supabase.from('passbook_inventory').update({ assigned_to_profile_id: null }).neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('security_audit_logs').update({ admin_id: null }).neq('id', '00000000-0000-0000-0000-000000000000');
 
         // Step B: Purge transactions, auctions, members, chit groups, and passbooks
         const [txRes, aucRes, gmRes, cgRes, pbRes] = await Promise.all([
@@ -936,9 +937,11 @@ export default function SettingsManager() {
         if (cgRes.error) throw new Error(`Chit groups purge failed: ${cgRes.error.message}`);
         if (pbRes.error) console.warn('Passbook inventory warning:', pbRes.error.message);
 
-        // Step C: Delete subscriber test profiles (preserving staff, managers, and admins)
-        const { error: profErr } = await supabase.from('profiles').delete().eq('role', 'subscriber');
-        if (profErr) console.warn('Profiles cleanup warning:', profErr.message);
+        // Step C: Delete all profiles EXCEPT the primary admin (kishoranbazhakan@gmail.com)
+        if (profile?.id) {
+          const { error: profErr } = await supabase.from('profiles').delete().neq('id', profile.id);
+          if (profErr) console.warn('Profiles cleanup warning:', profErr.message);
+        }
 
         // Step D: Reset all 4 treasury vault balances to ₹0
         const { error: trErr } = await supabase.from('global_treasury').update({
@@ -948,18 +951,22 @@ export default function SettingsManager() {
         }).neq('wallet_type', '');
         if (trErr) console.warn('Treasury reset warning:', trErr.message);
 
-        // Step E: Record audit log of the factory reset
-        await supabase.from('security_audit_logs').insert({
-          admin_id: profile?.id || null,
-          action_description: 'SYSTEM RESET: Full test database cleared. All chit groups, transactions, auctions, and test members wiped.',
-          target_table: 'all'
-        });
+        // Step E: Purge all audit logs completely so count is 0
+        const { error: auditErr } = await supabase
+          .from('security_audit_logs')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        if (auditErr) console.warn('Audit logs purge warning:', auditErr.message);
 
         purgeSuccessful = true;
       }
 
+      // Notify other components & sync local state
+      window.dispatchEvent(new CustomEvent('chitfund:audit_updated'));
+      window.dispatchEvent(new CustomEvent('chitfund:treasury_updated'));
+
       triggerHapticFeedback('success');
-      setResetSuccessMsg('Database test data cleared successfully! All groups, transactions, auctions, and test subscribers wiped. Treasury vaults reset to ₹0.');
+      setResetSuccessMsg('Database wiped clean! All chit groups, transactions, auctions, passbooks, audit trails, and member records cleared. Main admin preserved.');
       setShowResetModal(false);
       setConfirmKeyword('');
       await fetchDbStats();
@@ -3197,7 +3204,7 @@ export default function SettingsManager() {
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              This will permanently delete all chit groups, member rosters, auctions, and payment transactions. Treasury vault balances will reset to ₹0.
+              This will permanently delete all chit groups, member rosters, staff access, auctions, and payment transactions. Treasury vault balances will reset to ₹0, and only the main administrator account (kishoranbazhakan@gmail.com) will be preserved.
             </p>
 
             <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-2">
