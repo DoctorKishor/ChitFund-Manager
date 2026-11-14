@@ -2835,35 +2835,59 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
     }
   };
 
-  // Month 0 Launch Execution via Atomic confirm_month0_launch RPC
+  // Month 0 Launch Execution: Conclude Month 0 & Advance to Month 1
   const handleExecuteMonth0Launch = async () => {
     if (!month0LaunchModalGroup) return;
     try {
       setIsConfirmingMonth0(true);
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('confirm_month0_launch', {
-        p_group_id: month0LaunchModalGroup.id,
-        p_wallet: month0LaunchWallet,
-        p_admin_id: profile?.id || null,
-      });
-
-      if (rpcErr || !rpcData?.success) {
-        alert('Failed to launch Month 0: ' + (rpcData?.error || rpcErr?.message));
-        return;
-      }
-
-      const walletLabel = month0LaunchWallet === 'dad_bank' ? "Dad's Bank" : month0LaunchWallet === 'kishor_bank' ? "Kishor UPI" : month0LaunchWallet === 'mom_bank' ? "Mom's Bank" : "Cash Box";
-      
-      setLocalGroups(prev => prev.map(g => g.id === month0LaunchModalGroup.id ? { ...g, currentMonth: 1 } : g));
-      setSelectedDashboardMonth(1);
+      const grpId = month0LaunchModalGroup.id;
       const grpName = month0LaunchModalGroup.name;
       const grpTotal = month0LaunchModalGroup.totalValue;
+
+      // 1. Advance group to Month 1 in Supabase
+      const { error: updateErr } = await supabase
+        .from('chit_groups')
+        .update({
+          current_month: 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', grpId);
+
+      if (updateErr) {
+        throw updateErr;
+      }
+
+      // 2. Insert audit transaction record for Organizer Profit
+      await supabase.from('transactions').insert({
+        group_id: grpId,
+        wallet_type: 'cash_in_hand',
+        type: 'organizer_profit',
+        status: 'completed',
+        amount: grpTotal,
+        notes: `[Organizer Profit] Month 0 Launch — Full chit value ₹${grpTotal.toLocaleString('en-IN')} collected and sealed as Organizer Profit for "${grpName}".`,
+        cycle_month: 0,
+        created_by: profile?.id || null,
+      });
+
+      // 3. Security Audit Log
+      await logAuditEvent({
+        actionDescription: `MONTH 0 CONCLUDED: Group "${grpName}" advanced to Month 1 (1st Live Auction). All Month 0 collections (₹${grpTotal.toLocaleString('en-IN')}) sealed as Organizer Profit.`,
+        targetTable: 'chit_groups',
+        adminId: profile?.id || null,
+      });
+
+      setLocalGroups(prev => prev.map(g => g.id === grpId ? { ...g, currentMonth: 1, current_month: 1 } : g));
+      setSelectedDashboardMonth(1);
       setMonth0LaunchModalGroup(null);
       await fetchGroups();
       if (activeDashboardGroupId) {
         await fetchDashboardData(activeDashboardGroupId);
       }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chitfund:group_updated'));
+      }
       triggerHapticFeedback('success');
-      alert(`✓ Month 0 Launch Confirmed! ₹${grpTotal.toLocaleString('en-IN')} Organizer Profit recorded from ${walletLabel}. Group "${grpName}" advanced to Month 1.`);
+      alert(`✓ Month 0 Completed! Group "${grpName}" has advanced to Month 1 (1st Live Auction). All Month 0 collections are sealed as Organizer Profit.`);
     } catch (err: any) {
       console.error('Error confirming Month 0 launch:', err);
       alert('Error confirming launch: ' + (err.message || 'Unknown error'));
@@ -3971,7 +3995,7 @@ Thank you for your prompt payment! 🙏`;
                       >
                         <span>
                           {selectedDashboardMonth === 0 
-                            ? (isClosingMonth ? 'Confirming...' : 'Confirm Launch & Roll to M0') 
+                            ? (isClosingMonth ? 'Advancing...' : 'Roll to M1 (1st Auction)') 
                             : (isClosingMonth ? 'Closing...' : 'Close Month Cycle')}
                         </span>
                         <ArrowRight size={14} />
@@ -4757,7 +4781,7 @@ Thank you for your prompt payment! 🙏`;
                       className="w-full py-3 px-4 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-40 cursor-pointer"
                     >
                       <span>
-                        {selectedDashboardMonth === 0 ? 'Confirm Launch & Roll to Month 0' : 'Conclude & Advance Month'}
+                        {selectedDashboardMonth === 0 ? 'Conclude M0 & Advance to Month 1' : 'Conclude & Advance Month'}
                       </span>
                       <ArrowRight size={15} className="shrink-0" />
                     </button>
@@ -5594,7 +5618,7 @@ Thank you for your prompt payment! 🙏`;
                     }`}
                   >
                     <Rocket size={14} />
-                    <span>Confirm Launch &amp; Roll to M0</span>
+                    <span>Roll to M1 (1st Auction)</span>
                   </button>
                 </div>
               )}
@@ -6387,16 +6411,29 @@ Thank you for your prompt payment! 🙏`;
 
                           {/* Footer Touch Actions */}
                           {g.currentMonth === 0 ? (
-                            <div className="pt-3 border-t border-slate-100">
+                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  triggerHapticFeedback('light');
+                                  setSelectedWorkspaceGroupId(g.id);
+                                  fetchWorkspaceMembers(g.id);
+                                }}
+                                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
+                              >
+                                <Briefcase size={13} className="shrink-0" />
+                                <span className="whitespace-nowrap">Workspace</span>
+                              </button>
+
                               <button
                                 disabled={!canLaunchMonth0}
                                 onClick={() => canLaunchMonth0 && setMonth0LaunchModalGroup(g)}
-                                className={`w-full text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm whitespace-nowrap ${
+                                className={`text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm whitespace-nowrap ${
                                   canLaunchMonth0 ? 'bg-amber-600 hover:bg-amber-700 active:scale-95 cursor-pointer' : 'bg-amber-600/60 opacity-75 cursor-not-allowed'
                                 }`}
                               >
                                 <Rocket size={14} className="shrink-0" />
-                                <span className="whitespace-nowrap">Confirm Launch &amp; Roll to M0</span>
+                                <span className="whitespace-nowrap">Roll to M1</span>
                               </button>
                             </div>
                           ) : (
@@ -9165,7 +9202,7 @@ Thank you for your prompt payment! 🙏`;
         </div>
       )}
 
-      {/* ── MODAL: MONTH 0 ORGANIZER PROFIT WALLET SELECTION ── */}
+      {/* ── MODAL: ADVANCE MONTH 0 TO MONTH 1 CONFIRMATION ── */}
       {month0LaunchModalGroup && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto no-scrollbar">
           <div className="bg-white border-t sm:border border-slate-200/90 text-slate-900 rounded-t-3xl sm:rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl relative space-y-4 animate-in slide-in-from-bottom-6 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-150 max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto no-scrollbar my-0 sm:my-auto">
@@ -9173,11 +9210,11 @@ Thank you for your prompt payment! 🙏`;
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center font-bold">
-                  <Crown size={20} />
+                  <Rocket size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold font-display text-slate-900">Confirm Launch (Month 0)</h3>
-                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Organizer Profit Payout</span>
+                  <h3 className="text-base font-bold font-display text-slate-900">Advance to Month 1</h3>
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Conclude Launch Phase</span>
                 </div>
               </div>
               <button 
@@ -9189,52 +9226,30 @@ Thank you for your prompt payment! 🙏`;
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div className="p-3.5 bg-amber-50/60 rounded-2xl border border-amber-200 text-slate-900 text-xs space-y-1">
-                <div className="flex justify-between font-bold">
+            <div className="space-y-3.5">
+              <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200 text-slate-900 text-xs space-y-2">
+                <div className="flex justify-between items-center font-bold">
                   <span className="text-slate-600">Chit Group:</span>
-                  <span className="text-slate-900">{month0LaunchModalGroup.name}</span>
+                  <span className="text-slate-900 font-extrabold text-sm">{month0LaunchModalGroup.name}</span>
                 </div>
-                <div className="flex justify-between font-black text-sm text-amber-700 font-mono">
-                  <span>Organizer Profit:</span>
-                  <span>₹{month0LaunchModalGroup.totalValue?.toLocaleString('en-IN')}</span>
+                <div className="flex justify-between items-center font-mono">
+                  <span className="text-slate-600 font-sans font-medium">Organizer Profit:</span>
+                  <span className="font-extrabold text-amber-700 text-sm">₹{month0LaunchModalGroup.totalValue?.toLocaleString('en-IN')}</span>
                 </div>
-                <p className="text-[11px] text-slate-600 pt-1 leading-snug">
-                  All 1st-month collections are taken by the Organizer. Please select the vault/account from which this payout is recorded.
-                </p>
+                <div className="flex justify-between items-center text-[11px] text-slate-600 border-t border-amber-200/60 pt-1.5">
+                  <span>Cycle Transition:</span>
+                  <span className="font-bold text-amber-900 font-mono">Month 0 ➔ Month 1 (1st Auction)</span>
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Payout Source Vault</label>
-                <div className="space-y-1.5">
-                  {[
-                    { id: 'dad_bank' as WalletType, name: "Dad's Bank", bal: balances.dad_bank },
-                    { id: 'cash_in_hand' as WalletType, name: "Physical Cash Box", bal: balances.cash_in_hand },
-                    { id: 'kishor_bank' as WalletType, name: "Kishor UPI", bal: balances.kishor_bank },
-                    { id: 'mom_bank' as WalletType, name: "Mom's Bank", bal: balances.mom_bank },
-                  ].map((w) => {
-                    const isSelected = month0LaunchWallet === w.id;
-                    const bal = w.bal || 0;
-                    return (
-                      <button
-                        key={w.id}
-                        type="button"
-                        onClick={() => setMonth0LaunchWallet(w.id)}
-                        className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                          isSelected 
-                            ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/30' 
-                            : 'bg-slate-50/50 hover:bg-slate-100/70 border-slate-200'
-                        }`}
-                      >
-                        <div>
-                          <span className="text-xs font-bold text-slate-900 block">{w.name}</span>
-                          <span className="text-[10px] text-slate-500 font-mono">Available: ₹{bal.toLocaleString('en-IN')}</span>
-                        </div>
-                        {isSelected && <CheckCircle2 size={16} className="text-amber-600 shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-600 leading-relaxed space-y-1">
+                <p className="font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Crown size={13} className="text-amber-600 shrink-0" />
+                  Organizer Profit Rule (Month 0):
+                </p>
+                <p>
+                  All collections received from members in Month 0 are retained directly by the Organizer as profit. Advancing this group moves it to Month 1 where the first live auction and member bidding begin.
+                </p>
               </div>
 
               <div className="pt-2 flex gap-2">
@@ -9249,9 +9264,16 @@ Thank you for your prompt payment! 🙏`;
                   type="button"
                   onClick={handleExecuteMonth0Launch}
                   disabled={isConfirmingMonth0}
-                  className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
-                  {isConfirmingMonth0 ? 'Processing...' : 'Confirm Launch & Advance'}
+                  {isConfirmingMonth0 ? (
+                    'Advancing...'
+                  ) : (
+                    <>
+                      <Rocket size={14} />
+                      <span>Confirm &amp; Roll to M1</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
