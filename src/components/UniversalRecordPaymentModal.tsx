@@ -310,7 +310,7 @@ export default function UniversalRecordPaymentModal({
             sub => ({
               name: sub.full_name || sub.fullName || '',
               phone: sub.phone_number || sub.phoneNumber || '',
-              alias: sub.primaryAlias || (sub.aliases?.[0] || ''),
+              alias: sub.aliases && sub.aliases.length > 0 ? sub.aliases : (sub.primaryAlias ? [sub.primaryAlias] : []),
               ticket: sub.tickets?.[0] ?? null,
             })
           );
@@ -322,6 +322,7 @@ export default function UniversalRecordPaymentModal({
               matchScore: m.score,
               matchedField: m.matchedField,
               matchedValue: m.matchedValue,
+              matchedAlias: m.matchedField === 'alias' ? m.matchedValue : (m.item.matchedAlias || m.item.primaryAlias || null),
             }))
           );
 
@@ -1254,11 +1255,15 @@ export default function UniversalRecordPaymentModal({
                                           Similar
                                         </span>
                                       )}
-                                      {member.matchedAlias && (
-                                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
-                                          {member.matchedAlias}
+                                      {member.matchedAlias ? (
+                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded flex items-center gap-1">
+                                          🏷️ {member.matchedAlias}
                                         </span>
-                                      )}
+                                      ) : member.aliases && member.aliases.length > 0 ? (
+                                        <span className="text-[9px] font-medium text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded">
+                                          🏷️ {member.aliases.slice(0, 2).join(', ')}{member.aliases.length > 2 ? ` +${member.aliases.length - 2}` : ''}
+                                        </span>
+                                      ) : null}
                                     </div>
                                     <span className="text-[11px] text-slate-500 font-mono">
                                       {member.phone_number || member.phoneNumber || 'No phone'}

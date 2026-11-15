@@ -1787,10 +1787,36 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                                     Ticket #{grpDues.ticketNumber}
                                   </span>
                                   {grpDues.aliasName && (
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                      {grpDues.aliasName}
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
+                                      🏷️ {grpDues.aliasName}
                                     </span>
                                   )}
+                                  <button
+                                    type="button"
+                                    title="Edit ticket alias name"
+                                    onClick={async () => {
+                                      const newAlias = window.prompt(
+                                        `Enter Alias / Nominee name for ${grpDues.groupName} - Ticket #${grpDues.ticketNumber}:`,
+                                        grpDues.aliasName || ''
+                                      );
+                                      if (newAlias === null) return;
+                                      const cleanAlias = newAlias.trim() || null;
+                                      try {
+                                        const { error } = await supabase
+                                          .from('group_members')
+                                          .update({ alias_name: cleanAlias })
+                                          .eq('id', grpDues.groupMemberId);
+                                        if (error) throw error;
+                                        triggerHapticFeedback('success');
+                                        fetchMemberData();
+                                      } catch (err: any) {
+                                        alert(`Error updating ticket alias: ${err.message}`);
+                                      }
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
+                                  >
+                                    <Edit3 size={11} />
+                                  </button>
                                 </div>
                                 <p className="text-xs text-slate-500 mt-0.5">
                                   {grpDues.durationMonths} Months Duration · Current: Cycle {grpDues.effectiveCurrentMonth} of {grpDues.durationMonths} · {grpDues.durationMonths} Total Members

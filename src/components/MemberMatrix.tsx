@@ -1164,7 +1164,9 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               );
             }
           } else {
-            alert(`A member with phone number "${cleanPhone}" already exists (${existingProfile.full_name}). Please search or edit their existing profile.`);
+            alert(`A subscriber with phone number "${cleanPhone}" already exists (${existingProfile.full_name}).\n\nIn our Chit Fund system, multiple tickets/nominees for this phone number are managed via Ticket Aliases in your Chit Groups. Opening their profile now.`);
+            setSelectedMemberId(existingProfile.id);
+            setIsAddModalOpen(false);
             return;
           }
         } else {

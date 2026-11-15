@@ -88,7 +88,8 @@ import {
   QrCode,
   Zap,
   Clock,
-  Receipt
+  Receipt,
+  Tag
 } from 'lucide-react';
 
 // ── Utility: First Sunday on-or-after the 10th of a given month ──────────────
@@ -290,6 +291,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
   const [customAmountModalTicket, setCustomAmountModalTicket] = useState<any | null>(null);
   const [customAmountVal, setCustomAmountVal] = useState<number>(0);
+
+  const [aliasModalTicket, setAliasModalTicket] = useState<any | null>(null);
+  const [aliasModalVal, setAliasModalVal] = useState<string>('');
 
   const [expandedTimingTicketIds, setExpandedTimingTicketIds] = useState<number[]>([]);
   const [expandedEditTicketIds, setExpandedEditTicketIds] = useState<number[]>([]);
@@ -1036,6 +1040,64 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       setCustomAmountModalTicket(null);
     } catch (err: any) {
       alert(`Error saving custom amount: ${err.message}`);
+    }
+  };
+
+  const handleSaveTicketAlias = async (ticketId: string, ticketNum: number, newAlias: string | null) => {
+    try {
+      const cleanAlias = newAlias?.trim() || null;
+      const ticketObj = editGroupMembers.find(m => m.id === ticketId || m.ticket === ticketNum) ||
+                        workspaceMembers.find(m => m.id === ticketId || m.ticket === ticketNum);
+      const isTempId = !ticketId || ticketId.startsWith('unassigned-') || ticketId.startsWith('member-');
+      const targetGroupId = editingGroup?.id || selectedWorkspaceGroupId;
+
+      if (isTempId && targetGroupId && ticketObj) {
+        await supabase.from('group_members').upsert({
+          group_id: targetGroupId,
+          ticket_number: ticketNum,
+          profile_id: ticketObj.profileId || null,
+          alias_name: cleanAlias,
+          physical_book_synced: true,
+        }, { onConflict: 'group_id,ticket_number' });
+      } else if (!isTempId) {
+        const { error } = await supabase
+          .from('group_members')
+          .update({ alias_name: cleanAlias })
+          .eq('id', ticketId);
+
+        if (error) {
+          alert(`Failed to save alias: ${error.message}`);
+          return;
+        }
+      }
+
+      setEditGroupMembers(prev =>
+        prev.map(m => (m.id === ticketId || m.ticket === ticketNum)
+          ? { ...m, aliasName: cleanAlias, name: cleanAlias || m.profileName || m.name }
+          : m
+        )
+      );
+
+      if (selectedWorkspaceGroupId) {
+        setWorkspaceMembers(prev =>
+          prev.map(m => (m.id === ticketId || m.ticket === ticketNum)
+            ? { ...m, aliasName: cleanAlias, name: cleanAlias || m.profileName || m.name }
+            : m
+          )
+        );
+      }
+
+      recordSystemAuditLog(
+        cleanAlias 
+          ? `TICKET ALIAS SET: Ticket #${ticketNum} alias set to "${cleanAlias}"`
+          : `TICKET ALIAS CLEARED: Ticket #${ticketNum} reset to subscriber default`,
+        'group_members'
+      );
+
+      setAliasModalTicket(null);
+      triggerHapticFeedback('success');
+    } catch (err: any) {
+      alert(`Error saving ticket alias: ${err.message}`);
     }
   };
 
@@ -3123,12 +3185,27 @@ Thank you for your prompt payment! 🙏`;
     setEnrollments(Array.from({ length: dur }, () => ({ id: undefined, name: '', phone: '' })));
   };
 
-  const handleAssignExistingMember = (member: { id?: string; name: string; phone: string }, targetSlotIndex?: number) => {
-    const isAlreadyAdded = enrollments.some(e => e.name.toLowerCase() === member.name.toLowerCase());
-    if (isAlreadyAdded) {
-      alert(`"${member.name}" is already assigned to a ticket in this chit group.`);
-      return;
+  const handleAssignExistingMember = (member: { id?: string; name: string; phone: string; aliasName?: string }, targetSlotIndex?: number) => {
+    const existingCount = enrollments.filter(e => 
+      (e.id && member.id && e.id === member.id) || 
+      (e.phone && member.phone && normalizePhone(e.phone) === normalizePhone(member.phone))
+    ).length;
+
+    let assignedName = member.name;
+    let aliasToSet = member.aliasName || null;
+
+    if (existingCount > 0) {
+      const customAlias = window.prompt(
+        `"${member.name}" (${member.phone}) is already assigned to ${existingCount} ticket(s) in this group.\n\nEnter an Alias Name for this additional ticket (e.g. family, spouse or business name):`,
+        `${member.name} (Share ${existingCount + 1})`
+      );
+      if (customAlias === null) return; // user cancelled
+      if (customAlias.trim()) {
+        assignedName = customAlias.trim();
+        aliasToSet = customAlias.trim();
+      }
     }
+
     const slotIdx = (targetSlotIndex !== undefined && targetSlotIndex >= 0) 
       ? targetSlotIndex 
       : (targetSlotForAssign !== null && targetSlotForAssign >= 0)
@@ -3138,7 +3215,11 @@ Thank you for your prompt payment! 🙏`;
     if (slotIdx !== -1 && slotIdx < enrollments.length) {
       setEnrollments(prev => {
         const copy = [...prev];
-        copy[slotIdx] = member;
+        copy[slotIdx] = {
+          ...member,
+          name: assignedName,
+          aliasName: aliasToSet || undefined
+        };
         return copy;
       });
       setMemberSearchQuery('');
@@ -8162,12 +8243,31 @@ Thank you for your prompt payment! 🙏`;
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className={`text-xs sm:text-sm font-bold truncate ${member?.profileId ? 'text-slate-900' : 'text-slate-400 italic'}`}>
-                                    {member?.name || (member?.profileId ? 'Subscriber' : 'Unassigned Ticket')}
+                                    {member?.aliasName || member?.name || (member?.profileId ? 'Subscriber' : 'Unassigned Ticket')}
                                   </span>
+                                  {member?.aliasName && (
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded flex items-center gap-0.5">
+                                      🏷️ Alias
+                                    </span>
+                                  )}
                                   {member?.phone && (
                                     <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
                                       ({member.phone})
                                     </span>
+                                  )}
+                                  {member?.profileId && (
+                                    <button
+                                      type="button"
+                                      title="Edit ticket alias name"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setAliasModalTicket(member);
+                                        setAliasModalVal(member?.aliasName || '');
+                                      }}
+                                      className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
+                                    >
+                                      <Edit3 size={12} />
+                                    </button>
                                   )}
                                 </div>
                                 <div className="text-[10px] text-slate-500 font-medium truncate flex items-center gap-1.5 mt-0.5">
@@ -8283,6 +8383,24 @@ Thank you for your prompt payment! 🙏`;
 
                               {/* Action Buttons Row */}
                               <div className="flex flex-wrap gap-1.5 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!member?.profileId) return;
+                                    setAliasModalTicket(member);
+                                    setAliasModalVal(member?.aliasName || '');
+                                  }}
+                                  disabled={!member?.profileId}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 ${
+                                    member?.profileId && member?.aliasName
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
+                                  }`}
+                                >
+                                  <Tag size={12} className={member?.aliasName ? 'text-emerald-700' : 'text-slate-400'} />
+                                  <span>{member?.profileId && member?.aliasName ? `Alias: ${member.aliasName}` : 'Set Ticket Alias'}</span>
+                                </button>
+
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -8808,6 +8926,69 @@ Thank you for your prompt payment! 🙏`;
                 className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm text-center cursor-pointer"
               >
                 Save Custom Amount
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 5. SUB-MODAL: SET / EDIT TICKET ALIAS ──────── */}
+      {aliasModalTicket && (
+        <div className="fixed inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 w-full max-w-sm space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex justify-between items-start border-b border-slate-200 pb-3">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <Tag size={15} className="text-emerald-600" />
+                  <span>Ticket Alias Name</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Ticket #{aliasModalTicket.ticket} · {aliasModalTicket.name} {aliasModalTicket.phone ? `(${aliasModalTicket.phone})` : ''}
+                </p>
+              </div>
+              <button onClick={() => setAliasModalTicket(null)} className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-700 block">Alias / Nominee Name</label>
+              <input
+                type="text"
+                value={aliasModalVal}
+                placeholder="e.g. Sangeetha Kishor or Anbazhakan & Co"
+                onChange={(e) => setAliasModalVal(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 focus:border-brand-600 focus:bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs"
+                autoFocus
+              />
+              <p className="text-[10px] text-slate-500 leading-normal">
+                This name will appear on the <strong>A4 Payment Checklist</strong>, <strong>Live Auction Bidding</strong>, and <strong>Passbooks</strong> for Ticket #{aliasModalTicket.ticket}. Monthly collections for this phone number remain unified.
+              </p>
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setAliasModalTicket(null)}
+                className="w-full sm:w-auto border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2 rounded-xl transition-colors text-center shadow-2xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              {aliasModalTicket.aliasName && (
+                <button
+                  type="button"
+                  onClick={() => handleSaveTicketAlias(aliasModalTicket.id, aliasModalTicket.ticket, null)}
+                  className="w-full sm:w-auto border border-rose-300 text-rose-700 hover:bg-rose-50 font-bold text-xs px-3 py-2 rounded-xl transition-colors text-center shadow-2xs cursor-pointer"
+                >
+                  Reset to Default
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleSaveTicketAlias(aliasModalTicket.id, aliasModalTicket.ticket, aliasModalVal)}
+                className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2 rounded-xl transition-colors shadow-sm text-center cursor-pointer"
+              >
+                Save Ticket Alias
               </button>
             </div>
           </div>

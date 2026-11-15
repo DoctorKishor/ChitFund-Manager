@@ -168,7 +168,7 @@ export function searchSubscribersFuzzy<T>(
   extract: (item: T) => {
     name: string;
     phone?: string | null;
-    alias?: string | null;
+    alias?: string | string[] | null;
     ticket?: number | string | null;
   }
 ): FuzzySearchResult<T> {
@@ -199,13 +199,18 @@ export function searchSubscribersFuzzy<T>(
       matchedValue = name;
     }
 
-    // 2. Alias match
+    // 2. Alias match (single or multiple aliases supported)
     if (alias) {
-      const aliasScore = computeFuzzyScore(clean, alias);
-      if (aliasScore > bestScore) {
-        bestScore = aliasScore;
-        matchedField = 'alias';
-        matchedValue = alias;
+      const aliasList = Array.isArray(alias) ? alias : [alias];
+      for (const a of aliasList) {
+        if (a && typeof a === 'string' && a.trim()) {
+          const aliasScore = computeFuzzyScore(clean, a.trim());
+          if (aliasScore > bestScore) {
+            bestScore = aliasScore;
+            matchedField = 'alias';
+            matchedValue = a.trim();
+          }
+        }
       }
     }
 
