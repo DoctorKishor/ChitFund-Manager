@@ -638,13 +638,15 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       netPayout = Math.max(0, grpTotal - discount);
     }
 
-    const isDisbursed = allTransactions.some(
+    const isDisbursed = isWinner && allTransactions.some(
       (t: any) => t.type === 'payout' && (
-        (wonLog && (t.cycle_month !== null && t.cycle_month !== undefined 
-          ? Number(t.cycle_month) === Number(wonLog.month) 
-          : (t.notes?.includes(`Month ${wonLog.month}`) || t.notes?.includes(`M${wonLog.month}`))
-        )) ||
-        t.profile_id === member.id || t.group_member_id === member.id
+        (t.profile_id === member.id || t.group_member_id === member.id || (member.groups && member.groups.some((g: any) => t.notes?.includes(`#${g.ticket}`)))) &&
+        (
+          (t.cycle_month !== null && t.cycle_month !== undefined 
+            ? Number(t.cycle_month) === Number(wonLog.month) 
+            : (t.notes ? (t.notes.includes(`Month ${wonLog.month}`) || t.notes.includes(`M${wonLog.month}`)) : true)
+          )
+        )
       )
     );
 

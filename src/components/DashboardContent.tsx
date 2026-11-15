@@ -2156,7 +2156,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
     let hasPendingDue = false;
     if (!isCycleLaaba) {
-      const standardInst = Math.round(group.totalValue / (group.memberCount || group.duration || 1));
+      const standardInst = Math.round((group?.totalValue || 200000) / (group?.memberCount || group?.duration || 1));
       for (const member of dashboardGroupMembers) {
         const memDue = member.customInstallment !== null && member.customInstallment !== undefined 
           ? member.customInstallment 
@@ -2180,12 +2180,12 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         isDisbursalPending = true;
       } else {
         const winBid = Number(mAuction.winning_discount ?? mAuction.winning_bid ?? 0);
-        const netPrize = Math.max(0, group.totalValue - winBid);
+        const netPrize = Math.max(0, (group?.totalValue || 200000) - winBid);
         if (netPrize > 0) {
           const winProfileId = mAuction.winning_bidder_id || mAuction.winner_profile_id || mAuction.winner_id;
           const winMem = dashboardGroupMembers.find(mem => 
             (winProfileId && (mem.profileId === winProfileId || mem.id === winProfileId)) ||
-            (mAuction.winner_name && mem.name.toLowerCase() === mAuction.winner_name.toLowerCase())
+            (mAuction.winner_name && mem.name && mem.name.toLowerCase() === mAuction.winner_name.toLowerCase())
           );
           const mPattern = new RegExp(`\\bMonth\\s+${monthNum}\\b|\\bM${monthNum}\\b|\\bM\\s*${monthNum}\\b`, 'i');
           const mPayoutTxs = dashboardTransactions.filter(t =>
@@ -2214,16 +2214,17 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   };
 
   // Helper: navigate to historical auction logs tab for clicked chit group
-  const handleNavigateToAuctionHistory = (e?: React.MouseEvent) => {
+  const handleNavigateToAuctionHistory = (e?: React.MouseEvent, specificGroupId?: string) => {
     if (e) {
       const target = e.target as HTMLElement;
       if (target.closest('button, a, input, select')) return;
     }
+    const targetGroupId = specificGroupId || activeDashboardGroupId || localGroups.find(g => g.status !== 'draft' && g.status !== 'deleted')?.id || '';
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem('cf_auction_selected_group_id', activeDashboardGroupId || '');
+      sessionStorage.setItem('cf_auction_selected_group_id', targetGroupId);
       sessionStorage.setItem('cf_auction_view_tab', 'history');
       window.dispatchEvent(new CustomEvent('cf:navigate_auction_history', {
-        detail: { groupId: activeDashboardGroupId }
+        detail: { groupId: targetGroupId }
       }));
     }
     if (setActiveTab) {
@@ -2808,7 +2809,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         : '';
       const noteText = `Month ${selectedDashboardMonth} Winner Prize Payout - ${winnerName} (Discount: ${formatCurrency(winningBid)})${deductionSummaryStr}${disbursePayoutNote.trim() ? ` — Note: ${disbursePayoutNote.trim()}` : ''}`;
 
-      const netPayoutAmount = netPrizePot || (netCashAmount + totalDeductions);
+      const netPayoutAmount = (netCashAmount + totalDeductions) > 0 ? (netCashAmount + totalDeductions) : netPrizePot;
 
       // 1. Always record 'payout' transaction for the net prize won by subscriber
       const { error: txError } = await supabase

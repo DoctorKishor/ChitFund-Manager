@@ -386,9 +386,12 @@ export default function LiveAuctionEngine() {
         setAllGroups(parsedGroups);
         
         setSelectedGroupId(prev => {
-          const targetId = (prev && parsedGroups.some(g => g.id === prev)) ? prev : parsedGroups[0].id;
+          const savedNavId = typeof window !== 'undefined' ? sessionStorage.getItem('cf_auction_selected_group_id') : null;
+          const candidateId = prev || savedNavId;
+          const targetId = (candidateId && parsedGroups.some(g => g.id === candidateId)) ? candidateId : parsedGroups[0].id;
           const targetGroup = parsedGroups.find(g => g.id === targetId);
           if (targetGroup) setGroup(targetGroup);
+          if (savedNavId && typeof window !== 'undefined') sessionStorage.removeItem('cf_auction_selected_group_id');
           return targetId;
         });
       } else {
