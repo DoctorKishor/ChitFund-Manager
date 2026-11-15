@@ -1087,7 +1087,15 @@ export default function MemberDetailsView({ memberId, onBack, onAddAuditLog }: M
         const netPayout = Number(win.net_payout) || (totalVal - discountBid);
 
         // Find associated payout transaction
-        const payoutTx = memberTransactions.find(t => t.group_id === g.id && t.type === 'payout' && (t.notes?.includes(`Month ${win.month}`) || !t.notes));
+        const monthPattern = new RegExp(`\\bMonth\\s+${win.month}\\b|\\bM${win.month}\\b`, 'i');
+        const payoutTx = memberTransactions.find(t => 
+          t.type === 'payout' && (
+            (t.group_id === g.id) || !t.group_id
+          ) && (
+            (t.cycle_month !== null && t.cycle_month !== undefined ? Number(t.cycle_month) === Number(win.month) : false) ||
+            (t.notes ? monthPattern.test(t.notes) : false)
+          )
+        );
 
         wins.push({
           groupId: g.id,
@@ -1441,8 +1449,8 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
               </div>
               <div className="mt-3.5 pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center justify-between">
                 <span>{prizesWon.length > 0 ? `Net Payout: ${formatCurrency(prizesWon[0].netPayout)}` : `Not won yet · Eligible in M${(groupDuesBreakdowns[0]?.effectiveCurrentMonth || 0) + 1}`}</span>
-                <span className="text-xs font-bold text-slate-700">
-                  {prizesWon.length > 0 ? 'Disbursed' : 'Max Bid: 40%'}
+                <span className={`text-xs font-bold ${prizesWon.length > 0 && !prizesWon[0].isDisbursed ? 'text-amber-600' : 'text-slate-700'}`}>
+                  {prizesWon.length > 0 ? (prizesWon[0].isDisbursed ? 'Disbursed' : 'Disbursal Pending') : 'Max Bid: 40%'}
                 </span>
               </div>
             </div>
@@ -2097,7 +2105,9 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            win.isDisbursed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
                             {win.isDisbursed ? 'Disbursed' : 'Pending Disbursement'}
                           </span>
                         </div>
@@ -2293,8 +2303,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 <span className="text-xs font-bold text-emerald-700 leading-tight block truncate">
                   {prizesWon.length > 0 ? `Won Prize (M${prizesWon[0].month})` : 'Eligible Bidder'}
                 </span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">
-                  {prizesWon.length > 0 ? 'Disbursed' : `M${(groupDuesBreakdowns[0]?.effectiveCurrentMonth || 0) + 1} Auction`}
+                <span className={`text-[10px] font-semibold block mt-0.5 ${prizesWon.length > 0 && !prizesWon[0].isDisbursed ? 'text-amber-600' : 'text-slate-400'}`}>
+                  {prizesWon.length > 0 
+                    ? (prizesWon[0].isDisbursed ? 'Disbursed' : 'Disbursal Pending') 
+                    : `M${(groupDuesBreakdowns[0]?.effectiveCurrentMonth || 0) + 1} Auction`}
                 </span>
               </div>
             </div>

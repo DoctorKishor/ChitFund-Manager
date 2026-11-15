@@ -299,6 +299,42 @@ export default function LiveAuctionEngine() {
   const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState<boolean>(false);
   const groupDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Listen for navigation events from Dashboard (e.g. Winner Card click)
+  useEffect(() => {
+    const handleNav = (e: any) => {
+      const gId = e.detail?.groupId || sessionStorage.getItem('cf_auction_selected_group_id');
+      if (gId) {
+        setSelectedGroupId(gId);
+        const targetGroup = allGroups.find(item => item.id === gId);
+        if (targetGroup) setGroup(targetGroup);
+        fetchGroupDetails(gId);
+        sessionStorage.removeItem('cf_auction_selected_group_id');
+      }
+      setDesktopViewTab('history');
+      sessionStorage.removeItem('cf_auction_view_tab');
+    };
+
+    window.addEventListener('cf:navigate_auction_history', handleNav);
+
+    // Initial check on mount
+    if (typeof window !== 'undefined') {
+      const navTab = sessionStorage.getItem('cf_auction_view_tab');
+      const navGroup = sessionStorage.getItem('cf_auction_selected_group_id');
+      if (navTab === 'history') {
+        setDesktopViewTab('history');
+        sessionStorage.removeItem('cf_auction_view_tab');
+      }
+      if (navGroup) {
+        setSelectedGroupId(navGroup);
+        sessionStorage.removeItem('cf_auction_selected_group_id');
+      }
+    }
+
+    return () => {
+      window.removeEventListener('cf:navigate_auction_history', handleNav);
+    };
+  }, [allGroups]);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (groupDropdownRef.current && !groupDropdownRef.current.contains(event.target as Node)) {

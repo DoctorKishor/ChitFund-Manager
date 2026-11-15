@@ -625,11 +625,28 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
 
   // ── Live status helper for mobile card roster ──
   const getMemberStatusInfo = (member: MemberRecord) => {
-    const wonLog = allAuctionLogs.find((a: any) => a.winning_bidder_id === member.id);
+    const wonLog = allAuctionLogs.find(
+      (a: any) => a.winning_bidder_id === member.id || a.winner_id === member.id || a.winner_name === member.fullName
+    );
     const isWinner = !!wonLog;
-    const netPayout = wonLog
-      ? Math.max(0, Number(wonLog.total_value || 100000) - Number(wonLog.winning_discount || 0))
-      : 0;
+    let netPayout = 0;
+    if (wonLog) {
+      const matchingGrp: any = member.groups.find((g) => g.id === wonLog.group_id)
+        || allChitGroups.find((g) => g.id === wonLog.group_id);
+      const grpTotal = Number(matchingGrp?.totalValue ?? matchingGrp?.total_value ?? 200000);
+      const discount = Number(wonLog.winning_discount ?? wonLog.winning_bid ?? 0);
+      netPayout = Math.max(0, grpTotal - discount);
+    }
+
+    const isDisbursed = allTransactions.some(
+      (t: any) => t.type === 'payout' && (
+        (wonLog && (t.cycle_month !== null && t.cycle_month !== undefined 
+          ? Number(t.cycle_month) === Number(wonLog.month) 
+          : (t.notes?.includes(`Month ${wonLog.month}`) || t.notes?.includes(`M${wonLog.month}`))
+        )) ||
+        t.profile_id === member.id || t.group_member_id === member.id
+      )
+    );
 
     const memberTxs = allTransactions.filter(
       (t: any) => t.profile_id === member.id && t.type === 'collection'
@@ -662,6 +679,7 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       isWinner,
       wonMonth: wonLog?.month,
       netPayout,
+      isDisbursed,
       totalPaid,
       outstandingDue,
       isPassbookLinked,
@@ -2253,7 +2271,11 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
                         <div className="flex items-center gap-2">
                           {statusInfo.isWinner ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              statusInfo.isDisbursed
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-purple-50 text-purple-700 border border-purple-200'
+                            }`}>
                               Prize: ₹{statusInfo.netPayout.toLocaleString('en-IN')}
                             </span>
                           ) : statusInfo.outstandingDue > 0 ? (

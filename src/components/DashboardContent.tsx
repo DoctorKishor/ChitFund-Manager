@@ -2132,6 +2132,105 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     return `${monthName} '${yearShort} M${monthNum}${monthNum === 1 ? ' (1st Auction)' : ''}`;
   };
 
+  // Helper: compute comprehensive status of any month in group lifecycle:
+  // - active: current in-progress cycle (Brand)
+  // - upcoming: future cycle (Slate)
+  // - pending_due: past cycle with pending subscriber dues (Rose / Red)
+  // - disbursal_pending: past cycle with dues collected but auction prize not yet disbursed (Amber / Orange)
+  // - completed: past cycle with all dues settled and prize disbursed (Emerald / Green)
+  const getMonthProgressStatus = (group: any, monthNum: number) => {
+    const currentM = (group?.currentMonth !== undefined && group?.currentMonth !== null)
+      ? Number(group.currentMonth)
+      : 0;
+
+    if (monthNum === currentM) {
+      return { status: 'active', label: 'Active', color: 'brand' as const };
+    }
+    if (monthNum > currentM) {
+      return { status: 'upcoming', label: 'Upcoming', color: 'slate' as const };
+    }
+
+    // Past month (monthNum < currentM)
+    const mAuction = dashboardAuctionLogs.find(l => Number(l.month) === Number(monthNum));
+    const isCycleLaaba = !!mAuction?.is_laaba_seetu;
+
+    let hasPendingDue = false;
+    if (!isCycleLaaba) {
+      const standardInst = Math.round(group.totalValue / (group.memberCount || group.duration || 1));
+      for (const member of dashboardGroupMembers) {
+        const memDue = member.customInstallment !== null && member.customInstallment !== undefined 
+          ? member.customInstallment 
+          : standardInst;
+        const paid = getMemberPaidAmountForMonth(member.id || member.profileId, monthNum, member.profileId);
+        if (paid < memDue) {
+          hasPendingDue = true;
+          break;
+        }
+      }
+    }
+
+    if (hasPendingDue) {
+      return { status: 'pending_due', label: 'Pending Due', color: 'rose' as const };
+    }
+
+    // Check auction disbursal for Month 1..N
+    let isDisbursalPending = false;
+    if (monthNum > 0) {
+      if (!mAuction) {
+        isDisbursalPending = true;
+      } else {
+        const winBid = Number(mAuction.winning_discount ?? mAuction.winning_bid ?? 0);
+        const netPrize = Math.max(0, group.totalValue - winBid);
+        if (netPrize > 0) {
+          const winProfileId = mAuction.winning_bidder_id || mAuction.winner_profile_id || mAuction.winner_id;
+          const winMem = dashboardGroupMembers.find(mem => 
+            (winProfileId && (mem.profileId === winProfileId || mem.id === winProfileId)) ||
+            (mAuction.winner_name && mem.name.toLowerCase() === mAuction.winner_name.toLowerCase())
+          );
+          const mPattern = new RegExp(`\\bMonth\\s+${monthNum}\\b|\\bM${monthNum}\\b|\\bM\\s*${monthNum}\\b`, 'i');
+          const mPayoutTxs = dashboardTransactions.filter(t =>
+            t.type === 'payout' && (
+              (t.cycle_month !== null && t.cycle_month !== undefined ? Number(t.cycle_month) === Number(monthNum) : false) ||
+              (t.notes && mPattern.test(t.notes)) ||
+              (!t.cycle_month && (
+                (winProfileId && (t.profile_id === winProfileId || t.group_member_id === winProfileId)) ||
+                (winMem && (t.group_member_id === winMem.id || t.profile_id === winMem.profileId))
+              ))
+            )
+          );
+          const totalDisbursed = mPayoutTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+          if (totalDisbursed < netPrize) {
+            isDisbursalPending = true;
+          }
+        }
+      }
+    }
+
+    if (isDisbursalPending) {
+      return { status: 'disbursal_pending', label: 'Disbursal Pending', color: 'amber' as const };
+    }
+
+    return { status: 'completed', label: 'Completed', color: 'emerald' as const };
+  };
+
+  // Helper: navigate to historical auction logs tab for clicked chit group
+  const handleNavigateToAuctionHistory = (e?: React.MouseEvent) => {
+    if (e) {
+      const target = e.target as HTMLElement;
+      if (target.closest('button, a, input, select')) return;
+    }
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('cf_auction_selected_group_id', activeDashboardGroupId || '');
+      sessionStorage.setItem('cf_auction_view_tab', 'history');
+      window.dispatchEvent(new CustomEvent('cf:navigate_auction_history', {
+        detail: { groupId: activeDashboardGroupId }
+      }));
+    }
+    if (setActiveTab) {
+      setActiveTab('auctions');
+    }
+  };
+
   // Helper: compute smart multi-month payment allocations for live breakdown preview
   const computePaymentAllocations = (
     member: any,
@@ -3922,6 +4021,7 @@ Thank you for your prompt payment! 🙏`;
                       const isPast = (mNum < activeCycle);
                       const label = getDashboardMonthLabel(activeGroup, mNum);
                       const isFinale = (mNum === totalDuration);
+                      const mStatus = getMonthProgressStatus(activeGroup, mNum);
 
                       return (
                         <React.Fragment key={mNum}>
@@ -3935,22 +4035,32 @@ Thank you for your prompt payment! 🙏`;
                               isSelected
                                 ? 'bg-brand-600 text-white font-bold shadow-sm'
                                 : isPast
-                                ? 'font-semibold text-slate-600 hover:bg-slate-100'
+                                ? mStatus.color === 'rose'
+                                  ? 'font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200'
+                                  : mStatus.color === 'amber'
+                                  ? 'font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200'
+                                  : 'font-semibold text-slate-600 hover:bg-slate-100'
                                 : 'font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                             }`}
                           >
                             {isSelected ? (
                               <span className="w-2 h-2 rounded-full bg-white animate-ping" />
                             ) : isPast ? (
-                              <CheckCircle2 size={13} className="text-emerald-500" />
+                              mStatus.color === 'rose' ? (
+                                <AlertCircle size={13} className="text-rose-500" />
+                              ) : mStatus.color === 'amber' ? (
+                                <Clock size={13} className="text-amber-500" />
+                              ) : (
+                                <CheckCircle2 size={13} className="text-emerald-500" />
+                              )
                             ) : null}
                             <span>
                               {mNum === 0 
-                                ? `${label} Launch` 
+                                ? (isPast && mStatus.status !== 'completed' ? `${label} (${mStatus.label})` : `${label} Launch`)
                                 : mNum === activeCycle 
                                 ? `${label} (Active)` 
                                 : isPast
-                                ? `${label}`
+                                ? `${label}${mStatus.status !== 'completed' ? ` (${mStatus.label})` : ''}`
                                 : isFinale 
                                 ? `${label} (Finale)` 
                                 : `${label} (Upcoming)`}
@@ -4251,13 +4361,19 @@ Thank you for your prompt payment! 🙏`;
                     // Auction Winner details (using lifted variables)
                     return (
                       <>
-                        <div>
+                        <div
+                          onClick={handleNavigateToAuctionHistory}
+                          className="cursor-pointer group hover:bg-slate-50/50 -m-2 p-2 rounded-xl transition-all"
+                          title="Click to view historical auction ledger"
+                        >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <span className="p-1 rounded-lg bg-amber-100 text-amber-700">
                                 <Trophy size={16} />
                               </span>
-                              <span className="text-xs font-bold text-slate-800">Month {selectedDashboardMonth} Auction Winner</span>
+                              <span className="text-xs font-bold text-slate-800 group-hover:text-brand-600 transition-colors">
+                                Month {selectedDashboardMonth} Auction Winner →
+                              </span>
                             </div>
                             {isSettled ? (
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -4276,7 +4392,7 @@ Thank you for your prompt payment! 🙏`;
                           </div>
                           <div className="mt-2">
                             <div className="flex items-baseline justify-between">
-                              <h4 className="text-base font-bold text-slate-900 font-display">{winnerName}</h4>
+                              <h4 className="text-base font-bold text-slate-900 font-display group-hover:text-brand-600 transition-colors">{winnerName}</h4>
                               <span className="text-xs font-mono font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
                                 Ticket #{winnerTicketNum}
                               </span>
@@ -4301,7 +4417,10 @@ Thank you for your prompt payment! 🙏`;
                           {remainingPrizeDue > 0 ? (
                             <button
                               type="button"
-                              onClick={() => handleOpenDisburseModal(remainingPrizeDue)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenDisburseModal(remainingPrizeDue);
+                              }}
                               className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
                             >
                               <Banknote size={14} />
@@ -4315,17 +4434,20 @@ Thank you for your prompt payment! 🙏`;
 
                           <button
                             type="button"
-                            onClick={() => handleSharePayoutWhatsApp(
-                              activeGroup,
-                              winnerName,
-                              winnerPhone,
-                              selectedDashboardMonth,
-                              netPrizePot,
-                              winningBid,
-                              totalPrizeDisbursed,
-                              remainingPrizeDue,
-                              monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
-                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSharePayoutWhatsApp(
+                                activeGroup,
+                                winnerName,
+                                winnerPhone,
+                                selectedDashboardMonth,
+                                netPrizePot,
+                                winningBid,
+                                totalPrizeDisbursed,
+                                remainingPrizeDue,
+                                monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
+                              );
+                            }}
                             className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
                             title="Send WhatsApp Receipt"
                           >
@@ -4881,49 +5003,60 @@ Thank you for your prompt payment! 🙏`;
                 <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
                   {monthsRange.map((m) => {
                     const isGroupActiveMonth = m === (activeGroup?.currentMonth ?? 0);
-                    const isCompleted = m < (activeGroup?.currentMonth ?? 0);
                     const isInspecting = m === selectedDashboardMonth;
+                    const mStatus = getMonthProgressStatus(activeGroup, m);
+
+                    const barColor = mStatus.color === 'rose'
+                      ? 'bg-rose-500'
+                      : mStatus.color === 'amber'
+                      ? 'bg-amber-500'
+                      : mStatus.color === 'emerald'
+                      ? 'bg-emerald-500'
+                      : mStatus.color === 'brand'
+                      ? 'bg-brand-500'
+                      : 'bg-slate-200';
+
+                    const labelColor = isInspecting
+                      ? 'font-extrabold text-brand-700'
+                      : mStatus.color === 'rose'
+                      ? 'font-bold text-rose-700'
+                      : mStatus.color === 'amber'
+                      ? 'font-bold text-amber-700'
+                      : mStatus.color === 'emerald'
+                      ? 'font-bold text-emerald-700'
+                      : mStatus.color === 'brand'
+                      ? 'font-bold text-brand-600'
+                      : 'font-medium text-slate-500';
+
+                    const subColor = mStatus.color === 'rose'
+                      ? 'font-bold text-rose-600'
+                      : mStatus.color === 'amber'
+                      ? 'font-bold text-amber-600'
+                      : mStatus.color === 'emerald'
+                      ? 'font-medium text-emerald-600'
+                      : mStatus.color === 'brand'
+                      ? 'font-bold text-brand-600'
+                      : 'text-slate-400';
+
                     return (
                       <button
                         key={m}
                         type="button"
                         onClick={() => setSelectedDashboardMonth(m)}
-                        className={`flex-1 min-w-[54px] flex flex-col items-center group cursor-pointer p-1 rounded-xl transition-all ${
+                        className={`flex-1 min-w-[62px] flex flex-col items-center group cursor-pointer p-1 rounded-xl transition-all ${
                           isInspecting
                             ? 'bg-brand-50/70 border-2 border-brand-500 shadow-2xs'
                             : 'hover:bg-slate-50 border border-transparent'
                         }`}
                       >
                         <div
-                          className={`w-full h-1.5 rounded-full mb-1.5 transition-all ${
-                            isCompleted
-                              ? 'bg-emerald-500'
-                              : isGroupActiveMonth
-                              ? 'bg-brand-500'
-                              : 'bg-slate-200'
-                          }`}
+                          className={`w-full h-1.5 rounded-full mb-1.5 transition-all ${barColor}`}
                         />
-                        <span
-                          className={`text-[10px] ${
-                            isInspecting
-                              ? 'font-extrabold text-brand-700'
-                              : isCompleted
-                              ? 'font-bold text-emerald-700'
-                              : isGroupActiveMonth
-                              ? 'font-bold text-brand-600'
-                              : 'font-medium text-slate-500'
-                          }`}
-                        >
+                        <span className={`text-[10px] ${labelColor}`}>
                           M{m}
                         </span>
-                        <span className={`text-[9px] ${
-                          isGroupActiveMonth
-                            ? 'font-bold text-brand-600'
-                            : isCompleted
-                            ? 'font-medium text-emerald-600'
-                            : 'text-slate-400'
-                        }`}>
-                          {isGroupActiveMonth ? 'Active' : isCompleted ? 'Completed' : 'Upcoming'}
+                        <span className={`text-[8.5px] leading-tight text-center truncate max-w-[62px] ${subColor}`}>
+                          {mStatus.label}
                         </span>
                       </button>
                     );
@@ -4997,58 +5130,64 @@ Thank you for your prompt payment! 🙏`;
                   </div>
                 ) : (
                   <div>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0">
-                          <Trophy size={16} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h3 className="text-sm font-bold font-display text-slate-900 truncate">{winnerName}</h3>
-                            <span className="px-1.5 py-0.2 text-[10px] font-bold font-mono bg-slate-100 text-slate-700 rounded border border-slate-200">
-                              #{winnerTicketNum}
-                            </span>
+                    <div
+                      onClick={handleNavigateToAuctionHistory}
+                      className="cursor-pointer group hover:bg-slate-50/50 -m-1.5 p-1.5 rounded-xl transition-all"
+                      title="Click to view historical auction ledger"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0">
+                            <Trophy size={16} />
                           </div>
-                          <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium truncate">
-                            <span>Month {selectedDashboardMonth} Winner</span>
-                            {winnerPhone && (
-                              <>
-                                <span className="text-slate-300">•</span>
-                                <span className="text-slate-400 font-mono">{winnerPhone}</span>
-                              </>
-                            )}
-                          </p>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h3 className="text-sm font-bold font-display text-slate-900 group-hover:text-brand-600 transition-colors truncate">{winnerName}</h3>
+                              <span className="px-1.5 py-0.2 text-[10px] font-bold font-mono bg-slate-100 text-slate-700 rounded border border-slate-200">
+                                #{winnerTicketNum}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium truncate">
+                              <span>Month {selectedDashboardMonth} Winner →</span>
+                              {winnerPhone && (
+                                <>
+                                  <span className="text-slate-300">•</span>
+                                  <span className="text-slate-400 font-mono">{winnerPhone}</span>
+                                </>
+                              )}
+                            </p>
+                          </div>
                         </div>
+                        {isSettled ? (
+                          <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            ✓ Disbursed
+                          </span>
+                        ) : isPartial ? (
+                          <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                            Partial
+                          </span>
+                        ) : (
+                          <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                            Pending
+                          </span>
+                        )}
                       </div>
-                      {isSettled ? (
-                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          ✓ Disbursed
-                        </span>
-                      ) : isPartial ? (
-                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                          Partial
-                        </span>
-                      ) : (
-                        <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          Pending
-                        </span>
-                      )}
-                    </div>
 
-                    {/* Key Financial Matrix Grid */}
-                    <div className="mt-4 grid grid-cols-3 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                      <div>
-                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Discount</p>
-                        <p className="text-xs font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(winningBid)}</p>
-                      </div>
-                      <div className="border-l border-slate-200 pl-2.5">
-                        <p className="text-[10px] uppercase font-bold text-brand-600 leading-tight">Prize Due</p>
-                        <p className="text-xs font-extrabold text-brand-600 mt-0.5 font-mono">{formatCurrency(netPrizePot)}</p>
-                      </div>
-                      <div className="border-l border-slate-200 pl-2.5">
-                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Disbursed</p>
-                        <p className="text-xs font-bold text-slate-600 mt-0.5 font-mono">{formatCurrency(totalPrizeDisbursed)}</p>
+                      {/* Key Financial Matrix Grid */}
+                      <div className="mt-4 grid grid-cols-3 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Discount</p>
+                          <p className="text-xs font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(winningBid)}</p>
+                        </div>
+                        <div className="border-l border-slate-200 pl-2.5">
+                          <p className="text-[10px] uppercase font-bold text-brand-600 leading-tight">Prize Due</p>
+                          <p className="text-xs font-extrabold text-brand-600 mt-0.5 font-mono">{formatCurrency(netPrizePot)}</p>
+                        </div>
+                        <div className="border-l border-slate-200 pl-2.5">
+                          <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Disbursed</p>
+                          <p className="text-xs font-bold text-slate-600 mt-0.5 font-mono">{formatCurrency(totalPrizeDisbursed)}</p>
+                        </div>
                       </div>
                     </div>
 
@@ -5057,7 +5196,10 @@ Thank you for your prompt payment! 🙏`;
                       {remainingPrizeDue > 0 ? (
                         <button
                           type="button"
-                          onClick={() => handleOpenDisburseModal(remainingPrizeDue)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDisburseModal(remainingPrizeDue);
+                          }}
                           className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center space-x-1.5 transition-colors active:scale-95 cursor-pointer"
                         >
                           <Banknote size={14} />
@@ -5070,17 +5212,20 @@ Thank you for your prompt payment! 🙏`;
                       )}
                       <button
                         type="button"
-                        onClick={() => handleSharePayoutWhatsApp(
-                          activeGroup,
-                          winnerName,
-                          winnerPhone,
-                          selectedDashboardMonth,
-                          netPrizePot,
-                          winningBid,
-                          totalPrizeDisbursed,
-                          remainingPrizeDue,
-                          monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
-                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSharePayoutWhatsApp(
+                            activeGroup,
+                            winnerName,
+                            winnerPhone,
+                            selectedDashboardMonth,
+                            netPrizePot,
+                            winningBid,
+                            totalPrizeDisbursed,
+                            remainingPrizeDue,
+                            monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
+                          );
+                        }}
                         aria-label="Share WhatsApp Receipt"
                         className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-700 flex items-center justify-center transition-colors active:scale-95 shadow-xs cursor-pointer"
                       >
@@ -9681,48 +9826,48 @@ Thank you for your prompt payment! 🙏`;
         ];
 
         return (
-          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-150 overflow-y-auto">
-            <div className="bg-[#1D1D41] border border-[#27264E] text-white rounded-3xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl my-auto animate-in zoom-in-95 duration-150 max-h-[90dvh] overflow-y-auto">
+          <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
+            <div className="bg-white border border-slate-200 text-slate-900 rounded-3xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl my-auto animate-in zoom-in-95 duration-150 max-h-[92dvh] overflow-y-auto scrollbar-thin">
               {/* Modal Header */}
-              <div className="flex justify-between items-center border-b border-[#27264E] pb-3">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-[#02B15A]/15 text-[#02B15A] border border-[#02B15A]/30 flex items-center justify-center shrink-0 shadow-xs">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/80 flex items-center justify-center shrink-0 shadow-2xs">
                     <Banknote size={20} />
                   </div>
                   <div className="min-w-0">
-                    <h4 className="text-sm sm:text-base font-extrabold text-white tracking-tight leading-tight">
+                    <h4 className="text-sm sm:text-base font-extrabold font-display text-slate-900 tracking-tight leading-tight">
                       Disburse Prize Payout
                     </h4>
-                    <p className="text-[11px] text-[#AEABD8] font-medium truncate">
-                      {activeGroup?.name} · M{selectedDashboardMonth} Winner: <strong className="text-white">{winnerName}</strong>
+                    <p className="text-[11px] text-slate-500 font-medium truncate">
+                      {activeGroup?.name} · M{selectedDashboardMonth} Winner: <strong className="text-slate-800">{winnerName}</strong>
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowDisbursePayoutModal(false)}
-                  className="w-8 h-8 rounded-full bg-[#141332] hover:bg-[#27264E] text-[#AEABD8] hover:text-white border border-[#27264E] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                 >
                   <X size={15} />
                 </button>
               </div>
 
               {/* Pot Summary Pill */}
-              <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3.5 flex items-center justify-between">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3">
                 <div>
-                  <span className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider block">Gross Prize Pot</span>
-                  <span className="text-base sm:text-xl font-extrabold text-white font-mono">{formatCurrency(netPrizePot)}</span>
-                  <span className="text-[10px] text-[#AEABD8] block">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Gross Prize Pot</span>
+                  <span className="text-base sm:text-xl font-extrabold text-slate-900 font-mono">{formatCurrency(netPrizePot)}</span>
+                  <span className="text-[10px] text-slate-500 block">
                     (₹{totalChitVal.toLocaleString('en-IN')} − ₹{winningBid.toLocaleString('en-IN')} bid)
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">Remaining Due</span>
-                  <span className={`text-base sm:text-xl font-extrabold font-mono ${remainingPrizeDue > 0 ? 'text-[#FFBB38]' : 'text-[#02B15A]'}`}>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Remaining Due</span>
+                  <span className={`text-base sm:text-xl font-extrabold font-mono ${remainingPrizeDue > 0 ? 'text-brand-600' : 'text-emerald-600'}`}>
                     {formatCurrency(remainingPrizeDue)}
                   </span>
                   {totalPrizeDisbursed > 0 && (
-                    <span className="text-[10px] text-[#02B15A] font-bold block">
+                    <span className="text-[10px] text-emerald-700 font-bold block">
                       ✓ {formatCurrency(totalPrizeDisbursed)} already paid
                     </span>
                   )}
@@ -9730,16 +9875,16 @@ Thank you for your prompt payment! 🙏`;
               </div>
 
               {/* ── Net Settlement Offsets Section ── */}
-              <div className="bg-[#141332] border border-[#27264E] rounded-2xl p-3.5 space-y-3">
+              <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <CheckCircle2 size={15} className="text-[#6359E9] shrink-0" />
-                    <span className="text-xs font-bold text-white truncate">
+                    <CheckCircle2 size={15} className="text-brand-600 shrink-0" />
+                    <span className="text-xs font-bold text-slate-900 truncate">
                       Installment Offsets (Optional)
                     </span>
                   </div>
                   {totalDeductionsAmount > 0 && (
-                    <span className="text-[10px] font-bold text-[#E41414] bg-[#E41414]/10 border border-[#E41414]/30 px-2 py-0.5 rounded-md shrink-0">
+                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md shrink-0 font-mono">
                       − {formatCurrency(totalDeductionsAmount)} offset
                     </span>
                   )}
@@ -9747,7 +9892,7 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* 1. Past Pending Balances / Arrears Status */}
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
                     1. Past Pending Balances / Arrears
                   </span>
                   {unpaidArrears.length > 0 ? (
@@ -9761,26 +9906,26 @@ Thank you for your prompt payment! 🙏`;
                             onClick={() => toggleArrearMonth(a.month)}
                             className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                               isChecked
-                                ? 'bg-[#FFBB38]/15 border-[#FFBB38] ring-1 ring-[#FFBB38]'
-                                : 'bg-[#1D1D41] border-[#27264E] hover:border-[#FFBB38]/40'
+                                ? 'bg-amber-50/90 border-amber-300 ring-1 ring-amber-300 shadow-2xs'
+                                : 'bg-white border-slate-200 hover:border-slate-300'
                             }`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
-                                isChecked ? 'bg-[#FFBB38] border-[#FFBB38] text-[#141332]' : 'bg-[#141332] border-[#27264E]'
+                                isChecked ? 'bg-amber-500 border-amber-500 text-white' : 'bg-slate-100 border-slate-300'
                               }`}>
                                 {isChecked && <Check size={11} className="stroke-[3]" />}
                               </div>
                               <div className="min-w-0">
-                                <div className="text-xs font-bold text-white truncate">
+                                <div className="text-xs font-bold text-slate-900 truncate">
                                   Deduct Month {a.month} Past Arrear
                                 </div>
-                                <span className="text-[10px] text-[#AEABD8]">
+                                <span className="text-[10px] text-slate-500">
                                   Owes {formatCurrency(a.unpaid)} from M{a.month}
                                 </span>
                               </div>
                             </div>
-                            <span className="text-xs font-extrabold text-[#E41414] font-mono shrink-0">
+                            <span className="text-xs font-extrabold text-rose-600 font-mono shrink-0">
                               −{formatCurrency(a.unpaid)}
                             </span>
                           </button>
@@ -9788,12 +9933,12 @@ Thank you for your prompt payment! 🙏`;
                       })}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl px-3 py-2 text-[#02B15A] text-xs font-medium">
+                    <div className="flex items-center justify-between bg-emerald-50/80 border border-emerald-200/80 rounded-xl px-3 py-2 text-emerald-800 text-xs font-medium">
                       <span className="flex items-center gap-1.5 truncate">
-                        <Check size={13} className="text-[#02B15A] shrink-0" />
+                        <Check size={13} className="text-emerald-600 shrink-0" />
                         <span>No Past Arrears Pending</span>
                       </span>
-                      <span className="text-[10px] font-bold bg-[#02B15A]/20 text-[#02B15A] px-2 py-0.5 rounded shrink-0 font-mono">
+                      <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded shrink-0 font-mono">
                         ₹0 Due
                       </span>
                     </div>
@@ -9801,8 +9946,8 @@ Thank you for your prompt payment! 🙏`;
                 </div>
 
                 {/* 2. Current Month Installment Deduction Toggle */}
-                <div className="space-y-1.5 pt-1.5 border-t border-[#27264E]">
-                  <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">
+                <div className="space-y-1.5 pt-1.5 border-t border-slate-200/70">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
                     2. Current Month Installment (Month {selectedDashboardMonth})
                   </span>
                   {currentMonthUnpaid > 0 ? (
@@ -9811,39 +9956,39 @@ Thank you for your prompt payment! 🙏`;
                       onClick={toggleThisMonthDeduction}
                       className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         disburseDeductThisMonth
-                          ? 'bg-[#6359E9]/20 border-[#6359E9] ring-1 ring-[#6359E9]'
-                          : 'bg-[#1D1D41] border-[#27264E] hover:border-[#6359E9]/40'
+                          ? 'bg-indigo-50/80 border-brand-500 ring-1 ring-brand-500/20 shadow-2xs'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded border flex items-center justify-center shrink-0 transition-all ${
-                          disburseDeductThisMonth ? 'bg-[#6359E9] border-[#6359E9] text-white' : 'bg-[#141332] border-[#27264E]'
+                          disburseDeductThisMonth ? 'bg-brand-600 border-brand-600 text-white' : 'bg-slate-100 border-slate-300'
                         }`}>
                           {disburseDeductThisMonth && <Check size={12} className="stroke-[3]" />}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
+                          <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
                             <span>Deduct Month {selectedDashboardMonth} Due</span>
-                            <span className="text-[10px] font-semibold text-[#02B15A] bg-[#02B15A]/15 border border-[#02B15A]/30 px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
                               Mark PAID 🟢
                             </span>
                           </div>
-                          <span className="text-[10px] text-[#AEABD8] block">
+                          <span className="text-[10px] text-slate-500 block">
                             Current due: {formatCurrency(currentMonthUnpaid)}
                           </span>
                         </div>
                       </div>
-                      <span className="text-xs font-extrabold text-[#E41414] font-mono shrink-0">
+                      <span className="text-xs font-extrabold text-rose-600 font-mono shrink-0">
                         −{formatCurrency(currentMonthUnpaid)}
                       </span>
                     </button>
                   ) : (
-                    <div className="flex items-center justify-between bg-[#02B15A]/10 border border-[#02B15A]/30 rounded-xl px-3 py-2 text-[#02B15A] text-xs font-medium">
+                    <div className="flex items-center justify-between bg-emerald-50/80 border border-emerald-200/80 rounded-xl px-3 py-2 text-emerald-800 text-xs font-medium">
                       <span className="flex items-center gap-1.5 truncate">
-                        <Check size={13} className="text-[#02B15A] shrink-0" />
+                        <Check size={13} className="text-emerald-600 shrink-0" />
                         <span>Month {selectedDashboardMonth} Due Already Paid</span>
                       </span>
-                      <span className="text-[10px] font-bold bg-[#02B15A]/20 text-[#02B15A] px-2 py-0.5 rounded shrink-0 font-mono">
+                      <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded shrink-0 font-mono">
                         {formatCurrency(currentMonthPaid)}
                       </span>
                     </div>
@@ -9852,8 +9997,8 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* 3. Pre-pay Advance Upcoming Months (Clean 2-Column Grid) */}
                 {advanceCandidates.length > 0 && (
-                  <div className="space-y-1.5 pt-1.5 border-t border-[#27264E]">
-                    <span className="text-[10px] font-bold text-[#AEABD8] uppercase tracking-wider block">
+                  <div className="space-y-1.5 pt-1.5 border-t border-slate-200/70">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
                       3. Pre-pay Advance Months (Optional)
                     </span>
                     <div className="grid grid-cols-2 gap-2">
@@ -9866,12 +10011,12 @@ Thank you for your prompt payment! 🙏`;
                             onClick={() => toggleAdvanceMonth(m)}
                             className={`w-full py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                               isSelected
-                                ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-sm'
-                                : 'bg-[#1D1D41] hover:bg-[#27264E] text-[#AEABD8] border-[#27264E]'
+                                ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
+                                : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
                             }`}
                           >
                             <span className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                              isSelected ? 'bg-white text-[#6359E9]' : 'bg-[#141332] text-[#AEABD8]'
+                              isSelected ? 'bg-white text-brand-600' : 'bg-slate-100 text-slate-500'
                             }`}>
                               {isSelected ? '✓' : '+'}
                             </span>
@@ -9885,14 +10030,14 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* Calculation Summary Footer Pill */}
                 {totalDeductionsAmount > 0 && (
-                  <div className="bg-[#1D1D41] border border-[#27264E] rounded-xl p-3 flex items-center justify-between text-xs font-medium">
+                  <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between text-xs font-medium shadow-2xs">
                     <div className="space-y-0.5">
-                      <span className="text-[11px] text-[#AEABD8] block">Gross Prize: {formatCurrency(netPrizePot)}</span>
-                      <span className="text-[11px] text-[#E41414] font-semibold block">Deductions Offset: −{formatCurrency(totalDeductionsAmount)}</span>
+                      <span className="text-[11px] text-slate-500 block">Gross Prize: {formatCurrency(netPrizePot)}</span>
+                      <span className="text-[11px] text-rose-600 font-semibold block">Deductions Offset: −{formatCurrency(totalDeductionsAmount)}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] font-bold text-[#64CFF6] uppercase tracking-wider block">Net Cash Paid</span>
-                      <span className="text-sm font-extrabold text-white font-mono">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Net Cash Paid</span>
+                      <span className="text-sm font-extrabold text-slate-900 font-mono">
                         = {formatCurrency(Math.max(0, remainingPrizeDue - totalDeductionsAmount))}
                       </span>
                     </div>
@@ -9904,16 +10049,21 @@ Thank you for your prompt payment! 🙏`;
                 {/* Net Cash Handed Over Input */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider truncate">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider truncate">
                       Net Cash Payout (₹)
                     </label>
-                    <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#64CFF6] bg-[#64CFF6]/10 border border-[#64CFF6]/30 px-2 py-0.5 rounded-md shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDisbursePayoutAmount(Math.max(0, remainingPrizeDue - totalDeductionsAmount).toString())}
+                      className="text-[10px] sm:text-[11px] font-mono font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 px-2 py-0.5 rounded-md shrink-0 transition-colors cursor-pointer"
+                      title="Click to fill exact remaining due"
+                    >
                       Due: {formatCurrency(Math.max(0, remainingPrizeDue - totalDeductionsAmount))}
-                    </span>
+                    </button>
                   </div>
 
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-[#AEABD8]">₹</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400">₹</span>
                     <input
                       type="number"
                       min={0}
@@ -9921,14 +10071,14 @@ Thank you for your prompt payment! 🙏`;
                       value={disbursePayoutAmount}
                       onChange={(e) => setDisbursePayoutAmount(e.target.value)}
                       placeholder="0"
-                      className="w-full pl-9 pr-4 py-2.5 bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-2xl text-2xl font-extrabold text-white focus:outline-none transition-all font-mono"
+                      className="w-full pl-9 pr-4 py-2.5 bg-white border-2 border-slate-200 focus:border-brand-500 rounded-2xl text-2xl font-black text-slate-900 focus:outline-none transition-all font-mono shadow-2xs"
                     />
                   </div>
                 </div>
 
                 {/* Source Wallet Selector */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                     Paid From Which Vault / Bank?
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -9942,19 +10092,23 @@ Thank you for your prompt payment! 🙏`;
                           onClick={() => setDisbursePayoutWallet(w.id)}
                           className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-[#6359E9] text-white border-[#6359E9] shadow-sm'
-                              : 'bg-[#141332] hover:bg-[#1D1D41] text-[#AEABD8] border-[#27264E]'
+                              ? 'bg-brand-50 text-brand-900 border-2 border-brand-500 shadow-2xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm">{w.icon}</span>
                             <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                              isSelected ? 'bg-white/20 text-white' : isLowBal ? 'bg-[#FFBB38]/20 text-[#FFBB38]' : 'bg-[#1D1D41] text-[#AEABD8]'
+                              isSelected 
+                                ? 'bg-brand-100 text-brand-800' 
+                                : isLowBal 
+                                ? 'bg-amber-100 text-amber-800' 
+                                : 'bg-slate-100 text-slate-600'
                             }`}>
                               {formatCurrency(w.bal)}
                             </span>
                           </div>
-                          <div className="text-xs font-bold text-white truncate">{w.label}</div>
+                          <div className="text-xs font-bold text-slate-900 truncate">{w.label}</div>
                         </button>
                       );
                     })}
@@ -9963,7 +10117,7 @@ Thank you for your prompt payment! 🙏`;
 
                 {/* Disbursal Date Selector */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                     Payment Date
                   </label>
                   <div className="grid grid-cols-3 gap-2">
@@ -9972,8 +10126,8 @@ Thank you for your prompt payment! 🙏`;
                       onClick={() => setDisbursePayoutDateType('today')}
                       className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         disbursePayoutDateType === 'today'
-                          ? 'bg-[#6359E9] text-white border-[#6359E9]'
-                          : 'bg-[#141332] hover:bg-[#1D1D41] text-[#AEABD8] border-[#27264E]'
+                          ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                       }`}
                     >
                       Today
@@ -9983,8 +10137,8 @@ Thank you for your prompt payment! 🙏`;
                       onClick={() => setDisbursePayoutDateType('yesterday')}
                       className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         disbursePayoutDateType === 'yesterday'
-                          ? 'bg-[#6359E9] text-white border-[#6359E9]'
-                          : 'bg-[#141332] hover:bg-[#1D1D41] text-[#AEABD8] border-[#27264E]'
+                          ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                       }`}
                     >
                       Yesterday
@@ -9994,8 +10148,8 @@ Thank you for your prompt payment! 🙏`;
                       onClick={() => setDisbursePayoutDateType('custom')}
                       className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         disbursePayoutDateType === 'custom'
-                          ? 'bg-[#6359E9] text-white border-[#6359E9]'
-                          : 'bg-[#141332] hover:bg-[#1D1D41] text-[#AEABD8] border-[#27264E]'
+                          ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                       }`}
                     >
                       Custom Date
@@ -10006,7 +10160,7 @@ Thank you for your prompt payment! 🙏`;
                       type="date"
                       value={disbursePayoutCustomDate}
                       onChange={(e) => setDisbursePayoutCustomDate(e.target.value)}
-                      className="w-full mt-1.5 px-3 py-2 bg-[#141332] border border-[#27264E] rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-[#6359E9]"
+                      className="w-full mt-1.5 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-brand-500"
                     />
                   )}
                 </div>
@@ -10014,7 +10168,7 @@ Thank you for your prompt payment! 🙏`;
                 {/* Reference Note & Receipt Upload */}
                 <div className="space-y-2.5">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider block">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                       Reference Note / Cheque No. (Optional)
                     </label>
                     <input
@@ -10022,15 +10176,15 @@ Thank you for your prompt payment! 🙏`;
                       value={disbursePayoutNote}
                       onChange={(e) => setDisbursePayoutNote(e.target.value)}
                       placeholder="e.g. Cheque #492019 or IMPS Ref #81920"
-                      className="w-full px-3.5 py-2.5 bg-[#141332] border border-[#27264E] focus:border-[#6359E9] rounded-xl text-xs font-semibold text-white placeholder-[#AEABD8]/40 focus:outline-none"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-brand-500 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none"
                     />
                   </div>
 
                   {/* Receipt Photo Attachment */}
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-[#AEABD8] uppercase tracking-wider flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
                       <span className="flex items-center gap-1">
-                        <Paperclip size={13} className="text-[#AEABD8]" />
+                        <Paperclip size={13} className="text-slate-500" />
                         Attach Receipt / Cheque Photo (Optional)
                       </span>
                       {disbursePayoutReceiptUrl && (
@@ -10040,20 +10194,20 @@ Thank you for your prompt payment! 🙏`;
                             setDisbursePayoutReceiptUrl('');
                             setDisburseReceiptFileToUpload(null);
                           }}
-                          className="text-[#E41414] hover:underline text-[10px] font-bold cursor-pointer"
+                          className="text-rose-600 hover:underline text-[10px] font-bold cursor-pointer"
                         >
                           Remove Photo
                         </button>
                       )}
                     </label>
                     {disbursePayoutReceiptUrl ? (
-                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-[#27264E] bg-[#141332] flex items-center justify-center">
+                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">
                         <img src={disbursePayoutReceiptUrl} alt="Receipt preview" className="w-full h-full object-cover" />
                       </div>
                     ) : (
-                      <label className="border border-dashed border-[#27264E] hover:border-[#6359E9] rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer bg-[#141332] hover:bg-[#1D1D41] transition-colors">
-                        <Paperclip size={14} className="text-[#AEABD8]" />
-                        <span className="text-xs text-[#AEABD8] font-semibold">Tap to attach cheque / transfer screenshot</span>
+                      <label className="border-2 border-dashed border-slate-200 hover:border-brand-400 rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                        <Paperclip size={14} className="text-slate-500" />
+                        <span className="text-xs text-slate-600 font-semibold">Tap to attach cheque / transfer screenshot</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -10066,18 +10220,18 @@ Thank you for your prompt payment! 🙏`;
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="flex flex-col-reverse sm:flex-row gap-2.5 pt-2 border-t border-[#27264E]">
+                <div className="flex flex-col-reverse sm:flex-row gap-2.5 pt-2 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setShowDisbursePayoutModal(false)}
-                    className="w-full sm:flex-1 py-3 border border-[#27264E] hover:bg-[#141332] text-[#AEABD8] hover:text-white font-bold text-xs rounded-xl transition-colors text-center cursor-pointer"
+                    className="w-full sm:flex-1 py-3 border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl transition-colors text-center cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isProcessingDisbursal || (amountNum <= 0 && totalDeductionsAmount <= 0)}
-                    className="w-full sm:flex-2 py-3 bg-[#02B15A] hover:bg-[#02B15A]/90 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95 text-center cursor-pointer"
+                    className="w-full sm:flex-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95 text-center cursor-pointer"
                   >
                     {isProcessingDisbursal ? (
                       <>
