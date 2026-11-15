@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import SystemAuditLogViewer from './SystemAuditLogViewer';
 import ReceiptsVaultViewer from './ReceiptsVaultViewer';
+import { computeAuctionDateForCycle, calculatePaymentDelay } from '@/utils/auctionSchedule';
 
 export type ReportSubtab = 
   | 'monthly' 
@@ -605,7 +606,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
     };
   }, [selectedGroup, selectedMonth, groupMembers, transactions, auctionLogs]);
 
-  // Calculate defaulters stats for selected group & selected month
+  // Calculate defaulters stats for selected group & selected month with exact auction date delay
   const defaultersStats = useMemo(() => {
     if (!selectedGroup) {
       return {
@@ -613,30 +614,47 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         thisMonthDues: 0,
         defaultersCount: 0,
         defaultersList: [],
+        auctionDateFormatted: '',
+        daysPastAuction: 0,
       };
     }
 
-    // Sort outstanding members by highest total owed descending
+    // Determine canonical auction date for this specific month cycle
+    const currentCycleAuction = auctionLogs.find(a => a.group_id === selectedGroup.id && Number(a.month) === selectedMonth);
+    const selectedCycleAuctionDate = currentCycleAuction?.created_at
+      ? new Date(currentCycleAuction.created_at)
+      : computeAuctionDateForCycle(selectedGroup, selectedMonth);
+
+    const today = new Date();
+    const daysPastAuction = Math.max(0, Math.round((today.getTime() - selectedCycleAuctionDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+    // Sort outstanding members: prioritize chronic delay past auction date, then cumulative owed
     const rows = [...monthlyStats.outstandingRows]
-      .sort((a, b) => b.totalOwed - a.totalOwed)
-      .map((m, idx) => {
+      .map((m) => {
         const standardInst = m.standardInstallment || m.dueAmount || 1;
         const monthsOverdue = Math.max(1, Math.ceil(m.totalOwed / standardInst));
         
         // Compute overdue starting month
         let sinceDateLabel = activeMonthInfo.dateLabel;
         const gStart = selectedGroup.start_date || selectedGroup.startDate;
+        let oldestAuctionDate = selectedCycleAuctionDate;
+
         if (gStart) {
           const parsed = new Date(gStart);
           if (!isNaN(parsed.getTime())) {
             const overdueStartMonth = Math.max(0, selectedMonth - monthsOverdue + 1);
+            oldestAuctionDate = computeAuctionDateForCycle(selectedGroup, overdueStartMonth);
             const targetDate = new Date(parsed.getFullYear(), parsed.getMonth() + overdueStartMonth, 1);
             sinceDateLabel = `${targetDate.toLocaleDateString('en-US', { month: 'short' })} '${targetDate.getFullYear().toString().slice(-2)}`;
           }
         }
 
+        const totalOverdueDays = Math.max(0, Math.round((today.getTime() - oldestAuctionDate.getTime()) / (1000 * 60 * 60 * 24)));
+        const delayLabel = totalOverdueDays > 0
+          ? `${totalOverdueDays}d past ${oldestAuctionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} auction`
+          : `Auction due ${selectedCycleAuctionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
+
         return {
-          rank: idx + 1,
           id: m.id,
           profileId: m.profileId,
           name: m.name,
@@ -648,8 +666,19 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
           cumulativeDue: m.totalOwed,
           monthsOverdue: monthsOverdue,
           sinceDateLabel: sinceDateLabel,
+          delayDays: totalOverdueDays,
+          delayLabel: delayLabel,
+          auctionDateFormatted: selectedCycleAuctionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
         };
-      });
+      })
+      .sort((a, b) => {
+        // Prioritize greatest delay past auction date, then highest cumulative due
+        if (b.delayDays !== a.delayDays) {
+          return b.delayDays - a.delayDays;
+        }
+        return b.cumulativeDue - a.cumulativeDue;
+      })
+      .map((m, idx) => ({ ...m, rank: idx + 1 }));
 
     const cumulativeSum = rows.reduce((sum, r) => sum + r.cumulativeDue, 0);
     const thisMonthSum = rows.reduce((sum, r) => sum + r.thisMonthDue, 0);
@@ -659,8 +688,10 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       thisMonthDues: thisMonthSum,
       defaultersCount: rows.length,
       defaultersList: rows,
+      auctionDateFormatted: selectedCycleAuctionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      daysPastAuction,
     };
-  }, [selectedGroup, selectedMonth, monthlyStats, activeMonthInfo]);
+  }, [selectedGroup, selectedMonth, monthlyStats, activeMonthInfo, auctionLogs]);
 
   // Overview Data & Portfolio Metrics Calculation
   const overviewStats = useMemo(() => {
@@ -1575,8 +1606,12 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       const evaluatedMonthsCount = totalElapsedMonths;
 
       for (let m = 1; m <= totalElapsedMonths; m++) {
-        // Due date for month m (approx 10th of each cycle month)
-        const monthDueDate = new Date(baseStartDate.getFullYear(), baseStartDate.getMonth() + m, 10);
+        // Canonical scheduled auction date for month m (exact live/historical date parity)
+        const mAuction = auctionLogs.find(a => a.group_id === selectedGroup.id && Number(a.month) === m);
+        const auctionDate = mAuction?.created_at
+          ? new Date(mAuction.created_at)
+          : computeAuctionDateForCycle(selectedGroup, m);
+
         const monthPattern = new RegExp(`\\bMonth\\s+${m}\\b`, 'i');
         const paidTxs = memberTxs.filter(t => t.notes && monthPattern.test(t.notes));
 
@@ -1593,23 +1628,25 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         const isPaidFull = monthPaidAmount >= monthlyInstallment;
 
         if (isPaidFull) {
-          let paymentDate = monthDueDate;
+          let paymentDate = auctionDate;
           if (paidTxs.length > 0 && paidTxs[0].created_at) {
             const pDate = new Date(paidTxs[0].created_at);
             if (!isNaN(pDate.getTime())) {
               paymentDate = pDate;
             }
           }
-          const diffDays = Math.max(0, Math.round((paymentDate.getTime() - monthDueDate.getTime()) / (1000 * 60 * 60 * 24)));
-          if (diffDays <= 5) {
+          const delayInfo = calculatePaymentDelay(paymentDate, auctionDate, 5);
+          if (delayInfo.diffDays <= 0) {
             onTimeCount += 1;
           } else {
-            totalLateDaysSum += diffDays;
+            totalLateDaysSum += delayInfo.diffDays;
           }
         } else {
           unpaidCount += 1;
-          const overdueDays = Math.max(1, Math.round((today.getTime() - monthDueDate.getTime()) / (1000 * 60 * 60 * 24)));
-          totalLateDaysSum += overdueDays;
+          const delayInfo = calculatePaymentDelay(null, auctionDate, 5);
+          if (delayInfo.diffDays > 0) {
+            totalLateDaysSum += delayInfo.diffDays;
+          }
         }
       }
 
@@ -3022,7 +3059,12 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                           <span className="w-5 font-mono text-xs text-slate-400">{d.rank}</span>
                           <div>
                             <span className="font-bold text-sm text-slate-900 block">{d.name}</span>
-                            <span className="text-xs text-rose-600 font-medium">{d.monthsOverdue}m overdue · since {d.sinceDateLabel}</span>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                              <span className="text-xs text-rose-600 font-medium">{d.monthsOverdue}m overdue · since {d.sinceDateLabel}</span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-rose-50 text-rose-700 border border-rose-200">
+                                {d.delayLabel}
+                              </span>
+                            </div>
                           </div>
                         </div>
                         <div className="text-right">
@@ -3324,7 +3366,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                         <span className="w-8 font-mono text-sm font-black text-slate-900">{m.score}</span>
                         <div>
                           <span className="font-bold text-sm text-slate-900 block">{m.name}</span>
-                          <span className="text-xs text-slate-500 font-mono">Ticket #{m.ticket} · {m.onTimeCount}/{m.evaluatedMonthsCount} on time · {m.avgLateDays}d avg late</span>
+                          <span className="text-xs text-slate-500 font-mono">Ticket #{m.ticket} · {m.onTimeCount}/{m.evaluatedMonthsCount} on-time · {m.avgLateDays > 0 ? `+${m.avgLateDays}d avg delay past auction` : '0d delay (punctual)'}</span>
                         </div>
                       </div>
                       <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
@@ -3709,7 +3751,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                     <div className="flex justify-between items-start">
                       <div>
                         <span className="font-bold text-xs text-slate-900">{d.name}</span>
-                        <p className="text-[10px] text-rose-600 font-medium">{d.monthsOverdue}m overdue</p>
+                        <p className="text-[10px] text-rose-600 font-medium">{d.monthsOverdue}m overdue · {d.delayLabel}</p>
                       </div>
                       <span className="font-mono font-extrabold text-sm text-rose-600">₹{d.cumulativeDue.toLocaleString('en-IN')}</span>
                     </div>
@@ -3798,7 +3840,10 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                 <div key={m.id} className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-xs flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-bold text-xs text-slate-900">{m.score}</span>
-                    <span className="text-xs font-medium text-slate-900">{m.name}</span>
+                    <div>
+                      <span className="text-xs font-medium text-slate-900 block">{m.name}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">T#{m.ticket} · {m.avgLateDays > 0 ? `+${m.avgLateDays}d delay` : 'on-time'}</span>
+                    </div>
                   </div>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
                     m.status === 'Reliable' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : m.status === 'Watch' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200'

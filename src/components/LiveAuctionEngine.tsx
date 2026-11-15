@@ -1285,7 +1285,7 @@ export default function LiveAuctionEngine() {
         const { data: rpcRes, error: rpcErr } = await supabase.rpc('conclude_auction_cycle', {
           p_group_id: group.id,
           p_month: group.currentMonth,
-          p_next_month: nextMonth,
+          p_next_month: group.currentMonth,
           p_winner_member_id: (winnerId && !winnerId.startsWith('slot-')) ? winnerId : null,
           p_winner_profile_id: winningMember?.profileId || null,
           p_winning_discount: highestBid,
@@ -1300,7 +1300,7 @@ export default function LiveAuctionEngine() {
           console.warn('conclude_auction_cycle RPC failed, executing direct fallback:', rpcErr.message);
           // Fallback direct updates
           await supabase.from('chit_groups').update({
-            current_month: nextMonth,
+            current_month: group.currentMonth,
             kai_iruppu_pool: nextPool,
             status: isCompleting ? 'completed' : 'active',
             is_live_auction_active: false,
@@ -1325,7 +1325,7 @@ export default function LiveAuctionEngine() {
           });
 
           await supabase.from('security_audit_logs').insert({
-            action_description: `AUCTION CLOSED: Group "${group.name}" Month ${group.currentMonth} won by ${winningMember?.fullName || 'Member'} with discount ${formatCurrency(highestBid)}. Net Payout: ${formatCurrency(netPayout)}. Session Duration: ${finalSessionDuration}. Group advanced to Month ${nextMonth}.`,
+            action_description: `AUCTION CONCLUDED: Group "${group.name}" Month ${group.currentMonth} won by ${winningMember?.fullName || 'Member'} with discount ${formatCurrency(highestBid)}. Net Payout: ${formatCurrency(netPayout)}. Session Duration: ${finalSessionDuration}. (Active cycle remains Month ${group.currentMonth} until calendar month advances).`,
             target_table: 'auction_logs',
           });
         }
@@ -1347,7 +1347,7 @@ export default function LiveAuctionEngine() {
 
       setGroup(prev => prev ? ({
         ...prev,
-        currentMonth: nextMonth,
+        currentMonth: group.currentMonth,
         kai_iruppu_pool: nextPool,
         status: isCompleting ? 'completed' : 'active',
       }) : null);

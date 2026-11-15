@@ -23,20 +23,20 @@ import LiveAuditLogWidget from './LiveAuditLogWidget';
 import SlideToConfirm from './SlideToConfirm';
 import { HelpTooltip } from './HelpTooltip';
 import { triggerHapticFeedback } from '../utils/haptics';
-import { computeNextAuctionDateTime, formatTime12h, getFirstSundayOnOrAfterDay } from '../utils/auctionSchedule';
+import { computeNextAuctionDateTime, formatTime12h, getFirstSundayOnOrAfterDay, shouldAutoAdvanceCycle } from '../utils/auctionSchedule';
 import { generateReceiptNumber } from '@/utils/receiptNumber';
-import { 
-  DollarSign, 
-  Users, 
-  Briefcase, 
-  Calendar, 
+import {
+  DollarSign,
+  Users,
+  Briefcase,
+  Calendar,
   Crown,
-  Printer, 
-  Send, 
-  ShieldAlert, 
-  CheckCircle2, 
-  AlertCircle, 
-  ArrowUpRight, 
+  Printer,
+  Send,
+  ShieldAlert,
+  CheckCircle2,
+  AlertCircle,
+  ArrowUpRight,
   ArrowDownLeft,
   Coins,
   Search,
@@ -281,7 +281,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   // Advanced ChitBase Member Action Sub-Modals
   const [splitModalTicket, setSplitModalTicket] = useState<any | null>(null);
   const [splitPayers, setSplitPayers] = useState<{ name: string; part: number }[]>([]);
-  
+
   const [exitModalTicket, setExitModalTicket] = useState<any | null>(null);
   const [exitMonthVal, setExitMonthVal] = useState<number>(2);
 
@@ -397,6 +397,45 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       }
 
       if (data) {
+        // Auto-advance cycles whose auction is concluded and calendar month has rolled over
+        for (const g of data) {
+          const currentM = Number(g.current_month || 0);
+          if (currentM >= 1 && g.status === 'active' && g.start_date) {
+            const duration = Number(g.duration_months || 20);
+            try {
+              const { data: logs } = await supabase
+                .from('auction_logs')
+                .select('id')
+                .eq('group_id', g.id)
+                .eq('month', currentM)
+                .limit(1);
+
+              const hasAuctionConcluded = !!(logs && logs.length > 0);
+              if (shouldAutoAdvanceCycle(g.start_date, currentM, hasAuctionConcluded, duration)) {
+                const nextM = currentM + 1;
+                const isCompleting = nextM > duration;
+                await supabase
+                  .from('chit_groups')
+                  .update({
+                    current_month: nextM,
+                    status: isCompleting ? 'completed' : 'active',
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', g.id);
+
+                recordSystemAuditLog(
+                  `CALENDAR CYCLE ADVANCE: Group "${g.name}" advanced from Month ${currentM} to Month ${nextM} upon calendar month rollover.`,
+                  'chit_groups'
+                );
+                g.current_month = nextM;
+                if (isCompleting) g.status = 'completed';
+              }
+            } catch (cycleErr) {
+              console.warn('Auto-advance cycle check note:', cycleErr);
+            }
+          }
+        }
+
         setLocalGroups(
           data.map((g: any) => ({
             id: g.id,
@@ -753,16 +792,16 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         prev.map(cg =>
           cg.id === editingGroup.id
             ? {
-                ...cg,
-                name: editGroupName.trim(),
-                totalValue: valNum,
-                memberCount: countNum,
-                duration: countNum,
-                currentMonth: Number(editGroupCurrentMonth),
-                startDate: editGroupStartDate,
-                status: editGroupStatus,
-                active: editGroupStatus === 'active',
-              }
+              ...cg,
+              name: editGroupName.trim(),
+              totalValue: valNum,
+              memberCount: countNum,
+              duration: countNum,
+              currentMonth: Number(editGroupCurrentMonth),
+              startDate: editGroupStartDate,
+              status: editGroupStatus,
+              active: editGroupStatus === 'active',
+            }
             : cg
         )
       );
@@ -964,13 +1003,13 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         prev.map(m =>
           m.id === ticketId
             ? {
-                ...m,
-                profileId: recipientProfileId,
-                name: targetProfile.name,
-                phone: targetProfile.phone,
-                transferredFrom: prevProfileId,
-                transferEffectiveMonth: startMonth,
-              }
+              ...m,
+              profileId: recipientProfileId,
+              name: targetProfile.name,
+              phone: targetProfile.phone,
+              transferredFrom: prevProfileId,
+              transferEffectiveMonth: startMonth,
+            }
             : m
         )
       );
@@ -980,13 +1019,13 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
           prev.map(m =>
             m.id === ticketId
               ? {
-                  ...m,
-                  profileId: recipientProfileId,
-                  name: targetProfile.name,
-                  phone: targetProfile.phone,
-                  transferredFrom: prevProfileId,
-                  transferEffectiveMonth: startMonth,
-                }
+                ...m,
+                profileId: recipientProfileId,
+                name: targetProfile.name,
+                phone: targetProfile.phone,
+                transferredFrom: prevProfileId,
+                transferEffectiveMonth: startMonth,
+              }
               : m
           )
         );
@@ -1047,7 +1086,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     try {
       const cleanAlias = newAlias?.trim() || null;
       const ticketObj = editGroupMembers.find(m => m.id === ticketId || m.ticket === ticketNum) ||
-                        workspaceMembers.find(m => m.id === ticketId || m.ticket === ticketNum);
+        workspaceMembers.find(m => m.id === ticketId || m.ticket === ticketNum);
       const isTempId = !ticketId || ticketId.startsWith('unassigned-') || ticketId.startsWith('member-');
       const targetGroupId = editingGroup?.id || selectedWorkspaceGroupId;
 
@@ -1088,7 +1127,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       }
 
       recordSystemAuditLog(
-        cleanAlias 
+        cleanAlias
           ? `TICKET ALIAS SET: Ticket #${ticketNum} alias set to "${cleanAlias}"`
           : `TICKET ALIAS CLEARED: Ticket #${ticketNum} reset to subscriber default`,
         'group_members'
@@ -1442,9 +1481,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       const parts = group.nextAuctionDate.split('-');
       const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
       const timeDisplay = group?.nextAuctionTime || group?.auctionTime ? ` · ${formatTime12h(group?.nextAuctionTime || group?.auctionTime)}` : '';
-      return { 
-        display: (compact ? formatAuctionDateCompact(d) : formatAuctionDate(d)) + timeDisplay + (compact ? '' : ' (Override)'), 
-        isOverride: true 
+      return {
+        display: (compact ? formatAuctionDateCompact(d) : formatAuctionDate(d)) + timeDisplay + (compact ? '' : ' (Override)'),
+        isOverride: true
       };
     }
     const targetDate = computeNextAuctionDateTime({
@@ -1456,9 +1495,9 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       current_month: monthNum,
     });
     const timeDisplay = group?.auctionTime ? ` · ${formatTime12h(group.auctionTime)}` : '';
-    return { 
-      display: (compact ? formatAuctionDateCompact(targetDate) : formatAuctionDate(targetDate)) + timeDisplay, 
-      isOverride: false 
+    return {
+      display: (compact ? formatAuctionDateCompact(targetDate) : formatAuctionDate(targetDate)) + timeDisplay,
+      isOverride: false
     };
   };
 
@@ -2087,7 +2126,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     return dashboardTransactions
       .filter(t => {
         if (t.type !== 'collection') return false;
-        
+
         const isMonthMatch = t.cycle_month !== null && t.cycle_month !== undefined
           ? Number(t.cycle_month) === Number(month)
           : (t.notes ? monthPattern.test(t.notes) : false);
@@ -2158,8 +2197,8 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     if (!isCycleLaaba) {
       const standardInst = Math.round((group?.totalValue || 200000) / (group?.memberCount || group?.duration || 1));
       for (const member of dashboardGroupMembers) {
-        const memDue = member.customInstallment !== null && member.customInstallment !== undefined 
-          ? member.customInstallment 
+        const memDue = member.customInstallment !== null && member.customInstallment !== undefined
+          ? member.customInstallment
           : standardInst;
         const paid = getMemberPaidAmountForMonth(member.id || member.profileId, monthNum, member.profileId);
         if (paid < memDue) {
@@ -2183,7 +2222,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         const netPrize = Math.max(0, (group?.totalValue || 200000) - winBid);
         if (netPrize > 0) {
           const winProfileId = mAuction.winning_bidder_id || mAuction.winner_profile_id || mAuction.winner_id;
-          const winMem = dashboardGroupMembers.find(mem => 
+          const winMem = dashboardGroupMembers.find(mem =>
             (winProfileId && (mem.profileId === winProfileId || mem.id === winProfileId)) ||
             (mAuction.winner_name && mem.name && mem.name.toLowerCase() === mAuction.winner_name.toLowerCase())
           );
@@ -2251,8 +2290,8 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     const baseInst = Math.round(totalChitVal / (activeGroup?.memberCount || duration || 1));
     const memberInst = member.customInstallment !== null && member.customInstallment !== undefined ? member.customInstallment : baseInst;
 
-    const activeCurrentCycleMonth = (activeGroup?.currentMonth !== undefined && activeGroup?.currentMonth !== null) 
-      ? Number(activeGroup.currentMonth) 
+    const activeCurrentCycleMonth = (activeGroup?.currentMonth !== undefined && activeGroup?.currentMonth !== null)
+      ? Number(activeGroup.currentMonth)
       : 0;
 
     // Build month breakdown for all months from 0 to duration (N+1 total cycles: M0 Launch + M1..MN)
@@ -2337,7 +2376,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     } else {
       // Custom / Targeted Mode: Apply only to selected months
       const selectedSet = new Set(customMonths);
-      
+
       // Identify deferred past arrears that are NOT selected
       monthsData.filter(m => m.isArrear && m.remainingDue > 0 && !selectedSet.has(m.month)).forEach(m => {
         deferredArrears.push({ month: m.month, remainingDue: m.remainingDue });
@@ -2428,7 +2467,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       }
 
       const effectiveDateStr = computeEffectivePaymentDate(paymentDateType, customPaymentDate);
-      
+
       // 2. Compute allocations
       const { allocations } = computePaymentAllocations(
         recordingPaymentMember,
@@ -2447,10 +2486,10 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       const batchTag = `[Batch:${batchId}|Total:${amt}|Alloc:${allocations.map(a => `${a.month}:${a.amount}:${a.type}`).join(';')}]`;
 
       const rowsToInsert = allocations.map(item => {
-        const typeLabel = item.type === 'arrear' 
-          ? ' (Arrear Cleared)' 
-          : item.type === 'advance' 
-            ? ' (Advance Pre-paid)' 
+        const typeLabel = item.type === 'arrear'
+          ? ' (Arrear Cleared)'
+          : item.type === 'advance'
+            ? ' (Advance Pre-paid)'
             : '';
         const defaultNote = `Month ${item.month}${typeLabel} collection payment - Ticket #${recordingPaymentMember.ticket} (${recordingPaymentMember.name})`;
         const userNotePart = paymentNote.trim() ? ` — Note: ${paymentNote.trim()}` : '';
@@ -2495,6 +2534,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       setPaymentReceiptUrl('');
       setReceiptFileToUpload(null);
       setPaymentDateType('today');
+      setCustomPaymentDate(new Date().toISOString().split('T')[0]);
       setPaymentAllocationMode('auto');
       setPaymentCustomMonths([]);
       await fetchDashboardData(activeDashboardGroupId);
@@ -2543,6 +2583,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
 
       if (isSameDay(txDate, today)) {
         setPaymentDateType('today');
+      setCustomPaymentDate(new Date().toISOString().split('T')[0]);
         setCustomPaymentDate(today.toISOString().split('T')[0]);
       } else if (isSameDay(txDate, yesterday)) {
         setPaymentDateType('yesterday');
@@ -2553,6 +2594,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       }
     } else {
       setPaymentDateType('today');
+      setCustomPaymentDate(new Date().toISOString().split('T')[0]);
       setCustomPaymentDate(new Date().toISOString().split('T')[0]);
     }
   };
@@ -2768,7 +2810,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
       const effectiveDate = computeEffectivePaymentDate(disbursePayoutDateType, disbursePayoutCustomDate);
       const winningBid = Number(currentMonthAuction.winning_discount ?? currentMonthAuction.winning_bid ?? 0);
       const winnerProfileId = currentMonthAuction.winning_bidder_id || currentMonthAuction.winner_profile_id || currentMonthAuction.winner_id;
-      const memberMatch = dashboardGroupMembers.find(m => 
+      const memberMatch = dashboardGroupMembers.find(m =>
         (winnerProfileId && (m.profileId === winnerProfileId || m.id === winnerProfileId)) ||
         (currentMonthAuction.winner_name && m.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
       );
@@ -2804,7 +2846,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
         }
       }
 
-      const deductionSummaryStr = deductionsList.length > 0 
+      const deductionSummaryStr = deductionsList.length > 0
         ? ` (Offset ${deductionsList.map(d => `M${d.month}: ${formatCurrency(d.amount)}`).join(', ')})`
         : '';
       const noteText = `Month ${selectedDashboardMonth} Winner Prize Payout - ${winnerName} (Discount: ${formatCurrency(winningBid)})${deductionSummaryStr}${disbursePayoutNote.trim() ? ` — Note: ${disbursePayoutNote.trim()}` : ''}`;
@@ -2899,7 +2941,7 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
     const rawDigits = normalizePhone(winnerPhone);
     const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     const text = encodeURIComponent(
-`🏆 *CHIT PRIZE SETTLEMENT RECEIPT*
+      `🏆 *CHIT PRIZE SETTLEMENT RECEIPT*
 ───────────────────────
 🏢 *Group:* ${activeGroup.name}
 🗓️ *Month:* Month ${monthNum} (${getDashboardMonthLabel(activeGroup, monthNum)})
@@ -3177,17 +3219,17 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
   // WhatsApp Receipt Link Generator
   const generateWhatsAppReceiptUrl = (member: any, paidAmount: number, totalDue: number, tx?: any) => {
     const activeGroup = localGroups.find(g => g.id === activeDashboardGroupId);
-    const dateStr = tx?.created_at 
+    const dateStr = tx?.created_at
       ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
       : new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-    
+
     const rawPhone = member.phone || '';
     const digits = rawPhone.replace(/\D/g, '');
     const cleanPhone = digits.length === 10 ? `91${digits}` : digits;
 
     const remaining = Math.max(0, totalDue - paidAmount);
-    const msg = 
-`*CHIT FUNDS PAYMENT RECEIPT* 🧾
+    const msg =
+      `*CHIT FUNDS PAYMENT RECEIPT* 🧾
 ----------------------------------
 *Group:* ${activeGroup?.name || 'Chit Group'}
 *Month:* Month ${selectedDashboardMonth}
@@ -3211,7 +3253,7 @@ Thank you for your prompt payment! 🙏`;
     setNewGroupDuration(val);
     const num = Number(val);
     if (isNaN(num) || num <= 0) return;
-    
+
     setEnrollments(prev => {
       const copy = [...prev];
       if (copy.length < num) {
@@ -3286,8 +3328,8 @@ Thank you for your prompt payment! 🙏`;
   };
 
   const handleAssignExistingMember = (member: { id?: string; name: string; phone: string; aliasName?: string }, targetSlotIndex?: number) => {
-    const existingCount = enrollments.filter(e => 
-      (e.id && member.id && e.id === member.id) || 
+    const existingCount = enrollments.filter(e =>
+      (e.id && member.id && e.id === member.id) ||
       (e.phone && member.phone && normalizePhone(e.phone) === normalizePhone(member.phone))
     ).length;
 
@@ -3306,8 +3348,8 @@ Thank you for your prompt payment! 🙏`;
       }
     }
 
-    const slotIdx = (targetSlotIndex !== undefined && targetSlotIndex >= 0) 
-      ? targetSlotIndex 
+    const slotIdx = (targetSlotIndex !== undefined && targetSlotIndex >= 0)
+      ? targetSlotIndex
       : (targetSlotForAssign !== null && targetSlotForAssign >= 0)
         ? targetSlotForAssign
         : enrollments.findIndex(e => e.name === '');
@@ -3342,11 +3384,11 @@ Thank you for your prompt payment! 🙏`;
   const similarNameSubscriber = useMemo(() => {
     const input = newMemberName.trim();
     if (input.length < 3) return null;
-    
+
     // Find closest member whose name is not identical
     for (const member of masterDirectory) {
       if (member.name.toLowerCase().trim() === input.toLowerCase().trim()) continue;
-      
+
       const dist = levenshteinDistance(input, member.name);
       // If edit distance is 1 or 2 (or one is substring of another with length >= 4)
       if (dist <= 2 || (input.length >= 4 && member.name.toLowerCase().includes(input.toLowerCase()))) {
@@ -3377,8 +3419,8 @@ Thank you for your prompt payment! 🙏`;
         }
       }
 
-      const targetSlot = (targetSlotForAssign !== null && targetSlotForAssign >= 0) 
-        ? targetSlotForAssign 
+      const targetSlot = (targetSlotForAssign !== null && targetSlotForAssign >= 0)
+        ? targetSlotForAssign
         : enrollments.findIndex(e => e.name === '');
 
       if (targetSlot !== -1 && targetSlot < enrollments.length) {
@@ -3496,8 +3538,8 @@ Thank you for your prompt payment! 🙏`;
       }
 
       // Assign to the targeted spot or first empty spot in enrollments
-      const targetSlot = (targetSlotForAssign !== null && targetSlotForAssign >= 0) 
-        ? targetSlotForAssign 
+      const targetSlot = (targetSlotForAssign !== null && targetSlotForAssign >= 0)
+        ? targetSlotForAssign
         : enrollments.findIndex(e => e.name === '');
 
       if (targetSlot !== -1 && targetSlot < enrollments.length) {
@@ -3532,7 +3574,7 @@ Thank you for your prompt payment! 🙏`;
     if (isCreatingGroup) return;
 
     const duration = Number(newGroupDuration);
-    
+
     if (enrollments.length !== duration) {
       alert(`Validation Failure: Enrolled spots (${enrollments.length}) must match group duration in months (${duration}).`);
       return;
@@ -3778,7 +3820,7 @@ Thank you for your prompt payment! 🙏`;
         const monthsRange = [0, ...Array.from({ length: totalDuration }, (_, i) => i + 1)];
 
         // Recent transactions for this group / month
-        const currentMonthTransactions = dashboardTransactions.filter(t => 
+        const currentMonthTransactions = dashboardTransactions.filter(t =>
           t.type === 'collection' && (
             t.cycle_month !== null && t.cycle_month !== undefined
               ? Number(t.cycle_month) === Number(selectedDashboardMonth)
@@ -3821,7 +3863,7 @@ Thank you for your prompt payment! 🙏`;
         const winningBid = Number(currentMonthAuction?.winning_discount ?? currentMonthAuction?.winning_bid ?? 0);
         const netPrizePot = Math.max(0, totalChitVal - winningBid);
         const winnerProfileId = currentMonthAuction?.winning_bidder_id || currentMonthAuction?.winner_profile_id || currentMonthAuction?.winner_id;
-        const winnerMember = dashboardGroupMembers.find(m => 
+        const winnerMember = dashboardGroupMembers.find(m =>
           (winnerProfileId && (m.profileId === winnerProfileId || m.id === winnerProfileId)) ||
           (currentMonthAuction?.winner_name && m.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
         );
@@ -3945,936 +3987,926 @@ Thank you for your prompt payment! 🙏`;
             <div className="hidden lg:block space-y-6">
               {/* Top Chit Groups Pill Switcher Bar */}
               <div className="bg-white border border-slate-200/80 rounded-2xl p-2.5 sm:p-3 shadow-xs flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none flex-nowrap scroll-smooth flex-1 min-w-0">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 px-1.5 flex items-center gap-1.5">
-                  <Briefcase size={13} className="text-brand-600" />
-                  CHITS:
-                </span>
-                {localGroups.filter(g => g.status !== 'deleted' && g.status !== 'draft').length === 0 ? (
-                  <span className="text-xs text-slate-400 italic">No active chit groups found</span>
-                ) : (
-                  localGroups.filter(g => g.status !== 'deleted' && g.status !== 'draft').map((group) => {
-                    const isSelected = (activeGroup?.id === group.id);
-                    return (
-                      <button
-                        key={group.id}
-                        ref={(el) => {
-                          if (el) {
-                            chitGroupButtonsRef.current.set(group.id, el);
-                          } else {
-                            chitGroupButtonsRef.current.delete(group.id);
-                          }
-                        }}
-                        onClick={() => {
-                          setActiveDashboardGroupId(group.id);
-                          setSelectedDashboardMonth(group.currentMonth !== undefined && group.currentMonth !== null ? group.currentMonth : 0);
-                        }}
-                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                          isSelected
+                <div className="flex items-center gap-2 overflow-x-auto scrollbar-none flex-nowrap scroll-smooth flex-1 min-w-0">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 px-1.5 flex items-center gap-1.5">
+                    <Briefcase size={13} className="text-brand-600" />
+                    CHITS:
+                  </span>
+                  {localGroups.filter(g => g.status !== 'deleted' && g.status !== 'draft').length === 0 ? (
+                    <span className="text-xs text-slate-400 italic">No active chit groups found</span>
+                  ) : (
+                    localGroups.filter(g => g.status !== 'deleted' && g.status !== 'draft').map((group) => {
+                      const isSelected = (activeGroup?.id === group.id);
+                      return (
+                        <button
+                          key={group.id}
+                          ref={(el) => {
+                            if (el) {
+                              chitGroupButtonsRef.current.set(group.id, el);
+                            } else {
+                              chitGroupButtonsRef.current.delete(group.id);
+                            }
+                          }}
+                          onClick={() => {
+                            setActiveDashboardGroupId(group.id);
+                            setSelectedDashboardMonth(group.currentMonth !== undefined && group.currentMonth !== null ? group.currentMonth : 0);
+                          }}
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${isSelected
                             ? 'bg-brand-50 text-brand-700 border border-brand-200/80 shadow-xs ring-1 ring-brand-500/20'
                             : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600 hover:text-slate-900 border border-transparent'
-                        }`}
-                      >
-                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-brand-600 animate-pulse' : 'bg-amber-400'}`} />
-                        <span>{group.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold font-mono ${
-                          isSelected ? 'bg-brand-100 text-brand-800' : 'bg-white text-slate-600 border border-slate-200/60'
-                        }`}>
-                          {formatCurrency(group.totalValue)}
-                        </span>
-                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                          isSelected ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-600'
-                        }`}>
-                          M{group.currentMonth ?? 0} / {group.duration ?? group.memberCount ?? 20}
-                        </span>
-                      </button>
-                    );
-                  })
+                            }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-brand-600 animate-pulse' : 'bg-amber-400'}`} />
+                          <span>{group.name}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold font-mono ${isSelected ? 'bg-brand-100 text-brand-800' : 'bg-white text-slate-600 border border-slate-200/60'
+                            }`}>
+                            {formatCurrency(group.totalValue)}
+                          </span>
+                          <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${isSelected ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                            M{group.currentMonth ?? 0} / {group.duration ?? group.memberCount ?? 20}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Primary Quick Action: Record Payment */}
+                {canCollect && canQuickActions && (
+                  <button
+                    type="button"
+                    data-action="members:collect"
+                    data-permission-key="dashboard:quick_actions"
+                    onClick={() => handleOpenRecordPayment(null)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all shrink-0 cursor-pointer"
+                  >
+                    <Plus size={14} className="stroke-[2.5]" />
+                    <span>Record Payment</span>
+                  </button>
                 )}
               </div>
 
-              {/* Primary Quick Action: Record Payment */}
-              {canCollect && canQuickActions && (
-                <button
-                  type="button"
-                  data-action="members:collect"
-                  data-permission-key="dashboard:quick_actions"
-                  onClick={() => handleOpenRecordPayment(null)}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-xl shadow-sm shadow-brand-500/25 transition-all shrink-0 cursor-pointer"
-                >
-                  <Plus size={14} className="stroke-[2.5]" />
-                  <span>Record Payment</span>
-                </button>
-              )}
-            </div>
+              {/* BEGIN: CycleTimelineBar */}
+              {activeGroup && (
+                <section className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 overflow-x-auto scrollbar-none" data-purpose="cycle-timeline">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1 flex items-center gap-1.5 shrink-0">
+                      <Calendar size={14} className="text-slate-400" />
+                      Cycle Timeline:
+                    </span>
+                    <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-nowrap py-0.5">
+                      {monthsRange.map((mNum, idx) => {
+                        const isSelected = (selectedDashboardMonth === mNum);
+                        const isPast = (mNum < activeCycle);
+                        const label = getDashboardMonthLabel(activeGroup, mNum);
+                        const isFinale = (mNum === totalDuration);
+                        const mStatus = getMonthProgressStatus(activeGroup, mNum);
 
-            {/* BEGIN: CycleTimelineBar */}
-            {activeGroup && (
-              <section className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 overflow-x-auto scrollbar-none" data-purpose="cycle-timeline">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1 flex items-center gap-1.5 shrink-0">
-                    <Calendar size={14} className="text-slate-400" />
-                    Cycle Timeline:
-                  </span>
-                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-nowrap py-0.5">
-                    {monthsRange.map((mNum, idx) => {
-                      const isSelected = (selectedDashboardMonth === mNum);
-                      const isPast = (mNum < activeCycle);
-                      const label = getDashboardMonthLabel(activeGroup, mNum);
-                      const isFinale = (mNum === totalDuration);
-                      const mStatus = getMonthProgressStatus(activeGroup, mNum);
-
-                      return (
-                        <React.Fragment key={mNum}>
-                          {idx > 0 && (
-                            <span className="text-slate-300 font-bold px-0.5 select-none">→</span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDashboardMonth(mNum)}
-                            className={`px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer whitespace-nowrap ${
-                              isSelected
+                        return (
+                          <React.Fragment key={mNum}>
+                            {idx > 0 && (
+                              <span className="text-slate-300 font-bold px-0.5 select-none">→</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDashboardMonth(mNum)}
+                              className={`px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer whitespace-nowrap ${isSelected
                                 ? 'bg-brand-600 text-white font-bold shadow-sm'
                                 : isPast
-                                ? mStatus.color === 'rose'
-                                  ? 'font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200'
-                                  : mStatus.color === 'amber'
-                                  ? 'font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200'
-                                  : 'font-semibold text-slate-600 hover:bg-slate-100'
-                                : 'font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-                            }`}
-                          >
-                            {isSelected ? (
-                              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                            ) : isPast ? (
-                              mStatus.color === 'rose' ? (
-                                <AlertCircle size={13} className="text-rose-500" />
-                              ) : mStatus.color === 'amber' ? (
-                                <Clock size={13} className="text-amber-500" />
-                              ) : (
-                                <CheckCircle2 size={13} className="text-emerald-500" />
-                              )
-                            ) : null}
-                            <span>
-                              {mNum === 0 
-                                ? (isPast && mStatus.status !== 'completed' ? `${label} (${mStatus.label})` : `${label} Launch`)
-                                : mNum === activeCycle 
-                                ? `${label} (Active)` 
-                                : isPast
-                                ? `${label}${mStatus.status !== 'completed' ? ` (${mStatus.label})` : ''}`
-                                : isFinale 
-                                ? `${label} (Finale)` 
-                                : `${label} (Upcoming)`}
-                            </span>
-                          </button>
-                        </React.Fragment>
-                      );
-                    })}
+                                  ? mStatus.color === 'rose'
+                                    ? 'font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200'
+                                    : mStatus.color === 'amber'
+                                      ? 'font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200'
+                                      : 'font-semibold text-slate-600 hover:bg-slate-100'
+                                  : 'font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                                }`}
+                            >
+                              {isSelected ? (
+                                <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                              ) : isPast ? (
+                                mStatus.color === 'rose' ? (
+                                  <AlertCircle size={13} className="text-rose-500" />
+                                ) : mStatus.color === 'amber' ? (
+                                  <Clock size={13} className="text-amber-500" />
+                                ) : (
+                                  <CheckCircle2 size={13} className="text-emerald-500" />
+                                )
+                              ) : null}
+                              <span>
+                                {mNum === 0
+                                  ? (isPast && mStatus.status !== 'completed' ? `${label} (${mStatus.label})` : `${label} Launch`)
+                                  : mNum === activeCycle
+                                    ? `${label} (Active)`
+                                    : isPast
+                                      ? `${label}${mStatus.status !== 'completed' ? ` (${mStatus.label})` : ''}`
+                                      : isFinale
+                                        ? `${label} (Finale)`
+                                        : `${label} (Upcoming)`}
+                              </span>
+                            </button>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 text-xs text-slate-600 font-medium shrink-0">
-                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span>
-                    Next scheduled auction: <strong>{getGroupAuctionDate(activeGroup.id, activeCycle || 1).display}</strong>
-                  </span>
-                </div>
-              </section>
-            )}
-            {/* END: CycleTimelineBar */}
+                  <div className="flex items-center gap-2 text-xs text-slate-600 font-medium shrink-0">
+                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>
+                      Next scheduled auction: <strong>{getGroupAuctionDate(activeGroup.id, activeCycle || 1).display}</strong>
+                    </span>
+                  </div>
+                </section>
+              )}
+              {/* END: CycleTimelineBar */}
 
-            {/* BEGIN: TopMetricsGrid (12 cols) */}
-            {activeGroup && (
-              <section className="grid grid-cols-1 xl:grid-cols-12 gap-6" data-purpose="metrics-and-hero-banner">
-                {/* Main Cycle Progress Card (6 cols) */}
-                <div className="xl:col-span-6 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden flex flex-col justify-between space-y-4">
-                  <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-indigo-50/60 blur-2xl pointer-events-none" />
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold tracking-wide uppercase bg-brand-50 text-brand-700 border border-brand-200/60">
-                          {selectedDashboardMonth === 0 ? 'Month 0 Launch Month' : `Month ${selectedDashboardMonth} of ${totalDuration}`}
-                        </span>
-                        <span className="text-xs font-medium text-slate-600">
-                          {activeGroup.name} ({formatCurrency(totalChitVal)} Target)
-                        </span>
-                        {isLaaba && selectedDashboardMonth > 0 && (
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <Sparkles size={10} /> Laaba Seetu Active
+              {/* BEGIN: TopMetricsGrid (12 cols) */}
+              {activeGroup && (
+                <section className="grid grid-cols-1 xl:grid-cols-12 gap-6" data-purpose="metrics-and-hero-banner">
+                  {/* Main Cycle Progress Card (6 cols) */}
+                  <div className="xl:col-span-6 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden flex flex-col justify-between space-y-4">
+                    <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-indigo-50/60 blur-2xl pointer-events-none" />
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold tracking-wide uppercase bg-brand-50 text-brand-700 border border-brand-200/60">
+                            {selectedDashboardMonth === 0 ? 'Month 0 Launch Month' : `Month ${selectedDashboardMonth} of ${totalDuration}`}
                           </span>
-                        )}
+                          <span className="text-xs font-medium text-slate-600">
+                            {activeGroup.name} ({formatCurrency(totalChitVal)} Target)
+                          </span>
+                          {isLaaba && selectedDashboardMonth > 0 && (
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <Sparkles size={10} /> Laaba Seetu Active
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {(activeGroup.currentMonth ?? 0) > 0 && canRevertMonth && (
+                            <button
+                              type="button"
+                              data-action="dashboard:revert_month"
+                              onClick={handleRevertMonth}
+                              disabled={isClosingMonth}
+                              className="px-2.5 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                              title={`Roll back active cycle to Month ${(activeGroup.currentMonth ?? 1) - 1}`}
+                            >
+                              <RotateCcw size={12} />
+                              Revert to M{(activeGroup.currentMonth ?? 1) - 1}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
-                        {(activeGroup.currentMonth ?? 0) > 0 && canRevertMonth && (
+                      {/* Collected Big Numbers */}
+                      <div className="flex items-baseline gap-3 mb-2 flex-wrap">
+                        <span className="text-3xl font-black font-display text-slate-900 tracking-tight font-mono">
+                          {formatCurrency(actualCollectionsTotal)}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-600 uppercase tracking-wide">
+                          Collected so far
+                        </span>
+                        <span className="ml-auto text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200/60 px-2.5 py-0.5 rounded-full">
+                          Pending: {formatCurrency(pendingCollectionsTotal)}
+                        </span>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="space-y-1.5 my-4">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-brand-700 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-brand-600 inline-block" />
+                            {completionPct.toFixed(1)}% Collected
+                          </span>
+                          <span className="text-slate-600 font-medium">
+                            {pendingList.length} Members Remaining ({partialCount} Partial, {unpaidCount} Unpaid)
+                          </span>
+                        </div>
+                        <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                          <div
+                            className="h-full bg-gradient-to-r from-brand-600 to-indigo-500 rounded-full transition-all duration-500"
+                            style={{ width: `${completionPct}%` }}
+                          />
+                          {partialCount > 0 && (
+                            <div
+                              className="h-full bg-amber-400 rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100 - completionPct, (partialCount / Math.max(1, dashboardGroupMembers.length)) * 100)}%` }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Action Buttons Row */}
+                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-2">
+
+                        {canBroadcastReminders && pendingList.length > 0 && (
                           <button
                             type="button"
-                            data-action="dashboard:revert_month"
-                            onClick={handleRevertMonth}
-                            disabled={isClosingMonth}
-                            className="px-2.5 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                            title={`Roll back active cycle to Month ${(activeGroup.currentMonth ?? 1) - 1}`}
+                            data-action="communication:due_alerts"
+                            onClick={() => {
+                              setRemindModalTab('individual');
+                              setShowRemindModal(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
                           >
-                            <RotateCcw size={12} />
-                            Revert to M{(activeGroup.currentMonth ?? 1) - 1}
+                            <Send size={13} className="text-brand-600" />
+                            <span>Remind All ({pendingList.length})</span>
                           </button>
                         )}
                       </div>
-                    </div>
 
-                    {/* Collected Big Numbers */}
-                    <div className="flex items-baseline gap-3 mb-2 flex-wrap">
-                      <span className="text-3xl font-black font-display text-slate-900 tracking-tight font-mono">
-                        {formatCurrency(actualCollectionsTotal)}
-                      </span>
-                      <span className="text-sm font-semibold text-slate-600 uppercase tracking-wide">
-                        Collected so far
-                      </span>
-                      <span className="ml-auto text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200/60 px-2.5 py-0.5 rounded-full">
-                        Pending: {formatCurrency(pendingCollectionsTotal)}
-                      </span>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="space-y-1.5 my-4">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-brand-700 flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-brand-600 inline-block" />
-                          {completionPct.toFixed(1)}% Collected
-                        </span>
-                        <span className="text-slate-600 font-medium">
-                          {pendingList.length} Members Remaining ({partialCount} Partial, {unpaidCount} Unpaid)
-                        </span>
-                      </div>
-                      <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
-                        <div
-                          className="h-full bg-gradient-to-r from-brand-600 to-indigo-500 rounded-full transition-all duration-500"
-                          style={{ width: `${completionPct}%` }}
-                        />
-                        {partialCount > 0 && (
-                          <div
-                            className="h-full bg-amber-400 rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(100 - completionPct, (partialCount / Math.max(1, dashboardGroupMembers.length)) * 100)}%` }}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bottom Action Buttons Row */}
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
-                    <div className="flex items-center gap-2">
-
-                      {canBroadcastReminders && pendingList.length > 0 && (
+                      {((selectedDashboardMonth === 0 && canLaunchMonth0) || (selectedDashboardMonth > 0 && canConcludeMonth)) && (
                         <button
                           type="button"
-                          data-action="communication:due_alerts"
-                          onClick={() => {
-                            setRemindModalTab('individual');
-                            setShowRemindModal(true);
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                          data-action={selectedDashboardMonth === 0 ? "dashboard:launch_month0" : "dashboard:advance_month"}
+                          onClick={handleCloseMonth}
+                          disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100/80 text-brand-700 text-xs font-bold transition-colors border border-brand-200/50 disabled:opacity-40 cursor-pointer"
                         >
-                          <Send size={13} className="text-brand-600" />
-                          <span>Remind All ({pendingList.length})</span>
+                          <span>
+                            {selectedDashboardMonth === 0
+                              ? (isClosingMonth ? 'Advancing...' : 'Roll to M1 (1st Auction)')
+                              : (isClosingMonth ? 'Closing...' : 'Close Month Cycle')}
+                          </span>
+                          <ArrowRight size={14} />
                         </button>
                       )}
                     </div>
-
-                    {((selectedDashboardMonth === 0 && canLaunchMonth0) || (selectedDashboardMonth > 0 && canConcludeMonth)) && (
-                      <button
-                        type="button"
-                        data-action={selectedDashboardMonth === 0 ? "dashboard:launch_month0" : "dashboard:advance_month"}
-                        onClick={handleCloseMonth}
-                        disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup.currentMonth ?? 0)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100/80 text-brand-700 text-xs font-bold transition-colors border border-brand-200/50 disabled:opacity-40 cursor-pointer"
-                      >
-                        <span>
-                          {selectedDashboardMonth === 0 
-                            ? (isClosingMonth ? 'Advancing...' : 'Roll to M1 (1st Auction)') 
-                            : (isClosingMonth ? 'Closing...' : 'Close Month Cycle')}
-                        </span>
-                        <ArrowRight size={14} />
-                      </button>
-                    )}
                   </div>
-                </div>
 
-                {/* Kai Iruppu Pool Card (3 cols) */}
-                <div className="xl:col-span-3 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[11px] font-bold tracking-wider uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                        KAI IRUPPU POOL
+                  {/* Kai Iruppu Pool Card (3 cols) */}
+                  <div className="xl:col-span-3 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[11px] font-bold tracking-wider uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                          KAI IRUPPU POOL
+                        </span>
+                        {completedGroupAuctions.length > 0 && canViewReserves && (
+                          <button
+                            type="button"
+                            data-action="dashboard:view_reserves"
+                            onClick={() => setShowKaiIruppuBreakdown(prev => !prev)}
+                            className="text-xs text-brand-600 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                          >
+                            History ({completedGroupAuctions.length})
+                            <ChevronDown size={12} className={showKaiIruppuBreakdown ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <h3 className="text-3xl font-black font-display text-slate-900 tracking-tight font-mono">
+                          {formatCurrency(activeKaiIruppuPool)}
+                        </h3>
+                        <p className="text-xs font-medium text-slate-600 mt-0.5">
+                          Pool Ceiling: {formatCurrency(totalChitVal)}
+                        </p>
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-600">Reserve Capacity</span>
+                          <span className="font-bold text-slate-800">{laabaGoalPct}% Allocated</span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${Math.max(activeKaiIruppuPool > 0 ? 5 : 0, laabaGoalPct)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expandable Discount History */}
+                    {showKaiIruppuBreakdown && (
+                      <div className="pt-2 border-t border-slate-100 space-y-2 text-xs">
+                        <div className="flex justify-between text-[11px] text-slate-600">
+                          <span className="font-semibold text-slate-800">Contributions:</span>
+                          <span className="font-mono font-bold text-emerald-600">+{formatCurrency(totalDiscountsRecorded)}</span>
+                        </div>
+                        <div className="max-h-28 overflow-y-auto space-y-1 scrollbar-thin">
+                          {completedGroupAuctions.map(log => (
+                            <div key={log.id || log.month} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded">
+                              <span className="font-bold text-brand-600">M{log.month}</span>
+                              <span className="text-slate-600 truncate max-w-[90px]">{log.winner_name || 'Subscriber'}</span>
+                              <span className="font-mono font-bold text-emerald-600">+{formatCurrency(Number(log.winning_discount ?? log.winning_bid ?? 0))}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-4 pt-3 flex items-center justify-between text-xs text-slate-600 border-t border-slate-100">
+                      <span className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${isLaabaActive ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                        <span>{isLaabaActive ? 'Laaba Seetu Active (₹0 Due)' : 'Interest accruing: 1.2%/mo'}</span>
                       </span>
-                      {completedGroupAuctions.length > 0 && canViewReserves && (
+                      {canViewReserves && (
                         <button
                           type="button"
                           data-action="dashboard:view_reserves"
-                          onClick={() => setShowKaiIruppuBreakdown(prev => !prev)}
-                          className="text-xs text-brand-600 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                          onClick={() => setShowKaiIruppuBreakdown(p => !p)}
+                          className="text-slate-600 hover:text-slate-900 font-semibold cursor-pointer"
+                          title="Breakdown"
                         >
-                          History ({completedGroupAuctions.length})
-                          <ChevronDown size={12} className={showKaiIruppuBreakdown ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                          Breakdown
                         </button>
                       )}
                     </div>
-                    <div className="mt-2">
-                      <h3 className="text-3xl font-black font-display text-slate-900 tracking-tight font-mono">
-                        {formatCurrency(activeKaiIruppuPool)}
-                      </h3>
-                      <p className="text-xs font-medium text-slate-600 mt-0.5">
-                        Pool Ceiling: {formatCurrency(totalChitVal)}
-                      </p>
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-600">Reserve Capacity</span>
-                        <span className="font-bold text-slate-800">{laabaGoalPct}% Allocated</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div
-                          className="bg-gradient-to-r from-amber-400 to-amber-500 h-full rounded-full transition-all duration-500"
-                          style={{ width: `${Math.max(activeKaiIruppuPool > 0 ? 5 : 0, laabaGoalPct)}%` }}
-                        />
-                      </div>
-                    </div>
                   </div>
 
-                  {/* Expandable Discount History */}
-                  {showKaiIruppuBreakdown && (
-                    <div className="pt-2 border-t border-slate-100 space-y-2 text-xs">
-                      <div className="flex justify-between text-[11px] text-slate-600">
-                        <span className="font-semibold text-slate-800">Contributions:</span>
-                        <span className="font-mono font-bold text-emerald-600">+{formatCurrency(totalDiscountsRecorded)}</span>
-                      </div>
-                      <div className="max-h-28 overflow-y-auto space-y-1 scrollbar-thin">
-                        {completedGroupAuctions.map(log => (
-                          <div key={log.id || log.month} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded">
-                            <span className="font-bold text-brand-600">M{log.month}</span>
-                            <span className="text-slate-600 truncate max-w-[90px]">{log.winner_name || 'Subscriber'}</span>
-                            <span className="font-mono font-bold text-emerald-600">+{formatCurrency(Number(log.winning_discount ?? log.winning_bid ?? 0))}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Auction Summary & Winner Disbursal Card (3 cols) */}
+                  <div className="xl:col-span-3 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between relative overflow-hidden space-y-4">
+                    <div className="absolute top-0 right-0 transform translate-x-3 -translate-y-3 w-16 h-16 bg-amber-100/40 rounded-full blur-xl pointer-events-none" />
+                    {(() => {
+                      if (selectedDashboardMonth === 0) {
+                        return (
+                          <>
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="p-1.5 rounded-lg bg-amber-100 text-amber-700">
+                                    <Rocket size={16} />
+                                  </span>
+                                  <span className="text-xs font-bold text-slate-800">Launch Month Phase</span>
+                                </div>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                                  Month 0
+                                </span>
+                              </div>
+                              <div className="mt-2">
+                                <h4 className="text-base font-bold text-slate-900 font-display">Organizer Profit</h4>
+                                <p className="text-[11px] text-slate-600 mt-0.5">No live auction in Month 0. Pool is taken by Organizer.</p>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
+                                <div className="bg-slate-50 p-2 rounded-xl">
+                                  <span className="text-slate-500 text-[10px] uppercase font-semibold">Chit Value</span>
+                                  <p className="font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded-xl">
+                                  <span className="text-slate-500 text-[10px] uppercase font-semibold">Net Retained</span>
+                                  <p className="font-bold text-brand-700 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                              <span>Scheduled Launch:</span>
+                              <strong className="text-slate-900">{getGroupAuctionDate(activeGroup.id, 0).display}</strong>
+                            </div>
+                          </>
+                        );
+                      }
 
-                  <div className="mt-4 pt-3 flex items-center justify-between text-xs text-slate-600 border-t border-slate-100">
-                    <span className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${isLaabaActive ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-                      <span>{isLaabaActive ? 'Laaba Seetu Active (₹0 Due)' : 'Interest accruing: 1.2%/mo'}</span>
-                    </span>
-                    {canViewReserves && (
-                      <button
-                        type="button"
-                        data-action="dashboard:view_reserves"
-                        onClick={() => setShowKaiIruppuBreakdown(p => !p)}
-                        className="text-slate-600 hover:text-slate-900 font-semibold cursor-pointer"
-                        title="Breakdown"
-                      >
-                        Breakdown
-                      </button>
-                    )}
-                  </div>
-                </div>
+                      if (!currentMonthAuction) {
+                        return (
+                          <>
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="p-1.5 rounded-lg bg-indigo-50 text-brand-600">
+                                    <Trophy size={16} />
+                                  </span>
+                                  <span className="text-xs font-bold text-slate-800">Month {selectedDashboardMonth} Auction</span>
+                                </div>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                  Pending
+                                </span>
+                              </div>
+                              <div className="mt-2">
+                                <h4 className="text-base font-bold text-slate-900 font-display">Auction Not Held Yet</h4>
+                                <p className="text-[11px] text-slate-600 mt-0.5">Conduct bidding in Live Auction tab to declare winner.</p>
+                              </div>
+                              <div className="bg-slate-50 p-3 rounded-xl mt-3 text-xs text-slate-600">
+                                <span>Next Scheduled Auction:</span>
+                                <p className="font-bold text-slate-900 font-mono mt-0.5">{getGroupAuctionDate(activeGroup.id, selectedDashboardMonth).display}</p>
+                              </div>
+                            </div>
+                            {setActiveTab && (
+                              <button
+                                type="button"
+                                onClick={() => setActiveTab('auctions')}
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                              >
+                                <Trophy size={14} />
+                                <span>Open Live Auction</span>
+                              </button>
+                            )}
+                          </>
+                        );
+                      }
 
-                {/* Auction Summary & Winner Disbursal Card (3 cols) */}
-                <div className="xl:col-span-3 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between relative overflow-hidden space-y-4">
-                  <div className="absolute top-0 right-0 transform translate-x-3 -translate-y-3 w-16 h-16 bg-amber-100/40 rounded-full blur-xl pointer-events-none" />
-                  {(() => {
-                    if (selectedDashboardMonth === 0) {
+                      // Auction Winner details (using lifted variables)
                       return (
                         <>
-                          <div>
+                          <div
+                            onClick={handleNavigateToAuctionHistory}
+                            className="cursor-pointer group hover:bg-slate-50/50 -m-2 p-2 rounded-xl transition-all"
+                            title="Click to view historical auction ledger"
+                          >
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
-                                <span className="p-1.5 rounded-lg bg-amber-100 text-amber-700">
-                                  <Rocket size={16} />
+                                <span className="p-1 rounded-lg bg-amber-100 text-amber-700">
+                                  <Trophy size={16} />
                                 </span>
-                                <span className="text-xs font-bold text-slate-800">Launch Month Phase</span>
+                                <span className="text-xs font-bold text-slate-800 group-hover:text-brand-600 transition-colors">
+                                  Month {selectedDashboardMonth} Auction Winner →
+                                </span>
                               </div>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                                Month 0
-                              </span>
+                              {isSettled ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Fully Disbursed
+                                </span>
+                              ) : isPartial ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                                  Partial Disbursed
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                  Disbursal Pending
+                                </span>
+                              )}
                             </div>
                             <div className="mt-2">
-                              <h4 className="text-base font-bold text-slate-900 font-display">Organizer Profit</h4>
-                              <p className="text-[11px] text-slate-600 mt-0.5">No live auction in Month 0. Pool is taken by Organizer.</p>
+                              <div className="flex items-baseline justify-between">
+                                <h4 className="text-base font-bold text-slate-900 font-display group-hover:text-brand-600 transition-colors">{winnerName}</h4>
+                                <span className="text-xs font-mono font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  Ticket #{winnerTicketNum}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 mt-0.5">
+                                📞 {winnerPhone || 'No phone'} · Won via Bidding
+                              </p>
                             </div>
                             <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
                               <div className="bg-slate-50 p-2 rounded-xl">
-                                <span className="text-slate-500 text-[10px] uppercase font-semibold">Chit Value</span>
-                                <p className="font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
+                                <span className="text-slate-500 text-[10px] uppercase font-semibold">Bid Discount</span>
+                                <p className="font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(winningBid)}</p>
                               </div>
                               <div className="bg-slate-50 p-2 rounded-xl">
-                                <span className="text-slate-500 text-[10px] uppercase font-semibold">Net Retained</span>
-                                <p className="font-bold text-brand-700 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
+                                <span className="text-slate-500 text-[10px] uppercase font-semibold">Net Prize Due</span>
+                                <p className="font-bold text-brand-700 mt-0.5 font-mono">{formatCurrency(netPrizePot)}</p>
                               </div>
                             </div>
                           </div>
-                          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                            <span>Scheduled Launch:</span>
-                            <strong className="text-slate-900">{getGroupAuctionDate(activeGroup.id, 0).display}</strong>
-                          </div>
-                        </>
-                      );
-                    }
 
-                    if (!currentMonthAuction) {
-                      return (
-                        <>
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="p-1.5 rounded-lg bg-indigo-50 text-brand-600">
-                                  <Trophy size={16} />
-                                </span>
-                                <span className="text-xs font-bold text-slate-800">Month {selectedDashboardMonth} Auction</span>
-                              </div>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                                Pending
-                              </span>
-                            </div>
-                            <div className="mt-2">
-                              <h4 className="text-base font-bold text-slate-900 font-display">Auction Not Held Yet</h4>
-                              <p className="text-[11px] text-slate-600 mt-0.5">Conduct bidding in Live Auction tab to declare winner.</p>
-                            </div>
-                            <div className="bg-slate-50 p-3 rounded-xl mt-3 text-xs text-slate-600">
-                              <span>Next Scheduled Auction:</span>
-                              <p className="font-bold text-slate-900 font-mono mt-0.5">{getGroupAuctionDate(activeGroup.id, selectedDashboardMonth).display}</p>
-                            </div>
-                          </div>
-                          {setActiveTab && (
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab('auctions')}
-                              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                            >
-                              <Trophy size={14} />
-                              <span>Open Live Auction</span>
-                            </button>
-                          )}
-                        </>
-                      );
-                    }
-
-                    // Auction Winner details (using lifted variables)
-                    return (
-                      <>
-                        <div
-                          onClick={handleNavigateToAuctionHistory}
-                          className="cursor-pointer group hover:bg-slate-50/50 -m-2 p-2 rounded-xl transition-all"
-                          title="Click to view historical auction ledger"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="p-1 rounded-lg bg-amber-100 text-amber-700">
-                                <Trophy size={16} />
-                              </span>
-                              <span className="text-xs font-bold text-slate-800 group-hover:text-brand-600 transition-colors">
-                                Month {selectedDashboardMonth} Auction Winner →
-                              </span>
-                            </div>
-                            {isSettled ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Fully Disbursed
-                              </span>
-                            ) : isPartial ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                                Partial Disbursed
-                              </span>
+                          <div className="mt-4 pt-3 flex items-center gap-2 border-t border-slate-100">
+                            {remainingPrizeDue > 0 ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenDisburseModal(remainingPrizeDue);
+                                }}
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                              >
+                                <Banknote size={14} />
+                                <span>Disburse Prize ({formatCurrency(remainingPrizeDue)})</span>
+                              </button>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
-                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                Disbursal Pending
-                              </span>
+                              <div className="flex-1 text-center py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-200">
+                                ✓ Prize Settled
+                              </div>
                             )}
-                          </div>
-                          <div className="mt-2">
-                            <div className="flex items-baseline justify-between">
-                              <h4 className="text-base font-bold text-slate-900 font-display group-hover:text-brand-600 transition-colors">{winnerName}</h4>
-                              <span className="text-xs font-mono font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
-                                Ticket #{winnerTicketNum}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-600 mt-0.5">
-                              📞 {winnerPhone || 'No phone'} · Won via Bidding
-                            </p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
-                            <div className="bg-slate-50 p-2 rounded-xl">
-                              <span className="text-slate-500 text-[10px] uppercase font-semibold">Bid Discount</span>
-                              <p className="font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(winningBid)}</p>
-                            </div>
-                            <div className="bg-slate-50 p-2 rounded-xl">
-                              <span className="text-slate-500 text-[10px] uppercase font-semibold">Net Prize Due</span>
-                              <p className="font-bold text-brand-700 mt-0.5 font-mono">{formatCurrency(netPrizePot)}</p>
-                            </div>
-                          </div>
-                        </div>
 
-                        <div className="mt-4 pt-3 flex items-center gap-2 border-t border-slate-100">
-                          {remainingPrizeDue > 0 ? (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleOpenDisburseModal(remainingPrizeDue);
+                                handleSharePayoutWhatsApp(
+                                  activeGroup,
+                                  winnerName,
+                                  winnerPhone,
+                                  selectedDashboardMonth,
+                                  netPrizePot,
+                                  winningBid,
+                                  totalPrizeDisbursed,
+                                  remainingPrizeDue,
+                                  monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
+                                );
                               }}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                              className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
+                              title="Send WhatsApp Receipt"
                             >
-                              <Banknote size={14} />
-                              <span>Disburse Prize ({formatCurrency(remainingPrizeDue)})</span>
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z" />
+                              </svg>
                             </button>
-                          ) : (
-                            <div className="flex-1 text-center py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-200">
-                              ✓ Prize Settled
-                            </div>
-                          )}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </section>
+              )}
+              {/* END: TopMetricsGrid */}
 
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSharePayoutWhatsApp(
-                                activeGroup,
-                                winnerName,
-                                winnerPhone,
-                                selectedDashboardMonth,
-                                netPrizePot,
-                                winningBid,
-                                totalPrizeDisbursed,
-                                remainingPrizeDue,
-                                monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
-                              );
-                            }}
-                            className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
-                            title="Send WhatsApp Receipt"
-                          >
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z" />
-                            </svg>
-                          </button>
+              {/* BEGIN: Main2ColumnLayout */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
+                {/* Left 8 Columns: Member Collection & Installments Ledger */}
+                <section className="lg:col-span-8 space-y-4" data-purpose="member-collection-roster">
+                  <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+                    {/* Table Header Toolbar */}
+                    <div className="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-display font-bold text-base text-slate-900">Member Installments Breakdown</h3>
+                          <span className="text-xs bg-slate-100 text-slate-700 font-bold px-2.5 py-0.5 rounded-full">
+                            {selectedDashboardMonth === 0 ? 'Month 0 Launch' : `Month ${selectedDashboardMonth} Cycle`}
+                          </span>
                         </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              </section>
-            )}
-            {/* END: TopMetricsGrid */}
-
-            {/* BEGIN: Main2ColumnLayout */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
-              {/* Left 8 Columns: Member Collection & Installments Ledger */}
-              <section className="lg:col-span-8 space-y-4" data-purpose="member-collection-roster">
-                <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-                  {/* Table Header Toolbar */}
-                  <div className="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-display font-bold text-base text-slate-900">Member Installments Breakdown</h3>
-                        <span className="text-xs bg-slate-100 text-slate-700 font-bold px-2.5 py-0.5 rounded-full">
-                          {selectedDashboardMonth === 0 ? 'Month 0 Launch' : `Month ${selectedDashboardMonth} Cycle`}
-                        </span>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          {dashboardGroupMembers.length} active subscription slots registered in this chit group
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-600 mt-0.5">
-                        {dashboardGroupMembers.length} active subscription slots registered in this chit group
-                      </p>
-                    </div>
 
-                    {/* Filter Tabs */}
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-                      <button
-                        type="button"
-                        onClick={() => setMemberRosterFilter('all')}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          memberRosterFilter === 'all'
+                      {/* Filter Tabs */}
+                      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => setMemberRosterFilter('all')}
+                          className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${memberRosterFilter === 'all'
                             ? 'bg-white text-slate-900 shadow-2xs font-bold'
                             : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        All ({dashboardGroupMembers.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMemberRosterFilter('unpaid')}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          memberRosterFilter === 'unpaid'
-                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Unpaid ({unpaidCount})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMemberRosterFilter('partial')}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          memberRosterFilter === 'partial'
-                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Partial ({partialCount})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMemberRosterFilter('paid')}
-                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                          memberRosterFilter === 'paid'
-                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Paid ({paidList.length})
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Bulk Control Actions Strip */}
-                  <div className="px-5 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setMemberRosterSort(s => s === 'due' ? 'ticket' : s === 'ticket' ? 'name' : 'due')}
-                        className="text-slate-600 hover:text-slate-900 font-semibold flex items-center gap-1 cursor-pointer"
-                      >
-                        <Filter size={13} />
-                        <span>Sort: {memberRosterSort === 'due' ? 'Due Amount' : memberRosterSort === 'ticket' ? 'Ticket #' : 'Name'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Members Data Rows List */}
-                  <div className="divide-y divide-slate-100">
-                    {filteredAndSortedMembers.length === 0 ? (
-                      <div className="py-12 text-center text-xs text-slate-400">
-                        No members match the selected filter.
-                      </div>
-                    ) : (
-                      filteredAndSortedMembers.map((member) => {
-                        const initial = member.name.charAt(0).toUpperCase() || 'M';
-                        const isWinner = currentMonthAuction && (
-                          (currentMonthAuction.winning_bidder_id && (member.profileId === currentMonthAuction.winning_bidder_id || member.id === currentMonthAuction.winning_bidder_id)) ||
-                          (currentMonthAuction.winner_name && member.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
-                        );
-
-                        return (
-                          <div
-                            key={member.id}
-                            className={`p-4 hover:bg-slate-50/75 transition-colors flex items-center justify-between gap-4 ${
-                              member.status === 'partial' ? 'bg-amber-50/20' : ''
                             }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className={`w-10 h-10 rounded-full font-bold text-xs flex items-center justify-center shrink-0 font-display ${
-                                isWinner
+                        >
+                          All ({dashboardGroupMembers.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMemberRosterFilter('unpaid')}
+                          className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${memberRosterFilter === 'unpaid'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                          Unpaid ({unpaidCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMemberRosterFilter('partial')}
+                          className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${memberRosterFilter === 'partial'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                          Partial ({partialCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMemberRosterFilter('paid')}
+                          className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${memberRosterFilter === 'paid'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                          Paid ({paidList.length})
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bulk Control Actions Strip */}
+                    <div className="px-5 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setMemberRosterSort(s => s === 'due' ? 'ticket' : s === 'ticket' ? 'name' : 'due')}
+                          className="text-slate-600 hover:text-slate-900 font-semibold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Filter size={13} />
+                          <span>Sort: {memberRosterSort === 'due' ? 'Due Amount' : memberRosterSort === 'ticket' ? 'Ticket #' : 'Name'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Members Data Rows List */}
+                    <div className="divide-y divide-slate-100">
+                      {filteredAndSortedMembers.length === 0 ? (
+                        <div className="py-12 text-center text-xs text-slate-400">
+                          No members match the selected filter.
+                        </div>
+                      ) : (
+                        filteredAndSortedMembers.map((member) => {
+                          const initial = member.name.charAt(0).toUpperCase() || 'M';
+                          const isWinner = currentMonthAuction && (
+                            (currentMonthAuction.winning_bidder_id && (member.profileId === currentMonthAuction.winning_bidder_id || member.id === currentMonthAuction.winning_bidder_id)) ||
+                            (currentMonthAuction.winner_name && member.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
+                          );
+
+                          return (
+                            <div
+                              key={member.id}
+                              className={`p-4 hover:bg-slate-50/75 transition-colors flex items-center justify-between gap-4 ${member.status === 'partial' ? 'bg-amber-50/20' : ''
+                                }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className={`w-10 h-10 rounded-full font-bold text-xs flex items-center justify-center shrink-0 font-display ${isWinner
                                   ? 'bg-purple-100 text-purple-700'
                                   : member.status === 'partial'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : member.status === 'paid'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-indigo-100 text-brand-700'
-                              }`}>
-                                {initial}
-                              </div>
-
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className="text-sm font-bold text-slate-900 truncate">{member.name}</h4>
-                                  <span className="text-[11px] font-mono font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                                    #{member.ticket}
-                                  </span>
-
-                                  {member.status === 'paid' ? (
-                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded-full">
-                                      PAID
-                                    </span>
-                                  ) : member.status === 'partial' ? (
-                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full">
-                                      PARTIAL ({Math.round((member.paid / Math.max(1, member.effectiveDue)) * 100)}%)
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200/60 px-2 py-0.5 rounded-full">
-                                      UNPAID
-                                    </span>
-                                  )}
-
-                                  {isWinner && (
-                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                      Auction Winner
-                                    </span>
-                                  )}
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : member.status === 'paid'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-indigo-100 text-brand-700'
+                                  }`}>
+                                  {initial}
                                 </div>
 
-                                {member.status === 'partial' ? (
-                                  <>
-                                    <div className="flex items-center gap-3 text-xs mt-1">
-                                      <span className="text-slate-600">
-                                        Remaining Due: <strong className="text-rose-600">{formatCurrency(member.remaining)}</strong>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="text-sm font-bold text-slate-900 truncate">{member.name}</h4>
+                                    <span className="text-[11px] font-mono font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                                      #{member.ticket}
+                                    </span>
+
+                                    {member.status === 'paid' ? (
+                                      <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                                        PAID
                                       </span>
-                                      <span className="text-slate-300">•</span>
-                                      <span className="text-emerald-700 font-semibold">
-                                        Paid: {formatCurrency(member.paid)}
+                                    ) : member.status === 'partial' ? (
+                                      <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full">
+                                        PARTIAL ({Math.round((member.paid / Math.max(1, member.effectiveDue)) * 100)}%)
                                       </span>
-                                    </div>
-                                    <div className="w-48 bg-slate-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                                      <div
-                                        className="bg-amber-500 h-full rounded-full transition-all duration-300"
-                                        style={{ width: `${Math.min(100, Math.round((member.paid / Math.max(1, member.effectiveDue)) * 100))}%` }}
-                                      />
-                                    </div>
-                                  </>
-                                ) : member.status === 'paid' ? (
-                                  <p className="text-xs text-slate-500 mt-0.5">
-                                    Paid: <strong className="text-emerald-700 font-mono">{formatCurrency(member.paid)}</strong> · Mobile: {member.phone || 'N/A'}
-                                  </p>
-                                ) : (
-                                  <p className="text-xs text-slate-600 mt-0.5">
-                                    Due: <strong className="text-slate-900 font-mono">{formatCurrency(member.remaining)}</strong> · Mobile: {member.phone || 'N/A'}
-                                  </p>
+                                    ) : (
+                                      <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200/60 px-2 py-0.5 rounded-full">
+                                        UNPAID
+                                      </span>
+                                    )}
+
+                                    {isWinner && (
+                                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                        Auction Winner
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {member.status === 'partial' ? (
+                                    <>
+                                      <div className="flex items-center gap-3 text-xs mt-1">
+                                        <span className="text-slate-600">
+                                          Remaining Due: <strong className="text-rose-600">{formatCurrency(member.remaining)}</strong>
+                                        </span>
+                                        <span className="text-slate-300">•</span>
+                                        <span className="text-emerald-700 font-semibold">
+                                          Paid: {formatCurrency(member.paid)}
+                                        </span>
+                                      </div>
+                                      <div className="w-48 bg-slate-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                                        <div
+                                          className="bg-amber-500 h-full rounded-full transition-all duration-300"
+                                          style={{ width: `${Math.min(100, Math.round((member.paid / Math.max(1, member.effectiveDue)) * 100))}%` }}
+                                        />
+                                      </div>
+                                    </>
+                                  ) : member.status === 'paid' ? (
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                      Paid: <strong className="text-emerald-700 font-mono">{formatCurrency(member.paid)}</strong> · Mobile: {member.phone || 'N/A'}
+                                    </p>
+                                  ) : (
+                                    <p className="text-xs text-slate-600 mt-0.5">
+                                      Due: <strong className="text-slate-900 font-mono">{formatCurrency(member.remaining)}</strong> · Mobile: {member.phone || 'N/A'}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                {canBroadcastReminders && member.status !== 'paid' && (
+                                  <button
+                                    type="button"
+                                    data-action="communication:due_alerts"
+                                    onClick={() => {
+                                      triggerHapticFeedback('light');
+                                      const msg = encodeURIComponent(
+                                        `*CHIT INSTALLMENT DUE REMINDER* 🔔\n` +
+                                        `Group: ${activeGroup?.name}\n` +
+                                        `Month: Month ${selectedDashboardMonth} (${getDashboardMonthLabel(activeGroup, selectedDashboardMonth)})\n` +
+                                        `Ticket: #${member.ticket}\n` +
+                                        `Subscriber: ${member.name}\n` +
+                                        `Pending Due: ${formatCurrency(member.remaining)}\n\n` +
+                                        `Kindly clear your installment due for this month. Thank you! 🙏`
+                                      );
+                                      const cleanPhone = normalizePhone(member.phone);
+                                      const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${msg}` : `https://wa.me/?text=${msg}`;
+                                      window.open(url, '_blank');
+                                    }}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+                                    title={`Remind ${member.name} via WhatsApp`}
+                                  >
+                                    <Send size={13} className="text-brand-600" />
+                                    <span>Remind</span>
+                                  </button>
+                                )}
+
+                                {canCollect && (
+                                  <button
+                                    type="button"
+                                    data-action="members:collect"
+                                    onClick={() => handleOpenRecordPayment(member, activeDashboardGroupId, selectedDashboardMonth)}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+                                  >
+                                    <Coins size={13} />
+                                    <span>Record</span>
+                                  </button>
                                 )}
                               </div>
                             </div>
+                          );
+                        })
+                      )}
+                    </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              {canBroadcastReminders && member.status !== 'paid' && (
-                                <button
-                                  type="button"
-                                  data-action="communication:due_alerts"
-                                  onClick={() => {
-                                    triggerHapticFeedback('light');
-                                    const msg = encodeURIComponent(
-                                      `*CHIT INSTALLMENT DUE REMINDER* 🔔\n` +
-                                      `Group: ${activeGroup?.name}\n` +
-                                      `Month: Month ${selectedDashboardMonth} (${getDashboardMonthLabel(activeGroup, selectedDashboardMonth)})\n` +
-                                      `Ticket: #${member.ticket}\n` +
-                                      `Subscriber: ${member.name}\n` +
-                                      `Pending Due: ${formatCurrency(member.remaining)}\n\n` +
-                                      `Kindly clear your installment due for this month. Thank you! 🙏`
-                                    );
-                                    const cleanPhone = normalizePhone(member.phone);
-                                    const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${msg}` : `https://wa.me/?text=${msg}`;
-                                    window.open(url, '_blank');
-                                  }}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
-                                  title={`Remind ${member.name} via WhatsApp`}
-                                >
-                                  <Send size={13} className="text-brand-600" />
-                                  <span>Remind</span>
-                                </button>
-                              )}
+                    {/* Footer summary inside table */}
+                    <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 flex-wrap gap-2">
+                      <span>
+                        Showing {filteredAndSortedMembers.length} of {dashboardGroupMembers.length} enrolled subscribers
+                      </span>
+                      <div className="flex items-center gap-4">
+                        <span>Total Expected: <strong className="text-slate-900 font-mono">{formatCurrency(targetCollectionsTotal)}</strong></span>
+                        <span>Total Outstanding: <strong className="text-rose-600 font-mono">{formatCurrency(pendingCollectionsTotal)}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+                {/* END: Left 8 Columns */}
 
-                              {canCollect && (
-                                <button
-                                  type="button"
-                                  data-action="members:collect"
-                                  onClick={() => handleOpenRecordPayment(member, activeDashboardGroupId, selectedDashboardMonth)}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
-                                >
-                                  <Coins size={13} />
-                                  <span>Record</span>
-                                </button>
-                              )}
+                {/* Right 4 Columns: Payment Breakdown Ledger & Live Audit Log */}
+                <aside className="lg:col-span-4 space-y-6" data-purpose="ledger-and-audit-sidebar">
+                  {/* Card 1: Payments Breakdown Ledger */}
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3.5">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-indigo-50 text-brand-600">
+                          <Banknote size={16} />
+                        </div>
+                        <h3 className="font-display font-bold text-sm text-slate-900">Payments Breakdown</h3>
+                      </div>
+                      <span className="text-xs font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
+                        {currentMonthTransactions.length} Receipts
+                      </span>
+                    </div>
+
+                    {currentMonthTransactions.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-slate-400">
+                        No payment receipts logged for Month {selectedDashboardMonth} yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-0.5 scrollbar-thin">
+                        {currentMonthTransactions.map((tx) => {
+                          const matchedMember = dashboardGroupMembers.find(m => m.profileId === tx.profile_id || m.id === tx.group_member_id);
+                          const memberName = matchedMember?.name || 'Subscriber';
+                          const ticketNum = matchedMember?.ticket || '?';
+                          const dateStr = tx.created_at
+                            ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ', ' + new Date(tx.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                            : 'Today';
+
+                          const walletLabel = tx.wallet_type === 'kishor_bank'
+                            ? 'KISHOR BANK'
+                            : tx.wallet_type === 'dad_bank'
+                              ? 'DAD BANK'
+                              : tx.wallet_type === 'mom_bank'
+                                ? 'MOM BANK'
+                                : 'CASH IN HAND';
+
+                          return (
+                            <div
+                              key={tx.id}
+                              className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 transition-colors"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center justify-center font-mono">
+                                    #{ticketNum}
+                                  </span>
+                                  <div>
+                                    <h5 className="text-xs font-bold text-slate-900">{memberName}</h5>
+                                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                      {walletLabel}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className="text-sm font-bold text-emerald-600 font-mono">
+                                  +{formatCurrency(Number(tx.amount || 0))}
+                                </span>
+                              </div>
+
+                              <div className="mt-2 text-[11px] text-slate-600 leading-snug">
+                                <p>{dateStr}</p>
+                                {tx.notes && (
+                                  <p className="text-slate-500 text-[10px] italic truncate">
+                                    {tx.notes.replace(/\[Batch:[^\]]+\]/g, '').trim()}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                                {(() => {
+                                  const batchMatch = (tx.notes || '').match(/\[Batch:([A-Za-z0-9_-]+)\|Total:([0-9.]+)\|Alloc:([^\]]+)\]/);
+                                  const total = batchMatch ? parseFloat(batchMatch[2]) : null;
+                                  return total && total !== Number(tx.amount) ? (
+                                    <span className="text-[10px] font-mono text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
+                                      Part of {formatCurrency(total)} Batch
+                                    </span>
+                                  ) : <span />;
+                                })()}
+
+                                <div className="flex items-center gap-1.5 text-slate-500">
+                                  {matchedMember && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        triggerHapticFeedback('light');
+                                        setViewingReceiptTx({ tx, member: matchedMember });
+                                      }}
+                                      className="hover:text-brand-600 transition-colors p-1 cursor-pointer"
+                                      title="Share Receipt"
+                                    >
+                                      <Share2 size={13} />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditPayment(tx)}
+                                    className="hover:text-slate-900 transition-colors p-1 cursor-pointer"
+                                    title="Edit Entry"
+                                  >
+                                    <Edit3 size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeletePayment(tx)}
+                                    className="hover:text-rose-600 transition-colors p-1 cursor-pointer"
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {setActiveTab && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('cash')}
+                        className="w-full mt-2 py-2 text-center text-xs font-semibold text-brand-600 hover:text-brand-700 hover:bg-brand-50/60 rounded-xl transition-colors cursor-pointer"
+                      >
+                        View All Ledger Receipts →
+                      </button>
                     )}
                   </div>
 
-                  {/* Footer summary inside table */}
-                  <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 flex-wrap gap-2">
-                    <span>
-                      Showing {filteredAndSortedMembers.length} of {dashboardGroupMembers.length} enrolled subscribers
-                    </span>
-                    <div className="flex items-center gap-4">
-                      <span>Total Expected: <strong className="text-slate-900 font-mono">{formatCurrency(targetCollectionsTotal)}</strong></span>
-                      <span>Total Outstanding: <strong className="text-rose-600 font-mono">{formatCurrency(pendingCollectionsTotal)}</strong></span>
-                    </div>
-                  </div>
-                </div>
-              </section>
-              {/* END: Left 8 Columns */}
+                  {/* Card 2: Live System Activity Feed Widget (Identical to SystemAuditLogViewer) */}
+                  <LiveAuditLogWidget
+                    onViewFullReport={() => {
+                      if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('cf_reports_subtab', 'system_log');
+                      }
+                      setReportsInitialSubtab('system_log');
+                      if (setActiveTab) setActiveTab('reports');
+                    }}
+                  />
 
-              {/* Right 4 Columns: Payment Breakdown Ledger & Live Audit Log */}
-              <aside className="lg:col-span-4 space-y-6" data-purpose="ledger-and-audit-sidebar">
-                {/* Card 1: Payments Breakdown Ledger */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3.5">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-indigo-50 text-brand-600">
-                        <Banknote size={16} />
+                  {/* Card 3: Quick WhatsApp Broadcast Card */}
+                  <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
+                          Automation
+                        </span>
+                        <span className="text-xs text-emerald-400 font-semibold">Ready to Send</span>
                       </div>
-                      <h3 className="font-display font-bold text-sm text-slate-900">Payments Breakdown</h3>
+                      <h4 className="font-display font-bold text-sm mt-3">
+                        Broadcast Reminder to {unpaidCount + partialCount} Unpaid Members
+                      </h4>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Send personalized reminders via WhatsApp in 1-tap
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRemindModalTab('group');
+                          setShowRemindModal(true);
+                        }}
+                        className="mt-4 w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z" />
+                        </svg>
+                        <span>Trigger WhatsApp Dues Alert</span>
+                      </button>
                     </div>
-                    <span className="text-xs font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
-                      {currentMonthTransactions.length} Receipts
-                    </span>
                   </div>
-
-                  {currentMonthTransactions.length === 0 ? (
-                    <div className="py-6 text-center text-xs text-slate-400">
-                      No payment receipts logged for Month {selectedDashboardMonth} yet.
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-0.5 scrollbar-thin">
-                      {currentMonthTransactions.map((tx) => {
-                        const matchedMember = dashboardGroupMembers.find(m => m.profileId === tx.profile_id || m.id === tx.group_member_id);
-                        const memberName = matchedMember?.name || 'Subscriber';
-                        const ticketNum = matchedMember?.ticket || '?';
-                        const dateStr = tx.created_at 
-                          ? new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ', ' + new Date(tx.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
-                          : 'Today';
-
-                        const walletLabel = tx.wallet_type === 'kishor_bank'
-                          ? 'KISHOR BANK'
-                          : tx.wallet_type === 'dad_bank'
-                          ? 'DAD BANK'
-                          : tx.wallet_type === 'mom_bank'
-                          ? 'MOM BANK'
-                          : 'CASH IN HAND';
-
-                        return (
-                          <div
-                            key={tx.id}
-                            className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 transition-colors"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center gap-2.5">
-                                <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center justify-center font-mono">
-                                  #{ticketNum}
-                                </span>
-                                <div>
-                                  <h5 className="text-xs font-bold text-slate-900">{memberName}</h5>
-                                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                                    {walletLabel}
-                                  </span>
-                                </div>
-                              </div>
-                              <span className="text-sm font-bold text-emerald-600 font-mono">
-                                +{formatCurrency(Number(tx.amount || 0))}
-                              </span>
-                            </div>
-
-                            <div className="mt-2 text-[11px] text-slate-600 leading-snug">
-                              <p>{dateStr}</p>
-                              {tx.notes && (
-                                <p className="text-slate-500 text-[10px] italic truncate">
-                                  {tx.notes.replace(/\[Batch:[^\]]+\]/g, '').trim()}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between">
-                              {(() => {
-                                const batchMatch = (tx.notes || '').match(/\[Batch:([A-Za-z0-9_-]+)\|Total:([0-9.]+)\|Alloc:([^\]]+)\]/);
-                                const total = batchMatch ? parseFloat(batchMatch[2]) : null;
-                                return total && total !== Number(tx.amount) ? (
-                                  <span className="text-[10px] font-mono text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
-                                    Part of {formatCurrency(total)} Batch
-                                  </span>
-                                ) : <span />;
-                              })()}
-
-                              <div className="flex items-center gap-1.5 text-slate-500">
-                                {matchedMember && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      triggerHapticFeedback('light');
-                                      setViewingReceiptTx({ tx, member: matchedMember });
-                                    }}
-                                    className="hover:text-brand-600 transition-colors p-1 cursor-pointer"
-                                    title="Share Receipt"
-                                  >
-                                    <Share2 size={13} />
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditPayment(tx)}
-                                  className="hover:text-slate-900 transition-colors p-1 cursor-pointer"
-                                  title="Edit Entry"
-                                >
-                                  <Edit3 size={13} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeletePayment(tx)}
-                                  className="hover:text-rose-600 transition-colors p-1 cursor-pointer"
-                                  title="Delete"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {setActiveTab && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('cash')}
-                      className="w-full mt-2 py-2 text-center text-xs font-semibold text-brand-600 hover:text-brand-700 hover:bg-brand-50/60 rounded-xl transition-colors cursor-pointer"
-                    >
-                      View All Ledger Receipts →
-                    </button>
-                  )}
-                </div>
-
-                {/* Card 2: Live System Activity Feed Widget (Identical to SystemAuditLogViewer) */}
-                <LiveAuditLogWidget
-                  onViewFullReport={() => {
-                    if (typeof window !== 'undefined') {
-                      sessionStorage.setItem('cf_reports_subtab', 'system_log');
-                    }
-                    setReportsInitialSubtab('system_log');
-                    if (setActiveTab) setActiveTab('reports');
-                  }}
-                />
-
-                {/* Card 3: Quick WhatsApp Broadcast Card */}
-                <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
-                        Automation
-                      </span>
-                      <span className="text-xs text-emerald-400 font-semibold">Ready to Send</span>
-                    </div>
-                    <h4 className="font-display font-bold text-sm mt-3">
-                      Broadcast Reminder to {unpaidCount + partialCount} Unpaid Members
-                    </h4>
-                    <p className="text-xs text-slate-300 mt-1">
-                      Send personalized reminders via WhatsApp in 1-tap
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRemindModalTab('group');
-                        setShowRemindModal(true);
-                      }}
-                      className="mt-4 w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z" />
-                      </svg>
-                      <span>Trigger WhatsApp Dues Alert</span>
-                    </button>
-                  </div>
-                </div>
-              </aside>
-              {/* END: Right 4 Columns */}
+                </aside>
+                {/* END: Right 4 Columns */}
+              </div>
+              {/* END: Main2ColumnLayout */}
             </div>
-            {/* END: Main2ColumnLayout */}
-          </div>
-          {/* END: DESKTOP VIEW */}
+            {/* END: DESKTOP VIEW */}
 
             {/* ======================================================== */}
             {/* MOBILE VIEW: Stitch Admin Dashboard (Mobile Screens)      */}
@@ -4893,11 +4925,10 @@ Thank you for your prompt payment! 🙏`;
                           setActiveDashboardGroupId(group.id);
                           setSelectedDashboardMonth(group.currentMonth !== undefined && group.currentMonth !== null ? group.currentMonth : 0);
                         }}
-                        className={`flex-shrink-0 flex items-center space-x-1.5 px-3.5 py-1.5 font-medium rounded-full transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-brand-600 text-white shadow-sm'
-                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
+                        className={`flex-shrink-0 flex items-center space-x-1.5 px-3.5 py-1.5 font-medium rounded-full transition-all cursor-pointer ${isSelected
+                          ? 'bg-brand-600 text-white shadow-sm'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                         <span>{group.name}</span>
@@ -4928,1048 +4959,1193 @@ Thank you for your prompt payment! 🙏`;
                 <>
                   {/* BEGIN: HeroFinancialCard */}
                   <section className="rounded-3xl p-5 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20" data-purpose="hero-fund-card">
-                <div className="absolute -right-12 -top-12 w-48 h-48 bg-brand-500/25 rounded-full blur-2xl pointer-events-none" />
-                <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none" />
+                    <div className="absolute -right-12 -top-12 w-48 h-48 bg-brand-500/25 rounded-full blur-2xl pointer-events-none" />
+                    <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none" />
 
-                {/* Top Badge & Kai Iruppu Floating Pill */}
-                <div className="relative z-10 flex justify-between items-start gap-2">
-                  <div className="min-w-0">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[11px] text-indigo-200 font-medium whitespace-nowrap shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                      <span className="whitespace-nowrap">{selectedDashboardMonth === 0 ? 'Launch Month' : `Month ${selectedDashboardMonth} of ${totalDuration}`}</span>
-                      <span className="text-indigo-400 select-none">•</span>
-                      <span className="text-white font-semibold whitespace-nowrap">Cycle #{selectedDashboardMonth}</span>
+                    {/* Top Badge & Kai Iruppu Floating Pill */}
+                    <div className="relative z-10 flex justify-between items-start gap-2">
+                      <div className="min-w-0">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[11px] text-indigo-200 font-medium whitespace-nowrap shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                          <span className="whitespace-nowrap">{selectedDashboardMonth === 0 ? 'Launch Month' : `Month ${selectedDashboardMonth} of ${totalDuration}`}</span>
+                          <span className="text-indigo-400 select-none">•</span>
+                          <span className="text-white font-semibold whitespace-nowrap">Cycle #{selectedDashboardMonth}</span>
+                        </div>
+                        <div className="mt-3">
+                          <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Total Collected</p>
+                          <p className="text-3xl font-extrabold tracking-tight text-white mt-0.5 font-mono">{formatCurrency(actualCollectionsTotal)}</p>
+                          <p className="text-xs text-indigo-200/90 mt-1 flex items-center gap-1 font-mono">
+                            <span>Target:</span>
+                            <span className="font-bold text-white">{formatCurrency(targetCollectionsTotal)}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-white/10 rounded-md text-emerald-300 ml-1 font-semibold">{completionPct}%</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Kai Iruppu Reserve Pill */}
+                      <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-3 text-right shadow-sm shrink-0 min-w-[110px]">
+                        <div className="flex items-center justify-end space-x-1 mb-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                          <span className="text-[9px] uppercase font-bold text-amber-300 tracking-wider">Kai Iruppu</span>
+                        </div>
+                        <span className="text-base font-extrabold text-white tracking-tight block font-mono">{formatCurrency(activeKaiIruppuPool)}</span>
+                      </div>
                     </div>
-                    <div className="mt-3">
-                      <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Total Collected</p>
-                      <p className="text-3xl font-extrabold tracking-tight text-white mt-0.5 font-mono">{formatCurrency(actualCollectionsTotal)}</p>
-                      <p className="text-xs text-indigo-200/90 mt-1 flex items-center gap-1 font-mono">
-                        <span>Target:</span>
-                        <span className="font-bold text-white">{formatCurrency(targetCollectionsTotal)}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 bg-white/10 rounded-md text-emerald-300 ml-1 font-semibold">{completionPct}%</span>
-                      </p>
-                    </div>
-                  </div>
 
-                  {/* Kai Iruppu Reserve Pill */}
-                  <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-3 text-right shadow-sm shrink-0 min-w-[110px]">
-                    <div className="flex items-center justify-end space-x-1 mb-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                      <span className="text-[9px] uppercase font-bold text-amber-300 tracking-wider">Kai Iruppu</span>
-                    </div>
-                    <span className="text-base font-extrabold text-white tracking-tight block font-mono">{formatCurrency(activeKaiIruppuPool)}</span>
-                  </div>
-                </div>
-
-                {/* Progress Bar & Remainder Stats */}
-                <div className="relative z-10 mt-5 pt-3 border-t border-white/10">
-                  <div className="flex justify-between items-center text-xs font-medium text-slate-300 mb-2">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                      <span className="font-semibold text-white font-mono">{formatCurrency(pendingCollectionsTotal)} to collect</span>
-                    </div>
-                    <span className="text-indigo-200 font-medium">{pendingList.length} members pending</span>
-                  </div>
-                  <div className="w-full bg-white/15 h-2.5 rounded-full overflow-hidden p-0.5 backdrop-blur-sm">
-                    <div
-                      className="bg-gradient-to-r from-emerald-400 to-teal-300 h-full rounded-full transition-all duration-500 shadow-sm"
-                      style={{ width: `${Math.max(actualCollectionsTotal > 0 ? 5 : 0, completionPct)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Primary Cycle Advance CTA Inside Hero */}
-                {((selectedDashboardMonth === 0 && canLaunchMonth0) || (selectedDashboardMonth > 0 && canConcludeMonth)) && (
-                  <div className="relative z-10 mt-5">
-                    <button
-                      type="button"
-                      data-action={selectedDashboardMonth === 0 ? "dashboard:launch_month0" : "dashboard:advance_month"}
-                      onClick={handleCloseMonth}
-                      disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup?.currentMonth ?? 0)}
-                      className="w-full py-3 px-4 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-40 cursor-pointer"
-                    >
-                      <span>
-                        {selectedDashboardMonth === 0 ? 'Conclude M0 & Advance to Month 1' : 'Conclude & Advance Month'}
-                      </span>
-                      <ArrowRight size={15} className="shrink-0" />
-                    </button>
-                  </div>
-                )}
-              </section>
-              {/* END: HeroFinancialCard */}
-
-              {/* BEGIN: CycleMilestonesAndCountdown (Compact Month Selector) */}
-              <section className="bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200/90 shadow-card" data-purpose="auction-milestones-widget">
-                {/* Step Indicators for Months */}
-                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-                  {monthsRange.map((m) => {
-                    const isGroupActiveMonth = m === (activeGroup?.currentMonth ?? 0);
-                    const isInspecting = m === selectedDashboardMonth;
-                    const mStatus = getMonthProgressStatus(activeGroup, m);
-
-                    const barColor = mStatus.color === 'rose'
-                      ? 'bg-rose-500'
-                      : mStatus.color === 'amber'
-                      ? 'bg-amber-500'
-                      : mStatus.color === 'emerald'
-                      ? 'bg-emerald-500'
-                      : mStatus.color === 'brand'
-                      ? 'bg-brand-500'
-                      : 'bg-slate-200';
-
-                    const labelColor = isInspecting
-                      ? 'font-extrabold text-brand-700'
-                      : mStatus.color === 'rose'
-                      ? 'font-bold text-rose-700'
-                      : mStatus.color === 'amber'
-                      ? 'font-bold text-amber-700'
-                      : mStatus.color === 'emerald'
-                      ? 'font-bold text-emerald-700'
-                      : mStatus.color === 'brand'
-                      ? 'font-bold text-brand-600'
-                      : 'font-medium text-slate-500';
-
-                    const subColor = mStatus.color === 'rose'
-                      ? 'font-bold text-rose-600'
-                      : mStatus.color === 'amber'
-                      ? 'font-bold text-amber-600'
-                      : mStatus.color === 'emerald'
-                      ? 'font-medium text-emerald-600'
-                      : mStatus.color === 'brand'
-                      ? 'font-bold text-brand-600'
-                      : 'text-slate-400';
-
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setSelectedDashboardMonth(m)}
-                        className={`flex-1 min-w-[62px] flex flex-col items-center group cursor-pointer p-1 rounded-xl transition-all ${
-                          isInspecting
-                            ? 'bg-brand-50/70 border-2 border-brand-500 shadow-2xs'
-                            : 'hover:bg-slate-50 border border-transparent'
-                        }`}
-                      >
+                    {/* Progress Bar & Remainder Stats */}
+                    <div className="relative z-10 mt-5 pt-3 border-t border-white/10">
+                      <div className="flex justify-between items-center text-xs font-medium text-slate-300 mb-2">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                          <span className="font-semibold text-white font-mono">{formatCurrency(pendingCollectionsTotal)} to collect</span>
+                        </div>
+                        <span className="text-indigo-200 font-medium">{pendingList.length} members pending</span>
+                      </div>
+                      <div className="w-full bg-white/15 h-2.5 rounded-full overflow-hidden p-0.5 backdrop-blur-sm">
                         <div
-                          className={`w-full h-1.5 rounded-full mb-1.5 transition-all ${barColor}`}
+                          className="bg-gradient-to-r from-emerald-400 to-teal-300 h-full rounded-full transition-all duration-500 shadow-sm"
+                          style={{ width: `${Math.max(actualCollectionsTotal > 0 ? 5 : 0, completionPct)}%` }}
                         />
-                        <span className={`text-[10px] ${labelColor}`}>
-                          M{m}
-                        </span>
-                        <span className={`text-[8.5px] leading-tight text-center truncate max-w-[62px] ${subColor}`}>
-                          {mStatus.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-              {/* END: CycleMilestonesAndCountdown */}
-
-              {/* BEGIN: CurrentMonthAuctionWinnerCard */}
-              <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="auction-winner-card">
-                {selectedDashboardMonth === 0 ? (
-                  <div>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold text-lg shadow-inner">
-                          <Rocket size={20} className="text-amber-600" />
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h2 className="text-sm font-bold text-slate-900 leading-none">Organizer Profit</h2>
-                            <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-md border border-amber-200">Month 0</span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            Launch Month • No Live Auction Held
-                          </p>
-                        </div>
-                      </div>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Organizer Phase
-                      </span>
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                      <div>
-                        <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Chit Value</p>
-                        <p className="text-xs font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
-                      </div>
-                      <div className="border-l border-slate-200 pl-2.5">
-                        <p className="text-[10px] uppercase font-bold text-brand-600 leading-tight">Organizer Return</p>
-                        <p className="text-xs font-extrabold text-brand-600 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : !currentMonthAuction ? (
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-brand-600 border border-indigo-100 flex items-center justify-center font-bold text-lg shadow-inner">
-                          <Trophy size={20} className="text-brand-600" />
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h2 className="text-sm font-bold text-slate-900 leading-none">Month {selectedDashboardMonth} Auction</h2>
-                            <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-600 rounded-md border border-slate-200">Pending</span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            Auction Not Held Yet
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    {setActiveTab && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('auctions')}
-                        className="w-full py-2.5 px-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
-                      >
-                        <Trophy size={14} />
-                        <span>Open Live Auction Tab</span>
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <div
-                      onClick={handleNavigateToAuctionHistory}
-                      className="cursor-pointer group hover:bg-slate-50/50 -m-1.5 p-1.5 rounded-xl transition-all"
-                      title="Click to view historical auction ledger"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0">
-                            <Trophy size={16} />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <h3 className="text-sm font-bold font-display text-slate-900 group-hover:text-brand-600 transition-colors truncate">{winnerName}</h3>
-                              <span className="px-1.5 py-0.2 text-[10px] font-bold font-mono bg-slate-100 text-slate-700 rounded border border-slate-200">
-                                #{winnerTicketNum}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium truncate">
-                              <span>Month {selectedDashboardMonth} Winner →</span>
-                              {winnerPhone && (
-                                <>
-                                  <span className="text-slate-300">•</span>
-                                  <span className="text-slate-400 font-mono">{winnerPhone}</span>
-                                </>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                        {isSettled ? (
-                          <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            ✓ Disbursed
-                          </span>
-                        ) : isPartial ? (
-                          <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                            Partial
-                          </span>
-                        ) : (
-                          <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                            Pending
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Key Financial Matrix Grid */}
-                      <div className="mt-4 grid grid-cols-3 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                        <div>
-                          <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Discount</p>
-                          <p className="text-xs font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(winningBid)}</p>
-                        </div>
-                        <div className="border-l border-slate-200 pl-2.5">
-                          <p className="text-[10px] uppercase font-bold text-brand-600 leading-tight">Prize Due</p>
-                          <p className="text-xs font-extrabold text-brand-600 mt-0.5 font-mono">{formatCurrency(netPrizePot)}</p>
-                        </div>
-                        <div className="border-l border-slate-200 pl-2.5">
-                          <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Disbursed</p>
-                          <p className="text-xs font-bold text-slate-600 mt-0.5 font-mono">{formatCurrency(totalPrizeDisbursed)}</p>
-                        </div>
                       </div>
                     </div>
 
-                    {/* Action CTA Buttons */}
-                    <div className="mt-3.5 flex items-center space-x-2">
-                      {remainingPrizeDue > 0 ? (
+                    {/* Primary Cycle Advance CTA Inside Hero */}
+                    {((selectedDashboardMonth === 0 && canLaunchMonth0) || (selectedDashboardMonth > 0 && canConcludeMonth)) && (
+                      <div className="relative z-10 mt-5">
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenDisburseModal(remainingPrizeDue);
-                          }}
-                          className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center space-x-1.5 transition-colors active:scale-95 cursor-pointer"
+                          data-action={selectedDashboardMonth === 0 ? "dashboard:launch_month0" : "dashboard:advance_month"}
+                          onClick={handleCloseMonth}
+                          disabled={isClosingMonth || selectedDashboardMonth !== (activeGroup?.currentMonth ?? 0)}
+                          className="w-full py-3 px-4 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-40 cursor-pointer"
                         >
-                          <Banknote size={14} />
-                          <span>Disburse Prize ({formatCurrency(remainingPrizeDue)})</span>
+                          <span>
+                            {selectedDashboardMonth === 0 ? 'Conclude M0 & Advance to Month 1' : 'Conclude & Advance Month'}
+                          </span>
+                          <ArrowRight size={15} className="shrink-0" />
                         </button>
-                      ) : (
-                        <div className="flex-1 text-center py-2 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-200">
-                          ✓ Prize Settled
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSharePayoutWhatsApp(
-                            activeGroup,
-                            winnerName,
-                            winnerPhone,
-                            selectedDashboardMonth,
-                            netPrizePot,
-                            winningBid,
-                            totalPrizeDisbursed,
-                            remainingPrizeDue,
-                            monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
-                          );
-                        }}
-                        aria-label="Share WhatsApp Receipt"
-                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-700 flex items-center justify-center transition-colors active:scale-95 shadow-xs cursor-pointer"
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12.031 2C6.495 2 2 6.495 2 12.031c0 1.97.57 3.81 1.558 5.372L2.5 22l4.808-1.047a9.98 9.98 0 0 0 4.723 1.18c5.536 0 10.031-4.496 10.031-10.032S17.567 2 12.031 2zm5.727 14.198c-.24.673-1.393 1.285-1.922 1.343-.497.054-1.127.08-3.266-.807-2.734-1.135-4.498-3.906-4.636-4.088-.137-.182-1.1-1.464-1.1-2.793 0-1.328.694-1.982.942-2.247.248-.266.541-.332.723-.332.183 0 .365.002.525.01.17.009.398-.065.621.472.23.555.787 1.92.855 2.06.068.14.113.303.023.483-.09.18-.135.292-.27.45-.135.158-.284.354-.405.474-.136.136-.278.283-.12.553.158.271.7 1.155 1.503 1.868 1.033.918 1.905 1.203 2.176 1.339.27.135.43.113.589-.069.158-.18.677-.788.857-1.059.18-.27.36-.226.602-.136.241.09 1.536.724 1.799.855.263.131.439.196.502.304.064.108.064.629-.176 1.302z" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </section>
-              {/* END: CurrentMonthAuctionWinnerCard */}
+                      </div>
+                    )}
+                  </section>
+                  {/* END: HeroFinancialCard */}
 
-              {/* BEGIN: MemberDuesSection */}
-              <section className="space-y-3" data-purpose="member-dues-section">
-                {/* Section Controls */}
-                <div className="flex items-center justify-between pt-1">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-1.5">
-                      <span>Collection Status</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
-                        {pendingList.length} Pending
-                      </span>
-                    </h3>
-                    <p className="text-[11px] text-slate-500">Month {selectedDashboardMonth} installments breakdown</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRemindModalTab('group');
-                      setShowRemindModal(true);
-                    }}
-                    className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center space-x-1 transition-colors cursor-pointer"
-                  >
-                    <span>Remind All</span>
-                    <ArrowRight size={14} />
-                  </button>
-                </div>
+                  {/* BEGIN: CycleMilestonesAndCountdown (Compact Month Selector) */}
+                  <section className="bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200/90 shadow-card" data-purpose="auction-milestones-widget">
+                    {/* Step Indicators for Months */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                      {monthsRange.map((m) => {
+                        const isGroupActiveMonth = m === (activeGroup?.currentMonth ?? 0);
+                        const isInspecting = m === selectedDashboardMonth;
+                        const mStatus = getMonthProgressStatus(activeGroup, m);
 
-                {/* Filter Chips with Paid count included */}
-                <div className="flex items-center space-x-2 text-xs overflow-x-auto scrollbar-none py-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setMemberRosterFilter('all')}
-                    className={`px-3.5 py-1 rounded-lg font-semibold flex-shrink-0 transition-colors cursor-pointer ${
-                      memberRosterFilter === 'all'
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    All ({memberStats.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMemberRosterFilter('unpaid')}
-                    className={`px-3 py-1 rounded-lg font-medium flex-shrink-0 transition-colors cursor-pointer ${
-                      memberRosterFilter === 'unpaid'
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    Unpaid ({unpaidCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMemberRosterFilter('partial')}
-                    className={`px-3 py-1 rounded-lg font-medium flex-shrink-0 transition-colors cursor-pointer ${
-                      memberRosterFilter === 'partial'
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    Partial ({partialCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMemberRosterFilter('paid')}
-                    className={`px-3 py-1 rounded-lg font-medium flex-shrink-0 transition-colors cursor-pointer ${
-                      memberRosterFilter === 'paid'
-                        ? 'bg-slate-900 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'
-                    }`}
-                  >
-                    Paid ({paidList.length})
-                  </button>
-                </div>
+                        const barColor = mStatus.color === 'rose'
+                          ? 'bg-rose-500'
+                          : mStatus.color === 'amber'
+                            ? 'bg-amber-500'
+                            : mStatus.color === 'emerald'
+                              ? 'bg-emerald-500'
+                              : mStatus.color === 'brand'
+                                ? 'bg-brand-500'
+                                : 'bg-slate-200';
 
-                {/* Member Dues Cards List */}
-                <div className="space-y-2.5">
-                  {filteredAndSortedMembers.length === 0 ? (
-                    <div className="p-6 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
-                      No members match the current filter
-                    </div>
-                  ) : (
-                    filteredAndSortedMembers.map((member) => {
-                      const isPaid = member.status === 'paid';
-                      const isPartial = member.status === 'partial';
-                      const isUnpaid = member.status === 'unpaid';
-                      const avatarLetter = (member.name || 'M').charAt(0).toUpperCase();
+                        const labelColor = isInspecting
+                          ? 'font-extrabold text-brand-700'
+                          : mStatus.color === 'rose'
+                            ? 'font-bold text-rose-700'
+                            : mStatus.color === 'amber'
+                              ? 'font-bold text-amber-700'
+                              : mStatus.color === 'emerald'
+                                ? 'font-bold text-emerald-700'
+                                : mStatus.color === 'brand'
+                                  ? 'font-bold text-brand-600'
+                                  : 'font-medium text-slate-500';
 
-                      return (
-                        <div
-                          key={member.id}
-                          className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-card hover:border-slate-300 transition-all space-y-2.5"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3 min-w-0">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-xs shrink-0 ${
-                                isPaid
-                                  ? 'bg-emerald-50 border border-emerald-100 text-emerald-600'
-                                  : isPartial
-                                  ? 'bg-amber-50 border border-amber-100 text-amber-600'
-                                  : 'bg-indigo-50 border border-indigo-100 text-brand-600'
-                              }`}>
-                                {avatarLetter}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center space-x-1.5 flex-wrap">
-                                  <h4 className="text-xs font-bold text-slate-900 leading-tight truncate">{member.name}</h4>
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">
-                                    #{member.ticket}
-                                  </span>
-                                  {member.hasWon && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-50 text-amber-600 border border-amber-200 rounded">
-                                      🏆 Winner
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center space-x-2 mt-1 flex-wrap">
-                                  {isPaid ? (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                      PAID
-                                    </span>
-                                  ) : isPartial ? (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
-                                      PARTIAL
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-100">
-                                      UNPAID
-                                    </span>
-                                  )}
-                                  <span className="text-xs font-extrabold text-slate-900 font-mono">
-                                    Due: {formatCurrency(member.remaining)}
-                                  </span>
-                                  {isPartial && (
-                                    <span className="text-[10px] text-emerald-600 font-semibold font-mono">
-                                      (Paid: {formatCurrency(member.paid)})
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
+                        const subColor = mStatus.color === 'rose'
+                          ? 'font-bold text-rose-600'
+                          : mStatus.color === 'amber'
+                            ? 'font-bold text-amber-600'
+                            : mStatus.color === 'emerald'
+                              ? 'font-medium text-emerald-600'
+                              : mStatus.color === 'brand'
+                                ? 'font-bold text-brand-600'
+                                : 'text-slate-400';
 
-                            <div className="flex items-center space-x-1.5 shrink-0">
-                              {canBroadcastReminders && !isPaid && (
-                                <button
-                                  type="button"
-                                  data-action="communication:due_alerts"
-                                  onClick={() => {
-                                    triggerHapticFeedback('light');
-                                    const msg = encodeURIComponent(
-                                      `*CHIT INSTALLMENT DUE REMINDER* 🔔\n` +
-                                      `Group: ${activeGroup?.name}\n` +
-                                      `Month: Month ${selectedDashboardMonth} (${getDashboardMonthLabel(activeGroup, selectedDashboardMonth)})\n` +
-                                      `Ticket: #${member.ticket}\n` +
-                                      `Subscriber: ${member.name}\n` +
-                                      `Pending Due: ${formatCurrency(member.remaining)}\n\n` +
-                                      `Kindly clear your installment due for this month. Thank you! 🙏`
-                                    );
-                                    const cleanPhone = normalizePhone(member.phone);
-                                    const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${msg}` : `https://wa.me/?text=${msg}`;
-                                    window.open(url, '_blank');
-                                  }}
-                                  className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                                  title="Send Reminder"
-                                >
-                                  <Send size={14} />
-                                </button>
-                              )}
-                              {canCollect && (
-                                <button
-                                  type="button"
-                                  data-action="members:collect"
-                                  onClick={() => handleOpenRecordPayment(member, activeDashboardGroupId, selectedDashboardMonth)}
-                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center space-x-1 shadow-xs cursor-pointer"
-                                >
-                                  <span>Record</span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Progress indication for partial member */}
-                          {isPartial && (
-                            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
-                              <span>
-                                {Math.round((member.paid / (member.effectiveDue || 1)) * 100)}% Completed
-                              </span>
-                              <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className="bg-amber-500 h-full rounded-full"
-                                  style={{ width: `${Math.round((member.paid / (member.effectiveDue || 1)) * 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </section>
-              {/* END: MemberDuesSection */}
-
-              {/* BEGIN: RecentPaymentsLedgerSection */}
-              <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="ledger-preview">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-brand-600 flex items-center justify-center shadow-xs">
-                      <Receipt size={16} />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-900 leading-tight">Payment Ledger</h3>
-                      <p className="text-[10px] text-slate-400">
-                        {currentMonthTransactions.length} recent {currentMonthTransactions.length === 1 ? 'transaction' : 'transactions'} recorded
-                      </p>
-                    </div>
-                  </div>
-                  {setActiveTab && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (typeof window !== 'undefined') {
-                            sessionStorage.setItem('cf_reports_subtab', 'receipts');
-                          }
-                          setActiveTab('reports');
-                        }}
-                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                        title="Search and view all official receipts in Reports Center"
-                      >
-                        <Receipt size={12} />
-                        <span>Receipts Vault</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('reports')}
-                        className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-                      >
-                        View All
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Ledger Item Cards List */}
-                <div className="space-y-2">
-                  {currentMonthTransactions.length === 0 ? (
-                    <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center text-xs text-slate-400">
-                      No payment records for Month {selectedDashboardMonth} yet
-                    </div>
-                  ) : (
-                    currentMonthTransactions.slice(0, 5).map((tx) => {
-                      const member = dashboardGroupMembers.find(m => m.profileId === tx.profile_id || m.id === tx.group_member_id);
-                      const memberName = member?.name || 'Subscriber';
-                      const ticketNum = member?.ticket || '?';
-                      const walletLabel = tx.wallet_type === 'cash_in_hand' 
-                        ? 'Cash in Hand' 
-                        : tx.wallet_type === 'kishor_bank' 
-                        ? 'Kishor Bank' 
-                        : tx.wallet_type === 'dad_bank' 
-                        ? "Dad's Bank" 
-                        : "Mom's Bank";
-                      const dateStr = new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-                      const timeStr = new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                      return (
-                        <div
-                          key={tx.id}
-                          className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center justify-between hover:bg-slate-100/70 transition-all"
-                        >
-                          <div className="flex items-center space-x-3 min-w-0">
-                            <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center shrink-0 font-mono">
-                              #{ticketNum}
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setSelectedDashboardMonth(m)}
+                            className={`flex-1 min-w-[62px] flex flex-col items-center group cursor-pointer p-1 rounded-xl transition-all ${isInspecting
+                              ? 'bg-brand-50/70 border-2 border-brand-500 shadow-2xs'
+                              : 'hover:bg-slate-50 border border-transparent'
+                              }`}
+                          >
+                            <div
+                              className={`w-full h-1.5 rounded-full mb-1.5 transition-all ${barColor}`}
+                            />
+                            <span className={`text-[10px] ${labelColor}`}>
+                              M{m}
                             </span>
-                            <div className="min-w-0">
-                              <div className="flex items-center space-x-1.5">
-                                <h4 className="text-xs font-bold text-slate-800 truncate">{memberName}</h4>
-                                <span className="text-[9px] px-1 py-0.5 bg-slate-200/70 text-slate-700 rounded font-semibold shrink-0">
-                                  {walletLabel}
-                                </span>
+                            <span className={`text-[8.5px] leading-tight text-center truncate max-w-[62px] ${subColor}`}>
+                              {mStatus.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                  {/* END: CycleMilestonesAndCountdown */}
+
+                  {/* BEGIN: CurrentMonthAuctionWinnerCard */}
+                  <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="auction-winner-card">
+                    {selectedDashboardMonth === 0 ? (
+                      <div>
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold text-lg shadow-inner">
+                              <Rocket size={20} className="text-amber-600" />
+                            </div>
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <h2 className="text-sm font-bold text-slate-900 leading-none">Organizer Profit</h2>
+                                <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-md border border-amber-200">Month 0</span>
                               </div>
-                              <p className="text-[10px] text-slate-400 mt-0.5 truncate font-mono">
-                                {dateStr}, {timeStr}
+                              <p className="text-xs text-slate-500 mt-1">
+                                Launch Month • No Live Auction Held
                               </p>
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
-                            <span className="text-xs font-bold text-emerald-600 font-mono">
-                              +{formatCurrency(Number(tx.amount || 0))}
-                            </span>
-                            <div className="flex items-center justify-end space-x-1.5 mt-1 text-slate-400">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  triggerHapticFeedback('light');
-                                  setViewingReceiptTx({ tx, member });
-                                }}
-                                className="hover:text-slate-600 cursor-pointer"
-                                title="Share receipt"
-                              >
-                                <Share2 size={13} />
-                              </button>
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Organizer Phase
+                          </span>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Chit Value</p>
+                            <p className="text-xs font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
+                          </div>
+                          <div className="border-l border-slate-200 pl-2.5">
+                            <p className="text-[10px] uppercase font-bold text-brand-600 leading-tight">Organizer Return</p>
+                            <p className="text-xs font-extrabold text-brand-600 mt-0.5 font-mono">{formatCurrency(totalChitVal)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : !currentMonthAuction ? (
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-brand-600 border border-indigo-100 flex items-center justify-center font-bold text-lg shadow-inner">
+                              <Trophy size={20} className="text-brand-600" />
+                            </div>
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <h2 className="text-sm font-bold text-slate-900 leading-none">Month {selectedDashboardMonth} Auction</h2>
+                                <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-600 rounded-md border border-slate-200">Pending</span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Auction Not Held Yet
+                              </p>
                             </div>
                           </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-              </section>
-              {/* END: RecentPaymentsLedgerSection */}
+                        {setActiveTab && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('auctions')}
+                            className="w-full py-2.5 px-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+                          >
+                            <Trophy size={14} />
+                            <span>Open Live Auction Tab</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <div
+                          onClick={handleNavigateToAuctionHistory}
+                          className="cursor-pointer group hover:bg-slate-50/50 -m-1.5 p-1.5 rounded-xl transition-all"
+                          title="Click to view historical auction ledger"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0">
+                                <Trophy size={16} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h3 className="text-sm font-bold font-display text-slate-900 group-hover:text-brand-600 transition-colors truncate">{winnerName}</h3>
+                                  <span className="px-1.5 py-0.2 text-[10px] font-bold font-mono bg-slate-100 text-slate-700 rounded border border-slate-200">
+                                    #{winnerTicketNum}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium truncate">
+                                  <span>Month {selectedDashboardMonth} Winner →</span>
+                                  {winnerPhone && (
+                                    <>
+                                      <span className="text-slate-300">•</span>
+                                      <span className="text-slate-400 font-mono">{winnerPhone}</span>
+                                    </>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            {isSettled ? (
+                              <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                ✓ Disbursed
+                              </span>
+                            ) : isPartial ? (
+                              <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Partial
+                              </span>
+                            ) : (
+                              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                Pending
+                              </span>
+                            )}
+                          </div>
 
-              {/* Card: Live System Activity Feed (Mobile) */}
-              <LiveAuditLogWidget
-                limit={5}
-                onViewFullReport={() => {
-                  if (typeof window !== 'undefined') {
-                    sessionStorage.setItem('cf_reports_subtab', 'system_log');
-                  }
-                  setReportsInitialSubtab('system_log');
-                  if (setActiveTab) setActiveTab('reports');
-                }}
-              />
-            </>
-          )}
-        </div>
-        {/* END: MOBILE VIEW */}
+                          {/* Key Financial Matrix Grid */}
+                          <div className="mt-4 grid grid-cols-3 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                            <div>
+                              <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Discount</p>
+                              <p className="text-xs font-bold text-slate-800 mt-0.5 font-mono">{formatCurrency(winningBid)}</p>
+                            </div>
+                            <div className="border-l border-slate-200 pl-2.5">
+                              <p className="text-[10px] uppercase font-bold text-brand-600 leading-tight">Prize Due</p>
+                              <p className="text-xs font-extrabold text-brand-600 mt-0.5 font-mono">{formatCurrency(netPrizePot)}</p>
+                            </div>
+                            <div className="border-l border-slate-200 pl-2.5">
+                              <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Disbursed</p>
+                              <p className="text-xs font-bold text-slate-600 mt-0.5 font-mono">{formatCurrency(totalPrizeDisbursed)}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action CTA Buttons */}
+                        <div className="mt-3.5 flex items-center space-x-2">
+                          {remainingPrizeDue > 0 ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenDisburseModal(remainingPrizeDue);
+                              }}
+                              className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center space-x-1.5 transition-colors active:scale-95 cursor-pointer"
+                            >
+                              <Banknote size={14} />
+                              <span>Disburse Prize ({formatCurrency(remainingPrizeDue)})</span>
+                            </button>
+                          ) : (
+                            <div className="flex-1 text-center py-2 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-200">
+                              ✓ Prize Settled
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSharePayoutWhatsApp(
+                                activeGroup,
+                                winnerName,
+                                winnerPhone,
+                                selectedDashboardMonth,
+                                netPrizePot,
+                                winningBid,
+                                totalPrizeDisbursed,
+                                remainingPrizeDue,
+                                monthPayoutTxs[0]?.wallet_type?.replace(/_/g, ' ')
+                              );
+                            }}
+                            aria-label="Share WhatsApp Receipt"
+                            className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-700 flex items-center justify-center transition-colors active:scale-95 shadow-xs cursor-pointer"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12.031 2C6.495 2 2 6.495 2 12.031c0 1.97.57 3.81 1.558 5.372L2.5 22l4.808-1.047a9.98 9.98 0 0 0 4.723 1.18c5.536 0 10.031-4.496 10.031-10.032S17.567 2 12.031 2zm5.727 14.198c-.24.673-1.393 1.285-1.922 1.343-.497.054-1.127.08-3.266-.807-2.734-1.135-4.498-3.906-4.636-4.088-.137-.182-1.1-1.464-1.1-2.793 0-1.328.694-1.982.942-2.247.248-.266.541-.332.723-.332.183 0 .365.002.525.01.17.009.398-.065.621.472.23.555.787 1.92.855 2.06.068.14.113.303.023.483-.09.18-.135.292-.27.45-.135.158-.284.354-.405.474-.136.136-.278.283-.12.553.158.271.7 1.155 1.503 1.868 1.033.918 1.905 1.203 2.176 1.339.27.135.43.113.589-.069.158-.18.677-.788.857-1.059.18-.27.36-.226.602-.136.241.09 1.536.724 1.799.855.263.131.439.196.502.304.064.108.064.629-.176 1.302z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                  {/* END: CurrentMonthAuctionWinnerCard */}
+
+                  {/* BEGIN: MemberDuesSection */}
+                  <section className="space-y-3" data-purpose="member-dues-section">
+                    {/* Section Controls */}
+                    <div className="flex items-center justify-between pt-1">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-1.5">
+                          <span>Collection Status</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                            {pendingList.length} Pending
+                          </span>
+                        </h3>
+                        <p className="text-[11px] text-slate-500">Month {selectedDashboardMonth} installments breakdown</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRemindModalTab('group');
+                          setShowRemindModal(true);
+                        }}
+                        className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center space-x-1 transition-colors cursor-pointer"
+                      >
+                        <span>Remind All</span>
+                        <ArrowRight size={14} />
+                      </button>
+                    </div>
+
+                    {/* Filter Chips with Paid count included */}
+                    <div className="flex items-center space-x-2 text-xs overflow-x-auto scrollbar-none py-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setMemberRosterFilter('all')}
+                        className={`px-3.5 py-1 rounded-lg font-semibold flex-shrink-0 transition-colors cursor-pointer ${memberRosterFilter === 'all'
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                      >
+                        All ({memberStats.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemberRosterFilter('unpaid')}
+                        className={`px-3 py-1 rounded-lg font-medium flex-shrink-0 transition-colors cursor-pointer ${memberRosterFilter === 'unpaid'
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                      >
+                        Unpaid ({unpaidCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemberRosterFilter('partial')}
+                        className={`px-3 py-1 rounded-lg font-medium flex-shrink-0 transition-colors cursor-pointer ${memberRosterFilter === 'partial'
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                      >
+                        Partial ({partialCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemberRosterFilter('paid')}
+                        className={`px-3 py-1 rounded-lg font-medium flex-shrink-0 transition-colors cursor-pointer ${memberRosterFilter === 'paid'
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'
+                          }`}
+                      >
+                        Paid ({paidList.length})
+                      </button>
+                    </div>
+
+                    {/* Member Dues Cards List */}
+                    <div className="space-y-2.5">
+                      {filteredAndSortedMembers.length === 0 ? (
+                        <div className="p-6 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
+                          No members match the current filter
+                        </div>
+                      ) : (
+                        filteredAndSortedMembers.map((member) => {
+                          const isPaid = member.status === 'paid';
+                          const isPartial = member.status === 'partial';
+                          const isUnpaid = member.status === 'unpaid';
+                          const avatarLetter = (member.name || 'M').charAt(0).toUpperCase();
+
+                          return (
+                            <div
+                              key={member.id}
+                              className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-card hover:border-slate-300 transition-all space-y-2.5"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3 min-w-0">
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-xs shrink-0 ${isPaid
+                                    ? 'bg-emerald-50 border border-emerald-100 text-emerald-600'
+                                    : isPartial
+                                      ? 'bg-amber-50 border border-amber-100 text-amber-600'
+                                      : 'bg-indigo-50 border border-indigo-100 text-brand-600'
+                                    }`}>
+                                    {avatarLetter}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center space-x-1.5 flex-wrap">
+                                      <h4 className="text-xs font-bold text-slate-900 leading-tight truncate">{member.name}</h4>
+                                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">
+                                        #{member.ticket}
+                                      </span>
+                                      {member.hasWon && (
+                                        <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-50 text-amber-600 border border-amber-200 rounded">
+                                          🏆 Winner
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center space-x-2 mt-1 flex-wrap">
+                                      {isPaid ? (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                          PAID
+                                        </span>
+                                      ) : isPartial ? (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                                          PARTIAL
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-100">
+                                          UNPAID
+                                        </span>
+                                      )}
+                                      <span className="text-xs font-extrabold text-slate-900 font-mono">
+                                        Due: {formatCurrency(member.remaining)}
+                                      </span>
+                                      {isPartial && (
+                                        <span className="text-[10px] text-emerald-600 font-semibold font-mono">
+                                          (Paid: {formatCurrency(member.paid)})
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center space-x-1.5 shrink-0">
+                                  {canBroadcastReminders && !isPaid && (
+                                    <button
+                                      type="button"
+                                      data-action="communication:due_alerts"
+                                      onClick={() => {
+                                        triggerHapticFeedback('light');
+                                        const msg = encodeURIComponent(
+                                          `*CHIT INSTALLMENT DUE REMINDER* 🔔\n` +
+                                          `Group: ${activeGroup?.name}\n` +
+                                          `Month: Month ${selectedDashboardMonth} (${getDashboardMonthLabel(activeGroup, selectedDashboardMonth)})\n` +
+                                          `Ticket: #${member.ticket}\n` +
+                                          `Subscriber: ${member.name}\n` +
+                                          `Pending Due: ${formatCurrency(member.remaining)}\n\n` +
+                                          `Kindly clear your installment due for this month. Thank you! 🙏`
+                                        );
+                                        const cleanPhone = normalizePhone(member.phone);
+                                        const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${msg}` : `https://wa.me/?text=${msg}`;
+                                        window.open(url, '_blank');
+                                      }}
+                                      className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                                      title="Send Reminder"
+                                    >
+                                      <Send size={14} />
+                                    </button>
+                                  )}
+                                  {canCollect && (
+                                    <button
+                                      type="button"
+                                      data-action="members:collect"
+                                      onClick={() => handleOpenRecordPayment(member, activeDashboardGroupId, selectedDashboardMonth)}
+                                      className="px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center space-x-1 shadow-xs cursor-pointer"
+                                    >
+                                      <span>Record</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Progress indication for partial member */}
+                              {isPartial && (
+                                <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
+                                  <span>
+                                    {Math.round((member.paid / (member.effectiveDue || 1)) * 100)}% Completed
+                                  </span>
+                                  <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                    <div
+                                      className="bg-amber-500 h-full rounded-full"
+                                      style={{ width: `${Math.round((member.paid / (member.effectiveDue || 1)) * 100)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </section>
+                  {/* END: MemberDuesSection */}
+
+                  {/* BEGIN: RecentPaymentsLedgerSection */}
+                  <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="ledger-preview">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-50 text-brand-600 flex items-center justify-center shadow-xs">
+                          <Receipt size={16} />
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-bold text-slate-900 leading-tight">Payment Ledger</h3>
+                          <p className="text-[10px] text-slate-400">
+                            {currentMonthTransactions.length} recent {currentMonthTransactions.length === 1 ? 'transaction' : 'transactions'} recorded
+                          </p>
+                        </div>
+                      </div>
+                      {setActiveTab && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (typeof window !== 'undefined') {
+                                sessionStorage.setItem('cf_reports_subtab', 'receipts');
+                              }
+                              setActiveTab('reports');
+                            }}
+                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                            title="Search and view all official receipts in Reports Center"
+                          >
+                            <Receipt size={12} />
+                            <span>Receipts Vault</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('reports')}
+                            className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                          >
+                            View All
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ledger Item Cards List */}
+                    <div className="space-y-2">
+                      {currentMonthTransactions.length === 0 ? (
+                        <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center text-xs text-slate-400">
+                          No payment records for Month {selectedDashboardMonth} yet
+                        </div>
+                      ) : (
+                        currentMonthTransactions.slice(0, 5).map((tx) => {
+                          const member = dashboardGroupMembers.find(m => m.profileId === tx.profile_id || m.id === tx.group_member_id);
+                          const memberName = member?.name || 'Subscriber';
+                          const ticketNum = member?.ticket || '?';
+                          const walletLabel = tx.wallet_type === 'cash_in_hand'
+                            ? 'Cash in Hand'
+                            : tx.wallet_type === 'kishor_bank'
+                              ? 'Kishor Bank'
+                              : tx.wallet_type === 'dad_bank'
+                                ? "Dad's Bank"
+                                : "Mom's Bank";
+                          const dateStr = new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                          const timeStr = new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                          return (
+                            <div
+                              key={tx.id}
+                              className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center justify-between hover:bg-slate-100/70 transition-all"
+                            >
+                              <div className="flex items-center space-x-3 min-w-0">
+                                <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center shrink-0 font-mono">
+                                  #{ticketNum}
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="flex items-center space-x-1.5">
+                                    <h4 className="text-xs font-bold text-slate-800 truncate">{memberName}</h4>
+                                    <span className="text-[9px] px-1 py-0.5 bg-slate-200/70 text-slate-700 rounded font-semibold shrink-0">
+                                      {walletLabel}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 mt-0.5 truncate font-mono">
+                                    {dateStr}, {timeStr}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="text-xs font-bold text-emerald-600 font-mono">
+                                  +{formatCurrency(Number(tx.amount || 0))}
+                                </span>
+                                <div className="flex items-center justify-end space-x-1.5 mt-1 text-slate-400">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      triggerHapticFeedback('light');
+                                      setViewingReceiptTx({ tx, member });
+                                    }}
+                                    className="hover:text-slate-600 cursor-pointer"
+                                    title="Share receipt"
+                                  >
+                                    <Share2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </section>
+                  {/* END: RecentPaymentsLedgerSection */}
+
+                  {/* Card: Live System Activity Feed (Mobile) */}
+                  <LiveAuditLogWidget
+                    limit={5}
+                    onViewFullReport={() => {
+                      if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('cf_reports_subtab', 'system_log');
+                      }
+                      setReportsInitialSubtab('system_log');
+                      if (setActiveTab) setActiveTab('reports');
+                    }}
+                  />
+                </>
+              )}
+            </div>
+            {/* END: MOBILE VIEW */}
 
           </div>
         );
       }
 
-    case 'auctions':
-      return <LiveAuctionEngine />;
+      case 'auctions':
+        return <LiveAuctionEngine />;
 
-    case 'cash':
-      return <CashVaultLedger />;
+      case 'cash':
+        return <CashVaultLedger />;
 
-    case 'members':
-      return (
-        <MemberMatrix 
-          onOpenAuditLogs={() => {
-            setReportsInitialSubtab('system_log');
-            if (setActiveTab) setActiveTab('reports');
-          }}
-          onAddAuditLog={(desc) => recordSystemAuditLog(desc, 'profiles')} 
-        />
-      );
+      case 'members':
+        return (
+          <MemberMatrix
+            onOpenAuditLogs={() => {
+              setReportsInitialSubtab('system_log');
+              if (setActiveTab) setActiveTab('reports');
+            }}
+            onAddAuditLog={(desc) => recordSystemAuditLog(desc, 'profiles')}
+          />
+        );
 
-    case 'communication':
-      return (
-        <CommunicationBroadcastCenter 
-          onAddAuditLog={(desc) => recordSystemAuditLog(desc, 'chit_groups')}
-        />
-      );
+      case 'communication':
+        return (
+          <CommunicationBroadcastCenter
+            onAddAuditLog={(desc) => recordSystemAuditLog(desc, 'chit_groups')}
+          />
+        );
 
-    case 'reports':
-      return (
-        <ReportsCenter
-          initialSubtab={reportsInitialSubtab}
-          onSubtabChange={(sub) => setReportsInitialSubtab(sub)}
-        />
-      );
+      case 'reports':
+        return (
+          <ReportsCenter
+            initialSubtab={reportsInitialSubtab}
+            onSubtabChange={(sub) => setReportsInitialSubtab(sub)}
+          />
+        );
 
-    case 'users':
-      return (
-        <UserAccessManager 
-          onOpenAuditLogs={() => {
-            setReportsInitialSubtab('system_log');
-            if (setActiveTab) setActiveTab('reports');
-          }}
-          onAddAuditLog={(desc) => recordSystemAuditLog(desc, 'profiles')} 
-        />
-      );
+      case 'users':
+        return (
+          <UserAccessManager
+            onOpenAuditLogs={() => {
+              setReportsInitialSubtab('system_log');
+              if (setActiveTab) setActiveTab('reports');
+            }}
+            onAddAuditLog={(desc) => recordSystemAuditLog(desc, 'profiles')}
+          />
+        );
 
-    case 'settings':
-      return <SettingsManager />;
+      case 'settings':
+        return <SettingsManager />;
 
-    case 'chits': {
-      const selectedWorkspaceGroup = localGroups.find(g => g.id === selectedWorkspaceGroupId);
+      case 'chits': {
+        const selectedWorkspaceGroup = localGroups.find(g => g.id === selectedWorkspaceGroupId);
 
-      // Calculations for Chit Directory
-      const allNonDeletedGroups = localGroups.filter(g => g.status !== 'deleted');
-      const deletedGroups = localGroups.filter(g => g.status === 'deleted');
-      const activeGroupsCount = allNonDeletedGroups.filter(g => g.status === 'active' || (!g.status && g.active)).length;
-      const draftGroupsCount = allNonDeletedGroups.filter(g => g.status === 'draft').length;
-      const completedGroupsCount = allNonDeletedGroups.filter(g => g.status === 'completed').length;
-      const totalCirculatingValue = allNonDeletedGroups.reduce((acc, g) => acc + (Number(g.totalValue) || 0), 0);
-      const totalKaiIruppuCirculating = allNonDeletedGroups.reduce((acc, g) => acc + (Number(g.kaiIruppuPool || g.kai_iruppu_pool) || 0), 0);
-      const totalEnrolledSlotsCount = allNonDeletedGroups.reduce((acc, g) => acc + (Number(g.memberCount || g.duration) || 0), 0);
+        // Calculations for Chit Directory
+        const allNonDeletedGroups = localGroups.filter(g => g.status !== 'deleted');
+        const deletedGroups = localGroups.filter(g => g.status === 'deleted');
+        const activeGroupsCount = allNonDeletedGroups.filter(g => g.status === 'active' || (!g.status && g.active)).length;
+        const draftGroupsCount = allNonDeletedGroups.filter(g => g.status === 'draft').length;
+        const completedGroupsCount = allNonDeletedGroups.filter(g => g.status === 'completed').length;
+        const totalCirculatingValue = allNonDeletedGroups.reduce((acc, g) => acc + (Number(g.totalValue) || 0), 0);
+        const totalKaiIruppuCirculating = allNonDeletedGroups.reduce((acc, g) => acc + (Number(g.kaiIruppuPool || g.kai_iruppu_pool) || 0), 0);
+        const totalEnrolledSlotsCount = allNonDeletedGroups.reduce((acc, g) => acc + (Number(g.memberCount || g.duration) || 0), 0);
 
-      const filteredGroups = localGroups.filter(g => {
-        if (g.status === 'deleted') return false;
-        if (groupFilter === 'draft') return g.status === 'draft';
-        if (groupFilter === 'completed') return g.status === 'completed';
-        if (groupFilter === 'active') return g.status === 'active' || (!g.status && g.active);
-        return true;
-      }).filter(g => {
-        if (!chitsSearchQuery.trim()) return true;
-        return g.name.toLowerCase().includes(chitsSearchQuery.toLowerCase());
-      });
+        const filteredGroups = localGroups.filter(g => {
+          if (g.status === 'deleted') return false;
+          if (groupFilter === 'draft') return g.status === 'draft';
+          if (groupFilter === 'completed') return g.status === 'completed';
+          if (groupFilter === 'active') return g.status === 'active' || (!g.status && g.active);
+          return true;
+        }).filter(g => {
+          if (!chitsSearchQuery.trim()) return true;
+          return g.name.toLowerCase().includes(chitsSearchQuery.toLowerCase());
+        });
 
-      const filteredDeletedGroups = deletedGroups.filter(g => {
-        if (!chitsSearchQuery.trim()) return true;
-        return g.name.toLowerCase().includes(chitsSearchQuery.toLowerCase());
-      });
+        const filteredDeletedGroups = deletedGroups.filter(g => {
+          if (!chitsSearchQuery.trim()) return true;
+          return g.name.toLowerCase().includes(chitsSearchQuery.toLowerCase());
+        });
 
-      return (
-        <div className="space-y-4 sm:space-y-6">
-          
-          {/* ═══════════════════════════════════════════════════════════════════
+        return (
+          <div className="space-y-4 sm:space-y-6">
+
+            {/* ═══════════════════════════════════════════════════════════════════
               1. CHIT GROUP WORKSPACE VIEW
               ═══════════════════════════════════════════════════════════════════ */}
-          {selectedWorkspaceGroupId && selectedWorkspaceGroup && !showWizard ? (
-            <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200">
-              
-              {/* Workspace Top Navigation Bar */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 shadow-subtle flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setSelectedWorkspaceGroupId(null);
-                    }}
-                    className="border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs w-fit active:scale-95 cursor-pointer"
-                  >
-                    <ArrowLeft size={14} className="text-slate-500" />
-                    <span>Back to Groups</span>
-                  </button>
-                  <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${
-                      selectedWorkspaceGroup.status === 'draft' ? 'bg-amber-500' : selectedWorkspaceGroup.status === 'completed' ? 'bg-purple-500' : 'bg-emerald-500 animate-pulse'
-                    }`}></span>
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate max-w-[200px] sm:max-w-none">{selectedWorkspaceGroup.name}</h3>
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
-                      selectedWorkspaceGroup.status === 'draft'
-                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                        : selectedWorkspaceGroup.status === 'completed'
-                          ? 'bg-purple-50 text-purple-700 border-purple-200'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}>
-                      {selectedWorkspaceGroup.status ? selectedWorkspaceGroup.status.toUpperCase() : 'ACTIVE'}
-                    </span>
-                    <span className="text-[10px] font-bold bg-brand-50 text-brand-700 border border-brand-200 px-2 py-0.5 rounded-full font-mono">
-                      Month {selectedWorkspaceGroup.currentMonth} of {selectedWorkspaceGroup.duration}
-                    </span>
-                  </div>
-                </div>
+            {selectedWorkspaceGroupId && selectedWorkspaceGroup && !showWizard ? (
+              <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200">
 
-                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                  <button
-                    type="button"
-                    disabled={!canEditChit}
-                    onClick={() => canEditChit && openEditGroupModal(selectedWorkspaceGroup)}
-                    className={`border border-slate-200 bg-white text-slate-700 font-semibold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs ${
-                      canEditChit ? 'hover:bg-slate-50 active:scale-95 cursor-pointer' : 'opacity-60 cursor-not-allowed'
-                    }`}
-                  >
-                    <Edit3 size={13} className="text-slate-500" />
-                    <span>Edit Details</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canDeleteChit}
-                    onClick={() => canDeleteChit && openSoftDeleteModal(selectedWorkspaceGroup)}
-                    className={`border border-rose-200 bg-rose-50 text-rose-700 font-semibold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs ${
-                      canDeleteChit ? 'hover:bg-rose-100 active:scale-95 cursor-pointer' : 'opacity-60 cursor-not-allowed'
-                    }`}
-                    title={canDeleteChit ? "Move group to Recycle Bin" : "Restricted to Administrators"}
-                  >
-                    <Trash2 size={13} className="text-rose-600" />
-                    <span>Move to Bin</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Cycle Stepper / Timeline Anatomy (Inspired by Design Spec Section 3) */}
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-subtle space-y-3">
-                <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                      <CalendarDays size={14} className="text-brand-600" /> Cycle Timeline:
-                    </span>
-                    <span className="text-xs font-semibold text-slate-700">{selectedWorkspaceGroup.name}</span>
-                  </div>
-                  <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Next scheduled auction: </span>
-                    <strong className="font-semibold text-slate-800">{getGroupAuctionDate(selectedWorkspaceGroup.id).display}</strong>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto pb-2 scrollbar-none">
-                  <div className="flex items-center gap-2 min-w-max">
-                    {Array.from({ length: selectedWorkspaceGroup.duration + 1 }, (_, i) => i).map((m, idx) => {
-                      const isM0 = m === 0;
-                      const isCurrent = m === selectedWorkspaceGroup.currentMonth;
-                      const isCompleted = m < selectedWorkspaceGroup.currentMonth;
-                      const isFinale = m === selectedWorkspaceGroup.duration;
-
-                      let label = isM0 ? 'M0 Launch' : isFinale ? `M${m} (Finale)` : isCurrent ? `M${m} (Current)` : `M${m}`;
-                      if (m === 1 && !isCurrent && !isCompleted) label = 'M1 (1st Auction)';
-
-                      return (
-                        <React.Fragment key={m}>
-                          {idx > 0 && <ChevronRight size={12} className="text-slate-300 shrink-0" />}
-                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 ${
-                            isCompleted
-                              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                              : isCurrent
-                                ? 'bg-[#4338CA] text-white shadow-md shadow-indigo-500/20 ring-2 ring-indigo-200'
-                                : 'bg-slate-50 border border-slate-200 text-slate-400'
-                          }`}>
-                            {isCompleted ? (
-                              <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
-                            ) : isCurrent ? (
-                              <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0"></span>
-                            ) : null}
-                            <span>{label}</span>
-                          </div>
-                        </React.Fragment>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Group Key Metric Statistics Cards (2x2 on mobile, 4 on desktop) */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Pool Value</span>
-                    <span className="text-xl sm:text-2xl font-black text-slate-900 mt-1 block font-mono tracking-tight truncate">
-                      {formatCurrency(selectedWorkspaceGroup.totalValue)}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-500 mt-2 block font-medium">
-                    {selectedWorkspaceGroup.duration} Tickets Enrolled
-                  </span>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Monthly Installment</span>
-                    <span className="text-xl sm:text-2xl font-black text-brand-700 mt-1 block font-mono tracking-tight truncate">
-                      {formatCurrency(selectedWorkspaceGroup.totalValue / (selectedWorkspaceGroup.duration || 1))}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-500 mt-2 block font-medium">
-                    Per Member / Month
-                  </span>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Accumulated Pool</span>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">Kai Iruppu</span>
-                    </div>
-                    <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-1 block font-mono tracking-tight truncate">
-                      {formatCurrency(selectedWorkspaceGroup.kaiIruppuPool || 0)}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-emerald-600 mt-2 block font-medium">
-                    Discounts Carried Forward
-                  </span>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Scheduled Auction</span>
-                    <span className="text-sm sm:text-base font-bold text-slate-900 mt-1 block truncate">
-                      {getGroupAuctionDate(selectedWorkspaceGroup.id).display}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setScheduleModalGroup(selectedWorkspaceGroup)}
-                    className="text-[11px] font-semibold text-brand-600 hover:text-brand-700 hover:underline mt-2 block text-left cursor-pointer"
-                  >
-                    Configure Schedule →
-                  </button>
-                </div>
-              </div>
-
-              {/* Month 0 / Launch Status Banner */}
-              {selectedWorkspaceGroup.currentMonth === 0 && (
-                <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-subtle">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                      <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">
-                        Month 0: Launch Month — Organizer Profit Phase
-                      </h4>
-                    </div>
-                    <p className="text-xs text-amber-800 leading-relaxed">
-                      All {selectedWorkspaceGroup.duration} member installments are pooled and allocated directly to the Organizer as Organizer Profit ({formatCurrency(selectedWorkspaceGroup.totalValue)}). No live auction is held in Month 0.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={!canLaunchMonth0}
-                    onClick={() => canLaunchMonth0 && setMonth0LaunchModalGroup(selectedWorkspaceGroup)}
-                    className={`text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0 w-full sm:w-auto ${
-                      canLaunchMonth0 ? 'bg-amber-600 hover:bg-amber-700 active:scale-95 cursor-pointer' : 'bg-amber-600/60 opacity-75 cursor-not-allowed'
-                    }`}
-                  >
-                    <Rocket size={14} />
-                    <span>Roll to M1 (1st Auction)</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Live Auction Countdown & Schedule Banner */}
-              <AuctionCountdownBanner
-                groupId={selectedWorkspaceGroup.id}
-                groupName={selectedWorkspaceGroup.name}
-                currentMonth={selectedWorkspaceGroup.currentMonth}
-                durationMonths={selectedWorkspaceGroup.duration}
-                auctionDayOfMonth={selectedWorkspaceGroup.auctionDayOfMonth}
-                auctionTime={selectedWorkspaceGroup.auctionTime}
-                nextAuctionDate={selectedWorkspaceGroup.nextAuctionDate}
-                nextAuctionTime={selectedWorkspaceGroup.nextAuctionTime}
-                startDate={selectedWorkspaceGroup.startDate}
-                allowConfigure={true}
-                onScheduleUpdated={fetchGroups}
-                compact={false}
-              />
-
-              {/* Enrolled Member Ticket Roster Matrix */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-subtle">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-3">
-                  <div>
-                    <h4 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                      <Users size={18} className="text-brand-600" />
-                      Enrolled Ticket Matrix
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Live status of assigned tickets and auction winning eligibility
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
+                {/* Workspace Top Navigation Bar */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 shadow-subtle flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3">
                     <button
                       type="button"
                       onClick={() => {
                         triggerHapticFeedback('light');
-                        setPrintChecklistGroup(selectedWorkspaceGroup);
+                        setSelectedWorkspaceGroupId(null);
                       }}
-                      className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                      title="Print monthly payment checklist sheet / PDF"
+                      className="border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs w-fit active:scale-95 cursor-pointer"
                     >
-                      <Printer size={13} className="text-slate-500" />
-                      <span>Print Checklist</span>
+                      <ArrowLeft size={14} className="text-slate-500" />
+                      <span>Back to Groups</span>
                     </button>
+                    <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${selectedWorkspaceGroup.status === 'draft' ? 'bg-amber-500' : selectedWorkspaceGroup.status === 'completed' ? 'bg-purple-500' : 'bg-emerald-500 animate-pulse'
+                        }`}></span>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate max-w-[200px] sm:max-w-none">{selectedWorkspaceGroup.name}</h3>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${selectedWorkspaceGroup.status === 'draft'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : selectedWorkspaceGroup.status === 'completed'
+                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
+                        {selectedWorkspaceGroup.status ? selectedWorkspaceGroup.status.toUpperCase() : 'ACTIVE'}
+                      </span>
+                      <span className="text-[10px] font-bold bg-brand-50 text-brand-700 border border-brand-200 px-2 py-0.5 rounded-full font-mono">
+                        Month {selectedWorkspaceGroup.currentMonth} of {selectedWorkspaceGroup.duration}
+                      </span>
+                    </div>
+                  </div>
 
-                    {canWithdrawProfit && (
+                  <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                    <button
+                      type="button"
+                      disabled={!canEditChit}
+                      onClick={() => canEditChit && openEditGroupModal(selectedWorkspaceGroup)}
+                      className={`border border-slate-200 bg-white text-slate-700 font-semibold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs ${canEditChit ? 'hover:bg-slate-50 active:scale-95 cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                        }`}
+                    >
+                      <Edit3 size={13} className="text-slate-500" />
+                      <span>Edit Details</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canDeleteChit}
+                      onClick={() => canDeleteChit && openSoftDeleteModal(selectedWorkspaceGroup)}
+                      className={`border border-rose-200 bg-rose-50 text-rose-700 font-semibold text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-2xs ${canDeleteChit ? 'hover:bg-rose-100 active:scale-95 cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                        }`}
+                      title={canDeleteChit ? "Move group to Recycle Bin" : "Restricted to Administrators"}
+                    >
+                      <Trash2 size={13} className="text-rose-600" />
+                      <span>Move to Bin</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cycle Stepper / Timeline Anatomy (Inspired by Design Spec Section 3) */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-subtle space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <CalendarDays size={14} className="text-brand-600" /> Cycle Timeline:
+                      </span>
+                      <span className="text-xs font-semibold text-slate-700">{selectedWorkspaceGroup.name}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span>Next scheduled auction: </span>
+                      <strong className="font-semibold text-slate-800">{getGroupAuctionDate(selectedWorkspaceGroup.id).display}</strong>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto pb-2 scrollbar-none">
+                    <div className="flex items-center gap-2 min-w-max">
+                      {Array.from({ length: selectedWorkspaceGroup.duration + 1 }, (_, i) => i).map((m, idx) => {
+                        const isM0 = m === 0;
+                        const isCurrent = m === selectedWorkspaceGroup.currentMonth;
+                        const isCompleted = m < selectedWorkspaceGroup.currentMonth;
+                        const isFinale = m === selectedWorkspaceGroup.duration;
+
+                        let label = isM0 ? 'M0 Launch' : isFinale ? `M${m} (Finale)` : isCurrent ? `M${m} (Current)` : `M${m}`;
+                        if (m === 1 && !isCurrent && !isCompleted) label = 'M1 (1st Auction)';
+
+                        return (
+                          <React.Fragment key={m}>
+                            {idx > 0 && <ChevronRight size={12} className="text-slate-300 shrink-0" />}
+                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 ${isCompleted
+                              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                              : isCurrent
+                                ? 'bg-[#4338CA] text-white shadow-md shadow-indigo-500/20 ring-2 ring-indigo-200'
+                                : 'bg-slate-50 border border-slate-200 text-slate-400'
+                              }`}>
+                              {isCompleted ? (
+                                <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                              ) : isCurrent ? (
+                                <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0"></span>
+                              ) : null}
+                              <span>{label}</span>
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Group Key Metric Statistics Cards (2x2 on mobile, 4 on desktop) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Pool Value</span>
+                      <span className="text-xl sm:text-2xl font-black text-slate-900 mt-1 block font-mono tracking-tight truncate">
+                        {formatCurrency(selectedWorkspaceGroup.totalValue)}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-500 mt-2 block font-medium">
+                      {selectedWorkspaceGroup.duration} Tickets Enrolled
+                    </span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Monthly Installment</span>
+                      <span className="text-xl sm:text-2xl font-black text-brand-700 mt-1 block font-mono tracking-tight truncate">
+                        {formatCurrency(selectedWorkspaceGroup.totalValue / (selectedWorkspaceGroup.duration || 1))}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-500 mt-2 block font-medium">
+                      Per Member / Month
+                    </span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Accumulated Pool</span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">Kai Iruppu</span>
+                      </div>
+                      <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-1 block font-mono tracking-tight truncate">
+                        {formatCurrency(selectedWorkspaceGroup.kaiIruppuPool || 0)}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-emerald-600 mt-2 block font-medium">
+                      Discounts Carried Forward
+                    </span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-subtle flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Scheduled Auction</span>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 mt-1 block truncate">
+                        {getGroupAuctionDate(selectedWorkspaceGroup.id).display}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setScheduleModalGroup(selectedWorkspaceGroup)}
+                      className="text-[11px] font-semibold text-brand-600 hover:text-brand-700 hover:underline mt-2 block text-left cursor-pointer"
+                    >
+                      Configure Schedule →
+                    </button>
+                  </div>
+                </div>
+
+                {/* Month 0 / Launch Status Banner */}
+                {selectedWorkspaceGroup.currentMonth === 0 && (
+                  <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-subtle">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">
+                          Month 0: Launch Month — Organizer Profit Phase
+                        </h4>
+                      </div>
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        All {selectedWorkspaceGroup.duration} member installments are pooled and allocated directly to the Organizer as Organizer Profit ({formatCurrency(selectedWorkspaceGroup.totalValue)}). No live auction is held in Month 0.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canLaunchMonth0}
+                      onClick={() => canLaunchMonth0 && setMonth0LaunchModalGroup(selectedWorkspaceGroup)}
+                      className={`text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0 w-full sm:w-auto ${canLaunchMonth0 ? 'bg-amber-600 hover:bg-amber-700 active:scale-95 cursor-pointer' : 'bg-amber-600/60 opacity-75 cursor-not-allowed'
+                        }`}
+                    >
+                      <Rocket size={14} />
+                      <span>Roll to M1 (1st Auction)</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Live Auction Countdown & Schedule Banner */}
+                <AuctionCountdownBanner
+                  groupId={selectedWorkspaceGroup.id}
+                  groupName={selectedWorkspaceGroup.name}
+                  currentMonth={selectedWorkspaceGroup.currentMonth}
+                  durationMonths={selectedWorkspaceGroup.duration}
+                  auctionDayOfMonth={selectedWorkspaceGroup.auctionDayOfMonth}
+                  auctionTime={selectedWorkspaceGroup.auctionTime}
+                  nextAuctionDate={selectedWorkspaceGroup.nextAuctionDate}
+                  nextAuctionTime={selectedWorkspaceGroup.nextAuctionTime}
+                  startDate={selectedWorkspaceGroup.startDate}
+                  allowConfigure={true}
+                  onScheduleUpdated={fetchGroups}
+                  compact={false}
+                />
+
+                {/* Enrolled Member Ticket Roster Matrix */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-subtle">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                        <Users size={18} className="text-brand-600" />
+                        Enrolled Ticket Matrix
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Live status of assigned tickets and auction winning eligibility
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
                         type="button"
                         onClick={() => {
                           triggerHapticFeedback('light');
-                          setWithdrawProfitGroupId(selectedWorkspaceGroup.id);
-                          setShowWithdrawProfitModal(true);
+                          setPrintChecklistGroup(selectedWorkspaceGroup);
                         }}
-                        className="border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        title="Withdraw Month 0 launch profits from rotational cash box"
+                        className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                        title="Print monthly payment checklist sheet / PDF"
                       >
-                        <Crown size={13} className="text-amber-600" />
-                        <span>Take Profit</span>
+                        <Printer size={13} className="text-slate-500" />
+                        <span>Print Checklist</span>
                       </button>
-                    )}
 
-                    <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200">
-                      Total: {workspaceMembers.length} / {selectedWorkspaceGroup.duration} Tickets
-                    </span>
+                      {canWithdrawProfit && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            triggerHapticFeedback('light');
+                            setWithdrawProfitGroupId(selectedWorkspaceGroup.id);
+                            setShowWithdrawProfitModal(true);
+                          }}
+                          className="border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                          title="Withdraw Month 0 launch profits from rotational cash box"
+                        >
+                          <Crown size={13} className="text-amber-600" />
+                          <span>Take Profit</span>
+                        </button>
+                      )}
+
+                      <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200">
+                        Total: {workspaceMembers.length} / {selectedWorkspaceGroup.duration} Tickets
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                {/* Filter and Search Bar for Workspace Members */}
-                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5">
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold w-fit">
-                    <button
-                      type="button"
-                      onClick={() => setWorkspaceMemberFilter('all')}
-                      className={`px-3 py-1 rounded-lg transition-all ${
-                        workspaceMemberFilter === 'all'
+                  {/* Filter and Search Bar for Workspace Members */}
+                  <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5">
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold w-fit">
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceMemberFilter('all')}
+                        className={`px-3 py-1 rounded-lg transition-all ${workspaceMemberFilter === 'all'
                           ? 'bg-white text-slate-900 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      All ({workspaceMembers.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWorkspaceMemberFilter('eligible')}
-                      className={`px-3 py-1 rounded-lg transition-all ${
-                        workspaceMemberFilter === 'eligible'
+                          }`}
+                      >
+                        All ({workspaceMembers.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceMemberFilter('eligible')}
+                        className={`px-3 py-1 rounded-lg transition-all ${workspaceMemberFilter === 'eligible'
                           ? 'bg-white text-emerald-800 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Eligible ({workspaceMembers.filter(m => !m.hasWon).length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWorkspaceMemberFilter('won')}
-                      className={`px-3 py-1 rounded-lg transition-all ${
-                        workspaceMemberFilter === 'won'
+                          }`}
+                      >
+                        Eligible ({workspaceMembers.filter(m => !m.hasWon).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceMemberFilter('won')}
+                        className={`px-3 py-1 rounded-lg transition-all ${workspaceMemberFilter === 'won'
                           ? 'bg-white text-amber-800 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Won ({workspaceMembers.filter(m => m.hasWon).length})
-                    </button>
+                          }`}
+                      >
+                        Won ({workspaceMembers.filter(m => m.hasWon).length})
+                      </button>
+                    </div>
+
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search member or ticket..."
+                        value={workspaceMemberSearch}
+                        onChange={(e) => setWorkspaceMemberSearch(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 w-full sm:w-56"
+                      />
+                      {workspaceMemberSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setWorkspaceMemberSearch('')}
+                          className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
+                  {loadingWorkspaceMembers ? (
+                    <div className="py-12 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                      <RefreshCw size={14} className="animate-spin text-brand-600" />
+                      <span>Loading enrolled ticket matrix from Supabase...</span>
+                    </div>
+                  ) : workspaceMembers.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                      No individual member tickets linked to this group yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {workspaceMembers
+                        .filter(m => {
+                          if (workspaceMemberFilter === 'eligible') return !m.hasWon;
+                          if (workspaceMemberFilter === 'won') return m.hasWon;
+                          return true;
+                        })
+                        .filter(m => {
+                          if (!workspaceMemberSearch.trim()) return true;
+                          const q = workspaceMemberSearch.toLowerCase();
+                          return (m.name || '').toLowerCase().includes(q) ||
+                            String(m.ticket).includes(q) ||
+                            (m.phone || '').includes(q);
+                        })
+                        .map((member) => {
+                          const monogram = (member.name || 'S').trim().charAt(0).toUpperCase();
+
+                          return (
+                            <div
+                              key={member.id}
+                              className={`p-3.5 sm:p-4 rounded-2xl border transition-all space-y-2.5 ${member.hasWon
+                                ? 'bg-slate-50/70 border-slate-200/80'
+                                : 'bg-white border-slate-200/80 shadow-subtle hover:border-brand-300'
+                                }`}
+                            >
+                              <div className="flex justify-between items-start gap-2">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${member.hasWon
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                    : 'bg-blue-100 text-blue-700 border border-blue-200'
+                                    }`}>
+                                    {monogram}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <strong className="text-sm font-bold text-slate-900 block truncate max-w-[140px] sm:max-w-[160px]">
+                                        {member.name}
+                                      </strong>
+                                      <span className="text-[11px] font-mono font-bold text-slate-400">
+                                        #{member.ticket}
+                                      </span>
+                                    </div>
+                                    <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate">
+                                      <Phone size={10} className="shrink-0 text-slate-400" />
+                                      <span>{member.phone || 'No phone'}</span>
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {member.hasWon ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
+                                    <Trophy size={10} className="text-amber-600" />
+                                    <span>Won</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                    <CheckCircle2 size={10} className="text-emerald-600" />
+                                    <span>Eligible</span>
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Sub-status pills for split ticket or custom installments */}
+                              {(member.splitPool || member.customInstallment || member.exitMonth) && (
+                                <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-100 text-[10px]">
+                                  {member.splitPool && (
+                                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200">
+                                      Split Ticket ({member.splitPool.length} payers)
+                                    </span>
+                                  )}
+                                  {member.customInstallment && (
+                                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold border border-slate-200">
+                                      Custom: {formatCurrency(member.customInstallment)}
+                                    </span>
+                                  )}
+                                  {member.exitMonth && (
+                                    <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 font-semibold border border-rose-200">
+                                      Exits Month {member.exitMonth}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            ) : !showWizard ? (
+              /* ═══════════════════════════════════════════════════════════════════
+                 2. CHITS DIRECTORY VIEW (DESKTOP & MOBILE FINTECH EXPERIENCE)
+                 ═══════════════════════════════════════════════════════════════════ */
+              <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
+
+                {/* ─────────────────────────────────────────────────────────────
+                  MOBILE APP BAR (NATIVE ANDROID FINTECH APP HEADER)
+                  ───────────────────────────────────────────────────────────── */}
+                <div className="block lg:hidden bg-white border border-slate-200/80 rounded-3xl p-4 shadow-subtle space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-brand-700 to-brand-500 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-brand-500/20">
+                        <Briefcase size={18} />
+                      </div>
+                      <div>
+                        <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Chit Groups</h2>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          {activeGroupsCount} Active Pools · <strong className="text-brand-700 font-mono">{formatCurrency(totalCirculatingValue)}</strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    {canCreateChit && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHapticFeedback('light');
+                          setShowWizard(true);
+                        }}
+                        className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1 active:scale-95 cursor-pointer"
+                      >
+                        <Plus size={14} />
+                        <span>New Chit</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Mobile Search Input */}
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Search member or ticket..."
-                      value={workspaceMemberSearch}
-                      onChange={(e) => setWorkspaceMemberSearch(e.target.value)}
-                      className="bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 w-full sm:w-56"
+                      placeholder="Search chit groups..."
+                      value={chitsSearchQuery}
+                      onChange={(e) => setChitsSearchQuery(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 transition-colors"
                     />
-                    {workspaceMemberSearch && (
+                    {chitsSearchQuery && (
                       <button
                         type="button"
-                        onClick={() => setWorkspaceMemberSearch('')}
-                        className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                        onClick={() => setChitsSearchQuery('')}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
                       >
                         <X size={12} />
                       </button>
@@ -5977,271 +6153,192 @@ Thank you for your prompt payment! 🙏`;
                   </div>
                 </div>
 
-                {loadingWorkspaceMembers ? (
-                  <div className="py-12 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                    <RefreshCw size={14} className="animate-spin text-brand-600" />
-                    <span>Loading enrolled ticket matrix from Supabase...</span>
-                  </div>
-                ) : workspaceMembers.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                    No individual member tickets linked to this group yet.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {workspaceMembers
-                      .filter(m => {
-                        if (workspaceMemberFilter === 'eligible') return !m.hasWon;
-                        if (workspaceMemberFilter === 'won') return m.hasWon;
-                        return true;
-                      })
-                      .filter(m => {
-                        if (!workspaceMemberSearch.trim()) return true;
-                        const q = workspaceMemberSearch.toLowerCase();
-                        return (m.name || '').toLowerCase().includes(q) || 
-                               String(m.ticket).includes(q) || 
-                               (m.phone || '').includes(q);
-                      })
-                      .map((member) => {
-                        const monogram = (member.name || 'S').trim().charAt(0).toUpperCase();
-
-                        return (
-                          <div 
-                            key={member.id} 
-                            className={`p-3.5 sm:p-4 rounded-2xl border transition-all space-y-2.5 ${
-                              member.hasWon
-                                ? 'bg-slate-50/70 border-slate-200/80'
-                                : 'bg-white border-slate-200/80 shadow-subtle hover:border-brand-300'
-                            }`}
-                          >
-                            <div className="flex justify-between items-start gap-2">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                                  member.hasWon
-                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                    : 'bg-blue-100 text-blue-700 border border-blue-200'
-                                }`}>
-                                  {monogram}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <strong className="text-sm font-bold text-slate-900 block truncate max-w-[140px] sm:max-w-[160px]">
-                                      {member.name}
-                                    </strong>
-                                    <span className="text-[11px] font-mono font-bold text-slate-400">
-                                      #{member.ticket}
-                                    </span>
-                                  </div>
-                                  <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate">
-                                    <Phone size={10} className="shrink-0 text-slate-400" />
-                                    <span>{member.phone || 'No phone'}</span>
-                                  </span>
-                                </div>
-                              </div>
-
-                              {member.hasWon ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
-                                  <Trophy size={10} className="text-amber-600" />
-                                  <span>Won</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                                  <CheckCircle2 size={10} className="text-emerald-600" />
-                                  <span>Eligible</span>
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Sub-status pills for split ticket or custom installments */}
-                            {(member.splitPool || member.customInstallment || member.exitMonth) && (
-                              <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-100 text-[10px]">
-                                {member.splitPool && (
-                                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200">
-                                    Split Ticket ({member.splitPool.length} payers)
-                                  </span>
-                                )}
-                                {member.customInstallment && (
-                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold border border-slate-200">
-                                    Custom: {formatCurrency(member.customInstallment)}
-                                  </span>
-                                )}
-                                {member.exitMonth && (
-                                  <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 font-semibold border border-rose-200">
-                                    Exits Month {member.exitMonth}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-
-            </div>
-          ) : !showWizard ? (
-            /* ═══════════════════════════════════════════════════════════════════
-               2. CHITS DIRECTORY VIEW (DESKTOP & MOBILE FINTECH EXPERIENCE)
-               ═══════════════════════════════════════════════════════════════════ */
-            <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
-
-              {/* ─────────────────────────────────────────────────────────────
-                  MOBILE APP BAR (NATIVE ANDROID FINTECH APP HEADER)
+                {/* ─────────────────────────────────────────────────────────────
+                  DESKTOP EXECUTIVE METRICS STRIP (1440w DESIGN SPECIFICATION)
                   ───────────────────────────────────────────────────────────── */}
-              <div className="block lg:hidden bg-white border border-slate-200/80 rounded-3xl p-4 shadow-subtle space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-brand-700 to-brand-500 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-brand-500/20">
-                      <Briefcase size={18} />
+                <div className="hidden lg:grid grid-cols-4 gap-4">
+                  {/* Metric 1: Active Groups */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Chit Groups</span>
+                      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Verified
+                      </span>
                     </div>
-                    <div>
-                      <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Chit Groups</h2>
-                      <p className="text-[11px] text-slate-500 font-medium">
-                        {activeGroupsCount} Active Pools · <strong className="text-brand-700 font-mono">{formatCurrency(totalCirculatingValue)}</strong>
-                      </p>
+                    <div className="mt-2">
+                      <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">{activeGroupsCount}</span>
+                      <span className="text-xs text-slate-500 ml-2 font-medium">of {allNonDeletedGroups.length} total</span>
                     </div>
                   </div>
 
+                  {/* Metric 2: Total Circulating Value */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Circulating Pool</span>
+                      <span className="text-[10px] font-mono text-brand-700 font-semibold bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
+                        LEDGER TOTAL
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+                        {formatCurrency(totalCirculatingValue)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Metric 3: Kai Iruppu Reserve */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Kai Iruppu Reserve</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                        DISCOUNTS
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      <span className="text-3xl font-black text-emerald-700 font-mono tracking-tight">
+                        {formatCurrency(totalKaiIruppuCirculating)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Metric 4: Enrolled Tickets */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Enrolled Tickets</span>
+                      <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        CAPACITY
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+                        {totalEnrolledSlotsCount}
+                      </span>
+                      <span className="text-xs text-slate-500 ml-2 font-medium">member tickets</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ─────────────────────────────────────────────────────────────
+                  DESKTOP TOOLBAR (SEARCH + FILTER PILLS + CREATE CTA)
+                  ───────────────────────────────────────────────────────────── */}
+                <div className="hidden lg:flex items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-subtle">
+                  {/* Search */}
+                  <div className="relative flex-1 max-w-sm">
+                    <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by chit group name..."
+                      value={chitsSearchQuery}
+                      onChange={(e) => setChitsSearchQuery(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 transition-colors"
+                    />
+                    {chitsSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setChitsSearchQuery('')}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filter Pills Cluster */}
+                  <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                    <button
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setGroupFilter('all');
+                      }}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${groupFilter === 'all'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                      All ({allNonDeletedGroups.length})
+                    </button>
+                    <button
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setGroupFilter('active');
+                      }}
+                      className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${groupFilter === 'active'
+                        ? 'bg-white text-emerald-800 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span>Active ({activeGroupsCount})</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setGroupFilter('draft');
+                      }}
+                      className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${groupFilter === 'draft'
+                        ? 'bg-white text-amber-800 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                      <span>Draft ({draftGroupsCount})</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setGroupFilter('completed');
+                      }}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${groupFilter === 'completed'
+                        ? 'bg-white text-purple-800 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                      Completed ({completedGroupsCount})
+                    </button>
+                    <button
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setGroupFilter('bin');
+                      }}
+                      className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${groupFilter === 'bin'
+                        ? 'bg-rose-50 text-rose-700 shadow-xs border border-rose-200'
+                        : 'text-rose-600 hover:text-rose-800'
+                        }`}
+                    >
+                      <Trash2 size={12} />
+                      <span>Bin ({deletedGroups.length})</span>
+                    </button>
+                  </div>
+
+                  {/* Primary New Chit Button */}
                   {canCreateChit && (
                     <button
-                      type="button"
                       onClick={() => {
                         triggerHapticFeedback('light');
                         setShowWizard(true);
                       }}
-                      className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1 active:scale-95 cursor-pointer"
+                      className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 active:scale-95 cursor-pointer"
                     >
                       <Plus size={14} />
-                      <span>New Chit</span>
+                      <span>+ New Chit Group</span>
                     </button>
                   )}
                 </div>
 
-                {/* Mobile Search Input */}
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search chit groups..."
-                    value={chitsSearchQuery}
-                    onChange={(e) => setChitsSearchQuery(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 transition-colors"
-                  />
-                  {chitsSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setChitsSearchQuery('')}
-                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* ─────────────────────────────────────────────────────────────
-                  DESKTOP EXECUTIVE METRICS STRIP (1440w DESIGN SPECIFICATION)
+                {/* ─────────────────────────────────────────────────────────────
+                  MOBILE SEGMENTED HORIZONTAL FILTER CHIPS (ANDROID TOUCH CAROUSEL)
                   ───────────────────────────────────────────────────────────── */}
-              <div className="hidden lg:grid grid-cols-4 gap-4">
-                {/* Metric 1: Active Groups */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Chit Groups</span>
-                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Verified
-                    </span>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">{activeGroupsCount}</span>
-                    <span className="text-xs text-slate-500 ml-2 font-medium">of {allNonDeletedGroups.length} total</span>
-                  </div>
-                </div>
-
-                {/* Metric 2: Total Circulating Value */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Circulating Pool</span>
-                    <span className="text-[10px] font-mono text-brand-700 font-semibold bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
-                      LEDGER TOTAL
-                    </span>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">
-                      {formatCurrency(totalCirculatingValue)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Metric 3: Kai Iruppu Reserve */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Kai Iruppu Reserve</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                      DISCOUNTS
-                    </span>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-3xl font-black text-emerald-700 font-mono tracking-tight">
-                      {formatCurrency(totalKaiIruppuCirculating)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Metric 4: Enrolled Tickets */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-subtle flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Enrolled Tickets</span>
-                    <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      CAPACITY
-                    </span>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">
-                      {totalEnrolledSlotsCount}
-                    </span>
-                    <span className="text-xs text-slate-500 ml-2 font-medium">member tickets</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* ─────────────────────────────────────────────────────────────
-                  DESKTOP TOOLBAR (SEARCH + FILTER PILLS + CREATE CTA)
-                  ───────────────────────────────────────────────────────────── */}
-              <div className="hidden lg:flex items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-subtle">
-                {/* Search */}
-                <div className="relative flex-1 max-w-sm">
-                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by chit group name..."
-                    value={chitsSearchQuery}
-                    onChange={(e) => setChitsSearchQuery(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 transition-colors"
-                  />
-                  {chitsSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setChitsSearchQuery('')}
-                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Filter Pills Cluster */}
-                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                <div className="block lg:hidden flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
                   <button
                     onClick={() => {
                       triggerHapticFeedback('light');
                       setGroupFilter('all');
                     }}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                      groupFilter === 'all'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 active:scale-95 cursor-pointer ${groupFilter === 'all'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-700'
+                      }`}
                   >
                     All ({allNonDeletedGroups.length})
                   </button>
@@ -6250,13 +6347,12 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setGroupFilter('active');
                     }}
-                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                      groupFilter === 'active'
-                        ? 'bg-white text-emerald-800 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer ${groupFilter === 'active'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-700'
+                      }`}
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${groupFilter === 'active' ? 'bg-white' : 'bg-emerald-500'}`}></span>
                     <span>Active ({activeGroupsCount})</span>
                   </button>
                   <button
@@ -6264,13 +6360,12 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setGroupFilter('draft');
                     }}
-                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                      groupFilter === 'draft'
-                        ? 'bg-white text-amber-800 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer ${groupFilter === 'draft'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-700'
+                      }`}
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${groupFilter === 'draft' ? 'bg-white' : 'bg-amber-500'}`}></span>
                     <span>Draft ({draftGroupsCount})</span>
                   </button>
                   <button
@@ -6278,11 +6373,10 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setGroupFilter('completed');
                     }}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                      groupFilter === 'completed'
-                        ? 'bg-white text-purple-800 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 active:scale-95 cursor-pointer ${groupFilter === 'completed'
+                      ? 'bg-purple-700 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-700'
+                      }`}
                   >
                     Completed ({completedGroupsCount})
                   </button>
@@ -6291,834 +6385,425 @@ Thank you for your prompt payment! 🙏`;
                       triggerHapticFeedback('light');
                       setGroupFilter('bin');
                     }}
-                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
-                      groupFilter === 'bin'
-                        ? 'bg-rose-50 text-rose-700 shadow-xs border border-rose-200'
-                        : 'text-rose-600 hover:text-rose-800'
-                    }`}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 flex items-center gap-1 active:scale-95 cursor-pointer ${groupFilter === 'bin'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-rose-50 border border-rose-200 text-rose-700'
+                      }`}
                   >
                     <Trash2 size={12} />
                     <span>Bin ({deletedGroups.length})</span>
                   </button>
                 </div>
 
-                {/* Primary New Chit Button */}
-                {canCreateChit && (
-                  <button
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setShowWizard(true);
-                    }}
-                    className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2 active:scale-95 cursor-pointer"
-                  >
-                    <Plus size={14} />
-                    <span>+ New Chit Group</span>
-                  </button>
-                )}
-              </div>
-
-              {/* ─────────────────────────────────────────────────────────────
-                  MOBILE SEGMENTED HORIZONTAL FILTER CHIPS (ANDROID TOUCH CAROUSEL)
-                  ───────────────────────────────────────────────────────────── */}
-              <div className="block lg:hidden flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
-                <button
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setGroupFilter('all');
-                  }}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 active:scale-95 cursor-pointer ${
-                    groupFilter === 'all'
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'bg-white border border-slate-200 text-slate-700'
-                  }`}
-                >
-                  All ({allNonDeletedGroups.length})
-                </button>
-                <button
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setGroupFilter('active');
-                  }}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer ${
-                    groupFilter === 'active'
-                      ? 'bg-emerald-700 text-white shadow-xs'
-                      : 'bg-white border border-slate-200 text-slate-700'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${groupFilter === 'active' ? 'bg-white' : 'bg-emerald-500'}`}></span>
-                  <span>Active ({activeGroupsCount})</span>
-                </button>
-                <button
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setGroupFilter('draft');
-                  }}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 flex items-center gap-1.5 active:scale-95 cursor-pointer ${
-                    groupFilter === 'draft'
-                      ? 'bg-amber-600 text-white shadow-xs'
-                      : 'bg-white border border-slate-200 text-slate-700'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${groupFilter === 'draft' ? 'bg-white' : 'bg-amber-500'}`}></span>
-                  <span>Draft ({draftGroupsCount})</span>
-                </button>
-                <button
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setGroupFilter('completed');
-                  }}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 active:scale-95 cursor-pointer ${
-                    groupFilter === 'completed'
-                      ? 'bg-purple-700 text-white shadow-xs'
-                      : 'bg-white border border-slate-200 text-slate-700'
-                  }`}
-                >
-                  Completed ({completedGroupsCount})
-                </button>
-                <button
-                  onClick={() => {
-                    triggerHapticFeedback('light');
-                    setGroupFilter('bin');
-                  }}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all shrink-0 flex items-center gap-1 active:scale-95 cursor-pointer ${
-                    groupFilter === 'bin'
-                      ? 'bg-rose-600 text-white shadow-xs'
-                      : 'bg-rose-50 border border-rose-200 text-rose-700'
-                  }`}
-                >
-                  <Trash2 size={12} />
-                  <span>Bin ({deletedGroups.length})</span>
-                </button>
-              </div>
-
-              {/* ─────────────────────────────────────────────────────────────
+                {/* ─────────────────────────────────────────────────────────────
                   RECYCLE BIN VIEW (SOFT-DELETED GROUPS)
                   ───────────────────────────────────────────────────────────── */}
-              {groupFilter === 'bin' ? (
-                <div className="space-y-4">
-                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-subtle">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 border border-rose-200">
-                        <Trash2 size={20} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-rose-900 flex items-center gap-2">
-                          Recycle Bin
-                          <span className="text-[10px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
-                            {deletedGroups.length} Soft-Deleted Groups
-                          </span>
-                        </h4>
-                        <p className="text-xs text-rose-700 mt-0.5">
-                          Soft-deleted groups are securely preserved. Restore them to Draft anytime or permanently purge them.
-                        </p>
+                {groupFilter === 'bin' ? (
+                  <div className="space-y-4">
+                    <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-subtle">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 border border-rose-200">
+                          <Trash2 size={20} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-rose-900 flex items-center gap-2">
+                            Recycle Bin
+                            <span className="text-[10px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
+                              {deletedGroups.length} Soft-Deleted Groups
+                            </span>
+                          </h4>
+                          <p className="text-xs text-rose-700 mt-0.5">
+                            Soft-deleted groups are securely preserved. Restore them to Draft anytime or permanently purge them.
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                    {filteredDeletedGroups.length === 0 ? (
-                      <div className="col-span-full py-12 px-6 bg-white border border-dashed border-slate-200 rounded-2xl text-center flex flex-col items-center justify-center space-y-2 shadow-subtle">
-                        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200">
-                          <Trash2 size={24} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                      {filteredDeletedGroups.length === 0 ? (
+                        <div className="col-span-full py-12 px-6 bg-white border border-dashed border-slate-200 rounded-2xl text-center flex flex-col items-center justify-center space-y-2 shadow-subtle">
+                          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200">
+                            <Trash2 size={24} />
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-900">Recycle Bin is Empty</h4>
+                          <p className="text-xs text-slate-500">No deleted chit groups found.</p>
                         </div>
-                        <h4 className="text-sm font-bold text-slate-900">Recycle Bin is Empty</h4>
-                        <p className="text-xs text-slate-500">No deleted chit groups found.</p>
-                      </div>
-                    ) : (
-                      filteredDeletedGroups.map((g) => (
-                        <div key={g.id} className="bg-white border-2 border-rose-200 rounded-3xl p-4 sm:p-5 space-y-3.5 shadow-subtle hover:border-rose-300 transition-colors flex flex-col justify-between">
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-start">
-                              <div className="space-y-1 min-w-0">
-                                <div className="flex items-center space-x-2">
-                                  <span className="w-2 h-2 rounded-full shrink-0 bg-rose-500"></span>
-                                  <h4 className="text-sm font-bold text-slate-900 truncate max-w-[170px]">{g.name}</h4>
-                                </div>
-                                <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded border inline-block bg-rose-50 text-rose-700 border-rose-200">
-                                  IN RECYCLE BIN
-                                </span>
-                              </div>
-                              <div className="p-1.5 rounded-lg bg-rose-100 text-rose-700">
-                                <Trash2 size={15} />
-                              </div>
-                            </div>
-
-                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1 text-xs text-slate-700 font-mono">
-                              <div className="flex justify-between">
-                                <span className="text-slate-500">Total Pool:</span>
-                                <strong className="font-bold text-slate-900">{formatCurrency(g.totalValue)}</strong>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-slate-500">Duration:</span>
-                                <strong>{g.duration} Months ({g.memberCount || g.duration} Tickets)</strong>
-                              </div>
-                              {g.deletedAt && (
-                                <div className="flex justify-between pt-1 border-t border-slate-200 text-[10px]">
-                                  <span className="text-slate-500">Deleted:</span>
-                                  <span className="text-rose-600 font-medium">
-                                    {new Date(g.deletedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      ) : (
+                        filteredDeletedGroups.map((g) => (
+                          <div key={g.id} className="bg-white border-2 border-rose-200 rounded-3xl p-4 sm:p-5 space-y-3.5 shadow-subtle hover:border-rose-300 transition-colors flex flex-col justify-between">
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-start">
+                                <div className="space-y-1 min-w-0">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="w-2 h-2 rounded-full shrink-0 bg-rose-500"></span>
+                                    <h4 className="text-sm font-bold text-slate-900 truncate max-w-[170px]">{g.name}</h4>
+                                  </div>
+                                  <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded border inline-block bg-rose-50 text-rose-700 border-rose-200">
+                                    IN RECYCLE BIN
                                   </span>
                                 </div>
-                              )}
+                                <div className="p-1.5 rounded-lg bg-rose-100 text-rose-700">
+                                  <Trash2 size={15} />
+                                </div>
+                              </div>
+
+                              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1 text-xs text-slate-700 font-mono">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">Total Pool:</span>
+                                  <strong className="font-bold text-slate-900">{formatCurrency(g.totalValue)}</strong>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">Duration:</span>
+                                  <strong>{g.duration} Months ({g.memberCount || g.duration} Tickets)</strong>
+                                </div>
+                                {g.deletedAt && (
+                                  <div className="flex justify-between pt-1 border-t border-slate-200 text-[10px]">
+                                    <span className="text-slate-500">Deleted:</span>
+                                    <span className="text-rose-600 font-medium">
+                                      {new Date(g.deletedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
+                              <button
+                                type="button"
+                                disabled={isRestoringGroupId === g.id}
+                                onClick={() => handleRestoreGroup(g)}
+                                className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-semibold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+                              >
+                                {isRestoringGroupId === g.id ? (
+                                  <RefreshCw size={13} className="animate-spin text-emerald-600" />
+                                ) : (
+                                  <RotateCcw size={13} />
+                                )}
+                                <span>Restore</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openPermanentDeleteModal(g)}
+                                className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-semibold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+                              >
+                                <Trash2 size={13} />
+                                <span>Purge</span>
+                              </button>
                             </div>
                           </div>
-
-                          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
-                            <button
-                              type="button"
-                              disabled={isRestoringGroupId === g.id}
-                              onClick={() => handleRestoreGroup(g)}
-                              className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-semibold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
-                            >
-                              {isRestoringGroupId === g.id ? (
-                                <RefreshCw size={13} className="animate-spin text-emerald-600" />
-                              ) : (
-                                <RotateCcw size={13} />
-                              )}
-                              <span>Restore</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openPermanentDeleteModal(g)}
-                              className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-semibold text-xs py-2 px-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
-                            >
-                              <Trash2 size={13} />
-                              <span>Purge</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* ─────────────────────────────────────────────────────────────
-                   ACTIVE / DRAFT / COMPLETED DIRECTORY GRID
-                   (Fintech Cards for Desktop & Native Android for Mobile)
-                   ───────────────────────────────────────────────────────────── */
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-5">
-                  {filteredGroups.length === 0 ? (
-                    <div className="col-span-full py-16 px-6 bg-white border border-dashed border-slate-200 rounded-3xl text-center flex flex-col items-center justify-center space-y-3 shadow-subtle">
-                      <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 border border-brand-200 flex items-center justify-center">
-                        <Briefcase size={28} />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-base font-bold text-slate-900">No Groups in this Category</h4>
-                        <p className="text-xs text-slate-500 max-w-sm">
-                          {chitsSearchQuery.trim()
-                            ? `No chit groups matching "${chitsSearchQuery}".`
-                            : `There are no chit groups with status "${groupFilter}" currently.`}
-                        </p>
-                      </div>
-                      {canCreateChit && (
-                        <button
-                          onClick={() => {
-                            triggerHapticFeedback('light');
-                            setShowWizard(true);
-                          }}
-                          className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
-                        >
-                          + Create Chit Group
-                        </button>
+                        ))
                       )}
                     </div>
-                  ) : (
-                    filteredGroups.map((g) => {
-                      const progressPercent = Math.min(100, Math.round((g.currentMonth / (g.duration || 1)) * 100));
+                  </div>
+                ) : (
+                  /* ─────────────────────────────────────────────────────────────
+                     ACTIVE / DRAFT / COMPLETED DIRECTORY GRID
+                     (Fintech Cards for Desktop & Native Android for Mobile)
+                     ───────────────────────────────────────────────────────────── */
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-5">
+                    {filteredGroups.length === 0 ? (
+                      <div className="col-span-full py-16 px-6 bg-white border border-dashed border-slate-200 rounded-3xl text-center flex flex-col items-center justify-center space-y-3 shadow-subtle">
+                        <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 border border-brand-200 flex items-center justify-center">
+                          <Briefcase size={28} />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-base font-bold text-slate-900">No Groups in this Category</h4>
+                          <p className="text-xs text-slate-500 max-w-sm">
+                            {chitsSearchQuery.trim()
+                              ? `No chit groups matching "${chitsSearchQuery}".`
+                              : `There are no chit groups with status "${groupFilter}" currently.`}
+                          </p>
+                        </div>
+                        {canCreateChit && (
+                          <button
+                            onClick={() => {
+                              triggerHapticFeedback('light');
+                              setShowWizard(true);
+                            }}
+                            className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
+                          >
+                            + Create Chit Group
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      filteredGroups.map((g) => {
+                        const progressPercent = Math.min(100, Math.round((g.currentMonth / (g.duration || 1)) * 100));
 
-                      return (
-                        <div 
-                          key={g.id} 
-                          className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 shadow-subtle hover:border-brand-300 hover:shadow-card transition-all flex flex-col justify-between"
-                        >
-                          <div className="space-y-3">
-                            {/* Card Top: Status & Duration Pill & Quick Actions */}
-                            <div className="flex justify-between items-start gap-2">
-                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${
-                                  g.status === 'draft'
+                        return (
+                          <div
+                            key={g.id}
+                            className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 shadow-subtle hover:border-brand-300 hover:shadow-card transition-all flex flex-col justify-between"
+                          >
+                            <div className="space-y-3">
+                              {/* Card Top: Status & Duration Pill & Quick Actions */}
+                              <div className="flex justify-between items-start gap-2">
+                                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${g.status === 'draft'
                                     ? 'bg-amber-50 text-amber-700 border-amber-200'
                                     : g.status === 'completed'
                                       ? 'bg-purple-50 text-purple-700 border-purple-200'
                                       : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                }`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                                    g.status === 'draft' ? 'bg-amber-500' : g.status === 'completed' ? 'bg-purple-500' : 'bg-emerald-500 animate-pulse'
-                                  }`}></span>
-                                  <span className="whitespace-nowrap">{g.status ? g.status.toUpperCase() : 'ACTIVE'}</span>
-                                </span>
+                                    }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${g.status === 'draft' ? 'bg-amber-500' : g.status === 'completed' ? 'bg-purple-500' : 'bg-emerald-500 animate-pulse'
+                                      }`}></span>
+                                    <span className="whitespace-nowrap">{g.status ? g.status.toUpperCase() : 'ACTIVE'}</span>
+                                  </span>
 
-                                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap shrink-0">
-                                  M{g.currentMonth} / {g.duration}
-                                </span>
-                              </div>
-
-                              {/* Quick Action Menu */}
-                              <div className="flex items-center gap-1 shrink-0">
-                                {canEditChit && (
-                                  <button
-                                    type="button"
-                                    title="Edit chit details"
-                                    data-action="chits:edit"
-                                    onClick={() => openEditGroupModal(g)}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors active:scale-95 cursor-pointer"
-                                  >
-                                    <Edit3 size={14} />
-                                  </button>
-                                )}
-                                {canDeleteChit && (
-                                  <button
-                                    type="button"
-                                    title="Move to Recycle Bin"
-                                    data-action="chits:delete"
-                                    onClick={() => openSoftDeleteModal(g)}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors active:scale-95 cursor-pointer"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Hero Pool Value & Name */}
-                            <div>
-                              <h4 className="text-sm sm:text-base font-bold text-slate-900 truncate">{g.name}</h4>
-                              <div className="mt-1 flex items-baseline gap-2 flex-wrap sm:flex-nowrap">
-                                <span className="font-mono text-xl sm:text-2xl font-black text-slate-900 tracking-tight whitespace-nowrap">
-                                  {formatCurrency(g.totalValue)}
-                                </span>
-                                <span className="text-[10.5px] sm:text-[11px] text-slate-500 font-medium whitespace-nowrap">
-                                  Target ({g.duration} Tickets)
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Cycle Progress Bar */}
-                            {g.currentMonth === 0 ? (
-                              <div className="flex items-center justify-between py-1 px-2.5 rounded-xl bg-amber-50 border border-amber-200 min-w-0">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
-                                  <span className="text-[9.5px] sm:text-[10px] font-bold text-amber-900 uppercase tracking-wider whitespace-nowrap truncate">
-                                    Launch Month — Organizer Profit Phase
+                                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap shrink-0">
+                                    M{g.currentMonth} / {g.duration}
                                   </span>
                                 </div>
-                                {canWithdrawProfit && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      triggerHapticFeedback('light');
-                                      setWithdrawProfitGroupId(g.id);
-                                      setShowWithdrawProfitModal(true);
-                                    }}
-                                    className="text-[9.5px] font-bold text-amber-900 bg-amber-200/90 hover:bg-amber-300 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer shrink-0 ml-1.5"
-                                    title="Take profit from cash box"
-                                  >
-                                    <Crown size={11} className="text-amber-700" />
-                                    <span>Take Profit</span>
-                                  </button>
-                                )}
+
+                                {/* Quick Action Menu */}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {canEditChit && (
+                                    <button
+                                      type="button"
+                                      title="Edit chit details"
+                                      data-action="chits:edit"
+                                      onClick={() => openEditGroupModal(g)}
+                                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors active:scale-95 cursor-pointer"
+                                    >
+                                      <Edit3 size={14} />
+                                    </button>
+                                  )}
+                                  {canDeleteChit && (
+                                    <button
+                                      type="button"
+                                      title="Move to Recycle Bin"
+                                      data-action="chits:delete"
+                                      onClick={() => openSoftDeleteModal(g)}
+                                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors active:scale-95 cursor-pointer"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Hero Pool Value & Name */}
+                              <div>
+                                <h4 className="text-sm sm:text-base font-bold text-slate-900 truncate">{g.name}</h4>
+                                <div className="mt-1 flex items-baseline gap-2 flex-wrap sm:flex-nowrap">
+                                  <span className="font-mono text-xl sm:text-2xl font-black text-slate-900 tracking-tight whitespace-nowrap">
+                                    {formatCurrency(g.totalValue)}
+                                  </span>
+                                  <span className="text-[10.5px] sm:text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                                    Target ({g.duration} Tickets)
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Cycle Progress Bar */}
+                              {g.currentMonth === 0 ? (
+                                <div className="flex items-center justify-between py-1 px-2.5 rounded-xl bg-amber-50 border border-amber-200 min-w-0">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                                    <span className="text-[9.5px] sm:text-[10px] font-bold text-amber-900 uppercase tracking-wider whitespace-nowrap truncate">
+                                      Launch Month — Organizer Profit Phase
+                                    </span>
+                                  </div>
+                                  {canWithdrawProfit && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        triggerHapticFeedback('light');
+                                        setWithdrawProfitGroupId(g.id);
+                                        setShowWithdrawProfitModal(true);
+                                      }}
+                                      className="text-[9.5px] font-bold text-amber-900 bg-amber-200/90 hover:bg-amber-300 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer shrink-0 ml-1.5"
+                                      title="Take profit from cash box"
+                                    >
+                                      <Crown size={11} className="text-amber-700" />
+                                      <span>Take Profit</span>
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[10px] text-slate-500 font-semibold uppercase tracking-wider whitespace-nowrap">
+                                    <span>Cycle Progress</span>
+                                    <span className="font-mono">{progressPercent}%</span>
+                                  </div>
+                                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                    <div
+                                      className="bg-gradient-to-r from-brand-600 to-indigo-500 h-full rounded-full transition-all duration-300"
+                                      style={{ width: `${progressPercent}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 2x2 Clean Financial Grid */}
+                              <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                                <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 min-w-0">
+                                  <span className="text-[9.5px] sm:text-[10px] font-bold uppercase text-slate-400 block whitespace-nowrap">Monthly Due</span>
+                                  <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm block mt-0.5 whitespace-nowrap truncate">
+                                    {formatCurrency(g.totalValue / (g.duration || 1))}
+                                  </span>
+                                </div>
+
+                                <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 min-w-0">
+                                  <span className="text-[9.5px] sm:text-[10px] font-bold uppercase text-slate-400 block whitespace-nowrap">Kai Iruppu</span>
+                                  <span className="font-mono font-bold text-emerald-700 text-xs sm:text-sm block mt-0.5 whitespace-nowrap truncate">
+                                    {formatCurrency(g.kaiIruppuPool || 0)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Auction Date Row — strictly single line on mobile */}
+                              <div className="flex items-center justify-between pt-1 text-[10.5px] sm:text-xs text-slate-500 whitespace-nowrap gap-1.5 min-w-0">
+                                <span className="flex items-center gap-1 shrink-0 text-slate-500 font-medium whitespace-nowrap">
+                                  <CalendarDays size={12} className="text-slate-400 shrink-0" />
+                                  <span className="whitespace-nowrap">Next Auction:</span>
+                                </span>
+                                <div className="flex items-center gap-1.5 min-w-0 shrink-0 text-right whitespace-nowrap">
+                                  <strong className="text-slate-800 font-semibold text-[10.5px] sm:text-xs whitespace-nowrap">
+                                    {getGroupAuctionDate(g.id, g.currentMonth || 1, true).display}
+                                  </strong>
+                                  {canRescheduleAuction && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setScheduleModalGroup(g)}
+                                      className="text-[10px] sm:text-[10.5px] font-bold text-brand-700 hover:underline cursor-pointer shrink-0 whitespace-nowrap"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Footer Touch Actions */}
+                            {g.currentMonth === 0 ? (
+                              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    triggerHapticFeedback('light');
+                                    setSelectedWorkspaceGroupId(g.id);
+                                    fetchWorkspaceMembers(g.id);
+                                  }}
+                                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
+                                >
+                                  <Briefcase size={13} className="shrink-0" />
+                                  <span className="whitespace-nowrap">Workspace</span>
+                                </button>
+
+                                <button
+                                  disabled={!canLaunchMonth0}
+                                  onClick={() => canLaunchMonth0 && setMonth0LaunchModalGroup(g)}
+                                  className={`text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm whitespace-nowrap ${canLaunchMonth0 ? 'bg-amber-600 hover:bg-amber-700 active:scale-95 cursor-pointer' : 'bg-amber-600/60 opacity-75 cursor-not-allowed'
+                                    }`}
+                                >
+                                  <Rocket size={14} className="shrink-0" />
+                                  <span className="whitespace-nowrap">Roll to M1</span>
+                                </button>
                               </div>
                             ) : (
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-[10px] text-slate-500 font-semibold uppercase tracking-wider whitespace-nowrap">
-                                  <span>Cycle Progress</span>
-                                  <span className="font-mono">{progressPercent}%</span>
-                                </div>
-                                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                  <div 
-                                    className="bg-gradient-to-r from-brand-600 to-indigo-500 h-full rounded-full transition-all duration-300"
-                                    style={{ width: `${progressPercent}%` }}
-                                  ></div>
-                                </div>
+                              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    triggerHapticFeedback('light');
+                                    setSelectedWorkspaceGroupId(g.id);
+                                    fetchWorkspaceMembers(g.id);
+                                  }}
+                                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
+                                >
+                                  <Briefcase size={13} className="shrink-0" />
+                                  <span className="whitespace-nowrap">Workspace</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={isDuplicatingGroupId === g.id}
+                                  onClick={() => handleDuplicateGroup(g)}
+                                  className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 shadow-2xs whitespace-nowrap"
+                                >
+                                  {isDuplicatingGroupId === g.id ? (
+                                    <>
+                                      <RefreshCw size={12} className="animate-spin text-brand-600 shrink-0" />
+                                      <span className="whitespace-nowrap">Cloning...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy size={12} className="text-slate-400 shrink-0" />
+                                      <span className="whitespace-nowrap">Duplicate</span>
+                                    </>
+                                  )}
+                                </button>
                               </div>
                             )}
-
-                            {/* 2x2 Clean Financial Grid */}
-                            <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-                              <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 min-w-0">
-                                <span className="text-[9.5px] sm:text-[10px] font-bold uppercase text-slate-400 block whitespace-nowrap">Monthly Due</span>
-                                <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm block mt-0.5 whitespace-nowrap truncate">
-                                  {formatCurrency(g.totalValue / (g.duration || 1))}
-                                </span>
-                              </div>
-
-                              <div className="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 min-w-0">
-                                <span className="text-[9.5px] sm:text-[10px] font-bold uppercase text-slate-400 block whitespace-nowrap">Kai Iruppu</span>
-                                <span className="font-mono font-bold text-emerald-700 text-xs sm:text-sm block mt-0.5 whitespace-nowrap truncate">
-                                  {formatCurrency(g.kaiIruppuPool || 0)}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Auction Date Row — strictly single line on mobile */}
-                            <div className="flex items-center justify-between pt-1 text-[10.5px] sm:text-xs text-slate-500 whitespace-nowrap gap-1.5 min-w-0">
-                              <span className="flex items-center gap-1 shrink-0 text-slate-500 font-medium whitespace-nowrap">
-                                <CalendarDays size={12} className="text-slate-400 shrink-0" />
-                                <span className="whitespace-nowrap">Next Auction:</span>
-                              </span>
-                              <div className="flex items-center gap-1.5 min-w-0 shrink-0 text-right whitespace-nowrap">
-                                <strong className="text-slate-800 font-semibold text-[10.5px] sm:text-xs whitespace-nowrap">
-                                  {getGroupAuctionDate(g.id, g.currentMonth || 1, true).display}
-                                </strong>
-                                {canRescheduleAuction && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setScheduleModalGroup(g)}
-                                    className="text-[10px] sm:text-[10.5px] font-bold text-brand-700 hover:underline cursor-pointer shrink-0 whitespace-nowrap"
-                                  >
-                                    Edit
-                                  </button>
-                                )}
-                              </div>
-                            </div>
                           </div>
-
-                          {/* Footer Touch Actions */}
-                          {g.currentMonth === 0 ? (
-                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  triggerHapticFeedback('light');
-                                  setSelectedWorkspaceGroupId(g.id);
-                                  fetchWorkspaceMembers(g.id);
-                                }}
-                                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
-                              >
-                                <Briefcase size={13} className="shrink-0" />
-                                <span className="whitespace-nowrap">Workspace</span>
-                              </button>
-
-                              <button
-                                disabled={!canLaunchMonth0}
-                                onClick={() => canLaunchMonth0 && setMonth0LaunchModalGroup(g)}
-                                className={`text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm whitespace-nowrap ${
-                                  canLaunchMonth0 ? 'bg-amber-600 hover:bg-amber-700 active:scale-95 cursor-pointer' : 'bg-amber-600/60 opacity-75 cursor-not-allowed'
-                                }`}
-                              >
-                                <Rocket size={14} className="shrink-0" />
-                                <span className="whitespace-nowrap">Roll to M1</span>
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  triggerHapticFeedback('light');
-                                  setSelectedWorkspaceGroupId(g.id);
-                                  fetchWorkspaceMembers(g.id);
-                                }}
-                                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
-                              >
-                                <Briefcase size={13} className="shrink-0" />
-                                <span className="whitespace-nowrap">Workspace</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                disabled={isDuplicatingGroupId === g.id}
-                                onClick={() => handleDuplicateGroup(g)}
-                                className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 shadow-2xs whitespace-nowrap"
-                              >
-                                {isDuplicatingGroupId === g.id ? (
-                                  <>
-                                    <RefreshCw size={12} className="animate-spin text-brand-600 shrink-0" />
-                                    <span className="whitespace-nowrap">Cloning...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy size={12} className="text-slate-400 shrink-0" />
-                                    <span className="whitespace-nowrap">Duplicate</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-
-            </div>
-          ) : (
-            /* ═══════════════════════════════════════════════════════════════════
-               3. UPGRADED CHIT SETUP WIZARD VIEW
-               ═══════════════════════════════════════════════════════════════════ */
-            <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200">
-              
-              {/* Setup Wizard Progress Navigation Bar */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 shadow-subtle flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 border border-brand-200 flex items-center justify-center">
-                      <Sparkles size={16} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Chit Setup Wizard</h3>
-                      <p className="text-[11px] text-slate-500 font-medium">Step {wizardStep} of 3</p>
-                    </div>
+                        );
+                      })
+                    )}
                   </div>
-                  <button
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setShowWizard(false);
-                    }}
-                    className="text-xs text-slate-500 hover:text-slate-800 underline font-semibold transition-colors py-1 px-2"
-                  >
-                    Exit Wizard
-                  </button>
-                </div>
+                )}
 
-                {/* Step Indicators */}
-                <div className="flex items-center justify-between gap-1 sm:gap-3 w-full sm:w-auto">
-                  
-                  {/* Step 1 Pill */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setWizardStep(1);
-                    }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${
-                      wizardStep === 1 
-                        ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300' 
-                        : 'hover:bg-slate-50 text-slate-500'
-                    }`}
-                  >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                      wizardStep === 1 
-                        ? 'bg-brand-600 text-white shadow-xs' 
-                        : wizardStep > 1 
-                          ? 'bg-emerald-600 text-white' 
-                          : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      {wizardStep > 1 ? <Check size={11} /> : '1'}
-                    </span>
-                    <span className={`text-xs truncate ${wizardStep === 1 ? 'font-bold text-brand-900' : 'font-semibold text-slate-600'}`}>
-                      <span className="hidden sm:inline">1. </span>Parameters
-                    </span>
-                  </button>
-                  
-                  <div className="flex-1 sm:w-4 h-px bg-slate-200"></div>
-
-                  {/* Step 2 Pill */}
-                  <button
-                    type="button"
-                    disabled={!newGroupName.trim() || !newGroupValue || !newGroupDuration}
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setWizardStep(2);
-                    }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${
-                      wizardStep === 2 
-                        ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300' 
-                        : 'hover:bg-slate-50 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed'
-                    }`}
-                  >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                      wizardStep === 2 
-                        ? 'bg-brand-600 text-white shadow-xs' 
-                        : wizardStep > 2 
-                          ? 'bg-emerald-600 text-white' 
-                          : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      {wizardStep > 2 ? <Check size={11} /> : '2'}
-                    </span>
-                    <span className={`text-xs truncate ${wizardStep === 2 ? 'font-bold text-brand-900' : 'font-semibold text-slate-600'}`}>
-                      <span className="hidden sm:inline">2. </span>Members
-                    </span>
-                  </button>
-
-                  <div className="flex-1 sm:w-4 h-px bg-slate-200"></div>
-
-                  {/* Step 3 Pill */}
-                  <button
-                    type="button"
-                    disabled={!newGroupName.trim() || !newGroupValue || !newGroupDuration}
-                    onClick={() => {
-                      triggerHapticFeedback('light');
-                      setWizardStep(3);
-                    }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${
-                      wizardStep === 3 
-                        ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300' 
-                        : 'hover:bg-slate-50 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed'
-                    }`}
-                  >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                      wizardStep === 3 
-                        ? 'bg-brand-600 text-white shadow-xs' 
-                        : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      3
-                    </span>
-                    <span className={`text-xs truncate ${wizardStep === 3 ? 'font-bold text-brand-900' : 'font-semibold text-slate-600'}`}>
-                      <span className="hidden sm:inline">3. </span>Review
-                    </span>
-                  </button>
-                </div>
               </div>
+            ) : (
+              /* ═══════════════════════════════════════════════════════════════════
+                 3. UPGRADED CHIT SETUP WIZARD VIEW
+                 ═══════════════════════════════════════════════════════════════════ */
+              <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-200">
 
-              {/* ── STEP 1: BASIC INFO & SCHEDULE ── */}
-              {wizardStep === 1 && (
-                <div className="space-y-4 animate-in fade-in duration-150">
-                  
-                  {/* Step 1 Main Form Card */}
-                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-subtle">
-                    <div className="border-b border-slate-100 pb-3 flex items-center justify-between gap-2">
-                      <h4 className="text-sm font-bold text-slate-900">
-                        Step 1: Chit Parameters &amp; Schedule
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={handleAutoGenerateName}
-                        className="text-[11px] font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shrink-0 active:scale-95 cursor-pointer"
-                      >
-                        <Sparkles size={12} />
-                        <span>Auto-Name</span>
-                      </button>
+                {/* Setup Wizard Progress Navigation Bar */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 shadow-subtle flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 border border-brand-200 flex items-center justify-center">
+                        <Sparkles size={16} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Chit Setup Wizard</h3>
+                        <p className="text-[11px] text-slate-500 font-medium">Step {wizardStep} of 3</p>
+                      </div>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
-                      
-                      {/* 1. Group Name */}
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
-                          Group Name <span className="text-rose-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. G-2L-10M-OCT26"
-                            value={newGroupName}
-                            onChange={(e) => setNewGroupName(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors"
-                          />
-                          {newGroupName && (
-                            <button
-                              type="button"
-                              onClick={() => setNewGroupName('')}
-                              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5"
-                            >
-                              <X size={13} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 2. Total Pool Value */}
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
-                          Total Pool Value (₹) <span className="text-rose-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">₹</span>
-                          <input
-                            type="number"
-                            required
-                            placeholder="100000"
-                            value={newGroupValue}
-                            onChange={(e) => setNewGroupValue(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl pl-7 pr-3.5 py-2.5 text-xs font-bold font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors"
-                          />
-                        </div>
-                        {/* Target Presets */}
-                        <div className="grid grid-cols-4 gap-1.5 pt-0.5">
-                          {[
-                            { label: '₹1L', val: 100000 },
-                            { label: '₹2L', val: 200000 },
-                            { label: '₹5L', val: 500000 },
-                            { label: '₹10L', val: 1000000 },
-                          ].map(preset => {
-                            const isSelected = newGroupValue === preset.val.toString();
-                            return (
-                              <button
-                                key={preset.label}
-                                type="button"
-                                onClick={() => {
-                                  triggerHapticFeedback('light');
-                                  setNewGroupValue(preset.val.toString());
-                                }}
-                                className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border cursor-pointer ${
-                                  isSelected
-                                    ? 'bg-brand-600 text-white border-brand-600 shadow-xs ring-2 ring-brand-300'
-                                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
-                                }`}
-                              >
-                                {preset.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* 3. Duration & Member Count */}
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
-                          Duration / Tickets (Months) <span className="text-rose-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            required
-                            min={1}
-                            max={50}
-                            placeholder="20"
-                            value={newGroupDuration}
-                            onChange={(e) => handleDurationChange(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors"
-                          />
-                        </div>
-                        {/* Duration Presets */}
-                        <div className="grid grid-cols-4 gap-1.5 pt-0.5">
-                          {[5, 10, 20, 25].map(val => {
-                            const isSelected = newGroupDuration === val.toString();
-                            return (
-                              <button
-                                key={val}
-                                type="button"
-                                onClick={() => {
-                                  triggerHapticFeedback('light');
-                                  handleDurationChange(val.toString());
-                                }}
-                                className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border cursor-pointer ${
-                                  isSelected
-                                    ? 'bg-brand-600 text-white border-brand-600 shadow-xs ring-2 ring-brand-300'
-                                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
-                                }`}
-                              >
-                                {val}m
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* Schedule Row */}
-                    <div className="border-t border-slate-100 pt-4 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
-                      
-                      {/* Launch Date */}
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
-                          Launch Date (Month 0) <span className="text-rose-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="date"
-                            required
-                            value={newGroupStartDate}
-                            onChange={(e) => setNewGroupStartDate(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none font-semibold"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Recurring Auction Rule Dropdown */}
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
-                          Monthly Auction Rule
-                        </label>
-                        <select
-                          value={newGroupAuctionDay}
-                          onChange={(e) => {
-                            const day = Number(e.target.value);
-                            setNewGroupAuctionDay(day);
-                            updateLaunchDateFromRule(day, newGroupStartDate);
-                            triggerHapticFeedback('light');
-                          }}
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none cursor-pointer"
-                        >
-                          {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
-                            <option key={day} value={day}>
-                              1st Sunday on/after {day}th {day === 10 ? '(Default)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Recurring Auction Time */}
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
-                          Auction Bidding Time
-                        </label>
-                        <input
-                          type="time"
-                          value={newGroupAuctionTime}
-                          onChange={(e) => setNewGroupAuctionTime(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none"
-                        />
-                      </div>
-
-                    </div>
+                    <button
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setShowWizard(false);
+                      }}
+                      className="text-xs text-slate-500 hover:text-slate-800 underline font-semibold transition-colors py-1 px-2"
+                    >
+                      Exit Wizard
+                    </button>
                   </div>
 
-                  {/* Financial Projections Breakdown Card */}
-                  {Number(newGroupValue) > 0 && Number(newGroupDuration) > 0 && (
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-subtle space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                          <Coins size={14} className="text-brand-600" />
-                          <span>Financial Projections</span>
-                        </h5>
-                        <span className="text-[10px] font-semibold text-brand-700 bg-brand-50 border border-brand-200 px-2.5 py-0.5 rounded-full font-mono">
-                          {newGroupDuration} Tickets
-                        </span>
-                      </div>
+                  {/* Step Indicators */}
+                  <div className="flex items-center justify-between gap-1 sm:gap-3 w-full sm:w-auto">
 
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                          <span className="text-[10px] font-bold uppercase text-slate-500 block">Monthly Due</span>
-                          <strong className="text-sm sm:text-base font-extrabold text-brand-700 mt-0.5 block font-mono">
-                            {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}
-                          </strong>
-                          <span className="text-[10px] text-slate-500">per member / mo</span>
-                        </div>
+                    {/* Step 1 Pill */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setWizardStep(1);
+                      }}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${wizardStep === 1
+                        ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300'
+                        : 'hover:bg-slate-50 text-slate-500'
+                        }`}
+                    >
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${wizardStep === 1
+                        ? 'bg-brand-600 text-white shadow-xs'
+                        : wizardStep > 1
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-200 text-slate-600'
+                        }`}>
+                        {wizardStep > 1 ? <Check size={11} /> : '1'}
+                      </span>
+                      <span className={`text-xs truncate ${wizardStep === 1 ? 'font-bold text-brand-900' : 'font-semibold text-slate-600'}`}>
+                        <span className="hidden sm:inline">1. </span>Parameters
+                      </span>
+                    </button>
 
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                          <span className="text-[10px] font-bold uppercase text-slate-500 block">Month 0 Launch</span>
-                          <strong className="text-sm sm:text-base font-extrabold text-amber-700 mt-0.5 block font-mono">
-                            {formatCurrency(Number(newGroupValue))}
-                          </strong>
-                          <span className="text-[10px] text-amber-600 font-semibold">Organizer Profit</span>
-                        </div>
+                    <div className="flex-1 sm:w-4 h-px bg-slate-200"></div>
 
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                          <span className="text-[10px] font-bold uppercase text-slate-500 block">Total Lifecycle</span>
-                          <strong className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5 block">
-                            {Number(newGroupDuration) + 1} Months
-                          </strong>
-                          <span className="text-[10px] text-slate-500">M0 to M{newGroupDuration}</span>
-                        </div>
-
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                          <span className="text-[10px] font-bold uppercase text-slate-500 block">1st Auction (M1)</span>
-                          <strong className="text-xs sm:text-sm font-extrabold text-slate-900 mt-0.5 block truncate">
-                            {(() => {
-                              const targetDate = computeNextAuctionDateTime({
-                                auction_day_of_month: newGroupAuctionDay,
-                                auction_time: newGroupAuctionTime,
-                                next_auction_date: null,
-                                next_auction_time: newGroupAuctionTime,
-                                start_date: newGroupStartDate,
-                                current_month: 0,
-                              });
-                              return targetDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-                            })()}
-                          </strong>
-                          <span className="text-[10px] text-slate-500">{formatTime12h(newGroupAuctionTime)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Navigation Step 1 Footer */}
-                  <div className="flex justify-end pt-1">
+                    {/* Step 2 Pill */}
                     <button
                       type="button"
                       disabled={!newGroupName.trim() || !newGroupValue || !newGroupDuration}
@@ -7126,596 +6811,897 @@ Thank you for your prompt payment! 🙏`;
                         triggerHapticFeedback('light');
                         setWizardStep(2);
                       }}
-                      className="bg-brand-600 hover:bg-brand-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all w-full sm:w-auto cursor-pointer disabled:cursor-not-allowed"
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${wizardStep === 2
+                        ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300'
+                        : 'hover:bg-slate-50 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed'
+                        }`}
                     >
-                      <span>Proceed to Step 2: Assign Members</span>
-                      <ArrowRight size={14} />
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${wizardStep === 2
+                        ? 'bg-brand-600 text-white shadow-xs'
+                        : wizardStep > 2
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-200 text-slate-600'
+                        }`}>
+                        {wizardStep > 2 ? <Check size={11} /> : '2'}
+                      </span>
+                      <span className={`text-xs truncate ${wizardStep === 2 ? 'font-bold text-brand-900' : 'font-semibold text-slate-600'}`}>
+                        <span className="hidden sm:inline">2. </span>Members
+                      </span>
+                    </button>
+
+                    <div className="flex-1 sm:w-4 h-px bg-slate-200"></div>
+
+                    {/* Step 3 Pill */}
+                    <button
+                      type="button"
+                      disabled={!newGroupName.trim() || !newGroupValue || !newGroupDuration}
+                      onClick={() => {
+                        triggerHapticFeedback('light');
+                        setWizardStep(3);
+                      }}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${wizardStep === 3
+                        ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300'
+                        : 'hover:bg-slate-50 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed'
+                        }`}
+                    >
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${wizardStep === 3
+                        ? 'bg-brand-600 text-white shadow-xs'
+                        : 'bg-slate-200 text-slate-600'
+                        }`}>
+                        3
+                      </span>
+                      <span className={`text-xs truncate ${wizardStep === 3 ? 'font-bold text-brand-900' : 'font-semibold text-slate-600'}`}>
+                        <span className="hidden sm:inline">3. </span>Review
+                      </span>
                     </button>
                   </div>
                 </div>
-              )}
 
-              {/* ── STEP 2: ASSIGN GROUP MEMBERS ── */}
-              {wizardStep === 2 && (
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-subtle animate-in fade-in duration-150">
-                  
-                  {/* Step 2 Header & Quick Actions Bar */}
-                  <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-sm font-bold text-slate-900">
-                        Step 2: Assign Subscribers ({enrollments.filter(e => e.name !== '').length}/{newGroupDuration})
-                      </h4>
-                      {enrollments.every(e => e.name !== '') ? (
-                        <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                          <Check size={11} /> 100% Enrolled
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full">
-                          {enrollments.filter(e => !e.name).length} Open
-                        </span>
-                      )}
-                    </div>
+                {/* ── STEP 1: BASIC INFO & SCHEDULE ── */}
+                {wizardStep === 1 && (
+                  <div className="space-y-4 animate-in fade-in duration-150">
 
-                    <div className="flex items-center gap-2">
-                      {enrollments.some(e => e.name) && (
+                    {/* Step 1 Main Form Card */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 shadow-subtle">
+                      <div className="border-b border-slate-100 pb-3 flex items-center justify-between gap-2">
+                        <h4 className="text-sm font-bold text-slate-900">
+                          Step 1: Chit Parameters &amp; Schedule
+                        </h4>
                         <button
                           type="button"
-                          onClick={handleClearAllSlots}
-                          className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors active:scale-95 cursor-pointer"
+                          onClick={handleAutoGenerateName}
+                          className="text-[11px] font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shrink-0 active:scale-95 cursor-pointer"
                         >
-                          <RotateCcw size={12} />
-                          <span>Clear</span>
+                          <Sparkles size={12} />
+                          <span>Auto-Name</span>
                         </button>
-                      )}
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTargetSlotForAssign(null);
-                          setNewMemberName(memberSearchQuery.trim());
-                          setNewMemberPhone('');
-                          setShowCreateMemberModal(true);
-                        }}
-                        className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-xs active:scale-95 cursor-pointer"
-                      >
-                        <UserPlus size={13} />
-                        <span>+ Register</span>
-                      </button>
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
 
-                  {/* Fast Search & Auto-Suggest Combobox */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block flex items-center gap-1">
-                        <Search size={11} /> Search &amp; Assign {targetSlotForAssign !== null ? `(Slot #${targetSlotForAssign + 1})` : ''}
-                      </label>
-                      {targetSlotForAssign !== null && (
-                        <button
-                          type="button"
-                          onClick={() => setTargetSlotForAssign(null)}
-                          className="text-[10px] text-brand-600 hover:underline font-semibold"
-                        >
-                          Cancel Slot #{targetSlotForAssign + 1}
-                        </button>
-                      )}
-                    </div>
-
-                    {(() => {
-                      const filteredMembers = masterDirectory.filter(m => {
-                        const q = memberSearchQuery.trim().toLowerCase();
-                        if (!q) return true;
-                        const nameMatch = (m.name || '').toLowerCase().includes(q);
-                        const cleanDigits = q.replace(/\D/g, '');
-                        const phoneDigits = (m.phone || '').replace(/\D/g, '');
-                        const phoneMatch = (m.phone || '').toLowerCase().includes(q) || (cleanDigits.length > 0 && phoneDigits.includes(cleanDigits));
-                        return nameMatch || phoneMatch;
-                      });
-                      const totalItems = 1 + filteredMembers.length;
-
-                      return (
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-slate-400">
-                            <Search size={13} />
-                          </span>
-                          <input
-                            type="text"
-                            placeholder={targetSlotForAssign !== null ? `Type name for Slot #${targetSlotForAssign + 1}...` : "Search subscriber name or phone..."}
-                            value={memberSearchQuery}
-                            onFocus={() => {
-                              setIsSearchDropdownOpen(true);
-                              setDropdownHighlightedIndex(0);
-                            }}
-                            onChange={(e) => {
-                              setMemberSearchQuery(e.target.value);
-                              setIsSearchDropdownOpen(true);
-                              setDropdownHighlightedIndex(0);
-                            }}
-                            onKeyDown={(e) => {
-                              if (!isSearchDropdownOpen || memberSearchQuery.trim().length === 0) {
-                                if (e.key === 'ArrowDown') {
-                                  setIsSearchDropdownOpen(true);
-                                }
-                                return;
-                              }
-
-                              if (e.key === 'ArrowDown') {
-                                e.preventDefault();
-                                setDropdownHighlightedIndex(prev => (prev + 1) % totalItems);
-                              } else if (e.key === 'ArrowUp') {
-                                e.preventDefault();
-                                setDropdownHighlightedIndex(prev => (prev - 1 + totalItems) % totalItems);
-                              } else if (e.key === 'Enter') {
-                                e.preventDefault();
-                                if (dropdownHighlightedIndex === 0) {
-                                  setNewMemberName(memberSearchQuery.trim());
-                                  setNewMemberPhone('');
-                                  setShowCreateMemberModal(true);
-                                  setIsSearchDropdownOpen(false);
-                                } else {
-                                  const targetMember = filteredMembers[dropdownHighlightedIndex - 1];
-                                  if (targetMember) {
-                                    const isAlreadyEnrolled = enrollments.some(
-                                      en => en.name.toLowerCase() === targetMember.name.toLowerCase()
-                                    );
-                                    if (!isAlreadyEnrolled) {
-                                      handleAssignExistingMember(targetMember);
-                                    }
-                                  }
-                                }
-                              } else if (e.key === 'Escape') {
-                                setIsSearchDropdownOpen(false);
-                              }
-                            }}
-                            className="w-full bg-white border border-slate-200 focus:border-brand-500 rounded-xl pl-8 pr-10 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs"
-                          />
-                          {memberSearchQuery && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setMemberSearchQuery('');
-                                setIsSearchDropdownOpen(false);
-                              }}
-                              className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 p-1"
-                            >
-                              <X size={13} />
-                            </button>
-                          )}
-
-                          {/* Dropdown Suggestions */}
-                          {isSearchDropdownOpen && memberSearchQuery.trim().length > 0 && (
-                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-slate-100">
-                              {/* Create Option (Index 0) */}
-                              <div
-                                onClick={() => {
-                                  setNewMemberName(memberSearchQuery.trim());
-                                  setNewMemberPhone('');
-                                  setShowCreateMemberModal(true);
-                                  setIsSearchDropdownOpen(false);
-                                }}
-                                className={`p-2.5 cursor-pointer flex items-center justify-between text-xs transition-colors ${
-                                  dropdownHighlightedIndex === 0
-                                    ? 'bg-brand-50 text-brand-900 font-bold ring-1 ring-inset ring-brand-300'
-                                    : 'hover:bg-slate-50 text-brand-700 font-semibold'
-                                }`}
+                        {/* 1. Group Name */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                            Group Name <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. G-2L-10M-OCT26"
+                              value={newGroupName}
+                              onChange={(e) => setNewGroupName(e.target.value)}
+                              className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors"
+                            />
+                            {newGroupName && (
+                              <button
+                                type="button"
+                                onClick={() => setNewGroupName('')}
+                                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5"
                               >
-                                <span className="flex items-center gap-1.5">
-                                  <UserPlus size={14} />
-                                  <span>Create &quot;{memberSearchQuery}&quot;</span>
-                                </span>
-                                <span className="text-[10px] bg-brand-600 text-white px-2 py-0.5 rounded font-semibold flex items-center gap-1">
-                                  {dropdownHighlightedIndex === 0 && <span>↵</span>} + New
-                                </span>
-                              </div>
-
-                              {/* Matching Master Directory Members */}
-                              {filteredMembers.map((member, idx) => {
-                                const isAlreadyEnrolled = enrollments.some(
-                                  e => e.name.toLowerCase() === member.name.toLowerCase()
-                                );
-                                const isHighlighted = dropdownHighlightedIndex === idx + 1;
-
-                                return (
-                                  <div
-                                    key={idx}
-                                    onClick={() => {
-                                      if (!isAlreadyEnrolled) {
-                                        handleAssignExistingMember(member);
-                                      }
-                                    }}
-                                    className={`p-2.5 flex items-center justify-between text-xs transition-colors ${
-                                      isAlreadyEnrolled
-                                        ? 'bg-slate-50 text-slate-400 cursor-not-allowed opacity-60'
-                                        : isHighlighted
-                                          ? 'bg-brand-50 text-brand-900 font-bold ring-1 ring-inset ring-brand-300'
-                                          : 'hover:bg-slate-50 cursor-pointer text-slate-900'
-                                    }`}
-                                  >
-                                    <div>
-                                      <span className="font-bold block">{member.name}</span>
-                                      <span className="text-[10px] text-slate-500">{member.phone}</span>
-                                    </div>
-                                    <div>
-                                      {isAlreadyEnrolled ? (
-                                        <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Enrolled</span>
-                                      ) : isHighlighted ? (
-                                        <span className="text-[10px] font-bold text-white bg-brand-600 px-2.5 py-0.5 rounded shadow-sm">
-                                          ↵ Assign
-                                        </span>
-                                      ) : (
-                                        <span className="text-[10px] font-bold text-brand-700 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded hover:bg-brand-100">
-                                          Assign →
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Group Enrollment Slots Grid */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                        Enrolled Tickets ({enrollments.filter(e => e.name !== '').length}/{newGroupDuration})
-                      </h5>
-                      <span className="text-[10px] text-slate-500">
-                        {enrollments.some(e => e.name === '') ? 'Tap slot to assign' : '✓ All tickets assigned'}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[340px] sm:max-h-[420px] overflow-y-auto pr-1">
-                      {enrollments.map((slot, index) => {
-                        const isTargeted = targetSlotForAssign === index;
-                        const monogram = slot.name ? slot.name.trim().charAt(0).toUpperCase() : `${index + 1}`;
-
-                        return (
-                          <div 
-                            key={index} 
-                            className={`flex gap-2.5 items-center p-3 rounded-2xl border transition-all ${
-                              slot.name 
-                                ? 'bg-white border-slate-200 shadow-2xs hover:border-brand-300' 
-                                : isTargeted
-                                  ? 'border-brand-500 bg-brand-50/50 ring-2 ring-brand-200'
-                                  : 'border-dashed border-slate-300 bg-slate-50 hover:bg-white hover:border-brand-300 cursor-pointer'
-                            }`}
-                            onClick={() => {
-                              if (!slot.name) {
-                                triggerHapticFeedback('light');
-                                setTargetSlotForAssign(index);
-                                setIsSearchDropdownOpen(true);
-                              }
-                            }}
-                          >
-                            <span className={`text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                              slot.name
-                                ? 'bg-brand-50 text-brand-700 border border-brand-200'
-                                : isTargeted
-                                  ? 'bg-brand-600 text-white'
-                                  : 'bg-slate-200 text-slate-600'
-                            }`}>
-                              {monogram}
-                            </span>
-
-                            {slot.name ? (
-                              <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                                <div className="truncate">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-bold text-slate-900 truncate">{slot.name}</span>
-                                    <span className="text-[10px] text-slate-400 font-mono">#{index + 1}</span>
-                                  </div>
-                                  <span className="text-[10px] text-slate-500 block truncate flex items-center gap-1 mt-0.5">
-                                    <Phone size={10} className="text-slate-400 shrink-0" />
-                                    <span>{slot.phone}</span>
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    triggerHapticFeedback('light');
-                                    handleClearSlot(index);
-                                  }}
-                                  title="Unassign member"
-                                  className="text-rose-600 hover:text-rose-700 text-[10px] font-semibold px-2 py-1 rounded-lg border border-rose-200 shrink-0 bg-rose-50 hover:bg-rose-100 transition-colors flex items-center gap-1 active:scale-95 cursor-pointer"
-                                >
-                                  <Trash2 size={10} />
-                                  <span>Clear</span>
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex-1 min-w-0 flex items-center justify-between">
-                                <span className={`text-xs font-semibold truncate ${isTargeted ? 'text-brand-700' : 'text-slate-400'}`}>
-                                  {isTargeted ? 'Selected' : `Open Slot #${index + 1}`}
-                                </span>
-                                <span className="text-[10px] font-bold text-brand-700 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-lg shrink-0">
-                                  + Fill
-                                </span>
-                              </div>
+                                <X size={13} />
+                              </button>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Master Member Directory */}
-                  <div className="space-y-2 border-t border-slate-100 pt-3.5">
-                    <div className="flex items-center justify-between">
-                      <h5 className="text-[10px] font-bold text-brand-700 uppercase tracking-wider">
-                        Master Directory ({masterDirectory.length})
-                      </h5>
-                      <span className="text-[10px] text-slate-500">Tap subscriber to assign to first open slot</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[280px] overflow-y-auto pr-1">
-                      {masterDirectory.length === 0 ? (
-                        <div className="col-span-full py-4 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                          No subscribers found in database. Tap <strong>&quot;+ Register&quot;</strong> to add one.
                         </div>
-                      ) : (
-                        masterDirectory.map((member, i) => {
-                          const isAlreadyAdded = enrollments.some(e => 
-                            (member.id && e.id && e.id === member.id) ||
-                            (e.name && member.name && e.name.toLowerCase() === member.name.toLowerCase()) ||
-                            (e.phone && member.phone && e.phone.replace(/\D/g, '') === member.phone.replace(/\D/g, ''))
-                          );
 
-                          return (
-                            <button
-                              key={i}
-                              type="button"
-                              disabled={isAlreadyAdded}
-                              onClick={() => handleAssignExistingMember(member)}
-                              className={`p-3 rounded-2xl border text-left transition-all relative active:scale-95 flex flex-col justify-between ${
-                                isAlreadyAdded 
-                                  ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed' 
-                                  : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-brand-300 shadow-2xs cursor-pointer'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-1 w-full">
-                                <span className="text-xs font-bold text-slate-900 block truncate">{member.name}</span>
-                                {isAlreadyAdded && (
-                                  <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">
-                                    Enrolled
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-[10px] text-slate-500 block truncate mt-1 flex items-center gap-1 font-mono">
-                                <Phone size={10} className="text-slate-400 shrink-0" />
-                                <span>{member.phone}</span>
-                              </span>
-                            </button>
-                          );
-                        })
-                      )}
+                        {/* 2. Total Pool Value */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                            Total Pool Value (₹) <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">₹</span>
+                            <input
+                              type="number"
+                              required
+                              placeholder="100000"
+                              value={newGroupValue}
+                              onChange={(e) => setNewGroupValue(e.target.value)}
+                              className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl pl-7 pr-3.5 py-2.5 text-xs font-bold font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors"
+                            />
+                          </div>
+                          {/* Target Presets */}
+                          <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                            {[
+                              { label: '₹1L', val: 100000 },
+                              { label: '₹2L', val: 200000 },
+                              { label: '₹5L', val: 500000 },
+                              { label: '₹10L', val: 1000000 },
+                            ].map(preset => {
+                              const isSelected = newGroupValue === preset.val.toString();
+                              return (
+                                <button
+                                  key={preset.label}
+                                  type="button"
+                                  onClick={() => {
+                                    triggerHapticFeedback('light');
+                                    setNewGroupValue(preset.val.toString());
+                                  }}
+                                  className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border cursor-pointer ${isSelected
+                                    ? 'bg-brand-600 text-white border-brand-600 shadow-xs ring-2 ring-brand-300'
+                                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                  {preset.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* 3. Duration & Member Count */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                            Duration / Tickets (Months) <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              required
+                              min={1}
+                              max={50}
+                              placeholder="20"
+                              value={newGroupDuration}
+                              onChange={(e) => handleDurationChange(e.target.value)}
+                              className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-bold font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors"
+                            />
+                          </div>
+                          {/* Duration Presets */}
+                          <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                            {[5, 10, 20, 25].map(val => {
+                              const isSelected = newGroupDuration === val.toString();
+                              return (
+                                <button
+                                  key={val}
+                                  type="button"
+                                  onClick={() => {
+                                    triggerHapticFeedback('light');
+                                    handleDurationChange(val.toString());
+                                  }}
+                                  className={`text-[10px] font-bold py-1.5 rounded-lg transition-all text-center active:scale-95 border cursor-pointer ${isSelected
+                                    ? 'bg-brand-600 text-white border-brand-600 shadow-xs ring-2 ring-brand-300'
+                                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                  {val}m
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* Schedule Row */}
+                      <div className="border-t border-slate-100 pt-4 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
+
+                        {/* Launch Date */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                            Launch Date (Month 0) <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="date"
+                              required
+                              value={newGroupStartDate}
+                              onChange={(e) => setNewGroupStartDate(e.target.value)}
+                              className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none font-semibold"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Recurring Auction Rule Dropdown */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                            Monthly Auction Rule
+                          </label>
+                          <select
+                            value={newGroupAuctionDay}
+                            onChange={(e) => {
+                              const day = Number(e.target.value);
+                              setNewGroupAuctionDay(day);
+                              updateLaunchDateFromRule(day, newGroupStartDate);
+                              triggerHapticFeedback('light');
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none cursor-pointer"
+                          >
+                            {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
+                              <option key={day} value={day}>
+                                1st Sunday on/after {day}th {day === 10 ? '(Default)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Recurring Auction Time */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
+                            Auction Bidding Time
+                          </label>
+                          <input
+                            type="time"
+                            value={newGroupAuctionTime}
+                            onChange={(e) => setNewGroupAuctionTime(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none"
+                          />
+                        </div>
+
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Navigation Step 2 Buttons */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHapticFeedback('light');
-                        setWizardStep(1);
-                      }}
-                      className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center cursor-pointer"
-                    >
-                      <ArrowLeft size={13} className="inline mr-1" />
-                      <span>Back to Parameters</span>
-                    </button>
+                    {/* Financial Projections Breakdown Card */}
+                    {Number(newGroupValue) > 0 && Number(newGroupDuration) > 0 && (
+                      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-subtle space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <Coins size={14} className="text-brand-600" />
+                            <span>Financial Projections</span>
+                          </h5>
+                          <span className="text-[10px] font-semibold text-brand-700 bg-brand-50 border border-brand-200 px-2.5 py-0.5 rounded-full font-mono">
+                            {newGroupDuration} Tickets
+                          </span>
+                        </div>
 
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-                      <span className="text-xs text-slate-500 font-medium text-center sm:text-right">
-                        <strong className="text-slate-900">{enrollments.filter(e => e.name && e.name.trim() !== '').length}/{newGroupDuration}</strong> tickets
-                        {enrollments.some(e => !e.name || e.name.trim() === '') && (
-                          <span className="text-amber-600 font-bold ml-1.5">(Draft)</span>
-                        )}
-                      </span>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                            <span className="text-[10px] font-bold uppercase text-slate-500 block">Monthly Due</span>
+                            <strong className="text-sm sm:text-base font-extrabold text-brand-700 mt-0.5 block font-mono">
+                              {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}
+                            </strong>
+                            <span className="text-[10px] text-slate-500">per member / mo</span>
+                          </div>
+
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                            <span className="text-[10px] font-bold uppercase text-slate-500 block">Month 0 Launch</span>
+                            <strong className="text-sm sm:text-base font-extrabold text-amber-700 mt-0.5 block font-mono">
+                              {formatCurrency(Number(newGroupValue))}
+                            </strong>
+                            <span className="text-[10px] text-amber-600 font-semibold">Organizer Profit</span>
+                          </div>
+
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                            <span className="text-[10px] font-bold uppercase text-slate-500 block">Total Lifecycle</span>
+                            <strong className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5 block">
+                              {Number(newGroupDuration) + 1} Months
+                            </strong>
+                            <span className="text-[10px] text-slate-500">M0 to M{newGroupDuration}</span>
+                          </div>
+
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                            <span className="text-[10px] font-bold uppercase text-slate-500 block">1st Auction (M1)</span>
+                            <strong className="text-xs sm:text-sm font-extrabold text-slate-900 mt-0.5 block truncate">
+                              {(() => {
+                                const targetDate = computeNextAuctionDateTime({
+                                  auction_day_of_month: newGroupAuctionDay,
+                                  auction_time: newGroupAuctionTime,
+                                  next_auction_date: null,
+                                  next_auction_time: newGroupAuctionTime,
+                                  start_date: newGroupStartDate,
+                                  current_month: 0,
+                                });
+                                return targetDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+                              })()}
+                            </strong>
+                            <span className="text-[10px] text-slate-500">{formatTime12h(newGroupAuctionTime)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Navigation Step 1 Footer */}
+                    <div className="flex justify-end pt-1">
                       <button
                         type="button"
+                        disabled={!newGroupName.trim() || !newGroupValue || !newGroupDuration}
                         onClick={() => {
                           triggerHapticFeedback('light');
-                          setWizardStep(3);
+                          setWizardStep(2);
                         }}
-                        className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                        className="bg-brand-600 hover:bg-brand-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all w-full sm:w-auto cursor-pointer disabled:cursor-not-allowed"
                       >
-                        <span>Proceed to Review</span>
+                        <span>Proceed to Step 2: Assign Members</span>
                         <ArrowRight size={14} />
                       </button>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* ── STEP 3: REVIEW & LAUNCH PLAN ── */}
-              {wizardStep === 3 && (
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-subtle animate-in fade-in duration-150">
-                  <div className="border-b border-slate-100 pb-3 flex items-center justify-between gap-2">
-                    <h4 className="text-sm font-bold text-slate-900">Step 3: Review &amp; Launch</h4>
-                    <div>
-                      {enrollments.every(e => e.name !== '') ? (
-                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                          <CheckCircle2 size={12} /> Active Launch
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                          Draft ({enrollments.filter(e => !e.name).length} Open)
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                {/* ── STEP 2: ASSIGN GROUP MEMBERS ── */}
+                {wizardStep === 2 && (
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-subtle animate-in fade-in duration-150">
 
-                  {/* Summary Metric Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Group</span>
-                      <strong className="text-slate-900 mt-0.5 block truncate text-xs sm:text-sm font-bold">{newGroupName}</strong>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Pool Value</span>
-                      <strong className="text-brand-700 mt-0.5 block truncate text-xs sm:text-sm font-extrabold font-mono">{formatCurrency(Number(newGroupValue))}</strong>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Lifecycle</span>
-                      <strong className="text-slate-900 mt-0.5 block truncate text-xs sm:text-sm font-bold">{Number(newGroupDuration) + 1} Months (M0-M{newGroupDuration})</strong>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Monthly Due</span>
-                      <strong className="text-emerald-700 mt-0.5 block truncate text-xs sm:text-sm font-extrabold font-mono">
-                        {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))} / mo
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Operational Timeline Preview Box */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5">
-                    <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <CalendarDays size={14} className="text-brand-600" />
-                      <span>Operational Timeline</span>
-                    </h5>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
-                      
-                      {/* Month 0 Card */}
-                      <div className="bg-white border border-amber-200 rounded-xl p-3 space-y-1 shadow-2xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-amber-900 flex items-center gap-1">
-                            <Rocket size={12} className="text-amber-600" /> Month 0: Launch
+                    {/* Step 2 Header & Quick Actions Bar */}
+                    <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-bold text-slate-900">
+                          Step 2: Assign Subscribers ({enrollments.filter(e => e.name !== '').length}/{newGroupDuration})
+                        </h4>
+                        {enrollments.every(e => e.name !== '') ? (
+                          <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <Check size={11} /> 100% Enrolled
                           </span>
-                          <span className="text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded">
-                            Organizer Profit
+                        ) : (
+                          <span className="text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                            {enrollments.filter(e => !e.name).length} Open
                           </span>
-                        </div>
-                        <p className="text-[11px] text-slate-600">
-                          {newGroupStartDate} · All {newGroupDuration} members pay first installment ({formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}). No auction held.
-                        </p>
+                        )}
                       </div>
 
-                      {/* Month 1 Card */}
-                      <div className="bg-white border border-brand-200 rounded-xl p-3 space-y-1 shadow-2xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-brand-900 flex items-center gap-1">
-                            <Trophy size={12} className="text-brand-600" /> Month 1: 1st Auction
+                      <div className="flex items-center gap-2">
+                        {enrollments.some(e => e.name) && (
+                          <button
+                            type="button"
+                            onClick={handleClearAllSlots}
+                            className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors active:scale-95 cursor-pointer"
+                          >
+                            <RotateCcw size={12} />
+                            <span>Clear</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetSlotForAssign(null);
+                            setNewMemberName(memberSearchQuery.trim());
+                            setNewMemberPhone('');
+                            setShowCreateMemberModal(true);
+                          }}
+                          className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors shadow-xs active:scale-95 cursor-pointer"
+                        >
+                          <UserPlus size={13} />
+                          <span>+ Register</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Fast Search & Auto-Suggest Combobox */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block flex items-center gap-1">
+                          <Search size={11} /> Search &amp; Assign {targetSlotForAssign !== null ? `(Slot #${targetSlotForAssign + 1})` : ''}
+                        </label>
+                        {targetSlotForAssign !== null && (
+                          <button
+                            type="button"
+                            onClick={() => setTargetSlotForAssign(null)}
+                            className="text-[10px] text-brand-600 hover:underline font-semibold"
+                          >
+                            Cancel Slot #{targetSlotForAssign + 1}
+                          </button>
+                        )}
+                      </div>
+
+                      {(() => {
+                        const filteredMembers = masterDirectory.filter(m => {
+                          const q = memberSearchQuery.trim().toLowerCase();
+                          if (!q) return true;
+                          const nameMatch = (m.name || '').toLowerCase().includes(q);
+                          const cleanDigits = q.replace(/\D/g, '');
+                          const phoneDigits = (m.phone || '').replace(/\D/g, '');
+                          const phoneMatch = (m.phone || '').toLowerCase().includes(q) || (cleanDigits.length > 0 && phoneDigits.includes(cleanDigits));
+                          return nameMatch || phoneMatch;
+                        });
+                        const totalItems = 1 + filteredMembers.length;
+
+                        return (
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-slate-400">
+                              <Search size={13} />
+                            </span>
+                            <input
+                              type="text"
+                              placeholder={targetSlotForAssign !== null ? `Type name for Slot #${targetSlotForAssign + 1}...` : "Search subscriber name or phone..."}
+                              value={memberSearchQuery}
+                              onFocus={() => {
+                                setIsSearchDropdownOpen(true);
+                                setDropdownHighlightedIndex(0);
+                              }}
+                              onChange={(e) => {
+                                setMemberSearchQuery(e.target.value);
+                                setIsSearchDropdownOpen(true);
+                                setDropdownHighlightedIndex(0);
+                              }}
+                              onKeyDown={(e) => {
+                                if (!isSearchDropdownOpen || memberSearchQuery.trim().length === 0) {
+                                  if (e.key === 'ArrowDown') {
+                                    setIsSearchDropdownOpen(true);
+                                  }
+                                  return;
+                                }
+
+                                if (e.key === 'ArrowDown') {
+                                  e.preventDefault();
+                                  setDropdownHighlightedIndex(prev => (prev + 1) % totalItems);
+                                } else if (e.key === 'ArrowUp') {
+                                  e.preventDefault();
+                                  setDropdownHighlightedIndex(prev => (prev - 1 + totalItems) % totalItems);
+                                } else if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (dropdownHighlightedIndex === 0) {
+                                    setNewMemberName(memberSearchQuery.trim());
+                                    setNewMemberPhone('');
+                                    setShowCreateMemberModal(true);
+                                    setIsSearchDropdownOpen(false);
+                                  } else {
+                                    const targetMember = filteredMembers[dropdownHighlightedIndex - 1];
+                                    if (targetMember) {
+                                      const isAlreadyEnrolled = enrollments.some(
+                                        en => en.name.toLowerCase() === targetMember.name.toLowerCase()
+                                      );
+                                      if (!isAlreadyEnrolled) {
+                                        handleAssignExistingMember(targetMember);
+                                      }
+                                    }
+                                  }
+                                } else if (e.key === 'Escape') {
+                                  setIsSearchDropdownOpen(false);
+                                }
+                              }}
+                              className="w-full bg-white border border-slate-200 focus:border-brand-500 rounded-xl pl-8 pr-10 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs"
+                            />
+                            {memberSearchQuery && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMemberSearchQuery('');
+                                  setIsSearchDropdownOpen(false);
+                                }}
+                                className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 p-1"
+                              >
+                                <X size={13} />
+                              </button>
+                            )}
+
+                            {/* Dropdown Suggestions */}
+                            {isSearchDropdownOpen && memberSearchQuery.trim().length > 0 && (
+                              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                                {/* Create Option (Index 0) */}
+                                <div
+                                  onClick={() => {
+                                    setNewMemberName(memberSearchQuery.trim());
+                                    setNewMemberPhone('');
+                                    setShowCreateMemberModal(true);
+                                    setIsSearchDropdownOpen(false);
+                                  }}
+                                  className={`p-2.5 cursor-pointer flex items-center justify-between text-xs transition-colors ${dropdownHighlightedIndex === 0
+                                    ? 'bg-brand-50 text-brand-900 font-bold ring-1 ring-inset ring-brand-300'
+                                    : 'hover:bg-slate-50 text-brand-700 font-semibold'
+                                    }`}
+                                >
+                                  <span className="flex items-center gap-1.5">
+                                    <UserPlus size={14} />
+                                    <span>Create &quot;{memberSearchQuery}&quot;</span>
+                                  </span>
+                                  <span className="text-[10px] bg-brand-600 text-white px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                                    {dropdownHighlightedIndex === 0 && <span>↵</span>} + New
+                                  </span>
+                                </div>
+
+                                {/* Matching Master Directory Members */}
+                                {filteredMembers.map((member, idx) => {
+                                  const isAlreadyEnrolled = enrollments.some(
+                                    e => e.name.toLowerCase() === member.name.toLowerCase()
+                                  );
+                                  const isHighlighted = dropdownHighlightedIndex === idx + 1;
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      onClick={() => {
+                                        if (!isAlreadyEnrolled) {
+                                          handleAssignExistingMember(member);
+                                        }
+                                      }}
+                                      className={`p-2.5 flex items-center justify-between text-xs transition-colors ${isAlreadyEnrolled
+                                        ? 'bg-slate-50 text-slate-400 cursor-not-allowed opacity-60'
+                                        : isHighlighted
+                                          ? 'bg-brand-50 text-brand-900 font-bold ring-1 ring-inset ring-brand-300'
+                                          : 'hover:bg-slate-50 cursor-pointer text-slate-900'
+                                        }`}
+                                    >
+                                      <div>
+                                        <span className="font-bold block">{member.name}</span>
+                                        <span className="text-[10px] text-slate-500">{member.phone}</span>
+                                      </div>
+                                      <div>
+                                        {isAlreadyEnrolled ? (
+                                          <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Enrolled</span>
+                                        ) : isHighlighted ? (
+                                          <span className="text-[10px] font-bold text-white bg-brand-600 px-2.5 py-0.5 rounded shadow-sm">
+                                            ↵ Assign
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] font-bold text-brand-700 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded hover:bg-brand-100">
+                                            Assign →
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Group Enrollment Slots Grid */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          Enrolled Tickets ({enrollments.filter(e => e.name !== '').length}/{newGroupDuration})
+                        </h5>
+                        <span className="text-[10px] text-slate-500">
+                          {enrollments.some(e => e.name === '') ? 'Tap slot to assign' : '✓ All tickets assigned'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[340px] sm:max-h-[420px] overflow-y-auto pr-1">
+                        {enrollments.map((slot, index) => {
+                          const isTargeted = targetSlotForAssign === index;
+                          const monogram = slot.name ? slot.name.trim().charAt(0).toUpperCase() : `${index + 1}`;
+
+                          return (
+                            <div
+                              key={index}
+                              className={`flex gap-2.5 items-center p-3 rounded-2xl border transition-all ${slot.name
+                                ? 'bg-white border-slate-200 shadow-2xs hover:border-brand-300'
+                                : isTargeted
+                                  ? 'border-brand-500 bg-brand-50/50 ring-2 ring-brand-200'
+                                  : 'border-dashed border-slate-300 bg-slate-50 hover:bg-white hover:border-brand-300 cursor-pointer'
+                                }`}
+                              onClick={() => {
+                                if (!slot.name) {
+                                  triggerHapticFeedback('light');
+                                  setTargetSlotForAssign(index);
+                                  setIsSearchDropdownOpen(true);
+                                }
+                              }}
+                            >
+                              <span className={`text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${slot.name
+                                ? 'bg-brand-50 text-brand-700 border border-brand-200'
+                                : isTargeted
+                                  ? 'bg-brand-600 text-white'
+                                  : 'bg-slate-200 text-slate-600'
+                                }`}>
+                                {monogram}
+                              </span>
+
+                              {slot.name ? (
+                                <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                                  <div className="truncate">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-bold text-slate-900 truncate">{slot.name}</span>
+                                      <span className="text-[10px] text-slate-400 font-mono">#{index + 1}</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 block truncate flex items-center gap-1 mt-0.5">
+                                      <Phone size={10} className="text-slate-400 shrink-0" />
+                                      <span>{slot.phone}</span>
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      triggerHapticFeedback('light');
+                                      handleClearSlot(index);
+                                    }}
+                                    title="Unassign member"
+                                    className="text-rose-600 hover:text-rose-700 text-[10px] font-semibold px-2 py-1 rounded-lg border border-rose-200 shrink-0 bg-rose-50 hover:bg-rose-100 transition-colors flex items-center gap-1 active:scale-95 cursor-pointer"
+                                  >
+                                    <Trash2 size={10} />
+                                    <span>Clear</span>
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex-1 min-w-0 flex items-center justify-between">
+                                  <span className={`text-xs font-semibold truncate ${isTargeted ? 'text-brand-700' : 'text-slate-400'}`}>
+                                    {isTargeted ? 'Selected' : `Open Slot #${index + 1}`}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-brand-700 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-lg shrink-0">
+                                    + Fill
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Master Member Directory */}
+                    <div className="space-y-2 border-t border-slate-100 pt-3.5">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-[10px] font-bold text-brand-700 uppercase tracking-wider">
+                          Master Directory ({masterDirectory.length})
+                        </h5>
+                        <span className="text-[10px] text-slate-500">Tap subscriber to assign to first open slot</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[280px] overflow-y-auto pr-1">
+                        {masterDirectory.length === 0 ? (
+                          <div className="col-span-full py-4 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                            No subscribers found in database. Tap <strong>&quot;+ Register&quot;</strong> to add one.
+                          </div>
+                        ) : (
+                          masterDirectory.map((member, i) => {
+                            const isAlreadyAdded = enrollments.some(e =>
+                              (member.id && e.id && e.id === member.id) ||
+                              (e.name && member.name && e.name.toLowerCase() === member.name.toLowerCase()) ||
+                              (e.phone && member.phone && e.phone.replace(/\D/g, '') === member.phone.replace(/\D/g, ''))
+                            );
+
+                            return (
+                              <button
+                                key={i}
+                                type="button"
+                                disabled={isAlreadyAdded}
+                                onClick={() => handleAssignExistingMember(member)}
+                                className={`p-3 rounded-2xl border text-left transition-all relative active:scale-95 flex flex-col justify-between ${isAlreadyAdded
+                                  ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
+                                  : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-brand-300 shadow-2xs cursor-pointer'
+                                  }`}
+                              >
+                                <div className="flex items-start justify-between gap-1 w-full">
+                                  <span className="text-xs font-bold text-slate-900 block truncate">{member.name}</span>
+                                  {isAlreadyAdded && (
+                                    <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">
+                                      Enrolled
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-500 block truncate mt-1 flex items-center gap-1 font-mono">
+                                  <Phone size={10} className="text-slate-400 shrink-0" />
+                                  <span>{member.phone}</span>
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Navigation Step 2 Buttons */}
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHapticFeedback('light');
+                          setWizardStep(1);
+                        }}
+                        className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center cursor-pointer"
+                      >
+                        <ArrowLeft size={13} className="inline mr-1" />
+                        <span>Back to Parameters</span>
+                      </button>
+
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+                        <span className="text-xs text-slate-500 font-medium text-center sm:text-right">
+                          <strong className="text-slate-900">{enrollments.filter(e => e.name && e.name.trim() !== '').length}/{newGroupDuration}</strong> tickets
+                          {enrollments.some(e => !e.name || e.name.trim() === '') && (
+                            <span className="text-amber-600 font-bold ml-1.5">(Draft)</span>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            triggerHapticFeedback('light');
+                            setWizardStep(3);
+                          }}
+                          className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                        >
+                          <span>Proceed to Review</span>
+                          <ArrowRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── STEP 3: REVIEW & LAUNCH PLAN ── */}
+                {wizardStep === 3 && (
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-subtle animate-in fade-in duration-150">
+                    <div className="border-b border-slate-100 pb-3 flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-bold text-slate-900">Step 3: Review &amp; Launch</h4>
+                      <div>
+                        {enrollments.every(e => e.name !== '') ? (
+                          <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                            <CheckCircle2 size={12} /> Active Launch
                           </span>
-                          <span className="text-[9px] font-bold bg-brand-50 text-brand-700 border border-brand-200 px-1.5 py-0.5 rounded">
-                            Live Bidding
+                        ) : (
+                          <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                            Draft ({enrollments.filter(e => !e.name).length} Open)
                           </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Summary Metric Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <span className="text-slate-500 block text-[10px] uppercase font-bold">Group</span>
+                        <strong className="text-slate-900 mt-0.5 block truncate text-xs sm:text-sm font-bold">{newGroupName}</strong>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <span className="text-slate-500 block text-[10px] uppercase font-bold">Pool Value</span>
+                        <strong className="text-brand-700 mt-0.5 block truncate text-xs sm:text-sm font-extrabold font-mono">{formatCurrency(Number(newGroupValue))}</strong>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <span className="text-slate-500 block text-[10px] uppercase font-bold">Lifecycle</span>
+                        <strong className="text-slate-900 mt-0.5 block truncate text-xs sm:text-sm font-bold">{Number(newGroupDuration) + 1} Months (M0-M{newGroupDuration})</strong>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <span className="text-slate-500 block text-[10px] uppercase font-bold">Monthly Due</span>
+                        <strong className="text-emerald-700 mt-0.5 block truncate text-xs sm:text-sm font-extrabold font-mono">
+                          {formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))} / mo
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* Operational Timeline Preview Box */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5">
+                      <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <CalendarDays size={14} className="text-brand-600" />
+                        <span>Operational Timeline</span>
+                      </h5>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+
+                        {/* Month 0 Card */}
+                        <div className="bg-white border border-amber-200 rounded-xl p-3 space-y-1 shadow-2xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-amber-900 flex items-center gap-1">
+                              <Rocket size={12} className="text-amber-600" /> Month 0: Launch
+                            </span>
+                            <span className="text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded">
+                              Organizer Profit
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            {newGroupStartDate} · All {newGroupDuration} members pay first installment ({formatCurrency(Math.round(Number(newGroupValue) / Number(newGroupDuration)))}). No auction held.
+                          </p>
                         </div>
-                        <p className="text-[11px] text-slate-600">
-                          {(() => {
-                            try {
-                              let year: number;
-                              let month: number;
-                              if (newGroupStartDate.includes('-')) {
-                                const parts = newGroupStartDate.split('-');
-                                year = parseInt(parts[0], 10);
-                                month = parseInt(parts[1], 10) - 1;
-                              } else {
-                                const d = new Date(newGroupStartDate);
-                                year = d.getFullYear();
-                                month = d.getMonth();
+
+                        {/* Month 1 Card */}
+                        <div className="bg-white border border-brand-200 rounded-xl p-3 space-y-1 shadow-2xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-brand-900 flex items-center gap-1">
+                              <Trophy size={12} className="text-brand-600" /> Month 1: 1st Auction
+                            </span>
+                            <span className="text-[9px] font-bold bg-brand-50 text-brand-700 border border-brand-200 px-1.5 py-0.5 rounded">
+                              Live Bidding
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            {(() => {
+                              try {
+                                let year: number;
+                                let month: number;
+                                if (newGroupStartDate.includes('-')) {
+                                  const parts = newGroupStartDate.split('-');
+                                  year = parseInt(parts[0], 10);
+                                  month = parseInt(parts[1], 10) - 1;
+                                } else {
+                                  const d = new Date(newGroupStartDate);
+                                  year = d.getFullYear();
+                                  month = d.getMonth();
+                                }
+                                const day = Number(newGroupAuctionDay) || 10;
+                                const m1Date = new Date(year, month + 1, day);
+                                const dateFormatted = m1Date.toLocaleDateString('en-IN', {
+                                  weekday: 'short',
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric'
+                                });
+                                return (
+                                  <>
+                                    <strong className="text-slate-900 font-semibold">{dateFormatted} · {formatTime12h(newGroupAuctionTime)}</strong>. Winning discount accumulates into <code>kai_iruppu_pool</code>.
+                                  </>
+                                );
+                              } catch {
+                                return (
+                                  <>
+                                    <strong className="text-slate-900 font-semibold">{newGroupAuctionDay}th of next month · {formatTime12h(newGroupAuctionTime)}</strong>. Winning discount accumulates into <code>kai_iruppu_pool</code>.
+                                  </>
+                                );
                               }
-                              const day = Number(newGroupAuctionDay) || 10;
-                              const m1Date = new Date(year, month + 1, day);
-                              const dateFormatted = m1Date.toLocaleDateString('en-IN', {
-                                weekday: 'short',
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric'
-                              });
-                              return (
-                                <>
-                                  <strong className="text-slate-900 font-semibold">{dateFormatted} · {formatTime12h(newGroupAuctionTime)}</strong>. Winning discount accumulates into <code>kai_iruppu_pool</code>.
-                                </>
-                              );
-                            } catch {
-                              return (
-                                <>
-                                  <strong className="text-slate-900 font-semibold">{newGroupAuctionDay}th of next month · {formatTime12h(newGroupAuctionTime)}</strong>. Winning discount accumulates into <code>kai_iruppu_pool</code>.
-                                </>
-                              );
-                            }
-                          })()}
-                        </p>
+                            })()}
+                          </p>
+                        </div>
+
                       </div>
-
                     </div>
-                  </div>
 
-                  {/* Enrolled Subscribers Pill Grid */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Enrolled Subscribers ({enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration})
-                    </span>
-                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
-                      {enrollments.map((slot, index) => (
-                        <span key={index} className={`border text-xs px-2.5 py-1 rounded-xl shadow-2xs flex items-center gap-1.5 ${
-                          slot.name 
-                            ? 'bg-white border-slate-200 text-slate-800 font-semibold' 
+                    {/* Enrolled Subscribers Pill Grid */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Enrolled Subscribers ({enrollments.filter(e => e.name && e.name.trim() !== '').length} of {newGroupDuration})
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
+                        {enrollments.map((slot, index) => (
+                          <span key={index} className={`border text-xs px-2.5 py-1 rounded-xl shadow-2xs flex items-center gap-1.5 ${slot.name
+                            ? 'bg-white border-slate-200 text-slate-800 font-semibold'
                             : 'bg-amber-50 border-amber-200 text-amber-800 italic'
-                        }`}>
-                          <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold font-mono flex items-center justify-center">
-                            {index + 1}
+                            }`}>
+                            <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold font-mono flex items-center justify-center">
+                              {index + 1}
+                            </span>
+                            <span>{slot.name || 'Open Slot'}</span>
+                            {slot.phone && <span className="text-[10px] text-slate-400 font-mono">({slot.phone})</span>}
                           </span>
-                          <span>{slot.name || 'Open Slot'}</span>
-                          {slot.phone && <span className="text-[10px] text-slate-400 font-mono">({slot.phone})</span>}
-                        </span>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Navigation Step 3 Buttons */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHapticFeedback('light');
-                        setWizardStep(2);
-                      }}
-                      className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center cursor-pointer"
-                    >
-                      <ArrowLeft size={13} className="inline mr-1" />
-                      <span>Back to Members</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isCreatingGroup}
-                      onClick={handleCreateGroup}
-                      className={`font-bold text-xs px-7 py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 cursor-pointer ${
-                        isCreatingGroup
+                    {/* Navigation Step 3 Buttons */}
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2.5 pt-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHapticFeedback('light');
+                          setWizardStep(2);
+                        }}
+                        className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition-colors active:scale-95 text-center cursor-pointer"
+                      >
+                        <ArrowLeft size={13} className="inline mr-1" />
+                        <span>Back to Members</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isCreatingGroup}
+                        onClick={handleCreateGroup}
+                        className={`font-bold text-xs px-7 py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 cursor-pointer ${isCreatingGroup
                           ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           : 'bg-brand-600 hover:bg-brand-700 text-white'
-                      }`}
-                    >
-                      {isCreatingGroup ? (
-                        <>
-                          <RefreshCw size={14} className="animate-spin" />
-                          <span>Saving Group in Supabase...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Rocket size={14} />
-                          <span>Create Chit Group &amp; Enroll Slots</span>
-                        </>
-                      )}
-                    </button>
+                          }`}
+                      >
+                        {isCreatingGroup ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" />
+                            <span>Saving Group in Supabase...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Rocket size={14} />
+                            <span>Create Chit Group &amp; Enroll Slots</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-            </div>
-          )}
+              </div>
+            )}
 
-        </div>
-      );
-    }
+          </div>
+        );
+      }
 
       default:
         return null;
@@ -7730,7 +7716,7 @@ Thank you for your prompt payment! 🙏`;
       {editingGroup && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
           <div className="bg-white border border-slate-200/90 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden my-auto">
-            
+
             {/* 1. Modal Top Bar */}
             <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-white z-10">
               <div className="flex items-center gap-3">
@@ -7749,8 +7735,8 @@ Thank you for your prompt payment! 🙏`;
                 </div>
               </div>
 
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setEditingGroup(null)}
                 className="text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
               >
@@ -7763,22 +7749,20 @@ Thank you for your prompt payment! 🙏`;
               <button
                 type="button"
                 onClick={() => setEditActiveTab('details')}
-                className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
-                  editActiveTab === 'details'
-                    ? 'bg-white text-brand-700 border-brand-600 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 border-transparent'
-                }`}
+                className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 cursor-pointer ${editActiveTab === 'details'
+                  ? 'bg-white text-brand-700 border-brand-600 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 border-transparent'
+                  }`}
               >
                 <Briefcase size={14} /> Chit Details
               </button>
               <button
                 type="button"
                 onClick={() => setEditActiveTab('members')}
-                className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
-                  editActiveTab === 'members'
-                    ? 'bg-white text-brand-700 border-brand-600 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-900 border-transparent'
-                }`}
+                className={`py-2 px-4 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 cursor-pointer ${editActiveTab === 'members'
+                  ? 'bg-white text-brand-700 border-brand-600 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 border-transparent'
+                  }`}
               >
                 <Users size={14} /> Members
                 <span className="bg-brand-50 text-brand-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold border border-brand-200">
@@ -7792,7 +7776,7 @@ Thank you for your prompt payment! 🙏`;
 
               {editActiveTab === 'details' ? (
                 <form id="edit-chit-form" onSubmit={handleSaveEditGroup} className="space-y-6">
-                  
+
                   {/* Section A: Name & Status */}
                   <div className="space-y-3">
                     <div>
@@ -7819,11 +7803,10 @@ Thank you for your prompt payment! 🙏`;
                         <button
                           type="button"
                           onClick={() => setEditGroupStatus('draft')}
-                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                            editGroupStatus === 'draft'
-                              ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-2xs ring-1 ring-amber-200'
-                              : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                          }`}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${editGroupStatus === 'draft'
+                            ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-2xs ring-1 ring-amber-200'
+                            : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                            }`}
                         >
                           <Edit3 size={14} className={editGroupStatus === 'draft' ? 'text-amber-600' : 'text-slate-400'} />
                           Draft
@@ -7831,11 +7814,10 @@ Thank you for your prompt payment! 🙏`;
                         <button
                           type="button"
                           onClick={() => setEditGroupStatus('active')}
-                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                            editGroupStatus === 'active'
-                              ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs ring-1 ring-emerald-300'
-                              : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                          }`}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${editGroupStatus === 'active'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs ring-1 ring-emerald-300'
+                            : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                            }`}
                         >
                           <CheckCircle2 size={14} className={editGroupStatus === 'active' ? 'text-emerald-600' : 'text-slate-400'} />
                           Active
@@ -7843,11 +7825,10 @@ Thank you for your prompt payment! 🙏`;
                         <button
                           type="button"
                           onClick={() => setEditGroupStatus('completed')}
-                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                            editGroupStatus === 'completed'
-                              ? 'bg-brand-50 border-brand-300 text-brand-700 shadow-2xs ring-1 ring-brand-300'
-                              : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                          }`}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${editGroupStatus === 'completed'
+                            ? 'bg-brand-50 border-brand-300 text-brand-700 shadow-2xs ring-1 ring-brand-300'
+                            : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                            }`}
                         >
                           <Trophy size={14} className={editGroupStatus === 'completed' ? 'text-brand-600' : 'text-slate-400'} />
                           Completed
@@ -7975,8 +7956,8 @@ Thank you for your prompt payment! 🙏`;
                             SHARES LIVE {editGroupMembers.length} / {editGroupMemberCount}
                           </span>
                           <p className="text-[11px] text-slate-600 mt-0.5">
-                            {editGroupMembers.length === editGroupMemberCount 
-                              ? 'Share count matches the members assigned.' 
+                            {editGroupMembers.length === editGroupMemberCount
+                              ? 'Share count matches the members assigned.'
                               : `${editGroupMemberCount - editGroupMembers.length} tickets need member assignment.`}
                           </p>
                         </div>
@@ -8311,15 +8292,14 @@ Thank you for your prompt payment! 🙏`;
                             setDraggedTicketNum(null);
                             setDragOverTicketNum(null);
                           }}
-                          className={`rounded-2xl border transition-all ${
-                            isDragOver
-                              ? 'border-brand-600 ring-2 ring-brand-400/30 bg-brand-50/40 scale-[1.01]'
-                              : isBeingDragged
-                                ? 'opacity-40 border-dashed border-brand-500 bg-slate-50'
-                                : member?.profileId 
-                                  ? 'bg-white border-slate-200/90 shadow-2xs hover:border-brand-300' 
-                                  : 'border-dashed border-slate-300 bg-slate-50/60'
-                          }`}
+                          className={`rounded-2xl border transition-all ${isDragOver
+                            ? 'border-brand-600 ring-2 ring-brand-400/30 bg-brand-50/40 scale-[1.01]'
+                            : isBeingDragged
+                              ? 'opacity-40 border-dashed border-brand-500 bg-slate-50'
+                              : member?.profileId
+                                ? 'bg-white border-slate-200/90 shadow-2xs hover:border-brand-300'
+                                : 'border-dashed border-slate-300 bg-slate-50/60'
+                            }`}
                         >
                           {/* ── CARD HEADER (Always visible & Clickable to Expand) ── */}
                           <div
@@ -8377,11 +8357,10 @@ Thank you for your prompt payment! 🙏`;
                               )}
 
                               {/* Ticket Badge */}
-                              <span className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
-                                member?.profileId
-                                  ? 'bg-brand-50 text-brand-700 border border-brand-200'
-                                  : 'bg-slate-100 text-slate-400 border border-slate-200'
-                              }`}>
+                              <span className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${member?.profileId
+                                ? 'bg-brand-50 text-brand-700 border border-brand-200'
+                                : 'bg-slate-100 text-slate-400 border border-slate-200'
+                                }`}>
                                 #{ticketNum}
                               </span>
 
@@ -8472,7 +8451,7 @@ Thank you for your prompt payment! 🙏`;
                           {/* ── EXPANDED CONTROLS BODY ── */}
                           {isExpanded && (
                             <div className="px-3.5 pb-3.5 pt-2 space-y-3 border-t border-slate-100 bg-slate-50/50 animate-in fade-in duration-150 text-xs">
-                              
+
                               {/* Shares Stepper & Timing Line */}
                               <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
                                 <div className="flex items-center gap-2">
@@ -8537,11 +8516,10 @@ Thank you for your prompt payment! 🙏`;
                                     setAliasModalVal(member?.aliasName || '');
                                   }}
                                   disabled={!member?.profileId}
-                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 ${
-                                    member?.profileId && member?.aliasName
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
-                                  }`}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 ${member?.profileId && member?.aliasName
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
+                                    }`}
                                 >
                                   <Tag size={12} className={member?.aliasName ? 'text-emerald-700' : 'text-slate-400'} />
                                   <span>{member?.profileId && member?.aliasName ? `Alias: ${member.aliasName}` : 'Set Ticket Alias'}</span>
@@ -8555,11 +8533,10 @@ Thank you for your prompt payment! 🙏`;
                                     setCustomAmountVal(member?.customInstallment || standardDue);
                                   }}
                                   disabled={!member?.profileId}
-                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                                    member?.profileId && member?.customInstallment
-                                      ? 'bg-brand-50 text-brand-700 border-brand-300 shadow-2xs'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
-                                  }`}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${member?.profileId && member?.customInstallment
+                                    ? 'bg-brand-50 text-brand-700 border-brand-300 shadow-2xs'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
+                                    }`}
                                 >
                                   {member?.profileId && member?.customInstallment ? `Custom: ₹${member.customInstallment.toLocaleString('en-IN')}` : 'Set custom amount'}
                                 </button>
@@ -8575,11 +8552,10 @@ Thank you for your prompt payment! 🙏`;
                                     ]);
                                   }}
                                   disabled={!member?.profileId}
-                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                                    member?.profileId && member?.splitPool
-                                      ? 'bg-purple-50 text-purple-700 border-purple-300 shadow-2xs'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
-                                  }`}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${member?.profileId && member?.splitPool
+                                    ? 'bg-purple-50 text-purple-700 border-purple-300 shadow-2xs'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
+                                    }`}
                                 >
                                   {member?.profileId && member?.splitPool ? `Pool (${member.splitPool.length} payers)` : 'Split into pool'}
                                 </button>
@@ -8592,11 +8568,10 @@ Thank you for your prompt payment! 🙏`;
                                     setExitMonthVal(member?.exitMonth || (editingGroup?.currentMonth || 1) + 1);
                                   }}
                                   disabled={!member?.profileId}
-                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                                    member?.profileId && member?.exitMonth
-                                      ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-2xs'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
-                                  }`}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${member?.profileId && member?.exitMonth
+                                    ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-2xs'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
+                                    }`}
                                 >
                                   {member?.profileId && member?.exitMonth ? `Exits M${member.exitMonth}` : 'Member leaves chit...'}
                                 </button>
@@ -8610,11 +8585,10 @@ Thank you for your prompt payment! 🙏`;
                                     setTransferMonthVal((editingGroup?.currentMonth || 1) + 1);
                                   }}
                                   disabled={!member?.profileId}
-                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                                    member?.profileId && member?.transferredFrom
-                                      ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-2xs'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
-                                  }`}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${member?.profileId && member?.transferredFrom
+                                    ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-2xs'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed'
+                                    }`}
                                 >
                                   {member?.profileId && member?.transferredFrom ? 'Transferred' : 'Transfer shares...'}
                                 </button>
@@ -9145,40 +9119,36 @@ Thank you for your prompt payment! 🙏`;
       {deletingGroup && (() => {
         const isSoft = deleteMode === 'soft';
         const requiredPhrase = `DELETE ${deletingGroup.name}`;
-        const isPhraseMatched = 
+        const isPhraseMatched =
           deletePhraseInput.trim().toUpperCase() === requiredPhrase.toUpperCase() ||
           deletePhraseInput.trim().toUpperCase() === 'DELETE' ||
           deletePhraseInput.trim().toLowerCase() === deletingGroup.name.toLowerCase();
 
         return (
           <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-            <div className={`bg-white border-2 rounded-3xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto ${
-              isSoft ? 'border-amber-300' : 'border-rose-300'
-            }`}>
-              
-              {/* Header */}
-              <div className={`flex justify-between items-start border-b pb-3 ${
-                isSoft ? 'border-amber-200' : 'border-rose-200'
+            <div className={`bg-white border-2 rounded-3xl p-4 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto my-auto ${isSoft ? 'border-amber-300' : 'border-rose-300'
               }`}>
+
+              {/* Header */}
+              <div className={`flex justify-between items-start border-b pb-3 ${isSoft ? 'border-amber-200' : 'border-rose-200'
+                }`}>
                 <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-2xl ${
-                    isSoft ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
-                  }`}>
+                  <div className={`p-2.5 rounded-2xl ${isSoft ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                    }`}>
                     <AlertTriangle size={22} />
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-slate-900">
                       {isSoft ? 'Move Chit Group to Recycle Bin' : 'Permanent Deletion Warning'}
                     </h4>
-                    <p className={`text-xs font-semibold mt-0.5 ${
-                      isSoft ? 'text-amber-800' : 'text-rose-700'
-                    }`}>
+                    <p className={`text-xs font-semibold mt-0.5 ${isSoft ? 'text-amber-800' : 'text-rose-700'
+                      }`}>
                       &quot;{deletingGroup.name}&quot; ({formatCurrency(deletingGroup.totalValue)})
                     </p>
                   </div>
                 </div>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setDeletingGroup(null)}
                   className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                 >
@@ -9216,11 +9186,9 @@ Thank you for your prompt payment! 🙏`;
               {/* Safety Verification Step 1: Type Required Phrase */}
               <div className="space-y-1.5 pt-1">
                 <label className="text-[11px] text-slate-700 font-bold block">
-                  Step 1: Type <span className={`font-mono px-1.5 py-0.5 rounded select-all font-bold ${
-                    isSoft ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'
-                  }`}>DELETE {deletingGroup.name}</span> (or <span className={`font-mono px-1.5 py-0.5 rounded font-bold ${
-                    isSoft ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'
-                  }`}>DELETE</span>) below:
+                  Step 1: Type <span className={`font-mono px-1.5 py-0.5 rounded select-all font-bold ${isSoft ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'
+                    }`}>DELETE {deletingGroup.name}</span> (or <span className={`font-mono px-1.5 py-0.5 rounded font-bold ${isSoft ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'
+                      }`}>DELETE</span>) below:
                 </label>
                 <div className="relative">
                   <input
@@ -9228,11 +9196,10 @@ Thank you for your prompt payment! 🙏`;
                     placeholder={`Type DELETE ${deletingGroup.name}`}
                     value={deletePhraseInput}
                     onChange={(e) => setDeletePhraseInput(e.target.value)}
-                    className={`w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors shadow-2xs ${
-                      isPhraseMatched
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
-                        : isSoft ? 'border-slate-200 focus:border-amber-500' : 'border-slate-200 focus:border-rose-500'
-                    }`}
+                    className={`w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors shadow-2xs ${isPhraseMatched
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                      : isSoft ? 'border-slate-200 focus:border-amber-500' : 'border-slate-200 focus:border-rose-500'
+                      }`}
                     autoFocus
                   />
                   {isPhraseMatched && (
@@ -9291,13 +9258,12 @@ Thank you for your prompt payment! 🙏`;
                   type="button"
                   disabled={!isPhraseMatched || isDeletingGroup}
                   onClick={handleConfirmDelete}
-                  className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center ${
-                    isPhraseMatched && !isDeletingGroup
-                      ? isSoft
-                        ? 'bg-amber-500 hover:bg-amber-600 text-white cursor-pointer'
-                        : 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
-                      : 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
-                  }`}
+                  className={`w-full sm:w-auto font-bold text-xs px-5 py-2.5 sm:py-2 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 text-center ${isPhraseMatched && !isDeletingGroup
+                    ? isSoft
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white cursor-pointer'
+                      : 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60'
+                    }`}
                 >
                   {isDeletingGroup ? (
                     <>
@@ -9334,12 +9300,12 @@ Thank you for your prompt payment! 🙏`;
               prev.map(g =>
                 g.id === scheduleModalGroup.id
                   ? {
-                      ...g,
-                      auctionDayOfMonth: updated.auctionDayOfMonth,
-                      auctionTime: updated.auctionTime,
-                      nextAuctionDate: updated.nextAuctionDate,
-                      nextAuctionTime: updated.nextAuctionTime,
-                    }
+                    ...g,
+                    auctionDayOfMonth: updated.auctionDayOfMonth,
+                    auctionTime: updated.auctionTime,
+                    nextAuctionDate: updated.nextAuctionDate,
+                    nextAuctionTime: updated.nextAuctionTime,
+                  }
                   : g
               )
             );
@@ -9362,8 +9328,8 @@ Thank you for your prompt payment! 🙏`;
                   <p className="text-[11px] text-slate-500">Saves to Supabase directory and assigns to open slot</p>
                 </div>
               </div>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setShowCreateMemberModal(false)}
                 className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
               >
@@ -9432,13 +9398,12 @@ Thank you for your prompt payment! 🙏`;
                     Phone Number (10 Digits) *
                   </label>
                   {newMemberPhone.trim() && (
-                    <span className={`text-[10px] font-bold ${
-                      normalizePhone(newMemberPhone).length === 10
-                        ? 'text-emerald-700'
-                        : normalizePhone(newMemberPhone).length < 10
-                          ? 'text-amber-700'
-                          : 'text-rose-600'
-                    }`}>
+                    <span className={`text-[10px] font-bold ${normalizePhone(newMemberPhone).length === 10
+                      ? 'text-emerald-700'
+                      : normalizePhone(newMemberPhone).length < 10
+                        ? 'text-amber-700'
+                        : 'text-rose-600'
+                      }`}>
                       {normalizePhone(newMemberPhone).length === 10
                         ? '✓ Valid 10 digits'
                         : `${normalizePhone(newMemberPhone).length}/10 digits`}
@@ -9455,15 +9420,14 @@ Thank you for your prompt payment! 🙏`;
                     placeholder="e.g. 9842235740"
                     value={newMemberPhone}
                     onChange={(e) => setNewMemberPhone(e.target.value)}
-                    className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors font-mono shadow-2xs ${
-                      duplicatePhoneSubscriber
-                        ? 'border-amber-400 focus:border-amber-500 bg-amber-50'
-                        : !newMemberPhone.trim()
-                          ? 'border-slate-200 focus:border-brand-600 focus:bg-white'
-                          : normalizePhone(newMemberPhone).length === 10
-                            ? 'border-emerald-400 focus:border-emerald-500 bg-emerald-50/50'
-                            : 'border-amber-400 focus:border-amber-500 bg-amber-50/50'
-                    }`}
+                    className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors font-mono shadow-2xs ${duplicatePhoneSubscriber
+                      ? 'border-amber-400 focus:border-amber-500 bg-amber-50'
+                      : !newMemberPhone.trim()
+                        ? 'border-slate-200 focus:border-brand-600 focus:bg-white'
+                        : normalizePhone(newMemberPhone).length === 10
+                          ? 'border-emerald-400 focus:border-emerald-500 bg-emerald-50/50'
+                          : 'border-amber-400 focus:border-amber-500 bg-amber-50/50'
+                      }`}
                   />
                 </div>
                 {newMemberPhone.trim() && normalizePhone(newMemberPhone).length !== 10 && (
@@ -9581,9 +9545,9 @@ Thank you for your prompt payment! 🙏`;
                   <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Conclude Launch Phase</span>
                 </div>
               </div>
-              <button 
+              <button
                 type="button"
-                onClick={() => setMonth0LaunchModalGroup(null)} 
+                onClick={() => setMonth0LaunchModalGroup(null)}
                 className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
               >
                 <X size={16} />
@@ -9655,7 +9619,7 @@ Thank you for your prompt payment! 🙏`;
         const winningBid = currentMonthAuction ? Number(currentMonthAuction.winning_discount ?? currentMonthAuction.winning_bid ?? 0) : 0;
         const netPrizePot = currentMonthAuction ? Math.max(0, totalChitVal - winningBid) : 0;
         const winnerProfileId = currentMonthAuction?.winning_bidder_id || currentMonthAuction?.winner_profile_id || currentMonthAuction?.winner_id;
-        const winnerMember = dashboardGroupMembers.find(m => 
+        const winnerMember = dashboardGroupMembers.find(m =>
           (winnerProfileId && (m.profileId === winnerProfileId || m.id === winnerProfileId)) ||
           (currentMonthAuction?.winner_name && m.name.toLowerCase() === currentMonthAuction.winner_name.toLowerCase())
         );
@@ -9905,16 +9869,14 @@ Thank you for your prompt payment! 🙏`;
                             key={a.month}
                             type="button"
                             onClick={() => toggleArrearMonth(a.month)}
-                            className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                              isChecked
-                                ? 'bg-amber-50/90 border-amber-300 ring-1 ring-amber-300 shadow-2xs'
-                                : 'bg-white border-slate-200 hover:border-slate-300'
-                            }`}
+                            className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${isChecked
+                              ? 'bg-amber-50/90 border-amber-300 ring-1 ring-amber-300 shadow-2xs'
+                              : 'bg-white border-slate-200 hover:border-slate-300'
+                              }`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
-                                isChecked ? 'bg-amber-500 border-amber-500 text-white' : 'bg-slate-100 border-slate-300'
-                              }`}>
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked ? 'bg-amber-500 border-amber-500 text-white' : 'bg-slate-100 border-slate-300'
+                                }`}>
                                 {isChecked && <Check size={11} className="stroke-[3]" />}
                               </div>
                               <div className="min-w-0">
@@ -9955,16 +9917,14 @@ Thank you for your prompt payment! 🙏`;
                     <button
                       type="button"
                       onClick={toggleThisMonthDeduction}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                        disburseDeductThisMonth
-                          ? 'bg-indigo-50/80 border-brand-500 ring-1 ring-brand-500/20 shadow-2xs'
-                          : 'bg-white border-slate-200 hover:border-slate-300'
-                      }`}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${disburseDeductThisMonth
+                        ? 'bg-indigo-50/80 border-brand-500 ring-1 ring-brand-500/20 shadow-2xs'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded border flex items-center justify-center shrink-0 transition-all ${
-                          disburseDeductThisMonth ? 'bg-brand-600 border-brand-600 text-white' : 'bg-slate-100 border-slate-300'
-                        }`}>
+                        <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded border flex items-center justify-center shrink-0 transition-all ${disburseDeductThisMonth ? 'bg-brand-600 border-brand-600 text-white' : 'bg-slate-100 border-slate-300'
+                          }`}>
                           {disburseDeductThisMonth && <Check size={12} className="stroke-[3]" />}
                         </div>
                         <div className="min-w-0">
@@ -10010,15 +9970,13 @@ Thank you for your prompt payment! 🙏`;
                             key={m}
                             type="button"
                             onClick={() => toggleAdvanceMonth(m)}
-                            className={`w-full py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                              isSelected
-                                ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
-                                : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
-                            }`}
+                            className={`w-full py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${isSelected
+                              ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                              }`}
                           >
-                            <span className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                              isSelected ? 'bg-white text-brand-600' : 'bg-slate-100 text-slate-500'
-                            }`}>
+                            <span className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${isSelected ? 'bg-white text-brand-600' : 'bg-slate-100 text-slate-500'
+                              }`}>
                               {isSelected ? '✓' : '+'}
                             </span>
                             <span>Month {m}</span>
@@ -10091,21 +10049,19 @@ Thank you for your prompt payment! 🙏`;
                           key={w.id}
                           type="button"
                           onClick={() => setDisbursePayoutWallet(w.id)}
-                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-brand-50 text-brand-900 border-2 border-brand-500 shadow-2xs'
-                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                          }`}
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${isSelected
+                            ? 'bg-brand-50 text-brand-900 border-2 border-brand-500 shadow-2xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                            }`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm">{w.icon}</span>
-                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                              isSelected 
-                                ? 'bg-brand-100 text-brand-800' 
-                                : isLowBal 
-                                ? 'bg-amber-100 text-amber-800' 
+                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${isSelected
+                              ? 'bg-brand-100 text-brand-800'
+                              : isLowBal
+                                ? 'bg-amber-100 text-amber-800'
                                 : 'bg-slate-100 text-slate-600'
-                            }`}>
+                              }`}>
                               {formatCurrency(w.bal)}
                             </span>
                           </div>
@@ -10125,33 +10081,30 @@ Thank you for your prompt payment! 🙏`;
                     <button
                       type="button"
                       onClick={() => setDisbursePayoutDateType('today')}
-                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        disbursePayoutDateType === 'today'
-                          ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
-                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                      }`}
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${disbursePayoutDateType === 'today'
+                        ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                        }`}
                     >
                       Today
                     </button>
                     <button
                       type="button"
                       onClick={() => setDisbursePayoutDateType('yesterday')}
-                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        disbursePayoutDateType === 'yesterday'
-                          ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
-                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                      }`}
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${disbursePayoutDateType === 'yesterday'
+                        ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                        }`}
                     >
                       Yesterday
                     </button>
                     <button
                       type="button"
                       onClick={() => setDisbursePayoutDateType('custom')}
-                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        disbursePayoutDateType === 'custom'
-                          ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
-                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                      }`}
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${disbursePayoutDateType === 'custom'
+                        ? 'bg-brand-600 text-white border-brand-600 shadow-2xs'
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                        }`}
                     >
                       Custom Date
                     </button>
@@ -10320,22 +10273,20 @@ Thank you for your prompt payment! 🙏`;
                 <button
                   type="button"
                   onClick={() => setRemindModalTab('individual')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                    remindModalTab === 'individual'
-                      ? 'bg-white text-brand-700 shadow-xs font-black border border-slate-200/60'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${remindModalTab === 'individual'
+                    ? 'bg-white text-brand-700 shadow-xs font-black border border-slate-200/60'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   Individual ({pendingMembersList.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setRemindModalTab('group')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                    remindModalTab === 'group'
-                      ? 'bg-white text-brand-700 shadow-xs font-black border border-slate-200/60'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${remindModalTab === 'group'
+                    ? 'bg-white text-brand-700 shadow-xs font-black border border-slate-200/60'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   Group Broadcast
                 </button>
@@ -10493,7 +10444,7 @@ Thank you for your prompt payment! 🙏`;
       })()}
 
       {/* ── QUICK ACTION MODALS ──────────────────────────────────────────────── */}
-      
+
       {/* 1. Quick Personal Draw / Spend Modal */}
       <QuickPersonalDrawModal
         isOpen={showQuickPersonalDrawModal}

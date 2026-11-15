@@ -128,11 +128,22 @@ export default function UniversalRecordPaymentModal({
 
   // ── 4. Advanced Options Accordion ──
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const advancedOptionsRef = useRef<HTMLDivElement>(null);
   const [paymentDateType, setPaymentDateType] = useState<'today' | 'yesterday' | 'custom'>('today');
   const [customPaymentDate, setCustomPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [paymentNote, setPaymentNote] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+
+  const handleToggleAdvanced = () => {
+    const next = !showAdvanced;
+    setShowAdvanced(next);
+    if (next) {
+      setTimeout(() => {
+        advancedOptionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 70);
+    }
+  };
 
   // ── 5. Submission & Success State ──
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -165,10 +176,16 @@ export default function UniversalRecordPaymentModal({
       setPaymentMode('cash');
       setOnlineBank(upiConfig?.defaultVault || 'kishor_bank');
       setShowAdvanced(false);
+      setPaymentDateType('today');
+      setCustomPaymentDate(new Date().toISOString().slice(0, 10));
       setPaymentNote('');
       setReceiptFile(null);
       return;
     }
+
+    // Always ensure fresh default to 'today' when opening
+    setPaymentDateType('today');
+    setCustomPaymentDate(new Date().toISOString().slice(0, 10));
 
     // Preload subscribers and aliases for instant 0ms fuzzy search with "Did you mean?" support
     const preloadSubscribers = async () => {
@@ -835,8 +852,8 @@ export default function UniversalRecordPaymentModal({
 
   // Active receiving vault
   const effectiveWallet: WalletType = paymentMode === 'cash' ? 'cash_in_hand' : onlineBank;
-  const effectiveWalletLabel = paymentMode === 'cash' 
-    ? 'Cash Box' 
+  const effectiveWalletLabel = paymentMode === 'cash'
+    ? 'Cash Box'
     : onlineBank === 'kishor_bank' ? 'Kishor Bank (UPI)' : onlineBank === 'dad_bank' ? 'Dad Bank' : 'Mom Bank';
 
   // ─────────────────────────────────────────────────────────────
@@ -899,8 +916,8 @@ export default function UniversalRecordPaymentModal({
       const rowsToInsert = calculatedItemsList.map(item => {
         const typeLabel = item.isArrear ? ' (Arrear Cleared)' : item.isAdvance ? ' (Advance Pre-paid)' : '';
         const userNotePart = paymentNote.trim() ? ` — Note: ${paymentNote.trim()}` : '';
-        const ticketDisplay = item.group.aliasName 
-          ? `${item.group.aliasName} (Ticket #${item.group.ticketNumber})` 
+        const ticketDisplay = item.group.aliasName
+          ? `${item.group.aliasName} (Ticket #${item.group.ticketNumber})`
           : `Ticket #${item.group.ticketNumber} (${selectedMember.fullName})`;
         const noteText = `Month ${item.month}${typeLabel} collection payment - ${ticketDisplay}${userNotePart} ${batchTag}`;
 
@@ -1042,6 +1059,11 @@ export default function UniversalRecordPaymentModal({
         window.dispatchEvent(new CustomEvent('chitfund:treasury_updated'));
       }
 
+      // Reset date selection back to Today for subsequent payments
+      setPaymentDateType('today');
+      setCustomPaymentDate(new Date().toISOString().slice(0, 10));
+      setShowAdvanced(false);
+
       if (onPaymentSuccess) {
         onPaymentSuccess();
       }
@@ -1059,7 +1081,7 @@ export default function UniversalRecordPaymentModal({
     <>
       <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
         <div className="bg-white border-t sm:border border-slate-200 text-slate-900 rounded-t-3xl sm:rounded-3xl w-full max-w-lg shadow-2xl relative flex flex-col max-h-[92dvh] sm:max-h-[88vh] overflow-hidden my-0 sm:my-auto animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-150">
-          
+
           {/* ── TOP HEADER BAR ── */}
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
             <div className="flex items-center gap-2.5">
@@ -1087,7 +1109,7 @@ export default function UniversalRecordPaymentModal({
 
           {/* ── MAIN BODY CONTENT ── */}
           <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-slate-800 flex-1">
-            
+
             {/* ─────────────────────────────────────────────────────────────
                 STATE A: SUCCESS SCREEN (NO AUTO POPUP RECEIPT!)
             ───────────────────────────────────────────────────────────── */}
@@ -1228,19 +1250,17 @@ export default function UniversalRecordPaymentModal({
                                 key={member.id}
                                 type="button"
                                 onClick={() => handleSelectMember(member)}
-                                className={`w-full p-2.5 rounded-xl hover:bg-white border text-left flex items-center justify-between transition-all cursor-pointer ${
-                                  member.isFuzzyMatch
+                                className={`w-full p-2.5 rounded-xl hover:bg-white border text-left flex items-center justify-between transition-all cursor-pointer ${member.isFuzzyMatch
                                     ? 'border-amber-200/80 bg-amber-50/40 hover:border-amber-300'
                                     : 'border-transparent hover:border-slate-200'
-                                }`}
+                                  }`}
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   <div
-                                    className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${
-                                      member.isFuzzyMatch
+                                    className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${member.isFuzzyMatch
                                         ? 'bg-amber-100 text-amber-800'
                                         : 'bg-slate-200 text-slate-700'
-                                    }`}
+                                      }`}
                                   >
                                     {(member.full_name || member.fullName || 'U').charAt(0).toUpperCase()}
                                   </div>
@@ -1271,11 +1291,10 @@ export default function UniversalRecordPaymentModal({
                                   </div>
                                 </div>
                                 <span
-                                  className={`text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
-                                    member.isFuzzyMatch
+                                  className={`text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0 ${member.isFuzzyMatch
                                       ? 'text-amber-700 bg-amber-100/80 hover:bg-amber-200'
                                       : 'text-emerald-600 bg-emerald-50'
-                                  }`}
+                                    }`}
                                 >
                                   Select
                                 </span>
@@ -1379,11 +1398,10 @@ export default function UniversalRecordPaymentModal({
                           return (
                             <div
                               key={grp.groupMemberId}
-                              className={`rounded-2xl border transition-all overflow-hidden ${
-                                isTicketEnabled
+                              className={`rounded-2xl border transition-all overflow-hidden ${isTicketEnabled
                                   ? 'bg-white border-slate-300 shadow-sm ring-1 ring-emerald-500/20'
                                   : 'bg-slate-50/70 border-slate-200 opacity-75'
-                              }`}
+                                }`}
                             >
                               {/* Ticket Card Header */}
                               <div
@@ -1392,11 +1410,10 @@ export default function UniversalRecordPaymentModal({
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   <div
-                                    className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
-                                      isTicketEnabled
+                                    className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${isTicketEnabled
                                         ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
                                         : 'bg-white border-slate-300'
-                                    }`}
+                                      }`}
                                   >
                                     {isTicketEnabled && <Check size={13} className="stroke-[3]" />}
                                   </div>
@@ -1461,11 +1478,10 @@ export default function UniversalRecordPaymentModal({
                                             key={mb.month}
                                             type="button"
                                             onClick={() => handleToggleMonth(grp.groupMemberId, mb.month)}
-                                            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${
-                                              isSelected
+                                            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${isSelected
                                                 ? 'bg-rose-500 text-white border-rose-500 shadow-xs'
                                                 : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                                            }`}
+                                              }`}
                                           >
                                             <span>M{mb.month} Arrear</span>
                                             <span className="font-mono text-[10px] opacity-90">
@@ -1486,11 +1502,10 @@ export default function UniversalRecordPaymentModal({
                                         <button
                                           type="button"
                                           onClick={() => handleToggleMonth(grp.groupMemberId, grp.currentMonth)}
-                                          className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
-                                            isSelected
+                                          className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${isSelected
                                               ? (isLaaba ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-500/20' : 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-500/20')
                                               : (isLaaba ? 'bg-purple-50 text-purple-700 border-purple-300 hover:border-purple-500' : 'bg-white text-slate-800 border-slate-300 hover:border-emerald-500')
-                                          }`}
+                                            }`}
                                         >
                                           <span>M{grp.currentMonth} {isLaaba ? '🎉 Laaba Seetu' : 'Current'}</span>
                                           <span className="font-mono text-[10px] opacity-90">
@@ -1758,16 +1773,14 @@ export default function UniversalRecordPaymentModal({
                           triggerHapticFeedback('light');
                           setPaymentMode('cash');
                         }}
-                        className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                          paymentMode === 'cash'
+                        className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${paymentMode === 'cash'
                             ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
                             : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                            paymentMode === 'cash' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
-                          }`}>
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${paymentMode === 'cash' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+                            }`}>
                             <Banknote size={17} />
                           </div>
                           <div>
@@ -1785,16 +1798,14 @@ export default function UniversalRecordPaymentModal({
                           triggerHapticFeedback('light');
                           setPaymentMode('online');
                         }}
-                        className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                          paymentMode === 'online'
+                        className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${paymentMode === 'online'
                             ? 'bg-indigo-50/80 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs'
                             : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                            paymentMode === 'online' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
-                          }`}>
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${paymentMode === 'online' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
+                            }`}>
                             <Smartphone size={17} />
                           </div>
                           <div>
@@ -1828,11 +1839,10 @@ export default function UniversalRecordPaymentModal({
                                   triggerHapticFeedback('light');
                                   setOnlineBank(b.id);
                                 }}
-                                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
-                                  isBankSelected
+                                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${isBankSelected
                                     ? 'bg-white border-indigo-600 text-indigo-950 font-black shadow-xs ring-1 ring-indigo-500/30'
                                     : 'bg-white/60 hover:bg-white border-indigo-200 text-slate-700 font-semibold'
-                                }`}
+                                  }`}
                               >
                                 <span className="text-[11px] block truncate">{b.name}</span>
                                 <span className="text-[9px] text-slate-400 block truncate">{b.desc}</span>
@@ -1859,7 +1869,7 @@ export default function UniversalRecordPaymentModal({
                   <div className="pt-1">
                     <button
                       type="button"
-                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      onClick={handleToggleAdvanced}
                       className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 cursor-pointer py-1"
                     >
                       <span>More options (date, note, slip upload)</span>
@@ -1867,7 +1877,10 @@ export default function UniversalRecordPaymentModal({
                     </button>
 
                     {showAdvanced && (
-                      <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 mt-1.5 animate-in fade-in duration-150 text-xs">
+                      <div
+                        ref={advancedOptionsRef}
+                        className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 mt-1.5 animate-in fade-in duration-150 text-xs"
+                      >
                         {/* Date selection */}
                         <div className="space-y-1.5">
                           <label className="text-[11px] font-bold text-slate-600 block">Payment Date:</label>
@@ -1877,11 +1890,10 @@ export default function UniversalRecordPaymentModal({
                                 key={dt}
                                 type="button"
                                 onClick={() => setPaymentDateType(dt)}
-                                className={`flex-1 py-1.5 px-2 rounded-xl text-[11px] font-bold border capitalize transition-all cursor-pointer ${
-                                  paymentDateType === dt
+                                className={`flex-1 py-1.5 px-2 rounded-xl text-[11px] font-bold border capitalize transition-all cursor-pointer ${paymentDateType === dt
                                     ? 'bg-slate-900 text-white border-slate-900'
                                     : 'bg-white text-slate-600 border-slate-200'
-                                }`}
+                                  }`}
                               >
                                 {dt}
                               </button>
@@ -1953,13 +1965,12 @@ export default function UniversalRecordPaymentModal({
                 type="button"
                 onClick={handleConfirmPayment}
                 disabled={isSubmitting || totalCollectionAmount <= 0}
-                className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-[0.98] ${
-                  isSubmitting || totalCollectionAmount <= 0
+                className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-[0.98] ${isSubmitting || totalCollectionAmount <= 0
                     ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                     : paymentMode === 'cash'
                       ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25'
                       : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/25'
-                }`}
+                  }`}
               >
                 {isSubmitting ? (
                   <>

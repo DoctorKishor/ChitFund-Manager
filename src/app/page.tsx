@@ -180,7 +180,7 @@ export default function Home() {
         )}
 
         {/* 2. Main Content Board Canvas */}
-        <main className="flex-1 p-4 sm:p-8 pb-[max(9.5rem,calc(7.5rem+env(safe-area-inset-bottom)))] sm:pb-8 space-y-6 overflow-y-auto w-full max-w-[1700px] mx-auto bg-slate-50" data-purpose="dashboard-workspace">
+        <main className="flex-1 p-4 sm:p-8 pb-[max(11rem,calc(9rem+env(safe-area-inset-bottom)))] md:pb-12 space-y-6 overflow-y-auto w-full max-w-[1700px] mx-auto bg-slate-50" data-purpose="dashboard-workspace">
           {/* Dynamic Content Panel Board */}
           <div className="w-full">
             <DashboardContent activeTab={activeTab} setActiveTab={setActiveTab} />

@@ -17,8 +17,8 @@
   --text-white: #FFFFFF;
   --text-muted: #AEABD8;
   --text-secondary: #8C89B4;
-  --background: #141332;
-  --foreground: #FFFFFF;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
 }
 
 @theme inline {
@@ -33,6 +33,10 @@
   --color-brand-900: #312E81;
   --font-display: var(--font-display, 'Plus Jakarta Sans', sans-serif);
   --font-sans: var(--font-inter, Inter, sans-serif);
+}
+
+html, body {
+  background-color: #F8FAFC;
 }
 
 body {

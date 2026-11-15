@@ -20,7 +20,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#0B0F19",
+  themeColor: "#F8FAFC",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "Chit Funds Manager",
   },
 };
@@ -56,7 +56,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${plusJakartaSans.variable} h-full antialiased`}
+      className={`${inter.variable} ${plusJakartaSans.variable} h-full antialiased bg-slate-50`}
     >
       <body className="min-h-full bg-slate-50 text-slate-800 flex flex-col selection:bg-brand-500 selection:text-white">
         <ServiceWorkerRegistration />
