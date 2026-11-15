@@ -17,7 +17,8 @@ import {
   Eye,
   Settings2,
   Plus,
-  Minus
+  Minus,
+  Type
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -90,6 +91,35 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
   const [invocationTitle, setInvocationTitle] = useState<string>('OM NAMA SIVAYA');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
   const [loadingData, setLoadingData] = useState<boolean>(true);
+
+  // Typable Font Size Control (Office / MS Word Style)
+  const [tableFontSize, setTableFontSize] = useState<number>(() => {
+    const count = group.duration || group.duration_months || 20;
+    if (count <= 10) return 16;
+    if (count <= 20) return 14;
+    return 12;
+  });
+
+  const effectiveFontSize = tableFontSize && tableFontSize >= 6 ? Math.min(32, tableFontSize) : 14;
+
+  const handleFontSizeChange = (valStr: string) => {
+    if (valStr === '') {
+      setTableFontSize(0);
+      return;
+    }
+    const val = parseInt(valStr, 10);
+    if (!isNaN(val)) {
+      setTableFontSize(Math.min(32, Math.max(0, val)));
+    }
+  };
+
+  const handleFontSizeBlur = () => {
+    if (!tableFontSize || tableFontSize < 8) {
+      setTableFontSize(8);
+    } else if (tableFontSize > 28) {
+      setTableFontSize(28);
+    }
+  };
 
   // Raw fetched database records
   const [members, setMembers] = useState<any[]>([]);
@@ -516,7 +546,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             th {
               border: 1px solid #000000;
               padding: 4px;
-              font-size: 11px;
+              font-size: ${Math.max(10, Math.min(13, effectiveFontSize))}px;
               font-weight: 900;
               background: #ffffff;
               text-align: center;
@@ -535,7 +565,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             td {
               border: 1px solid #000000;
               height: ${dynamicRowHeightPx}px;
-              font-size: ${checklistRows.length <= 10 ? '12px' : checklistRows.length <= 20 ? '11px' : '10px'};
+              font-size: ${effectiveFontSize}px;
               font-weight: 600;
               padding: 0 4px;
               vertical-align: middle;
@@ -543,11 +573,13 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             td.td-sl {
               text-align: center;
               font-weight: 700;
+              font-size: ${effectiveFontSize}px;
             }
             td.td-name {
               text-align: left;
               padding-left: 8px;
               font-weight: 900;
+              font-size: ${effectiveFontSize}px;
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
@@ -555,11 +587,12 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             td.td-num {
               text-align: center;
               font-weight: 700;
+              font-size: ${effectiveFontSize}px;
             }
             td.td-date {
               text-align: center;
               font-family: monospace;
-              font-size: 10px;
+              font-size: ${Math.max(9, effectiveFontSize - 2)}px;
             }
             .footer-block {
               margin-top: 10px;
@@ -581,7 +614,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                 
                 <div class="header-block">
                   <div class="header-left">
-                    <div class="group-name">GROUP - ${group.name.toUpperCase()}</div>
+                    <div class="group-name">${group.name.toUpperCase()}</div>
                     <div class="chit-amount">CHIT AMOUNT - ${formatINR(group.totalValue || group.total_value || 0)}</div>
                     <div class="months-dur">MONTHS - ${group.duration || group.duration_months} MONTHS</div>
                     <div class="monthly-due">MONTHLY DUE - ${effectiveDuePerMember}${activeMonthsList.length > 1 ? ` (${activeMonthsList.length} MONTHS)` : ''}</div>
@@ -962,40 +995,94 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             </div>
           )}
 
-          {/* Prefill Payments Toggle */}
-          <div className="flex items-center justify-between pt-2 border-t border-slate-200">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-700">Pre-fill:</span>
-              <span className="text-[10px] text-slate-500">
-                {prefillPayments 
-                  ? `With recorded payments` 
-                  : 'Blank handwritten sheet'}
-              </span>
+          {/* Bottom Toolbar: Pre-fill & Typable Font Size Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-200">
+            {/* Prefill Payments Toggle */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-700">Pre-fill:</span>
+                <span className="text-[10px] text-slate-500 hidden sm:inline">
+                  {prefillPayments 
+                    ? `With recorded payments` 
+                    : 'Blank handwritten sheet'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPrefillPayments(false);
+                    triggerHapticFeedback('light');
+                  }}
+                  className={`text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all ${
+                    !prefillPayments
+                      ? 'bg-white text-slate-900 shadow-2xs border border-slate-200 font-bold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Empty
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPrefillPayments(true);
+                    triggerHapticFeedback('light');
+                  }}
+                  className={`text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all ${
+                    prefillPayments
+                      ? 'bg-indigo-600 text-white shadow-2xs font-bold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Pre-fill
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
-              <button
-                type="button"
-                onClick={() => setPrefillPayments(false)}
-                className={`text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all ${
-                  !prefillPayments
-                    ? 'bg-white text-slate-900 shadow-2xs border border-slate-200 font-bold'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Empty
-              </button>
-              <button
-                type="button"
-                onClick={() => setPrefillPayments(true)}
-                className={`text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all ${
-                  prefillPayments
-                    ? 'bg-indigo-600 text-white shadow-2xs font-bold'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Pre-fill
-              </button>
+            {/* Typable MS Word Style Font Size Control */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <Type size={14} className="text-slate-500" />
+                <span className="text-[11px] font-bold text-slate-700">Font Size:</span>
+              </div>
+              <div className="flex items-center bg-white border border-slate-300 rounded-xl p-0.5 shadow-2xs hover:border-indigo-400 focus-within:border-indigo-600 focus-within:ring-1 focus-within:ring-indigo-600 transition-all">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setTableFontSize(prev => Math.max(8, (prev || 14) - 1));
+                  }}
+                  className="p-1 sm:p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-slate-900 transition-colors active:scale-95 cursor-pointer"
+                  title="Decrease font size"
+                >
+                  <Minus size={13} />
+                </button>
+                <div className="flex items-center px-0.5">
+                  <input
+                    type="number"
+                    min={8}
+                    max={28}
+                    value={tableFontSize === 0 ? '' : tableFontSize}
+                    onChange={(e) => handleFontSizeChange(e.target.value)}
+                    onBlur={handleFontSizeBlur}
+                    className="w-8 sm:w-10 text-center font-bold text-xs text-slate-900 bg-transparent focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    title="Type font size (8 - 28 pt)"
+                  />
+                  <span className="text-[10px] font-semibold text-slate-400 pr-1 select-none">pt</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHapticFeedback('light');
+                    setTableFontSize(prev => Math.min(28, (prev || 14) + 1));
+                  }}
+                  className="p-1 sm:p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-slate-900 transition-colors active:scale-95 cursor-pointer"
+                  title="Increase font size"
+                >
+                  <Plus size={13} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1028,7 +1115,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                   {/* Left Column */}
                   <div className="space-y-0.5 sm:space-y-1">
                     <div className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-black">
-                      GROUP - <span className="font-black">{group.name.toUpperCase()}</span>
+                      <span className="font-black">{group.name.toUpperCase()}</span>
                     </div>
                     <div className="text-xs sm:text-base font-black tracking-tight">
                       CHIT AMOUNT - <span className="text-sm sm:text-lg">{formatINR(group.totalValue || group.total_value || 0)}</span>
@@ -1058,25 +1145,46 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
 
               {/* ── MAIN CHECKLIST TABLE (Expands dynamically to fill page height) ── */}
               <div className="w-full flex-1 flex flex-col overflow-x-auto my-1">
-                <table className="w-full flex-1 border-collapse border border-black text-black text-[10px] sm:text-xs">
+                <table 
+                  className="w-full flex-1 border-collapse border border-black text-black"
+                  style={{ fontSize: `${effectiveFontSize}px` }}
+                >
                   <thead>
                     <tr className="border-b-2 border-black bg-white font-black h-8">
-                      <th className="border border-black px-1.5 sm:px-2 py-1 text-center w-[6%]">
+                      <th 
+                        className="border border-black px-1.5 sm:px-2 py-1 text-center w-[6%]"
+                        style={{ fontSize: `${Math.max(10, Math.min(13, effectiveFontSize))}px` }}
+                      >
                         SL.NO.
                       </th>
-                      <th className="border border-black px-2 sm:px-3 py-1 text-left w-[30%]">
+                      <th 
+                        className="border border-black px-2 sm:px-3 py-1 text-left w-[30%]"
+                        style={{ fontSize: `${Math.max(10, Math.min(13, effectiveFontSize))}px` }}
+                      >
                         NAME
                       </th>
-                      <th className="border border-black px-1.5 sm:px-2 py-1 text-center w-[16%]">
+                      <th 
+                        className="border border-black px-1.5 sm:px-2 py-1 text-center w-[16%]"
+                        style={{ fontSize: `${Math.max(10, Math.min(13, effectiveFontSize))}px` }}
+                      >
                         AMOUNT
                       </th>
-                      <th className="border border-black px-1.5 sm:px-2 py-1 text-center w-[16%]">
+                      <th 
+                        className="border border-black px-1.5 sm:px-2 py-1 text-center w-[16%]"
+                        style={{ fontSize: `${Math.max(10, Math.min(13, effectiveFontSize))}px` }}
+                      >
                         DATE
                       </th>
-                      <th className="border border-black px-1.5 sm:px-2 py-1 text-center w-[16%]">
+                      <th 
+                        className="border border-black px-1.5 sm:px-2 py-1 text-center w-[16%]"
+                        style={{ fontSize: `${Math.max(10, Math.min(13, effectiveFontSize))}px` }}
+                      >
                         PAID
                       </th>
-                      <th className="border border-black px-1.5 sm:px-2 py-1 text-center w-[16%]">
+                      <th 
+                        className="border border-black px-1.5 sm:px-2 py-1 text-center w-[16%]"
+                        style={{ fontSize: `${Math.max(10, Math.min(13, effectiveFontSize))}px` }}
+                      >
                         BALANCE
                       </th>
                     </tr>
@@ -1088,22 +1196,40 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                         style={{ height: `${dynamicRowHeightPx}px` }}
                         className="border-b border-black font-semibold"
                       >
-                        <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
+                        <td 
+                          className="border border-black px-1.5 text-center font-bold text-black align-middle"
+                          style={{ fontSize: `${effectiveFontSize}px` }}
+                        >
                           {row.ticket}
                         </td>
-                        <td className="border border-black px-2 sm:px-3 text-left font-black text-black truncate align-middle max-w-[140px] sm:max-w-none">
+                        <td 
+                          className="border border-black px-2 sm:px-3 text-left font-black text-black truncate align-middle max-w-[140px] sm:max-w-none"
+                          style={{ fontSize: `${effectiveFontSize}px` }}
+                        >
                           {row.name}
                         </td>
-                        <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
+                        <td 
+                          className="border border-black px-1.5 text-center font-bold text-black align-middle"
+                          style={{ fontSize: `${effectiveFontSize}px` }}
+                        >
                           {row.dueAmount}
                         </td>
-                        <td className="border border-black px-1 text-center font-mono text-[9px] sm:text-[11px] align-middle">
+                        <td 
+                          className="border border-black px-1 text-center font-mono align-middle"
+                          style={{ fontSize: `${Math.max(9, effectiveFontSize - 2)}px` }}
+                        >
                           {row.paidDate || ''}
                         </td>
-                        <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
+                        <td 
+                          className="border border-black px-1.5 text-center font-bold text-black align-middle"
+                          style={{ fontSize: `${effectiveFontSize}px` }}
+                        >
                           {row.paidAmount !== undefined ? row.paidAmount : ''}
                         </td>
-                        <td className="border border-black px-1.5 text-center font-bold text-black align-middle">
+                        <td 
+                          className="border border-black px-1.5 text-center font-bold text-black align-middle"
+                          style={{ fontSize: `${effectiveFontSize}px` }}
+                        >
                           {row.balanceAmount !== undefined ? (row.balanceAmount === 0 ? '-' : row.balanceAmount) : ''}
                         </td>
                       </tr>
