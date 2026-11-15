@@ -3395,7 +3395,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
             </header>
 
             {/* Scrollable Main Content */}
-            <main className="flex-1 px-4 py-4 space-y-4 pb-28">
+            <main className="flex-1 px-4 py-4 space-y-4 pb-[max(9.5rem,calc(7.5rem+env(safe-area-inset-bottom)))] sm:pb-8">
               {desktopViewTab === 'history' ? (
                 <div className="flex flex-col w-full">
                   {/* Back Nav & Context Bar */}
@@ -4791,7 +4791,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
         </header>
 
         {/* Scrollable Main Content */}
-        <main className="flex-1 px-3 py-3 space-y-3 pb-28">
+        <main className="flex-1 px-3 py-3 space-y-3 pb-[max(9.5rem,calc(7.5rem+env(safe-area-inset-bottom)))] sm:pb-8">
 
           {/* Current Highest Discount Banner Card */}
           <section className="rounded-2xl p-3.5 sm:p-4 text-white shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20">
