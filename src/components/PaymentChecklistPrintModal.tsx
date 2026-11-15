@@ -472,7 +472,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
             }
             .invocation {
               text-align: center;
-              font-size: 11px;
+              font-size: ${Math.max(9, effectiveFontSize - 2)}px;
               font-weight: 800;
               text-transform: uppercase;
               letter-spacing: 1.5px;
@@ -499,34 +499,34 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               gap: 2px;
             }
             .group-name {
-              font-size: 13px;
+              font-size: ${effectiveFontSize}px;
               font-weight: 900;
               text-transform: uppercase;
               letter-spacing: 0.2px;
             }
             .chit-amount {
-              font-size: 15px;
+              font-size: ${effectiveFontSize + 2}px;
               font-weight: 900;
               letter-spacing: -0.2px;
             }
             .months-dur {
-              font-size: 12px;
+              font-size: ${Math.max(10, effectiveFontSize - 1)}px;
               font-weight: 700;
               text-transform: uppercase;
             }
             .monthly-due {
-              font-size: 13px;
+              font-size: ${effectiveFontSize}px;
               font-weight: 900;
             }
             .cycle-label {
-              font-size: 13px;
+              font-size: ${effectiveFontSize + 1}px;
               font-weight: 900;
               text-transform: uppercase;
               text-decoration: underline;
               text-underline-offset: 3px;
             }
             .date-label {
-              font-size: 12px;
+              font-size: ${effectiveFontSize}px;
               font-weight: 700;
               text-decoration: underline;
               text-underline-offset: 3px;
@@ -601,7 +601,7 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               display: flex;
               justify-content: space-between;
               align-items: center;
-              font-size: 10px;
+              font-size: ${Math.max(9, effectiveFontSize - 2)}px;
               color: #444444;
             }
           </style>
@@ -1105,7 +1105,10 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               <div>
                 {/* ── TOP INVOCATION LINE (CENTERED & SMALL) ── */}
                 {invocationTitle.trim() && (
-                  <div className="text-center font-bold tracking-widest text-[10px] sm:text-xs uppercase mb-2.5 text-black font-serif">
+                  <div 
+                    className="text-center font-bold tracking-widest uppercase mb-2.5 text-black font-serif"
+                    style={{ fontSize: `${Math.max(9, effectiveFontSize - 2)}px` }}
+                  >
                     {invocationTitle}
                   </div>
                 )}
@@ -1114,29 +1117,52 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
                 <div className="flex justify-between items-start mb-3 sm:mb-4 text-black border-b-2 border-black pb-2 sm:pb-3">
                   {/* Left Column */}
                   <div className="space-y-0.5 sm:space-y-1">
-                    <div className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-black">
+                    <div 
+                      className="font-black uppercase tracking-wider text-black"
+                      style={{ fontSize: `${effectiveFontSize}px` }}
+                    >
                       <span className="font-black">{group.name.toUpperCase()}</span>
                     </div>
-                    <div className="text-xs sm:text-base font-black tracking-tight">
-                      CHIT AMOUNT - <span className="text-sm sm:text-lg">{formatINR(group.totalValue || group.total_value || 0)}</span>
+                    <div 
+                      className="font-black tracking-tight"
+                      style={{ fontSize: `${effectiveFontSize + 2}px` }}
+                    >
+                      CHIT AMOUNT - <span>{formatINR(group.totalValue || group.total_value || 0)}</span>
                     </div>
-                    <div className="text-[11px] sm:text-sm font-bold uppercase tracking-wider text-black">
+                    <div 
+                      className="font-bold uppercase tracking-wider text-black"
+                      style={{ fontSize: `${Math.max(10, effectiveFontSize - 1)}px` }}
+                    >
                       MONTHS - {group.duration || group.duration_months} MONTHS
                     </div>
-                    <div className="text-[11px] sm:text-sm font-black tracking-wide">
-                      MONTHLY DUE - <span className="text-xs sm:text-base">{effectiveDuePerMember}</span>
+                    <div 
+                      className="font-black tracking-wide"
+                      style={{ fontSize: `${effectiveFontSize}px` }}
+                    >
+                      MONTHLY DUE - <span>{effectiveDuePerMember}</span>
                       {activeMonthsList.length > 1 && (
-                        <span className="text-[10px] sm:text-xs font-bold ml-1 text-gray-700">({activeMonthsList.length} MONTHS)</span>
+                        <span 
+                          className="font-bold ml-1 text-gray-700"
+                          style={{ fontSize: `${Math.max(9, effectiveFontSize - 2)}px` }}
+                        >
+                          ({activeMonthsList.length} MONTHS)
+                        </span>
                       )}
                     </div>
                   </div>
 
                   {/* Right Column */}
                   <div className="text-right space-y-0.5 sm:space-y-1">
-                    <div className="text-[11px] sm:text-sm font-black uppercase tracking-wider underline underline-offset-4 decoration-black">
+                    <div 
+                      className="font-black uppercase tracking-wider underline underline-offset-4 decoration-black"
+                      style={{ fontSize: `${effectiveFontSize + 1}px` }}
+                    >
                       {customHeaderCycle || computedMonthDetails.headerCycleLabel}
                     </div>
-                    <div className="text-[10px] sm:text-sm font-bold tracking-wider underline underline-offset-4 decoration-black">
+                    <div 
+                      className="font-bold tracking-wider underline underline-offset-4 decoration-black"
+                      style={{ fontSize: `${effectiveFontSize}px` }}
+                    >
                       {customDateStr || computedMonthDetails.formattedDate}
                     </div>
                   </div>
@@ -1239,7 +1265,10 @@ export default function PaymentChecklistPrintModal({ group, onClose }: PaymentCh
               </div>
 
               {/* ── FOOTER SIGN-OFF PINNED AT BOTTOM OF A4 ── */}
-              <div className="mt-3 pt-2.5 flex justify-between items-center text-[10px] sm:text-xs text-gray-700 border-t border-gray-400">
+              <div 
+                className="mt-3 pt-2.5 flex justify-between items-center text-gray-700 border-t border-gray-400"
+                style={{ fontSize: `${Math.max(9, effectiveFontSize - 2)}px` }}
+              >
                 <div className="font-semibold">
                   Cycle: <strong>{activeMonthsList.length === 1 ? `Month ${activeMonthsList[0]}` : `Months ${activeMonthsList.join(', ')}`}</strong>
                 </div>
