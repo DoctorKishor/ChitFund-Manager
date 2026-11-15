@@ -12,6 +12,7 @@ import MaintenanceScreen from '@/components/MaintenanceScreen';
 import AppLogo from '@/components/AppLogo';
 import { useAuth } from '@/context/AuthContext';
 import { useMaintenance } from '@/context/MaintenanceContext';
+import { useBackHandler } from '@/context/BackNavigationContext';
 import { AlertTriangle, Wrench, Menu } from 'lucide-react';
 
 export default function Home() {
@@ -19,6 +20,24 @@ export default function Home() {
   const { isMaintenanceMode } = useMaintenance();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  // Priority 100: If mobile navigation drawer is open, back closes the drawer
+  useBackHandler('mobile_drawer', 100, () => {
+    if (mobileDrawerOpen) {
+      setMobileDrawerOpen(false);
+      return true;
+    }
+    return false;
+  }, mobileDrawerOpen);
+
+  // Priority 10: If on a non-dashboard tab, back navigates to Overview tab
+  useBackHandler('main_tab_navigation', 10, () => {
+    if (activeTab !== 'dashboard') {
+      setActiveTab('dashboard');
+      return true;
+    }
+    return false;
+  }, activeTab !== 'dashboard');
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {

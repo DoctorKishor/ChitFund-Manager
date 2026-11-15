@@ -66,6 +66,8 @@ const CATEGORIES: PermissionCategory[] = [
     toggleBgClass: 'peer-checked:bg-brand-600',
     items: [
       { key: 'dashboard:view_kpis', label: 'View Financial Overview Cards', desc: 'Show Total Collected, Target, and Pending dues summary cards' },
+      { key: 'dashboard:view_payment_ledger', label: 'View Payment Ledger & Receipts', desc: 'Show recent collection transactions and receipts vault button in Overview' },
+      { key: 'dashboard:view_activity_feed', label: 'View Live System Activity Feed', desc: 'Show realtime audit logs and staff activity ledger stream in Overview' },
       { key: 'dashboard:quick_actions', label: 'Quick Actions (+ Record Payment & Menu)', desc: 'Show header "+ Record Payment" button and floating quick action shortcuts' },
       { key: 'dashboard:launch_month0', label: 'Confirm Launch & Roll to Month 1', desc: 'Button to complete Month 0 and allocate Organizer Profit' },
       { key: 'dashboard:advance_month', label: 'Conclude & Advance Month', desc: 'Button to finish current monthly auction cycle and advance to next month' },

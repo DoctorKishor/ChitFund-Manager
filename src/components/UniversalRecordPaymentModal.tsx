@@ -5,6 +5,7 @@ import { supabase } from '@/utils/supabase/client';
 import { useWallet, WalletType } from '@/context/WalletContext';
 import { useAuth } from '@/context/AuthContext';
 import { useSystemSettings } from '@/context/SystemSettingsContext';
+import { useBackHandler } from '@/context/BackNavigationContext';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import PassbookScannerModal from '@/components/PassbookScannerModal';
 import { PaymentReceiptModal } from '@/components/PaymentReceiptModal';
@@ -91,6 +92,15 @@ export default function UniversalRecordPaymentModal({
   const { balances, updateBalance } = useWallet();
   const { profile: currentAdminProfile } = useAuth();
   const { chitRules, upiConfig, notifConfig } = useSystemSettings();
+
+  // Priority 100: Hardware/Browser Back button closes this payment modal
+  useBackHandler('universal_record_payment_modal', 100, () => {
+    if (isOpen) {
+      onClose();
+      return true;
+    }
+    return false;
+  }, isOpen);
 
   // ── 1. Search / Member Selection State ──
   const [searchQuery, setSearchQuery] = useState('');

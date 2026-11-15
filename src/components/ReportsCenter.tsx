@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import SystemAuditLogViewer from './SystemAuditLogViewer';
 import ReceiptsVaultViewer from './ReceiptsVaultViewer';
+import { useBackHandler } from '@/context/BackNavigationContext';
 import { computeAuctionDateForCycle, calculatePaymentDelay } from '@/utils/auctionSchedule';
 
 export type ReportSubtab = 
@@ -183,6 +184,33 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
   // Month & group tab refs for auto-centering
   const monthSliderRef = useRef<HTMLDivElement>(null);
   const groupSliderRef = useRef<HTMLDivElement>(null);
+
+  // ── Hierarchical Back Navigation Handlers ──
+  // Priority 100: Modals & Drawers in Reports Center
+  useBackHandler('reports_preview_modal', 100, () => {
+    if (showPreviewModal) {
+      setShowPreviewModal(false);
+      return true;
+    }
+    return false;
+  }, showPreviewModal);
+
+  useBackHandler('reports_search_dropdown', 100, () => {
+    if (isSearchDropdownOpen) {
+      setIsSearchDropdownOpen(false);
+      return true;
+    }
+    return false;
+  }, isSearchDropdownOpen);
+
+  // Priority 50: Non-primary report subtab steps back to Monthly
+  useBackHandler('reports_subtab_navigation', 50, () => {
+    if (activeSubtab !== 'monthly') {
+      setActiveSubtab('monthly');
+      return true;
+    }
+    return false;
+  }, activeSubtab !== 'monthly');
 
   // ── System Audit Log State & Realtime Fetch ──
   const [systemAuditLogs, setSystemAuditLogs] = useState<any[]>([]);

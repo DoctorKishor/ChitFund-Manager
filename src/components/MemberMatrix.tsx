@@ -11,6 +11,7 @@ import PassbookScannerModal from './PassbookScannerModal';
 import PassbookSheetGeneratorModal, { StickerItem } from './PassbookSheetGeneratorModal';
 import PassbookInventoryModal from './PassbookInventoryModal';
 import PassbookQrCenterModal from './PassbookQrCenterModal';
+import { useBackHandler } from '@/context/BackNavigationContext';
 import { getPassbookScanUrl } from '@/utils/qrCodeGenerator';
 import { 
   Users, 
@@ -161,6 +162,53 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
 
   // Role creation modal trigger from header
   const [isCreateRoleModalOpen, setIsCreateRoleModalOpen] = useState<boolean>(false);
+
+  // ── Hierarchical Back Navigation Handlers ──
+  // Priority 100: Member Matrix Modals & Inspection Drawers
+  useBackHandler('member_matrix_modals', 100, () => {
+    if (isAddModalOpen) {
+      setIsAddModalOpen(false);
+      return true;
+    }
+    if (editingMember) {
+      setEditingMember(null);
+      return true;
+    }
+    if (pairingMember) {
+      setPairingMember(null);
+      return true;
+    }
+    if (isInventoryOpen) {
+      setIsInventoryOpen(false);
+      return true;
+    }
+    if (isQrCenterOpen) {
+      setIsQrCenterOpen(false);
+      return true;
+    }
+    if (isPrintModalOpen) {
+      setIsPrintModalOpen(false);
+      return true;
+    }
+    if (isCreateRoleModalOpen) {
+      setIsCreateRoleModalOpen(false);
+      return true;
+    }
+    if (drawerMemberId) {
+      setDrawerMemberId(null);
+      return true;
+    }
+    return false;
+  }, isAddModalOpen || !!editingMember || !!pairingMember || isInventoryOpen || isQrCenterOpen || isPrintModalOpen || isCreateRoleModalOpen || !!drawerMemberId);
+
+  // Priority 50: Member Profile Details back to Directory
+  useBackHandler('member_details_subview', 50, () => {
+    if (selectedMemberId) {
+      handleBackFromMemberDetails();
+      return true;
+    }
+    return false;
+  }, !!selectedMemberId);
 
   const handleExportRolesPolicy = () => {
     const policyData = {

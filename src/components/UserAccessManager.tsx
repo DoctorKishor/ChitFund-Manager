@@ -5,6 +5,7 @@ import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@supabase/supabase-js';
 import { triggerHapticFeedback } from '@/utils/haptics';
+import { useBackHandler } from '@/context/BackNavigationContext';
 import RoleManagerPanel from './RoleManagerPanel';
 import RoleAppPreviewModal from './RoleAppPreviewModal';
 import {
@@ -93,6 +94,41 @@ export default function UserAccessManager({ onOpenAuditLogs, onAddAuditLog }: Us
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
   const [selectedPreviewRoleId, setSelectedPreviewRoleId] = useState<string>('collections_agent');
   const [selectedStaff, setSelectedStaff] = useState<StaffProfile | null>(null);
+
+  // ── Hierarchical Back Navigation Handlers ──
+  // Priority 100: Access Manager Modals
+  useBackHandler('user_access_modals', 100, () => {
+    if (isPreviewModalOpen) {
+      setIsPreviewModalOpen(false);
+      return true;
+    }
+    if (isAddStaffOpen) {
+      setIsAddStaffOpen(false);
+      return true;
+    }
+    if (isEditStaffOpen) {
+      setIsEditStaffOpen(false);
+      return true;
+    }
+    if (isResetPasswordOpen) {
+      setIsResetPasswordOpen(false);
+      return true;
+    }
+    if (isDeleteStaffOpen) {
+      setIsDeleteStaffOpen(false);
+      return true;
+    }
+    return false;
+  }, isPreviewModalOpen || isAddStaffOpen || isEditStaffOpen || isResetPasswordOpen || isDeleteStaffOpen);
+
+  // Priority 50: Roles subtab steps back to Staff list
+  useBackHandler('user_access_subtab', 50, () => {
+    if (activeSubtab === 'roles') {
+      setActiveSubtab('staff');
+      return true;
+    }
+    return false;
+  }, activeSubtab === 'roles');
 
   // Add staff form state
   const [newFullName, setNewFullName] = useState<string>('');

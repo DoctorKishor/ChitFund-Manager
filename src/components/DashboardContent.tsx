@@ -22,6 +22,7 @@ import { PaymentReceiptModal } from './PaymentReceiptModal';
 import LiveAuditLogWidget from './LiveAuditLogWidget';
 import SlideToConfirm from './SlideToConfirm';
 import { HelpTooltip } from './HelpTooltip';
+import { useBackHandler } from '@/context/BackNavigationContext';
 import { triggerHapticFeedback } from '../utils/haptics';
 import { computeNextAuctionDateTime, formatTime12h, getFirstSundayOnOrAfterDay, shouldAutoAdvanceCycle } from '../utils/auctionSchedule';
 import { generateReceiptNumber } from '@/utils/receiptNumber';
@@ -173,6 +174,8 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const canRevertMonth = canPerformAction('chits:edit') || canPerformAction('dashboard:revert_month');
   const canViewReserves = canPerformAction('dashboard:view_reserves');
   const canViewKpis = canPerformAction('dashboard:view_kpis');
+  const canViewPaymentLedger = canPerformAction('dashboard:view_payment_ledger');
+  const canViewActivityFeed = canPerformAction('dashboard:view_activity_feed');
   const canQuickActions = canPerformAction('dashboard:quick_actions');
   const canDeleteChit = canPerformAction('chits:delete');
   const canRescheduleAuction = canPerformAction('chits:reschedule_auction');
@@ -1702,6 +1705,89 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
   const [remindPhoneInputs, setRemindPhoneInputs] = useState<{ [memberId: string]: string }>({});
   const [savingMemberPhoneId, setSavingMemberPhoneId] = useState<string | null>(null);
   const [remindCopied, setRemindCopied] = useState<boolean>(false);
+
+  // ── Hierarchical Back Navigation Handlers ──
+  // Priority 100: Topmost Modals in Overview / Dashboard
+  useBackHandler('dashboard_receipt_modal', 100, () => {
+    if (viewingReceiptTx) {
+      setViewingReceiptTx(null);
+      return true;
+    }
+    return false;
+  }, !!viewingReceiptTx);
+
+  useBackHandler('dashboard_modals', 100, () => {
+    if (showDisbursePayoutModal) {
+      setShowDisbursePayoutModal(false);
+      return true;
+    }
+    if (month0LaunchModalGroup) {
+      setMonth0LaunchModalGroup(null);
+      return true;
+    }
+    if (isUniversalPaymentOpen) {
+      setIsUniversalPaymentOpen(false);
+      return true;
+    }
+    if (showQuickPersonalDrawModal) {
+      setShowQuickPersonalDrawModal(false);
+      return true;
+    }
+    if (showQuickAtmModal) {
+      setShowQuickAtmModal(false);
+      return true;
+    }
+    if (showWithdrawProfitModal) {
+      setShowWithdrawProfitModal(false);
+      return true;
+    }
+    if (showRemindModal) {
+      setShowRemindModal(false);
+      return true;
+    }
+    if (printChecklistGroup) {
+      setPrintChecklistGroup(null);
+      return true;
+    }
+    if (deletingGroup) {
+      setDeletingGroup(null);
+      return true;
+    }
+    if (aliasModalTicket) {
+      setAliasModalTicket(null);
+      return true;
+    }
+    if (splitModalTicket) {
+      setSplitModalTicket(null);
+      return true;
+    }
+    if (exitModalTicket) {
+      setExitModalTicket(null);
+      return true;
+    }
+    if (transferModalTicket) {
+      setTransferModalTicket(null);
+      return true;
+    }
+    if (customAmountModalTicket) {
+      setCustomAmountModalTicket(null);
+      return true;
+    }
+    if (showKaiIruppuBreakdown) {
+      setShowKaiIruppuBreakdown(false);
+      return true;
+    }
+    return false;
+  }, showDisbursePayoutModal || !!month0LaunchModalGroup || isUniversalPaymentOpen || showQuickPersonalDrawModal || showQuickAtmModal || showWithdrawProfitModal || showRemindModal || !!printChecklistGroup || !!deletingGroup || !!aliasModalTicket || !!splitModalTicket || !!exitModalTicket || !!transferModalTicket || !!customAmountModalTicket || showKaiIruppuBreakdown);
+
+  // Priority 50: Sub-view (Member Details View back to Members Directory)
+  useBackHandler('dashboard_member_details', 50, () => {
+    if (selectedMemberId) {
+      setSelectedMemberId(null);
+      return true;
+    }
+    return false;
+  }, !!selectedMemberId);
 
   // Helper: Generate individual subscriber WhatsApp reminder URL
   const generateMemberReminderWhatsAppUrl = (
@@ -4734,7 +4820,8 @@ Thank you for your prompt payment! 🙏`;
                 {/* Right 4 Columns: Payment Breakdown Ledger & Live Audit Log */}
                 <aside className="lg:col-span-4 space-y-6" data-purpose="ledger-and-audit-sidebar">
                   {/* Card 1: Payments Breakdown Ledger */}
-                  <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3.5">
+                  {canViewPaymentLedger && (
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3.5">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 rounded-lg bg-indigo-50 text-brand-600">
@@ -4859,17 +4946,20 @@ Thank you for your prompt payment! 🙏`;
                       </button>
                     )}
                   </div>
+                  )}
 
                   {/* Card 2: Live System Activity Feed Widget (Identical to SystemAuditLogViewer) */}
-                  <LiveAuditLogWidget
-                    onViewFullReport={() => {
-                      if (typeof window !== 'undefined') {
-                        sessionStorage.setItem('cf_reports_subtab', 'system_log');
-                      }
-                      setReportsInitialSubtab('system_log');
-                      if (setActiveTab) setActiveTab('reports');
-                    }}
-                  />
+                  {canViewActivityFeed && (
+                    <LiveAuditLogWidget
+                      onViewFullReport={() => {
+                        if (typeof window !== 'undefined') {
+                          sessionStorage.setItem('cf_reports_subtab', 'system_log');
+                        }
+                        setReportsInitialSubtab('system_log');
+                        if (setActiveTab) setActiveTab('reports');
+                      }}
+                    />
+                  )}
 
                   {/* Card 3: Quick WhatsApp Broadcast Card */}
                   <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
@@ -5468,7 +5558,8 @@ Thank you for your prompt payment! 🙏`;
                   {/* END: MemberDuesSection */}
 
                   {/* BEGIN: RecentPaymentsLedgerSection */}
-                  <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="ledger-preview">
+                  {canViewPaymentLedger && (
+                    <section className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card" data-purpose="ledger-preview">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-2">
                         <div className="w-7 h-7 rounded-lg bg-indigo-50 text-brand-600 flex items-center justify-center shadow-xs">
@@ -5574,19 +5665,22 @@ Thank you for your prompt payment! 🙏`;
                       )}
                     </div>
                   </section>
+                  )}
                   {/* END: RecentPaymentsLedgerSection */}
 
                   {/* Card: Live System Activity Feed (Mobile) */}
-                  <LiveAuditLogWidget
-                    limit={5}
-                    onViewFullReport={() => {
-                      if (typeof window !== 'undefined') {
-                        sessionStorage.setItem('cf_reports_subtab', 'system_log');
-                      }
-                      setReportsInitialSubtab('system_log');
-                      if (setActiveTab) setActiveTab('reports');
-                    }}
-                  />
+                  {canViewActivityFeed && (
+                    <LiveAuditLogWidget
+                      limit={5}
+                      onViewFullReport={() => {
+                        if (typeof window !== 'undefined') {
+                          sessionStorage.setItem('cf_reports_subtab', 'system_log');
+                        }
+                        setReportsInitialSubtab('system_log');
+                        if (setActiveTab) setActiveTab('reports');
+                      }}
+                    />
+                  )}
                 </>
               )}
             </div>

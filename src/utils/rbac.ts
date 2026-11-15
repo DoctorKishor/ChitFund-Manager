@@ -15,6 +15,8 @@ export type MainTabId =
 export type PermissionAction =
   // ── Overview & Dashboard Controls ──
   | 'dashboard:view_kpis'
+  | 'dashboard:view_payment_ledger'
+  | 'dashboard:view_activity_feed'
   | 'dashboard:quick_actions'
   | 'dashboard:launch_month0'
   | 'dashboard:advance_month'
@@ -145,6 +147,8 @@ export const TREASURY_SUBTAB_PERMISSIONS: Record<CashHandlingSubtab, string[]> =
 export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
   // ── Overview & Dashboard Controls ──
   'dashboard:view_kpis': ['admin', 'manager', 'auditor'],
+  'dashboard:view_payment_ledger': ['admin', 'manager', 'collections_agent', 'auditor'],
+  'dashboard:view_activity_feed': ['admin', 'manager', 'auditor'],
   'dashboard:quick_actions': ['admin', 'manager', 'collections_agent'],
   'dashboard:launch_month0': ['admin'],
   'dashboard:advance_month': ['admin', 'manager'],

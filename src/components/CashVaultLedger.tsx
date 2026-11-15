@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useWallet, WalletType } from '../context/WalletContext';
 import { useAuth } from '../context/AuthContext';
 import { useSystemSettings } from '../context/SystemSettingsContext';
+import { useBackHandler } from '@/context/BackNavigationContext';
 import { supabase } from '../utils/supabase/client';
 import { triggerHapticFeedback } from '@/utils/haptics';
 import { logAuditEvent } from '@/utils/auditLogger';
@@ -120,6 +121,29 @@ export default function CashVaultLedger() {
   // Active Modal Dialog States
   const [activeModal, setActiveModal] = useState<'none' | 'atm' | 'spend' | 'deposit' | 'transfer' | 'denominations' | 'settle' | 'recover'>('none');
   const [showWithdrawProfitModal, setShowWithdrawProfitModal] = useState<boolean>(false);
+
+  // ── Hierarchical Back Navigation Handlers ──
+  // Priority 100: Treasury Modals
+  useBackHandler('treasury_modal', 100, () => {
+    if (activeModal !== 'none') {
+      setActiveModal('none');
+      return true;
+    }
+    if (showWithdrawProfitModal) {
+      setShowWithdrawProfitModal(false);
+      return true;
+    }
+    return false;
+  }, activeModal !== 'none' || showWithdrawProfitModal);
+
+  // Priority 50: Expanded wallet card back to full grid
+  useBackHandler('treasury_expanded_card', 50, () => {
+    if (activeExpandedCard !== null) {
+      setActiveExpandedCard(null);
+      return true;
+    }
+    return false;
+  }, activeExpandedCard !== null);
 
   // Form State: External Cash Deposit / Float Inflow
   const [depositDest, setDepositDest] = useState<WalletType>('cash_in_hand');

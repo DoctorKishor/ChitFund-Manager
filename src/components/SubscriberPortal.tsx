@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { useBackHandler } from '@/context/BackNavigationContext';
 import FontSizeSwitcher from '@/components/FontSizeSwitcher';
 import { 
   Ticket, 
@@ -427,6 +428,33 @@ export default function SubscriberPortal() {
   const [scheduleFilter, setScheduleFilter] = useState<'all' | 'paid' | 'pending'>('all');
   const [showScheduleInfoModal, setShowScheduleInfoModal] = useState<boolean>(false);
   const [showMpinForm, setShowMpinForm] = useState<boolean>(false);
+
+  // ── Hierarchical Back Navigation Handlers ──
+  // Priority 100: Subscriber Modals
+  useBackHandler('subscriber_modals', 100, () => {
+    if (selectedTx) {
+      setSelectedTx(null);
+      return true;
+    }
+    if (showPaymentModal) {
+      setShowPaymentModal(false);
+      return true;
+    }
+    if (showScheduleInfoModal) {
+      setShowScheduleInfoModal(false);
+      return true;
+    }
+    return false;
+  }, !!selectedTx || showPaymentModal || showScheduleInfoModal);
+
+  // Priority 10: Non-overview tabs step back to Overview
+  useBackHandler('subscriber_tab_navigation', 10, () => {
+    if (activeTab !== 'overview') {
+      setActiveTab('overview');
+      return true;
+    }
+    return false;
+  }, activeTab !== 'overview');
 
   const toggleBreakdown = (groupId: string) => {
     setExpandedBreakdownGroupIds((prev) =>

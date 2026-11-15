@@ -6,6 +6,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { MaintenanceProvider } from "@/context/MaintenanceContext";
 import { OrganizationProvider } from "@/context/OrganizationContext";
 import { SystemSettingsProvider } from "@/context/SystemSettingsContext";
+import { BackNavigationProvider } from "@/context/BackNavigationContext";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import NetworkStatusBanner from "@/components/NetworkStatusBanner";
 
@@ -66,7 +67,9 @@ export default function RootLayout({
             <SystemSettingsProvider>
               <MaintenanceProvider>
                 <WalletProvider>
-                  {children}
+                  <BackNavigationProvider>
+                    {children}
+                  </BackNavigationProvider>
                 </WalletProvider>
               </MaintenanceProvider>
             </SystemSettingsProvider>

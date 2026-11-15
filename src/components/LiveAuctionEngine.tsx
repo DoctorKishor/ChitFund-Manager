@@ -59,6 +59,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useWallet, WalletType } from '@/context/WalletContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useSystemSettings } from '@/context/SystemSettingsContext';
+import { useBackHandler } from '@/context/BackNavigationContext';
 import { exportAuctionReportPdf, shareAuctionReportToWhatsApp } from '@/utils/auctionPdfExporter';
 import AuctionReportDocument, { AuctionReportData } from '@/components/AuctionReportDocument';
 import LiveViewersModal, { ActiveViewerInfo } from '@/components/LiveViewersModal';
@@ -298,6 +299,89 @@ export default function LiveAuctionEngine() {
   // Group switcher dropdown state
   const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState<boolean>(false);
   const groupDropdownRef = useRef<HTMLDivElement>(null);
+
+  // ── Hierarchical Back Navigation Handlers ──
+  // Priority 100: Topmost Modals and Overlays in Live Auction Engine
+  useBackHandler('auction_concluded_report', 100, () => {
+    if (showConcludedReportScreen) {
+      setShowConcludedReportScreen(false);
+      return true;
+    }
+    return false;
+  }, showConcludedReportScreen);
+
+  useBackHandler('auction_historical_log_detail', 100, () => {
+    if (selectedHistoricalLog) {
+      setSelectedHistoricalLog(null);
+      return true;
+    }
+    return false;
+  }, !!selectedHistoricalLog);
+
+  useBackHandler('auction_winner_celebration', 100, () => {
+    if (recordedWinnerSummary) {
+      setRecordedWinnerSummary(null);
+      return true;
+    }
+    return false;
+  }, !!recordedWinnerSummary);
+
+  useBackHandler('auction_modals', 100, () => {
+    if (showCloseModal) {
+      setShowCloseModal(false);
+      return true;
+    }
+    if (showBidModal) {
+      setShowBidModal(false);
+      return true;
+    }
+    if (showRollCallModal) {
+      setShowRollCallModal(false);
+      return true;
+    }
+    if (showTimelineDrawer) {
+      setShowTimelineDrawer(false);
+      return true;
+    }
+    if (showViewersModal) {
+      setShowViewersModal(false);
+      return true;
+    }
+    if (showScheduleModal) {
+      setShowScheduleModal(false);
+      return true;
+    }
+    if (showStartConfirmModal) {
+      setShowStartConfirmModal(false);
+      return true;
+    }
+    if (showMonth0Modal) {
+      setShowMonth0Modal(false);
+      return true;
+    }
+    if (isGroupDropdownOpen) {
+      setIsGroupDropdownOpen(false);
+      return true;
+    }
+    return false;
+  }, showCloseModal || showBidModal || showRollCallModal || showTimelineDrawer || showViewersModal || showScheduleModal || showStartConfirmModal || showMonth0Modal || isGroupDropdownOpen);
+
+  // Priority 50: Sub-views (Archive -> Arena, Studio -> Overview)
+  useBackHandler('auction_archive_subview', 50, () => {
+    if (desktopViewTab === 'history') {
+      setDesktopViewTab('arena');
+      return true;
+    }
+    return false;
+  }, desktopViewTab === 'history');
+
+  useBackHandler('auction_studio_stage', 50, () => {
+    if (stage === 'studio') {
+      setStage('overview');
+      return true;
+    }
+    return false;
+  }, stage === 'studio');
 
   // Listen for navigation events from Dashboard (e.g. Winner Card click)
   useEffect(() => {
@@ -2340,7 +2424,9 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
                   {/* Cumulative Performance Metrics Grid */}
                   {(() => {
-                    const totalDisbursed = historicalAuctionLogs.reduce((sum, l) => sum + (l.netPayout || 0), 0);
+                    const totalDisbursed = historicalAuctionLogs.reduce((sum, l) => sum + (l.totalDisbursed || 0), 0);
+                    const totalPrizeNet = historicalAuctionLogs.reduce((sum, l) => sum + (l.netPayout || 0), 0);
+                    const disbursedPct = totalPrizeNet > 0 ? Math.round((totalDisbursed / totalPrizeNet) * 100) : 100;
                     const totalDiscount = historicalAuctionLogs.reduce((sum, l) => sum + (l.winningDiscount || 0), 0);
                     const avgDiscountPct = historicalAuctionLogs.length > 0 
                       ? ((totalDiscount / (historicalAuctionLogs.length * (group.totalValue || 1))) * 100).toFixed(1)
@@ -2383,11 +2469,13 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                                 {formatCurrency(totalDisbursed)}
                               </div>
                               <p className="text-xs text-slate-500 mt-1 font-sans">
-                                Cumulative to {historicalAuctionLogs.length} prize winners
+                                {totalDisbursed >= totalPrizeNet ? 'All winner prizes disbursed' : `${formatCurrency(Math.max(0, totalPrizeNet - totalDisbursed))} prize pending disbursal`}
                               </p>
                             </div>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700">
-                              100% Solvency
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                              disbursedPct === 100 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'
+                            }`}>
+                              {disbursedPct}% Disbursed
                             </span>
                           </div>
                         </div>
@@ -3495,7 +3583,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
                   {/* Search & Filter Controls */}
                   {(() => {
-                    const completedCount = historicalAuctionLogs.filter(l => l.disbursalStatus === 'fully_disbursed' || !l.disbursalStatus).length;
+                    const completedCount = historicalAuctionLogs.filter(l => l.disbursalStatus === 'fully_disbursed').length;
                     const laabaCount = historicalAuctionLogs.filter(l => l.isLaabaSeetu).length;
                     const pendingCount = historicalAuctionLogs.filter(l => l.disbursalStatus === 'pending' || l.disbursalStatus === 'partially_disbursed').length;
 
@@ -3575,7 +3663,9 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
 
                   {/* Cumulative Performance Summary Grid (2x2 KPI Bento) */}
                   {(() => {
-                    const totalDisbursed = historicalAuctionLogs.reduce((sum, l) => sum + (l.netPayout || 0), 0);
+                    const totalDisbursed = historicalAuctionLogs.reduce((sum, l) => sum + (l.totalDisbursed || 0), 0);
+                    const totalPrizeNet = historicalAuctionLogs.reduce((sum, l) => sum + (l.netPayout || 0), 0);
+                    const disbursedPct = totalPrizeNet > 0 ? Math.round((totalDisbursed / totalPrizeNet) * 100) : 100;
                     const totalDiscount = historicalAuctionLogs.reduce((sum, l) => sum + (l.winningDiscount || 0), 0);
                     const laabaCount = historicalAuctionLogs.filter(l => l.isLaabaSeetu).length;
                     const durationPct = Math.round((historicalAuctionLogs.length / (group.durationMonths || 1)) * 100);
@@ -3593,9 +3683,11 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                             <div className="text-base font-black text-slate-900 leading-tight">
                               {formatCurrency(totalDisbursed)}
                             </div>
-                            <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-0.5 mt-0.5">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                              100% Solvency
+                            <span className={`text-[10px] font-semibold flex items-center gap-0.5 mt-0.5 ${
+                              disbursedPct === 100 ? 'text-emerald-600' : 'text-amber-600'
+                            }`}>
+                              <CheckCircle2 className={`w-3 h-3 ${disbursedPct === 100 ? 'text-emerald-500' : 'text-amber-500'}`} />
+                              {disbursedPct}% Disbursed
                             </span>
                           </div>
                         </div>

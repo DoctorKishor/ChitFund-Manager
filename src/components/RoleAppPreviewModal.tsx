@@ -6,6 +6,7 @@ import { supabase } from '@/utils/supabase/client';
 import { useAuth, RolePreviewAuthProvider, broadcastRoleUpdate } from '@/context/AuthContext';
 import { CustomRoleRecord, MainTabId, PermissionAction } from '@/utils/rbac';
 import { triggerHapticFeedback } from '@/utils/haptics';
+import { useBackHandler } from '@/context/BackNavigationContext';
 import DashboardContent from './DashboardContent';
 import Sidebar from './Sidebar';
 import MobileBottomNav from './MobileBottomNav';
@@ -42,6 +43,7 @@ import {
   MessageSquare,
   HelpCircle,
   ToggleLeft,
+  FileText,
   ToggleRight,
   MousePointer,
   Crosshair,
@@ -101,7 +103,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
     is_privileged: true,
     allowed_tabs: ['dashboard', 'chits', 'members', 'auctions', 'cash', 'reports', 'communication', 'users', 'settings'],
     allowed_actions: [
-      'dashboard:view_kpis', 'dashboard:quick_actions', 'dashboard:launch_month0', 'dashboard:advance_month', 'dashboard:revert_month', 'dashboard:view_reserves',
+      'dashboard:view_kpis', 'dashboard:view_payment_ledger', 'dashboard:view_activity_feed', 'dashboard:quick_actions', 'dashboard:launch_month0', 'dashboard:advance_month', 'dashboard:revert_month', 'dashboard:view_reserves',
       'chits:view', 'chits:create', 'chits:edit', 'chits:launch_month0', 'chits:reschedule_auction', 'chits:configure_laaba_seetu', 'chits:swap_ticket', 'chits:delete',
       'members:view', 'members:enroll', 'members:edit', 'members:collect', 'members:waive_penalties', 'members:suspend', 'members:pair_qr', 'members:revoke_qr', 'members:batch_qr', 'members:reset_mpin', 'members:export', 'members:delete',
       'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:override_floor', 'auctions:edit_historical', 'auctions:disburse', 'auctions:issue_receipt',
@@ -120,7 +122,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
     is_privileged: true,
     allowed_tabs: ['dashboard', 'chits', 'members', 'auctions', 'communication', 'reports'],
     allowed_actions: [
-      'dashboard:view_kpis', 'dashboard:quick_actions', 'dashboard:advance_month', 'dashboard:view_reserves',
+      'dashboard:view_kpis', 'dashboard:view_payment_ledger', 'dashboard:view_activity_feed', 'dashboard:quick_actions', 'dashboard:advance_month', 'dashboard:view_reserves',
       'chits:view', 'chits:create', 'chits:edit', 'chits:reschedule_auction', 'chits:configure_laaba_seetu', 'chits:swap_ticket',
       'members:view', 'members:enroll', 'members:edit', 'members:collect', 'members:suspend', 'members:pair_qr', 'members:revoke_qr', 'members:batch_qr', 'members:reset_mpin', 'members:export',
       'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:disburse', 'auctions:issue_receipt',
@@ -138,6 +140,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
     is_privileged: true,
     allowed_tabs: ['dashboard', 'members', 'communication'],
     allowed_actions: [
+      'dashboard:view_payment_ledger',
       'dashboard:quick_actions',
       'members:view', 'members:collect', 'members:pair_qr',
       'treasury:collect_cash',
@@ -168,7 +171,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
     is_privileged: true,
     allowed_tabs: ['dashboard', 'chits', 'members', 'cash', 'reports'],
     allowed_actions: [
-      'dashboard:view_kpis', 'dashboard:view_reserves',
+      'dashboard:view_kpis', 'dashboard:view_payment_ledger', 'dashboard:view_activity_feed', 'dashboard:view_reserves',
       'chits:view',
       'members:view', 'members:export',
       'auctions:view',
@@ -215,8 +218,10 @@ const CATEGORY_TAB_MAP: Record<string, MainTabId> = {
 };
 
 const ALL_ACTIONS: ActionMeta[] = [
-  // 1. Overview Dashboard (6 Actions)
+  // 1. Overview Dashboard (8 Actions)
   { key: 'dashboard:view_kpis', label: 'View Financial Overview Cards', desc: 'Show Total Collected, Target, and Pending dues summary cards', category: 'Overview Dashboard', icon: BarChart3 },
+  { key: 'dashboard:view_payment_ledger', label: 'View Payment Ledger & Receipts', desc: 'Show recent collection transactions and receipts vault button', category: 'Overview Dashboard', icon: FileText },
+  { key: 'dashboard:view_activity_feed', label: 'View Live System Activity Feed', desc: 'Show realtime audit logs and staff activity ledger stream', category: 'Overview Dashboard', icon: ShieldCheck },
   { key: 'dashboard:quick_actions', label: 'Quick Actions (+ Record Payment & Menu)', desc: 'Show header "+ Record Payment" button and floating quick action shortcuts', category: 'Overview Dashboard', icon: Sparkles },
   { key: 'dashboard:launch_month0', label: 'Confirm Launch & Roll to Month 1', desc: 'Button to complete Month 0 and allocate Organizer Profit', category: 'Overview Dashboard', icon: Rocket },
   { key: 'dashboard:advance_month', label: 'Conclude & Advance Month', desc: 'Button to finish current monthly auction cycle and advance to next month', category: 'Overview Dashboard', icon: ArrowRight },
@@ -307,6 +312,8 @@ const ALL_ACTIONS: ActionMeta[] = [
 const ACTION_MATCH_RULES: { key: PermissionAction; match: (lower: string) => boolean }[] = [
   // 1. Overview Dashboard
   { key: 'dashboard:view_kpis', match: (t) => t.includes('total collected') || t.includes('target:') || t.includes('to collect') || t.includes('financial overview') },
+  { key: 'dashboard:view_payment_ledger', match: (t) => t.includes('payment ledger') || t.includes('receipts vault') || t.includes('payments breakdown') || t.includes('ledger receipts') },
+  { key: 'dashboard:view_activity_feed', match: (t) => t.includes('live system activity') || t.includes('audit log') || t.includes('activity feed') || t.includes('staff action') },
   { key: 'dashboard:quick_actions', match: (t) => t.includes('quick action') || t.includes('speed dial') || t.includes('floating action') },
   { key: 'dashboard:launch_month0', match: (t) => t.includes('confirm launch & roll to month 1') || t.includes('confirm launch') },
   { key: 'dashboard:advance_month', match: (t) => t.includes('conclude & advance month') || t.includes('conclude & advance') },
@@ -810,6 +817,15 @@ export default function RoleAppPreviewModal({
   // Live editable working copy of the selected role's permissions
   const [allowedTabs, setAllowedTabs] = useState<MainTabId[]>([]);
   const [allowedActions, setAllowedActions] = useState<PermissionAction[]>([]);
+
+  // Hierarchical back handler for preview modal
+  useBackHandler('role_app_preview_modal', 100, () => {
+    if (isOpen) {
+      onClose();
+      return true;
+    }
+    return false;
+  }, isOpen);
 
   // 1. Fetch available custom roles
   const loadRoles = useCallback(async () => {
