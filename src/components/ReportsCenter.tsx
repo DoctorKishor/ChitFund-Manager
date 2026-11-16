@@ -44,6 +44,7 @@ import {
   Trophy,
   RefreshCw,
   Receipt,
+  ChevronDown,
 } from 'lucide-react';
 import SystemAuditLogViewer from './SystemAuditLogViewer';
 import ReceiptsVaultViewer from './ReceiptsVaultViewer';
@@ -2472,17 +2473,86 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
          ══════════════════════════════════════════════════════════════ */}
       <div className="hidden md:flex flex-1 flex-col min-w-0 overflow-hidden bg-slate-50">
         
-        {/* Top Navigation Header */}
-        <header className="h-16 bg-white border-b border-slate-200/80 px-8 flex items-center justify-between flex-shrink-0 z-20">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <h1 className="text-lg font-bold font-display text-slate-900 tracking-tight whitespace-nowrap">
-                Reports &amp; Analytics Center
+        {/* Top Navigation Header & Subtabs Bar */}
+        <header className="h-16 bg-white border-b border-slate-200/80 px-6 lg:px-8 flex items-center justify-between flex-shrink-0 z-20">
+          <div className="flex items-center gap-5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-sm border border-brand-200/60 shadow-2xs">
+                <BarChart3 className="w-4 h-4 text-brand-600" />
+              </div>
+              <h1 className="text-base font-bold font-display text-slate-900 tracking-tight whitespace-nowrap">
+                Reports Center
               </h1>
             </div>
             
             <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
 
+            {/* 4 Multi-Dimension Reporting Subtabs Pills */}
+            <nav className="flex items-center gap-1.5">
+              {canExportChecklist && (
+                <button
+                  onClick={() => handleSelectSubtab('monthly')}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                    activeSubtab === 'monthly'
+                      ? 'bg-brand-600 text-white shadow-2xs'
+                      : 'hover:bg-slate-100 text-slate-600 font-semibold'
+                  }`}
+                >
+                  <TrendingUp size={14} /> Collections &amp; Statements
+                </button>
+              )}
+
+              {canViewDefaulters && (
+                <button
+                  onClick={() => handleSelectSubtab('defaulters')}
+                  className={`px-3.5 py-1.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                    activeSubtab === 'defaulters'
+                      ? 'bg-brand-600 text-white font-bold shadow-2xs'
+                      : 'hover:bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  <AlertTriangle size={14} /> Defaulters &amp; Reliability
+                  {defaultersStats.defaultersCount > 0 && (
+                    <span className={`px-1.5 py-0.2 rounded-full font-bold text-[10px] ${
+                      activeSubtab === 'defaulters' ? 'bg-white text-rose-600' : 'bg-rose-100 text-rose-700'
+                    }`}>
+                      {defaultersStats.defaultersCount}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {canViewReceipts && (
+                <button
+                  onClick={() => handleSelectSubtab('receipts')}
+                  className={`px-3.5 py-1.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                    activeSubtab === 'receipts'
+                      ? 'bg-brand-600 text-white font-bold shadow-2xs'
+                      : 'hover:bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  <Receipt size={14} /> Receipts Vault
+                </button>
+              )}
+
+              {canViewAuditLogs && (
+                <button
+                  onClick={() => handleSelectSubtab('system_log')}
+                  className={`px-3.5 py-1.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                    activeSubtab === 'system_log'
+                      ? 'bg-brand-600 text-white font-bold shadow-2xs'
+                      : 'hover:bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  <ShieldCheck size={14} /> System Audit Logs
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+                </button>
+              )}
+            </nav>
+          </div>
+
+          {/* Action Suite & Chit Scheme Selector */}
+          <div className="flex items-center gap-2.5">
             {/* Chit Scheme Filter Dropdown */}
             <div className="relative inline-flex items-center">
               <svg className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2498,51 +2568,19 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                 ) : (
                   chitGroups.map((g, idx) => (
                     <option key={g.id} value={g.id}>
-                      Group {String.fromCharCode(65 + idx)}: {g.name} (₹{(Number(g.total_value) / 100000).toFixed(0)}L · {g.duration_months} Members)
+                      Group {String.fromCharCode(65 + idx)}: {g.name} (₹{(Number(g.total_value) / 100000).toFixed(0)}L · {g.duration_months}m)
                     </option>
                   ))
                 )}
               </select>
-              <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-              </svg>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" />
             </div>
 
-            {/* Cycle Filter Dropdown */}
-            <div className="relative inline-flex items-center">
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                className="appearance-none bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-semibold px-3 pr-7 py-1.5 rounded-xl border border-slate-200/70 transition-all focus:bg-white focus:border-brand-500 cursor-pointer"
-              >
-                {monthList.length === 0 ? (
-                  <option value={0}>No Active Cycles</option>
-                ) : (
-                  monthList.map((m) => {
-                    const isCurrent = m.num === (selectedGroup?.current_month !== undefined ? Number(selectedGroup.current_month) : 0);
-                    return (
-                      <option key={m.num} value={m.num}>
-                        Cycle: Month {m.num} {isCurrent ? '(Active Current)' : m.num === 0 ? '(Organizer Profit Launch)' : '(Settled)'}
-                      </option>
-                    );
-                  })
-                )}
-              </select>
-              <svg className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-              </svg>
-            </div>
-          </div>
-
-          {/* Action Suite: Print Audit Sheet & Certified PDF Report */}
-          <div className="flex items-center gap-2.5">
             <button
               onClick={handlePrintPDF}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200/80 transition-all shadow-2xs cursor-pointer"
             >
-              <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-              </svg>
+              <Printer className="w-3.5 h-3.5 text-slate-500" />
               <span>Print Audit Sheet</span>
             </button>
             
@@ -2554,9 +2592,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
               {isGeneratingPDF ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                </svg>
+                <Download className="w-3.5 h-3.5" />
               )}
               <span>Certified PDF Report</span>
             </button>
@@ -2566,209 +2602,6 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         {/* WORKSPACE BODY (Spacious 1440px Viewport) */}
         <main className="flex-1 overflow-y-auto p-7">
           <div className="w-full max-w-[1440px] mx-auto space-y-6">
-            
-            {/* 1. HIGH-LEVEL PORTFOLIO ANALYTICS & EXECUTIVE KPI BENTO */}
-            {activeSubtab !== 'system_log' && (
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              
-              {/* Tile 1: Active Scheme Capital */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Scheme Capital</span>
-                  <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-sm border border-brand-200/60">
-                    <svg className="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="my-3">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black font-display tracking-tight text-slate-900 tabular-nums">
-                      ₹{portfolioStats.totalAUM.toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
-                      +₹{(portfolioStats.monthlyRunRate / 100000).toFixed(1)}L/mo run rate
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 font-medium">
-                    {portfolioStats.activeGroupsCount} Active Chit Groups · {portfolioStats.totalTicketsCount} Tickets
-                  </p>
-                </div>
-                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span>Consolidated Portfolio</span>
-                  <span className="font-mono font-semibold text-slate-700">{portfolioStats.groupNamesSummary}</span>
-                </div>
-              </div>
-
-              {/* Tile 2: Collection Velocity */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Collection Velocity (M{selectedMonth})
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm border border-emerald-200/60">
-                    <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="my-3">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black font-display tracking-tight text-slate-900 tabular-nums">
-                      {portfolioStats.velocityPercent}%
-                    </span>
-                    <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200/60">
-                      ₹{portfolioStats.arrearsAmount.toLocaleString('en-IN')} arrears
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 font-medium font-mono">
-                    ₹{portfolioStats.collectedAmount.toLocaleString('en-IN')} of ₹{portfolioStats.expectedAmount.toLocaleString('en-IN')} collected
-                  </p>
-                </div>
-                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span>Current Status</span>
-                  <span className="font-semibold text-emerald-700">
-                    {portfolioStats.paidMembers} / {portfolioStats.totalMembers} Members Paid
-                  </span>
-                </div>
-              </div>
-
-              {/* Tile 3: Net Prize Disbursed */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Prize Disbursed</span>
-                  <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-sm border border-amber-200">
-                    <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="my-3">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black font-display tracking-tight text-slate-900 tabular-nums">
-                      ₹{portfolioStats.totalDisbursedAndDue.toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
-                      M{selectedMonth} Liability Active
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 font-medium font-mono">
-                    ₹{portfolioStats.settledDisbursed.toLocaleString('en-IN')} Settled · ₹{portfolioStats.activeDue.toLocaleString('en-IN')} Due
-                  </p>
-                </div>
-                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span>Pending Winner</span>
-                  <span className="font-mono font-semibold text-slate-700">{portfolioStats.latestWinner}</span>
-                </div>
-              </div>
-
-              {/* Tile 4: Kai Iruppu Reserve Pool */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kai Iruppu Reserve Pool</span>
-                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-brand-600 flex items-center justify-center font-bold text-sm border border-brand-200/60">
-                    <svg className="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="my-3">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black font-display tracking-tight text-slate-900 tabular-nums">
-                      ₹{portfolioStats.totalPool.toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full border border-brand-200/60">
-                      {portfolioStats.poolPercent}% Funded
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden border border-slate-200/60">
-                    <div className="bg-brand-600 h-1.5 rounded-full" style={{ width: `${portfolioStats.poolPercent}%` }}></div>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 font-medium font-mono">
-                    Target: ₹{portfolioStats.targetPool.toLocaleString('en-IN')} (Laaba Seetu)
-                  </p>
-                </div>
-                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span>Bonus Pool Health</span>
-                  <span className="font-semibold text-emerald-700">
-                    {portfolioStats.poolPercent >= 100 ? 'Ready for Disbursal' : 'Accumulating Towards Bonus'}
-                  </span>
-                </div>
-              </div>
-
-            </section>
-            )}
-
-            {/* 2. MULTI-DIMENSION REPORTING SUBTABS BAR */}
-            <section className="bg-white rounded-2xl border border-slate-200/80 p-2 shadow-xs">
-              <div className="flex items-center justify-between overflow-x-auto no-scrollbar gap-2">
-                <nav className="flex items-center gap-1.5 min-w-max">
-                  {canExportChecklist && (
-                    <button
-                      onClick={() => handleSelectSubtab('monthly')}
-                      className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-                        activeSubtab === 'monthly'
-                          ? 'bg-brand-600 text-white shadow-2xs'
-                          : 'hover:bg-slate-100 text-slate-600 font-semibold'
-                      }`}
-                    >
-                      <TrendingUp size={15} /> Collections &amp; Statements
-                    </button>
-                  )}
-
-                  {canViewDefaulters && (
-                    <button
-                      onClick={() => handleSelectSubtab('defaulters')}
-                      className={`px-4 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                        activeSubtab === 'defaulters'
-                          ? 'bg-brand-600 text-white font-bold shadow-2xs'
-                          : 'hover:bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      <AlertTriangle size={15} /> Defaulters &amp; Reliability
-                      {defaultersStats.defaultersCount > 0 && (
-                        <span className={`px-1.5 py-0.2 rounded-full font-bold text-[10px] ${
-                          activeSubtab === 'defaulters' ? 'bg-white text-rose-600' : 'bg-rose-100 text-rose-700'
-                        }`}>
-                          {defaultersStats.defaultersCount}
-                        </span>
-                      )}
-                    </button>
-                  )}
-
-                  {canViewReceipts && (
-                    <button
-                      onClick={() => handleSelectSubtab('receipts')}
-                      className={`px-4 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                        activeSubtab === 'receipts'
-                          ? 'bg-brand-600 text-white font-bold shadow-2xs'
-                          : 'hover:bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      <Receipt size={15} /> Receipts Vault
-                    </button>
-                  )}
-
-                  {canViewAuditLogs && (
-                    <button
-                      onClick={() => handleSelectSubtab('system_log')}
-                      className={`px-4 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                        activeSubtab === 'system_log'
-                          ? 'bg-brand-600 text-white font-bold shadow-2xs'
-                          : 'hover:bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      <ShieldCheck size={15} /> System Audit Logs
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
-                    </button>
-                  )}
-                </nav>
-
-                <div className="hidden xl:flex items-center gap-2 pr-2">
-                  <span className="text-[11px] text-slate-400 font-mono">View: Real-Time Synced</span>
-                </div>
-              </div>
-            </section>
 
             {/* ── 3. SUBTAB BODY SECTIONS (DESKTOP) ── */}
             {activeSubtab === 'monthly' && (
@@ -3611,67 +3444,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
         {/* Main Scrollable Content */}
         <main className="flex-1 px-3.5 py-3 space-y-3 pb-24">
           
-          {/* 1. COMPACT ELEGANT TOP STATS CARD */}
-          {activeSubtab !== 'system_log' && (
-            <section className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-card space-y-3">
-              <div className="flex items-start justify-between">
-                <div className="space-y-0.5">
-                  <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Active CHIT VALUE</p>
-                  <h2 className="text-2xl font-extrabold text-slate-900 tabular-nums tracking-tight">
-                    ₹{portfolioStats.totalAUM.toLocaleString('en-IN')}
-                  </h2>
-                </div>
-                <div className="text-right">
-                  <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10px]">
-                    M{selectedMonth} Active
-                  </span>
-                  <p className="text-[10px] text-slate-400 mt-1 font-medium">
-                    {portfolioStats.totalTicketsCount} Tickets · {portfolioStats.activeGroupsCount} Groups
-                  </p>
-                </div>
-              </div>
-
-              {/* Velocity bar */}
-              <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-1.5">
-                <div className="flex justify-between items-center text-xs font-semibold">
-                  <span className="text-slate-600 font-medium text-[11px]">Cycle M{selectedMonth} Velocity</span>
-                  <span className="text-brand-700 font-bold text-xs">
-                    {portfolioStats.velocityPercent}%{' '}
-                    <span className="text-[10px] font-normal text-slate-500">
-                      (₹{(portfolioStats.collectedAmount / 100000).toFixed(2)}L / ₹{(portfolioStats.expectedAmount / 100000).toFixed(1)}L)
-                    </span>
-                  </span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-emerald-600 h-1.5 rounded-full" style={{ width: `${Math.min(100, portfolioStats.velocityPercent)}%` }}></div>
-                </div>
-              </div>
-
-              {/* 3-Pill Context Summary */}
-              <div className="grid grid-cols-3 gap-1.5 text-center pt-0.5">
-                <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
-                  <p className="text-[9px] text-slate-400 font-medium uppercase">Cash</p>
-                  <p className="text-[11px] font-bold text-slate-800 font-mono">
-                    ₹{((balances?.cash_in_hand || 0) / 1000).toFixed(1)}k
-                  </p>
-                </div>
-                <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
-                  <p className="text-[9px] text-slate-400 font-medium uppercase">Bank</p>
-                  <p className="text-[11px] font-bold text-slate-800 font-mono">
-                    ₹{(((balances?.kishor_bank || 0) + (balances?.dad_bank || 0) + (balances?.mom_bank || 0)) / 100000).toFixed(2)}L
-                  </p>
-                </div>
-                <div className="p-1.5 bg-amber-50/60 rounded-lg border border-amber-200/70">
-                  <p className="text-[9px] text-amber-700 font-medium uppercase">Kai Iruppu</p>
-                  <p className="text-[11px] font-bold text-amber-900 font-mono">
-                    ₹{(portfolioStats.totalPool / 1000).toFixed(1)}k
-                  </p>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* 2. MONTH-BY-MONTH COLLECTION LEDGER (MOBILE TAB VIEW) */}
+          {/* 1. MONTH-BY-MONTH COLLECTION LEDGER (MOBILE TAB VIEW) */}
           {activeSubtab === 'monthly' && (
             <section className="space-y-2.5">
               <div className="flex items-center justify-between px-1">

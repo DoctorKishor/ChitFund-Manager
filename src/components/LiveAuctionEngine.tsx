@@ -1141,6 +1141,18 @@ export default function LiveAuctionEngine() {
           }
         });
 
+      // 3. Persist audit trail for live auction bid
+      supabase
+        .from('security_audit_logs')
+        .insert({
+          admin_id: profile?.id || null,
+          target_table: 'auction_logs',
+          action_description: `LIVE AUCTION BID: Ticket #${member.ticketNumber} (${member.fullName}) shouted discount bid of ₹${amount.toLocaleString('en-IN')} for "${group?.name}" Month ${group?.currentMonth ?? 1}`,
+        })
+        .then(({ error: auditErr }) => {
+          if (auditErr) console.warn('Audit log bid recording warning:', auditErr.message);
+        });
+
       return updated;
     });
 

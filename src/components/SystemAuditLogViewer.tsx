@@ -256,6 +256,15 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
         icon: '🏆',
       };
     }
+    if (desc.includes('AUCTION') || desc.includes('BID') || table === 'auction_logs') {
+      return {
+        category: 'auctions' as EventCategory,
+        label: 'Live Auction',
+        badgeColor: 'bg-cyan-50 text-cyan-700 border-cyan-200/80',
+        dotColor: 'bg-cyan-500',
+        icon: '🔨',
+      };
+    }
     if (desc.includes('LAUNCH') || desc.includes('MONTH ADVANCE') || desc.includes('ADVANCED TO') || desc.includes('GROUP CREATED') || table === 'chit_groups') {
       return {
         category: 'cycles' as EventCategory,
@@ -281,15 +290,6 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
         badgeColor: 'bg-purple-50 text-purple-700 border-purple-200/80',
         dotColor: 'bg-purple-500',
         icon: '👤',
-      };
-    }
-    if (desc.includes('AUCTION') || desc.includes('BID') || table === 'auction_logs') {
-      return {
-        category: 'auctions' as EventCategory,
-        label: 'Live Auction',
-        badgeColor: 'bg-cyan-50 text-cyan-700 border-cyan-200/80',
-        dotColor: 'bg-cyan-500',
-        icon: '🔨',
       };
     }
     return {
@@ -388,6 +388,22 @@ export default function SystemAuditLogViewer({ onBack, className = '' }: SystemA
     }
 
     // 2. For modern human-readable descriptions, extract smart context pills
+    // Specialized parser for LIVE AUCTION BID events
+    if (rawDesc.toUpperCase().includes('LIVE AUCTION BID:') || rawDesc.toUpperCase().includes('SHOUTED DISCOUNT BID')) {
+      const bidMatch = rawDesc.match(/Ticket\s*#?(\d+)\s*(?:\(([^)]+)\))?\s*shouted\s+discount\s+bid\s+of\s+(₹\s*[\d,]+)\s+for\s+"([^"]+)"(?:\s+Month\s+(\d+))?/i);
+      if (bidMatch) {
+        const [, ticketNum, memName, bidAmt, gName, monthNum] = bidMatch;
+        const cleanAmt = bidAmt.replace(/\s+/g, '');
+        return {
+          title: `Auction bid placed: ${cleanAmt} by ${memName ? memName.trim() : `Ticket #${ticketNum}`} (Ticket #${ticketNum})${monthNum ? ` · Month ${monthNum}` : ''}`,
+          amount: cleanAmt,
+          groupName: gName,
+          memberName: memName ? memName.trim() : undefined,
+          wallet: undefined,
+          isLegacyRaw: false,
+        };
+      }
+    }
     // Extract amount: e.g. ₹25,000 or ₹ 25,000
     const amountMatch = rawDesc.match(/₹\s*([\d,]+(?:\.\d+)?)/);
     const amount = amountMatch ? `₹${amountMatch[1]}` : undefined;

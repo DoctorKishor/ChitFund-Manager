@@ -215,7 +215,19 @@ export default function LiveAuditLogWidget({
       let dotColor = 'bg-slate-400';
       let icon = '🛡️';
 
-      if (rawDescUpper.includes('REVERT') || rawDescUpper.includes('ROLLBACK')) {
+      if (rawDescUpper.includes('AUCTION') || rawDescUpper.includes('BID') || table === 'auction_logs') {
+        categoryLabel = 'Live Auction';
+        badgeClass = 'bg-cyan-50 text-cyan-700 border-cyan-200';
+        dotColor = 'bg-cyan-500';
+        icon = '🔨';
+        if (rawDescUpper.includes('LIVE AUCTION BID:') || rawDescUpper.includes('SHOUTED DISCOUNT BID')) {
+          const bidMatch = rawDesc.match(/Ticket\s*#?(\d+)\s*(?:\(([^)]+)\))?\s*shouted\s+discount\s+bid\s+of\s+(₹\s*[\d,]+)\s+for\s+"([^"]+)"(?:\s+Month\s+(\d+))?/i);
+          if (bidMatch) {
+            const [, ticketNum, memName, bidAmt, gName, monthNum] = bidMatch;
+            title = `Auction bid: ${bidAmt.replace(/\s+/g, '')} by ${memName ? memName.trim() : `Ticket #${ticketNum}`} (#${ticketNum})${monthNum ? ` · M${monthNum}` : ''}`;
+          }
+        }
+      } else if (rawDescUpper.includes('REVERT') || rawDescUpper.includes('ROLLBACK')) {
         categoryLabel = 'Reversal';
         badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
         dotColor = 'bg-rose-500';
@@ -273,11 +285,6 @@ export default function LiveAuditLogWidget({
         badgeClass = 'bg-purple-50 text-purple-700 border-purple-200';
         dotColor = 'bg-purple-500';
         icon = '👤';
-      } else if (rawDescUpper.includes('AUCTION') || rawDescUpper.includes('BID') || table === 'auction_logs') {
-        categoryLabel = 'Live Auction';
-        badgeClass = 'bg-cyan-50 text-cyan-700 border-cyan-200';
-        dotColor = 'bg-cyan-500';
-        icon = '🔨';
       }
 
       // 4. EXTRACT CONTEXT PILLS

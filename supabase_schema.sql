@@ -419,6 +419,10 @@ begin
         if array_length(changes, 1) > 0 then
           log_description := 'Updated chit group "' || new.name || '" (' || array_to_string(changes, ', ') || ')';
         else
+          -- If only live_bid_stream or transient auction flags changed, skip generic settings log
+          if new.live_bid_stream is distinct from old.live_bid_stream then
+            return new; -- Handled explicitly by LIVE AUCTION BID audit entry
+          end if;
           log_description := 'Updated settings for chit group "' || new.name || '"';
         end if;
       end;
