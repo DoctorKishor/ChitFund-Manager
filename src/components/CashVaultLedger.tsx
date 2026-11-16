@@ -39,7 +39,10 @@ import {
   Send,
   FileText,
   ChevronRight,
-  Crown
+  Crown,
+  RotateCcw,
+  ArrowUpDown,
+  SlidersHorizontal
 } from 'lucide-react';
 import WithdrawOrganizerProfitModal from './WithdrawOrganizerProfitModal';
 
@@ -110,7 +113,9 @@ export default function CashVaultLedger() {
 
   // Active filter for account cards & statement
   const [selectedWalletFilter, setSelectedWalletFilter] = useState<'all' | WalletType>('all');
-  const [dateRangeFilter, setDateRangeFilter] = useState<'month' | '30days' | 'all'>('month');
+  const [dateRangeFilter, setDateRangeFilter] = useState<'month' | '30days' | 'all'>('all');
+  const [ledgerSortOrder, setLedgerSortOrder] = useState<'newest' | 'oldest' | 'amount_high' | 'amount_low'>('newest');
+  const [mobileTxLimit, setMobileTxLimit] = useState<number>(10);
   const [activeExpandedCard, setActiveExpandedCard] = useState<WalletType | null>(null);
 
   // Supabase Data State
@@ -216,6 +221,23 @@ export default function CashVaultLedger() {
   // Ledger Filter & Search
   const [ledgerSearch, setLedgerSearch] = useState<string>('');
   const [ledgerTypeFilter, setLedgerTypeFilter] = useState<string>('all');
+
+  const currentCalMonthLabel = useMemo(() => {
+    return new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+  }, []);
+
+  const hasActiveLedgerFilters = useMemo(() => {
+    return selectedWalletFilter !== 'all' || ledgerTypeFilter !== 'all' || dateRangeFilter !== 'all' || ledgerSearch.trim() !== '' || ledgerSortOrder !== 'newest';
+  }, [selectedWalletFilter, ledgerTypeFilter, dateRangeFilter, ledgerSearch, ledgerSortOrder]);
+
+  const resetLedgerFilters = () => {
+    setSelectedWalletFilter('all');
+    setLedgerTypeFilter('all');
+    setDateRangeFilter('all');
+    setLedgerSearch('');
+    setLedgerSortOrder('newest');
+    setMobileTxLimit(10);
+  };
 
   // Fetch initial data
   const fetchData = async () => {
@@ -560,9 +582,9 @@ export default function CashVaultLedger() {
     return { total, activeCount: active.length };
   }, [computedFloatingDeposits]);
 
-  // Master Transaction Feed filtered by active wallet, date range, and type
+  // Master Transaction Feed filtered by active wallet, date range, type, search and sorted
   const filteredTransactions = useMemo(() => {
-    return recentTransactions.filter((tx) => {
+    const list = recentTransactions.filter((tx) => {
       const notes = (tx.notes || tx.description || '').toLowerCase();
       
       let matchesDate = true;
@@ -614,7 +636,23 @@ export default function CashVaultLedger() {
 
       return matchesDate && matchesWallet && matchesType && matchesSearch;
     });
-  }, [recentTransactions, selectedWalletFilter, ledgerTypeFilter, ledgerSearch, dateRangeFilter]);
+
+    return [...list].sort((a, b) => {
+      if (ledgerSortOrder === 'newest') {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      if (ledgerSortOrder === 'oldest') {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+      if (ledgerSortOrder === 'amount_high') {
+        return Number(b.amount || 0) - Number(a.amount || 0);
+      }
+      if (ledgerSortOrder === 'amount_low') {
+        return Number(a.amount || 0) - Number(b.amount || 0);
+      }
+      return 0;
+    });
+  }, [recentTransactions, selectedWalletFilter, ledgerTypeFilter, ledgerSearch, dateRangeFilter, ledgerSortOrder]);
 
   // Denomination Calculations
   const calculatedPhysicalCash = useMemo(() => {
@@ -1697,7 +1735,7 @@ export default function CashVaultLedger() {
         </section>
 
         {/* 6. Mobile Audit Statement & Recent Transactions Stream */}
-        <section className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-card space-y-2.5">
+        <section className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-card space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <span className="w-7 h-7 rounded-lg bg-indigo-50 text-brand-600 flex items-center justify-center font-bold text-xs">📝</span>
@@ -1706,38 +1744,205 @@ export default function CashVaultLedger() {
                 <p className="text-[10px] text-slate-500">Live credit &amp; debit movements</p>
               </div>
             </div>
-            <span className="text-[11px] font-semibold text-slate-500">{filteredTransactions.length} txs</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
+                {filteredTransactions.length} txs
+              </span>
+              {hasActiveLedgerFilters && (
+                <button
+                  type="button"
+                  onClick={resetLedgerFilters}
+                  title="Reset all filters"
+                  className="p-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            {filteredTransactions.slice(0, 5).map((tx) => {
-              const { isCredit, badgeLabel } = getTxDirection(tx, selectedWalletFilter);
-              return (
-                <div key={tx.id} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                    <span className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 flex items-center justify-center text-xs flex-shrink-0">
-                      {tx.type === 'atm_withdrawal' ? '🏧' : tx.type === 'collection' ? '💰' : tx.type === 'personal_draw' ? '💼' : '🔄'}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-slate-900 truncate">
-                        {tx.notes || tx.description || 'Treasury Movement'}
-                      </div>
-                      <p className="text-[10px] text-slate-500 truncate">
-                        {WALLET_META[tx.wallet_type]?.shortName}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right font-mono flex-shrink-0">
-                    <span className={`text-xs font-bold ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
-                    </span>
-                    <div className="text-[9px] text-slate-400">
-                      {new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                    </div>
-                  </div>
+          {/* Mobile Filter & Search Controls */}
+          <div className="space-y-2 pt-0.5">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
+              <input 
+                type="text"
+                placeholder="Search memo, amount, ID..."
+                value={ledgerSearch}
+                onChange={(e) => setLedgerSearch(e.target.value)}
+                className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-7 py-2 text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all"
+              />
+              {ledgerSearch && (
+                <button
+                  type="button"
+                  onClick={() => setLedgerSearch('')}
+                  className="absolute right-2 top-2 p-0.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Dropdowns: Row 1 (Vault & Category) */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative">
+                <select 
+                  value={selectedWalletFilter}
+                  onChange={(e) => setSelectedWalletFilter(e.target.value as any)}
+                  className="w-full text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 pr-6 truncate appearance-none focus:bg-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 cursor-pointer"
+                >
+                  <option value="all">All 4 Vaults</option>
+                  <option value="cash_in_hand">Cash Box</option>
+                  <option value="kishor_bank">Dr. Kishor (HDFC)</option>
+                  <option value="dad_bank">Dad Bank (CSB)</option>
+                  <option value="mom_bank">Mom Bank (SBI)</option>
+                </select>
+                <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-2.5 pointer-events-none" />
+              </div>
+
+              <div className="relative">
+                <select 
+                  value={ledgerTypeFilter}
+                  onChange={(e) => setLedgerTypeFilter(e.target.value)}
+                  className="w-full text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 pr-6 truncate appearance-none focus:bg-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 cursor-pointer"
+                >
+                  <option value="all">All Categories</option>
+                  <option value="collection">Collections (+)</option>
+                  <option value="payout">Prize Disbursal (-)</option>
+                  <option value="transfer">Vault Transfer</option>
+                  <option value="atm">ATM Relocation</option>
+                  <option value="draw">Personal Draw (-)</option>
+                  <option value="organizer_profit">👑 Profit (-)</option>
+                  <option value="float">Float Inflow (+)</option>
+                </select>
+                <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-2.5 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Filter Dropdowns: Row 2 (Date Range & Sort Order) */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative">
+                <select 
+                  value={dateRangeFilter}
+                  onChange={(e) => setDateRangeFilter(e.target.value as any)}
+                  className="w-full text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 pr-6 truncate appearance-none focus:bg-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 cursor-pointer"
+                >
+                  <option value="all">Date: All Time</option>
+                  <option value="month">Date: {currentCalMonthLabel}</option>
+                  <option value="30days">Date: Last 30 Days</option>
+                </select>
+                <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-2.5 pointer-events-none" />
+              </div>
+
+              <div className="relative">
+                <select 
+                  value={ledgerSortOrder}
+                  onChange={(e) => setLedgerSortOrder(e.target.value as any)}
+                  className="w-full text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 pr-6 truncate appearance-none focus:bg-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 cursor-pointer"
+                >
+                  <option value="newest">Sort: Newest First</option>
+                  <option value="oldest">Sort: Oldest First</option>
+                  <option value="amount_high">Sort: Highest ₹</option>
+                  <option value="amount_low">Sort: Lowest ₹</option>
+                </select>
+                <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-2.5 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Active Filters Summary Pill */}
+            {hasActiveLedgerFilters && (
+              <div className="flex items-center justify-between text-[11px] bg-indigo-50/80 border border-indigo-100 rounded-xl px-3 py-1.5 text-indigo-700">
+                <div className="flex items-center gap-1.5">
+                  <SlidersHorizontal className="w-3 h-3 text-indigo-600" />
+                  <span className="font-medium">Filter active ({filteredTransactions.length} matching)</span>
                 </div>
-              );
-            })}
+                <button
+                  type="button"
+                  onClick={resetLedgerFilters}
+                  className="font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Movements List */}
+          <div className="space-y-2 pt-1">
+            {filteredTransactions.length === 0 ? (
+              <div className="p-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
+                <p className="text-xs text-slate-500">No transactions match your current filters.</p>
+                {hasActiveLedgerFilters && (
+                  <button
+                    type="button"
+                    onClick={resetLedgerFilters}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-brand-600 hover:bg-slate-100 shadow-xs cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset Filters</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              filteredTransactions.slice(0, mobileTxLimit).map((tx) => {
+                const { isCredit, badgeLabel } = getTxDirection(tx, selectedWalletFilter);
+                return (
+                  <div key={tx.id} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                      <span className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 flex items-center justify-center text-xs flex-shrink-0">
+                        {tx.type === 'atm_withdrawal' ? '🏧' : tx.type === 'collection' ? '💰' : tx.type === 'personal_draw' ? '💼' : tx.type === 'organizer_profit' ? '👑' : '🔄'}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-900 truncate">
+                          {tx.notes || tx.description || 'Treasury Movement'}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] text-slate-500 truncate">
+                            {WALLET_META[tx.wallet_type]?.shortName || tx.wallet_type}
+                          </span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-[9px] font-semibold text-slate-400">
+                            {badgeLabel.replace(/[+\-()]/g, '').trim()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right font-mono flex-shrink-0">
+                      <span className={`text-xs font-bold ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
+                      </span>
+                      <div className="text-[9px] text-slate-400">
+                        {new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            {/* Pagination / Expand for Mobile */}
+            {filteredTransactions.length > mobileTxLimit && (
+              <button
+                type="button"
+                onClick={() => setMobileTxLimit(prev => prev + 15)}
+                className="w-full py-2 bg-slate-100 hover:bg-slate-200/80 active:scale-95 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>View More ({filteredTransactions.length - mobileTxLimit} remaining)</span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {mobileTxLimit > 10 && filteredTransactions.length > 10 && (
+              <button
+                type="button"
+                onClick={() => setMobileTxLimit(10)}
+                className="w-full py-1.5 text-[11px] font-semibold text-slate-400 hover:text-slate-600 transition-colors text-center cursor-pointer"
+              >
+                Show Less
+              </button>
+            )}
           </div>
         </section>
 
@@ -2366,9 +2571,9 @@ export default function CashVaultLedger() {
                   onChange={(e) => setDateRangeFilter(e.target.value as any)}
                   className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:ring-brand-500 focus:border-brand-500 pr-7 appearance-none cursor-pointer"
                 >
-                  <option value="month">Date: This Month / M2 Cycle</option>
-                  <option value="30days">Date: Last 30 Days</option>
                   <option value="all">Date: All Time</option>
+                  <option value="month">Date: This Month ({currentCalMonthLabel})</option>
+                  <option value="30days">Date: Last 30 Days</option>
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2 pointer-events-none" />
               </div>
@@ -2405,6 +2610,32 @@ export default function CashVaultLedger() {
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2 pointer-events-none" />
               </div>
+
+              <div className="relative">
+                <select 
+                  value={ledgerSortOrder}
+                  onChange={(e) => setLedgerSortOrder(e.target.value as any)}
+                  className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:ring-brand-500 focus:border-brand-500 pr-7 appearance-none cursor-pointer"
+                >
+                  <option value="newest">Sort: Newest First</option>
+                  <option value="oldest">Sort: Oldest First</option>
+                  <option value="amount_high">Sort: Highest Amount</option>
+                  <option value="amount_low">Sort: Lowest Amount</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2 pointer-events-none" />
+              </div>
+
+              {hasActiveLedgerFilters && (
+                <button
+                  type="button"
+                  onClick={resetLedgerFilters}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl border border-rose-200 transition-colors cursor-pointer"
+                  title="Reset all filters"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset</span>
+                </button>
+              )}
 
               <button 
                 onClick={() => window.print()}

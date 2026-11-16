@@ -9,6 +9,8 @@ export interface AuctionScheduleConfig {
   next_auction_time?: string | null;
   start_date?: string | null;
   current_month?: number | null;
+  has_auction_concluded?: boolean | null;
+  hasAuctionConcluded?: boolean | null;
 }
 
 export interface CountdownState {
@@ -115,14 +117,19 @@ export function computeNextAuctionDateTime(config?: AuctionScheduleConfig | null
 
     if (startYear !== undefined && !isNaN(startYear) && startMonth !== undefined && !isNaN(startMonth)) {
       // M0 is launch month (no auction), M1 is 1st live auction, M2 is 2nd live auction
-      const monthNum = config.current_month === 0 ? 1 : Number(config.current_month);
-      const targetMonthDate = new Date(startYear, startMonth + monthNum, 1);
-      const canonicalSunday = getFirstSundayOnOrAfterDay(
+      let monthNum = config.current_month === 0 ? 1 : Number(config.current_month);
+      const isConcluded = Boolean(config.has_auction_concluded || config.hasAuctionConcluded);
+      if (isConcluded) {
+        monthNum += 1;
+      }
+
+      let targetMonthDate = new Date(startYear, startMonth + monthNum, 1);
+      let canonicalSunday = getFirstSundayOnOrAfterDay(
         targetMonthDate.getFullYear(), 
         targetMonthDate.getMonth(), 
         defaultCutoffDay
       );
-      return new Date(
+      let target = new Date(
         canonicalSunday.getFullYear(),
         canonicalSunday.getMonth(),
         canonicalSunday.getDate(),
@@ -131,6 +138,29 @@ export function computeNextAuctionDateTime(config?: AuctionScheduleConfig | null
         0,
         0
       );
+
+      // If this target has already passed and no explicit future override date is set,
+      // count down to the next upcoming auction round so the timer doesn't freeze at 0
+      if (target.getTime() <= Date.now()) {
+        monthNum += 1;
+        targetMonthDate = new Date(startYear, startMonth + monthNum, 1);
+        canonicalSunday = getFirstSundayOnOrAfterDay(
+          targetMonthDate.getFullYear(), 
+          targetMonthDate.getMonth(), 
+          defaultCutoffDay
+        );
+        target = new Date(
+          canonicalSunday.getFullYear(),
+          canonicalSunday.getMonth(),
+          canonicalSunday.getDate(),
+          targetHour,
+          targetMinute,
+          0,
+          0
+        );
+      }
+
+      return target;
     }
   }
 

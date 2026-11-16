@@ -156,6 +156,7 @@ export default function LiveAuctionEngine() {
   const canOverrideFloor = canPerformAction('auctions:override_floor');
   const canDisbursePayout = canPerformAction('auctions:disburse');
   const canIssueReceipt = canPerformAction('auctions:issue_receipt');
+  const canViewHistoryKpis = canPerformAction('auctions:view_history_kpis');
   const { organizationName, organizationTagline, organizationInitials } = useOrganization();
   const { chitRules } = useSystemSettings();
 
@@ -167,6 +168,12 @@ export default function LiveAuctionEngine() {
   const [historicalAuctionLogs, setHistoricalAuctionLogs] = useState<HistoricalAuctionLog[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Check if an auction for the group's current active cycle month has already been conducted & concluded
+  const isCurrentMonthAuctionCompleted = useMemo(() => {
+    if (!group) return false;
+    return historicalAuctionLogs.some(l => Number(l.month) === Number(group.currentMonth));
+  }, [historicalAuctionLogs, group?.currentMonth]);
+
   // Live countdown state for scheduled auction rounds
   const [countdown, setCountdown] = useState<CountdownState>(() => {
     const target = computeNextAuctionDateTime({
@@ -176,6 +183,7 @@ export default function LiveAuctionEngine() {
       next_auction_time: group?.next_auction_time,
       start_date: group?.startDate,
       current_month: group?.currentMonth,
+      has_auction_concluded: false,
     });
     return calculateAuctionCountdown(target);
   });
@@ -190,6 +198,7 @@ export default function LiveAuctionEngine() {
         next_auction_time: group.next_auction_time,
         start_date: group.startDate,
         current_month: group.currentMonth,
+        has_auction_concluded: isCurrentMonthAuctionCompleted,
       });
       setCountdown(calculateAuctionCountdown(target));
     };
@@ -205,6 +214,7 @@ export default function LiveAuctionEngine() {
     group?.next_auction_time,
     group?.startDate,
     group?.currentMonth,
+    isCurrentMonthAuctionCompleted,
   ]);
 
   // Derived countdown conditions for UI states
@@ -903,8 +913,9 @@ export default function LiveAuctionEngine() {
       next_auction_time: group.next_auction_time,
       start_date: group.startDate,
       current_month: group.currentMonth,
+      has_auction_concluded: isCurrentMonthAuctionCompleted,
     });
-  }, [group]);
+  }, [group, isCurrentMonthAuctionCompleted]);
 
   // Is the scheduled auction date today?
   const isAuctionDateToday = useMemo(() => {
@@ -2423,7 +2434,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   </div>
 
                   {/* Cumulative Performance Metrics Grid */}
-                  {(() => {
+                  {canViewHistoryKpis && (() => {
                     const totalDisbursed = historicalAuctionLogs.reduce((sum, l) => sum + (l.totalDisbursed || 0), 0);
                     const totalPrizeNet = historicalAuctionLogs.reduce((sum, l) => sum + (l.netPayout || 0), 0);
                     const disbursedPct = totalPrizeNet > 0 ? Math.round((totalDisbursed / totalPrizeNet) * 100) : 100;
@@ -3662,7 +3673,7 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                   })()}
 
                   {/* Cumulative Performance Summary Grid (2x2 KPI Bento) */}
-                  {(() => {
+                  {canViewHistoryKpis && (() => {
                     const totalDisbursed = historicalAuctionLogs.reduce((sum, l) => sum + (l.totalDisbursed || 0), 0);
                     const totalPrizeNet = historicalAuctionLogs.reduce((sum, l) => sum + (l.netPayout || 0), 0);
                     const disbursedPct = totalPrizeNet > 0 ? Math.round((totalDisbursed / totalPrizeNet) * 100) : 100;
@@ -3960,22 +3971,6 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                       <Download className="w-4 h-4" />
                       <span>Download Multi-Month Ledger Summary (PDF)</span>
                     </button>
-                  </div>
-
-                  {/* Ledger Authenticity Stamp Footer */}
-                  <div className="bg-slate-200/60 rounded-2xl p-3.5 mb-2 flex items-start gap-3 border border-slate-300/60">
-                    <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-[11px] font-black text-slate-800 tracking-tight flex items-center gap-1">
-                        <span>PostgreSQL Immutable Ledger Certified</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      </div>
-                      <p className="text-[10px] text-slate-500 leading-normal mt-0.5">
-                        Cryptographically sealed against tampering · Certified by {organizationName} · 100% secure
-                      </p>
-                    </div>
                   </div>
                 </div>
               ) : (

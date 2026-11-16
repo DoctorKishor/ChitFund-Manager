@@ -106,7 +106,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
       'dashboard:view_kpis', 'dashboard:view_payment_ledger', 'dashboard:view_activity_feed', 'dashboard:quick_actions', 'dashboard:launch_month0', 'dashboard:advance_month', 'dashboard:revert_month', 'dashboard:view_reserves',
       'chits:view', 'chits:create', 'chits:edit', 'chits:launch_month0', 'chits:reschedule_auction', 'chits:configure_laaba_seetu', 'chits:swap_ticket', 'chits:delete',
       'members:view', 'members:enroll', 'members:edit', 'members:collect', 'members:waive_penalties', 'members:suspend', 'members:pair_qr', 'members:revoke_qr', 'members:batch_qr', 'members:reset_mpin', 'members:export', 'members:delete',
-      'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:override_floor', 'auctions:edit_historical', 'auctions:disburse', 'auctions:issue_receipt',
+      'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:override_floor', 'auctions:edit_historical', 'auctions:disburse', 'auctions:issue_receipt', 'auctions:view_history_kpis',
       'treasury:view', 'treasury:view_cash_box', 'treasury:view_banks', 'treasury:collect_cash', 'treasury:move_money', 'treasury:confirm_atm', 'treasury:deposit', 'treasury:recover_float', 'treasury:personal_draw', 'treasury:settle_draw', 'treasury:withdraw_organizer_profit', 'treasury:delete_transaction', 'treasury:reconcile',
       'reports:view', 'reports:view_pnl', 'reports:export', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_receipts', 'reports:view_audit_logs', 'reports:export_audit',
       'communication:view', 'communication:broadcast', 'communication:pre_auction', 'communication:post_auction', 'communication:due_alerts', 'communication:custom', 'communication:manage_templates',
@@ -125,7 +125,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
       'dashboard:view_kpis', 'dashboard:view_payment_ledger', 'dashboard:view_activity_feed', 'dashboard:quick_actions', 'dashboard:advance_month', 'dashboard:view_reserves',
       'chits:view', 'chits:create', 'chits:edit', 'chits:reschedule_auction', 'chits:configure_laaba_seetu', 'chits:swap_ticket',
       'members:view', 'members:enroll', 'members:edit', 'members:collect', 'members:suspend', 'members:pair_qr', 'members:revoke_qr', 'members:batch_qr', 'members:reset_mpin', 'members:export',
-      'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:disburse', 'auctions:issue_receipt',
+      'auctions:view', 'auctions:conduct', 'auctions:bid', 'auctions:conclude', 'auctions:disburse', 'auctions:issue_receipt', 'auctions:view_history_kpis',
       'treasury:view_cash_box', 'treasury:collect_cash', 'treasury:recover_float',
       'communication:view', 'communication:broadcast', 'communication:pre_auction', 'communication:post_auction', 'communication:due_alerts', 'communication:custom', 'communication:manage_templates',
       'reports:view', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_receipts'
@@ -174,7 +174,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRoleRecord[] = [
       'dashboard:view_kpis', 'dashboard:view_payment_ledger', 'dashboard:view_activity_feed', 'dashboard:view_reserves',
       'chits:view',
       'members:view', 'members:export',
-      'auctions:view',
+      'auctions:view', 'auctions:view_history_kpis',
       'treasury:view', 'treasury:view_cash_box',
       'reports:view', 'reports:view_pnl', 'reports:export', 'reports:export_checklist', 'reports:export_ledger', 'reports:view_defaulters', 'reports:view_receipts', 'reports:view_audit_logs', 'reports:export_audit'
     ],
@@ -261,6 +261,7 @@ const ALL_ACTIONS: ActionMeta[] = [
   { key: 'auctions:edit_historical', label: 'Edit Past Auction Results', desc: 'Fix accidental winning bid amounts or member errors in past months', category: 'Auctions & Bidding Tab', icon: RotateCcw },
   { key: 'auctions:disburse', label: 'Disburse Prize Money (Payout)', desc: 'Pay out the net prize pot to the winning member via cash or bank', category: 'Auctions & Bidding Tab', icon: Landmark },
   { key: 'auctions:issue_receipt', label: 'Print Winner Payout Receipt', desc: 'Generate and print the official winner prize payout settlement receipt', category: 'Auctions & Bidding Tab', icon: Check },
+  { key: 'auctions:view_history_kpis', label: 'View Auction History Summary Bento Cards', desc: 'Show cumulative Disbursed, Pool Discount, Completed Rounds & Laaba Seetu KPI cards in Auction Archive', category: 'Auctions & Bidding Tab', icon: BarChart3 },
 
   // 5. Treasury Tab (12 Actions)
   { key: 'treasury:view', label: 'View All Cash & Bank Balances', desc: 'Combined total balance across Cash Box and all bank accounts', category: 'Treasury Tab', icon: Vault },
@@ -352,6 +353,7 @@ const ACTION_MATCH_RULES: { key: PermissionAction; match: (lower: string) => boo
   { key: 'auctions:edit_historical', match: (t) => t.includes('edit past auction') || t.includes('fix auction') || t.includes('past auction results') },
   { key: 'auctions:disburse', match: (t) => t.includes('confirm & disburse') || t.includes('disburse pot') || t.includes('disburse payout') || t.includes('prize money') },
   { key: 'auctions:issue_receipt', match: (t) => t.includes('winner voucher') || t.includes('issue receipt') || t.includes('payout receipt') || t.includes('settlement receipt') },
+  { key: 'auctions:view_history_kpis', match: (t) => t.includes('bento') || t.includes('history kpis') || t.includes('cumulative performance') || t.includes('auction history summary') },
   { key: 'auctions:view', match: (t) => t.includes('view live auction') || t.includes('live auction arena') || t.includes('auction countdown') },
 
   // 5. Treasury Tab

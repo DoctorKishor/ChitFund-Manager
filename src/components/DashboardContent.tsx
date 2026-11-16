@@ -5990,6 +5990,7 @@ Thank you for your prompt payment! 🙏`;
                   nextAuctionDate={selectedWorkspaceGroup.nextAuctionDate}
                   nextAuctionTime={selectedWorkspaceGroup.nextAuctionTime}
                   startDate={selectedWorkspaceGroup.startDate}
+                  hasAuctionConcluded={dashboardAuctionLogs.some(l => Number(l.month) === Number(selectedWorkspaceGroup.currentMonth))}
                   allowConfigure={true}
                   onScheduleUpdated={fetchGroups}
                   compact={false}

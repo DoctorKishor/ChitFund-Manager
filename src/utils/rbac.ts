@@ -56,6 +56,7 @@ export type PermissionAction =
   | 'auctions:edit_historical'
   | 'auctions:disburse'
   | 'auctions:issue_receipt'
+  | 'auctions:view_history_kpis'
 
   // ── Treasury & Financial Multi-Vaults ──
   | 'treasury:view'
@@ -188,6 +189,7 @@ export const ACTION_PERMISSIONS: Record<PermissionAction, string[]> = {
   'auctions:edit_historical': ['admin'],
   'auctions:disburse': ['admin', 'manager'],
   'auctions:issue_receipt': ['admin', 'manager', 'auction_clerk'],
+  'auctions:view_history_kpis': ['admin', 'manager', 'auditor'],
 
   // ── Treasury & Financial Multi-Vaults ──
   'treasury:view': ['admin', 'auditor'],

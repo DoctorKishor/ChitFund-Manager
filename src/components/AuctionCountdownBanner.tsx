@@ -41,6 +41,7 @@ interface AuctionCountdownBannerProps {
   nextAuctionDate?: string | null;
   nextAuctionTime?: string | null;
   startDate?: string | null;
+  hasAuctionConcluded?: boolean;
   allowConfigure?: boolean;
   onScheduleUpdated?: () => void;
   theme?: 'light' | 'dark';
@@ -57,6 +58,7 @@ export default function AuctionCountdownBanner({
   nextAuctionDate,
   nextAuctionTime = '19:00',
   startDate,
+  hasAuctionConcluded = false,
   allowConfigure = false,
   onScheduleUpdated,
   theme = 'light',
@@ -70,6 +72,7 @@ export default function AuctionCountdownBanner({
     nextAuctionTime: nextAuctionTime || auctionTime || '19:00',
     startDate: startDate || null,
     currentMonth,
+    hasAuctionConcluded,
   });
 
   const [countdown, setCountdown] = useState<CountdownState>(() => {
@@ -80,6 +83,7 @@ export default function AuctionCountdownBanner({
       next_auction_time: activeConfig.nextAuctionTime,
       start_date: activeConfig.startDate,
       current_month: activeConfig.currentMonth,
+      has_auction_concluded: activeConfig.hasAuctionConcluded,
     });
     return calculateAuctionCountdown(target);
   });
@@ -112,6 +116,7 @@ export default function AuctionCountdownBanner({
       next_auction_time: activeConfig.nextAuctionTime,
       start_date: activeConfig.startDate,
       current_month: activeConfig.currentMonth,
+      has_auction_concluded: activeConfig.hasAuctionConcluded,
     });
   };
 
@@ -170,6 +175,7 @@ export default function AuctionCountdownBanner({
       nextAuctionTime: nextAuctionTime || auctionTime || '19:00',
       startDate: startDate || null,
       currentMonth,
+      hasAuctionConcluded,
     };
     setActiveConfig(updated);
     setEditNextDate(nextAuctionDate || '');
@@ -184,9 +190,10 @@ export default function AuctionCountdownBanner({
       next_auction_time: updated.nextAuctionTime,
       start_date: updated.startDate,
       current_month: updated.currentMonth,
+      has_auction_concluded: updated.hasAuctionConcluded,
     });
     setCountdown(calculateAuctionCountdown(target));
-  }, [nextAuctionDate, nextAuctionTime, auctionDayOfMonth, auctionTime, startDate, currentMonth]);
+  }, [nextAuctionDate, nextAuctionTime, auctionDayOfMonth, auctionTime, startDate, currentMonth, hasAuctionConcluded]);
 
   // Live 1-second countdown interval
   useEffect(() => {
@@ -243,6 +250,7 @@ export default function AuctionCountdownBanner({
         nextAuctionTime: finalTime,
         startDate: startDate || null,
         currentMonth,
+        hasAuctionConcluded: activeConfig.hasAuctionConcluded,
       };
       setActiveConfig(newConfig);
 
@@ -253,6 +261,7 @@ export default function AuctionCountdownBanner({
         next_auction_time: newConfig.nextAuctionTime,
         start_date: newConfig.startDate,
         current_month: newConfig.currentMonth,
+        has_auction_concluded: newConfig.hasAuctionConcluded,
       });
       setCountdown(calculateAuctionCountdown(newTarget));
 
@@ -598,6 +607,7 @@ export default function AuctionCountdownBanner({
               nextAuctionTime: updated.nextAuctionTime,
               startDate: activeConfig.startDate,
               currentMonth,
+              hasAuctionConcluded: activeConfig.hasAuctionConcluded,
             };
             setActiveConfig(newConfig);
             const newTarget = computeNextAuctionDateTime({
@@ -607,6 +617,7 @@ export default function AuctionCountdownBanner({
               next_auction_time: newConfig.nextAuctionTime,
               start_date: newConfig.startDate,
               current_month: newConfig.currentMonth,
+              has_auction_concluded: newConfig.hasAuctionConcluded,
             });
             setCountdown(calculateAuctionCountdown(newTarget));
             if (onScheduleUpdated) {

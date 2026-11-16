@@ -134,6 +134,7 @@ const CATEGORIES: PermissionCategory[] = [
       { key: 'auctions:edit_historical', label: 'Edit Past Auction Results', desc: 'Fix accidental winning bid amounts or member errors in past months' },
       { key: 'auctions:disburse', label: 'Disburse Prize Money (Payout)', desc: 'Pay out the net prize pot to the winning member via cash or bank' },
       { key: 'auctions:issue_receipt', label: 'Print Winner Payout Receipt', desc: 'Generate and print the official winner prize payout settlement receipt' },
+      { key: 'auctions:view_history_kpis', label: 'View Auction History Summary Bento Cards', desc: 'Show cumulative Disbursed, Pool Discount, Completed Rounds & Laaba Seetu KPI cards in Auction Archive' },
     ],
   },
   {
