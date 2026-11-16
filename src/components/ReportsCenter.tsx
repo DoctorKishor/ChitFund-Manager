@@ -70,15 +70,9 @@ interface SubtabConfig {
 }
 
 const REPORT_SUBTABS: SubtabConfig[] = [
-  { id: 'monthly', label: 'Monthly', icon: TrendingUp, description: 'Monthly collection statements, expected dues & PDF sharing' },
-  { id: 'defaulters', label: 'Defaulters', icon: AlertTriangle, description: 'Overdue members, pending cycles & recovery tracking' },
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard, description: 'High-level portfolio performance & group summary' },
-  { id: 'period', label: 'Period', icon: Calendar, description: 'Date range analysis, quarterly & custom period reports' },
-  { id: 'earnings', label: 'Earnings', icon: Coins, description: 'Organizer profit, accumulated discount pools & ROI' },
-  { id: 'payouts', label: 'Payouts', icon: CreditCard, description: 'Auction prize disbursements, net payouts & debt liabilities' },
-  { id: 'member', label: 'Member', icon: User, description: 'Individual subscriber ledgers, statements & ticket history' },
-  { id: 'reliability', label: 'Reliability', icon: ShieldCheck, description: 'Punctuality ratings, member trust score & payment habits' },
-  { id: 'receipts', label: 'Receipts', icon: Receipt, description: 'Search, audit, verify & re-issue all subscriber payment receipts' },
+  { id: 'monthly', label: 'Collections & Statements', icon: TrendingUp, description: 'Monthly collection ledger, expected dues, scheme financials & statements' },
+  { id: 'defaulters', label: 'Defaulters & Reliability', icon: AlertTriangle, description: 'Overdue arrears, auction delay tracking, trust scores & recovery' },
+  { id: 'receipts', label: 'Receipts Vault', icon: Receipt, description: 'Search, audit, verify & re-issue all subscriber payment receipts' },
   { id: 'system_log', label: 'System Logs', icon: ShieldCheck, description: 'Live immutable system audit trail, security events & administrative history' },
 ];
 
@@ -127,20 +121,25 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
   }, [initialSubtab]);
 
   const handleSelectSubtab = (sub: ReportSubtab) => {
-    setActiveSubtab(sub);
-    if (onSubtabChange) onSubtabChange(sub);
+    let target = sub;
+    // Map legacy subtabs to primary hubs
+    if (['overview', 'period', 'earnings', 'payouts'].includes(sub)) {
+      target = 'monthly';
+    } else if (['member', 'reliability'].includes(sub)) {
+      target = 'defaulters';
+    }
+    setActiveSubtab(target);
+    if (onSubtabChange) onSubtabChange(target);
   };
 
   // Fallback to permitted subtab if active subtab is restricted
   useEffect(() => {
     if (activeSubtab === 'monthly' && !canExportChecklist) {
-      if (canViewReceipts) handleSelectSubtab('receipts');
-      else if (canViewDefaulters) handleSelectSubtab('defaulters');
-      else if (canExportLedger) handleSelectSubtab('member');
-      else if (canViewPnl) handleSelectSubtab('overview');
+      if (canViewDefaulters) handleSelectSubtab('defaulters');
+      else if (canViewReceipts) handleSelectSubtab('receipts');
       else if (canViewAuditLogs) handleSelectSubtab('system_log');
     }
-  }, [activeSubtab, canExportChecklist, canViewReceipts, canViewDefaulters, canExportLedger, canViewPnl, canViewAuditLogs]);
+  }, [activeSubtab, canExportChecklist, canViewReceipts, canViewDefaulters, canViewAuditLogs]);
 
   // Supabase Data State
   const [loading, setLoading] = useState<boolean>(true);
@@ -175,6 +174,10 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
   // Earnings Subtab Filter State
   const [earningsTimeFilter, setEarningsTimeFilter] = useState<'this_month' | 'this_fy' | 'all_time'>('all_time');
   const [earningsGroupId, setEarningsGroupId] = useState<string>('all');
+
+  // Defaulters & Reliability Unified Filter State
+  const [defaulterFilter, setDefaulterFilter] = useState<'all' | 'overdue' | 'delayed' | 'punctual'>('all');
+  const [defaulterSearchQuery, setDefaulterSearchQuery] = useState<string>('');
 
   // Member Subtab Search & Selection State
   const [memberSearchQuery, setMemberSearchQuery] = useState<string>('');
@@ -1739,7 +1742,106 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       attentionCount,
       memberList: sortedMembers,
     };
-  }, [selectedGroup, activeGroupMembers, transactions]);
+  }, [selectedGroup, activeGroupMembers, transactions, auctionLogs]);
+
+  // Unified Risk & Reliability Counts for Quick Filter Chips
+  const riskCounts = useMemo(() => {
+    const allCount = reliabilityStats.memberList.length;
+    const overdueCount = defaultersStats.defaultersCount;
+    const delayedCount = reliabilityStats.memberList.filter(m => {
+      const def = defaultersStats.defaultersList.find(d => d.id === m.id);
+      return (def && def.delayDays > 3) || m.avgLateDays > 3;
+    }).length;
+    const punctualCount = reliabilityStats.memberList.filter(m => {
+      const def = defaultersStats.defaultersList.find(d => d.id === m.id);
+      return (!def || def.cumulativeDue === 0) && m.score >= 80;
+    }).length;
+
+    return { allCount, overdueCount, delayedCount, punctualCount };
+  }, [reliabilityStats, defaultersStats]);
+
+  // Unified Defaulters & Reliability Member Roster
+  const unifiedRiskMembers = useMemo(() => {
+    if (!selectedGroup || activeGroupMembers.length === 0) return [];
+
+    const defaultersMap = new Map<string, (typeof defaultersStats.defaultersList)[0]>();
+    defaultersStats.defaultersList.forEach(d => {
+      defaultersMap.set(d.id, d);
+    });
+
+    const list = reliabilityStats.memberList.map((relMember) => {
+      const overdueData = defaultersMap.get(relMember.id);
+      const hasOverdue = !!overdueData && overdueData.cumulativeDue > 0;
+      const cumulativeDue = overdueData ? overdueData.cumulativeDue : 0;
+      const monthsOverdue = overdueData ? overdueData.monthsOverdue : 0;
+      const sinceDateLabel = overdueData ? overdueData.sinceDateLabel : '';
+      const delayDays = overdueData ? overdueData.delayDays : (relMember.avgLateDays || 0);
+      const delayLabel = overdueData ? overdueData.delayLabel : (relMember.avgLateDays > 0 ? `+${relMember.avgLateDays}d avg delay` : '0d delay (on-time)');
+
+      return {
+        ...relMember,
+        hasOverdue,
+        cumulativeDue,
+        monthsOverdue,
+        sinceDateLabel,
+        delayDays,
+        delayLabel,
+        isDelayed: delayDays > 3,
+        isPunctual: !hasOverdue && relMember.score >= 80,
+      };
+    });
+
+    // Priority sort: Overdue members first (highest delay & debt), then by score ascending
+    const sorted = [...list].sort((a, b) => {
+      if (a.hasOverdue && !b.hasOverdue) return -1;
+      if (!a.hasOverdue && b.hasOverdue) return 1;
+      if (a.hasOverdue && b.hasOverdue) {
+        if (b.delayDays !== a.delayDays) return b.delayDays - a.delayDays;
+        return b.cumulativeDue - a.cumulativeDue;
+      }
+      return a.score - b.score;
+    });
+
+    // Apply quick filter chip
+    let filtered = sorted;
+    if (defaulterFilter === 'overdue') {
+      filtered = filtered.filter(m => m.hasOverdue);
+    } else if (defaulterFilter === 'delayed') {
+      filtered = filtered.filter(m => m.isDelayed || m.delayDays > 3);
+    } else if (defaulterFilter === 'punctual') {
+      filtered = filtered.filter(m => m.isPunctual);
+    }
+
+    // Apply quick search query
+    if (defaulterSearchQuery.trim()) {
+      const q = defaulterSearchQuery.toLowerCase().trim();
+      filtered = filtered.filter(m => 
+        m.name.toLowerCase().includes(q) || 
+        String(m.ticket).includes(q) || 
+        (m.phone && m.phone.includes(q))
+      );
+    }
+
+    return filtered;
+  }, [selectedGroup, activeGroupMembers, reliabilityStats, defaultersStats, defaulterFilter, defaulterSearchQuery]);
+
+  // 1-tap WhatsApp Action for Unified Risk Roster
+  const handleWhatsAppRiskMember = (m: any) => {
+    let text = '';
+    if (m.hasOverdue) {
+      text = `🚨 *Chit Fund Overdue Reminder*\n\nDear *${m.name}* (Ticket #${m.ticket}),\n\nYour installment for *${selectedGroup?.name}* has a pending overdue of *₹${m.cumulativeDue.toLocaleString('en-IN')}* (${m.monthsOverdue} months overdue since ${m.sinceDateLabel}).\nAuction Delay: ${m.delayLabel}.\n\nKindly arrange to clear the dues at your earliest convenience to keep your account active and maintain your reliability score.\n\n— ${organizerCompanyName}`;
+    } else {
+      text = `🌟 *Chit Fund Payment Acknowledgment*\n\nDear *${m.name}* (Ticket #${m.ticket}),\n\nThank you for your timely payments for *${selectedGroup?.name}*! Your account is in excellent standing with a Trust & Reliability Score of *${m.score}/100*.\n\n— ${organizerCompanyName}`;
+    }
+
+    const cleanPhone = (m.phone || '').replace(/[^0-9]/g, '');
+    if (cleanPhone) {
+      const formatted = cleanPhone.startsWith('91') && cleanPhone.length > 10 ? cleanPhone : `91${cleanPhone.replace(/^0+/, '')}`;
+      window.open(`https://wa.me/${formatted}?text=${encodeURIComponent(text)}`, '_blank');
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
+  };
 
   // AI Ask your Data Handler
   const handleAskData = (question: string) => {
@@ -1981,17 +2083,21 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       text += `\n— ${organizerCompanyName}`;
     } else if (activeSubtab === 'defaulters') {
       if (!selectedGroup) return;
-      text = `🚨 *${selectedGroup.name} — Defaulters Report (${activeMonthInfo.dateLabel})*\n\n`;
-      text += `• Cumulative Dues: *${formatCurrency(defaultersStats.cumulativeDues)}*\n`;
-      text += `• This Month Due: *${formatCurrency(defaultersStats.thisMonthDues)}*\n`;
-      text += `• Defaulters: *${defaultersStats.defaultersCount} members*\n\n`;
-      text += `*Overdue Members:*\n`;
+      text = `🚨 *${selectedGroup.name} — Defaulters & Reliability Report (${activeMonthInfo.dateLabel})*\n\n`;
+      text += `• Total Overdue Arrears: *${formatCurrency(defaultersStats.cumulativeDues)}*\n`;
+      text += `• Defaulters Count: *${defaultersStats.defaultersCount} members*\n`;
+      text += `• Trust Health: ${reliabilityStats.reliableCount} Reliable · ${reliabilityStats.watchCount} Watch · ${reliabilityStats.atRiskCount} At Risk\n\n`;
+      text += `*Member Status Summary:*\n`;
 
-      if (defaultersStats.defaultersList.length === 0) {
-        text += `✅ All members are up to date! Zero defaulters.\n`;
+      if (unifiedRiskMembers.length === 0) {
+        text += `✅ All members are up to date! Zero arrears.\n`;
       } else {
-        defaultersStats.defaultersList.forEach((d) => {
-          text += `${d.rank}. *${d.name}* (T#${d.ticket}) — Cumulative: *${formatCurrency(d.cumulativeDue)}* (${d.monthsOverdue} mo overdue since ${d.sinceDateLabel})\n`;
+        unifiedRiskMembers.slice(0, 20).forEach((m, idx) => {
+          if (m.hasOverdue) {
+            text += `${idx + 1}. *${m.name}* (T#${m.ticket}) — *${formatCurrency(m.cumulativeDue)} Owed* (${m.monthsOverdue}m overdue, ${m.delayLabel}) · Score: ${m.score}/100 [${m.status}]\n`;
+          } else {
+            text += `${idx + 1}. *${m.name}* (T#${m.ticket}) — Up to date · Score: ${m.score}/100 [${m.status}]\n`;
+          }
         });
       }
       text += `\n— ${organizerCompanyName}`;
@@ -2042,7 +2148,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
       text = `📅 *PERIOD REPORT (${periodDateLabel})*\nGroup: *${periodStats.selectedGroupName}*\nCollected: *${formatCurrency(periodStats.totalCollected)}*\nPaid Out: *${formatCurrency(periodStats.totalPaidOut)}*\nNet Flow: *${formatCurrency(periodStats.netFlow)}*\n\nPlease find the attached official Period Report PDF.`;
     } else if (activeSubtab === 'defaulters') {
       if (!selectedGroup) return;
-      text = `🚨 *DEFAULTERS REPORT (${activeMonthInfo.dateLabel})*\nGroup: *${selectedGroup.name}*\nCumulative Dues: *${formatCurrency(defaultersStats.cumulativeDues)}*\nDefaulters: *${defaultersStats.defaultersCount} members*\n\nPlease find the attached official Defaulters Report PDF.`;
+      text = `🚨 *DEFAULTERS & RELIABILITY REPORT (${activeMonthInfo.dateLabel})*\nGroup: *${selectedGroup.name}*\nCumulative Arrears: *${formatCurrency(defaultersStats.cumulativeDues)}*\nDefaulters: *${defaultersStats.defaultersCount} members*\nReliable: *${reliabilityStats.reliableCount}* | Watch: *${reliabilityStats.watchCount}* | At Risk: *${reliabilityStats.atRiskCount}*\n\nPlease find the attached official Defaulters & Reliability Report PDF.`;
     } else {
       if (!selectedGroup) return;
       text = `📄 *MONTH ${selectedMonth === 0 ? '0 (LAUNCH)' : selectedMonth} STATEMENT (PDF)*\nGroup: *${selectedGroup.name}*\nCollected: *${formatCurrency(monthlyStats.collected)} / ${formatCurrency(monthlyStats.expected)}* (${monthlyStats.collectionPercent}%)\nPending: *${formatCurrency(monthlyStats.pending)}*\n\nPlease find the attached official Month Statement PDF report.`;
@@ -2600,125 +2706,66 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                   {canExportChecklist && (
                     <button
                       onClick={() => handleSelectSubtab('monthly')}
-                      className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                      className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
                         activeSubtab === 'monthly'
-                          ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-2xs'
+                          ? 'bg-brand-600 text-white shadow-2xs'
                           : 'hover:bg-slate-100 text-slate-600 font-semibold'
                       }`}
                     >
-                      <span>📊</span> Monthly Collection Ledger
+                      <TrendingUp size={15} /> Collections &amp; Statements
                     </button>
                   )}
 
                   {canViewDefaulters && (
                     <button
                       onClick={() => handleSelectSubtab('defaulters')}
-                      className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                      className={`px-4 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
                         activeSubtab === 'defaulters'
-                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                          ? 'bg-brand-600 text-white font-bold shadow-2xs'
                           : 'hover:bg-slate-100 text-slate-600'
                       }`}
                     >
-                      <span>⚠️</span> Defaulter &amp; Overdue Tracker
-                      <span className="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px]">
-                        {defaultersStats.defaultersCount}
-                      </span>
-                    </button>
-                  )}
-
-                  {canViewPnl && (
-                    <>
-                      <button
-                        onClick={() => handleSelectSubtab('period')}
-                        className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                          activeSubtab === 'period'
-                            ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                            : 'hover:bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        <span>📅</span> Period &amp; Date-Range Analysis
-                      </button>
-
-                      <button
-                        onClick={() => handleSelectSubtab('earnings')}
-                        className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                          activeSubtab === 'earnings'
-                            ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                            : 'hover:bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        <span>💼</span> Organizer Earnings &amp; Pool Growth
-                      </button>
-
-                      <button
-                        onClick={() => handleSelectSubtab('payouts')}
-                        className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                          activeSubtab === 'payouts'
-                            ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                            : 'hover:bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        <span>🏆</span> Prize Pot Disbursals
-                      </button>
-                    </>
-                  )}
-
-                  {canExportLedger && (
-                    <button
-                      onClick={() => handleSelectSubtab('member')}
-                      className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                        activeSubtab === 'member'
-                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                          : 'hover:bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      <span>👤</span> Individual Member Statement
-                    </button>
-                  )}
-
-                  {canViewPnl && (
-                    <button
-                      onClick={() => handleSelectSubtab('reliability')}
-                      className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                        activeSubtab === 'reliability'
-                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                          : 'hover:bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      <span>⭐</span> Member Trust &amp; Reliability Score
+                      <AlertTriangle size={15} /> Defaulters &amp; Reliability
+                      {defaultersStats.defaultersCount > 0 && (
+                        <span className={`px-1.5 py-0.2 rounded-full font-bold text-[10px] ${
+                          activeSubtab === 'defaulters' ? 'bg-white text-rose-600' : 'bg-rose-100 text-rose-700'
+                        }`}>
+                          {defaultersStats.defaultersCount}
+                        </span>
+                      )}
                     </button>
                   )}
 
                   {canViewReceipts && (
                     <button
                       onClick={() => handleSelectSubtab('receipts')}
-                      className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                      className={`px-4 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
                         activeSubtab === 'receipts'
-                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                          ? 'bg-brand-600 text-white font-bold shadow-2xs'
                           : 'hover:bg-slate-100 text-slate-600'
                       }`}
                     >
-                      <span>🧾</span> Payment Receipts
+                      <Receipt size={15} /> Receipts Vault
                     </button>
                   )}
 
                   {canViewAuditLogs && (
                     <button
                       onClick={() => handleSelectSubtab('system_log')}
-                      className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
+                      className={`px-4 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer ${
                         activeSubtab === 'system_log'
-                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
+                          ? 'bg-brand-600 text-white font-bold shadow-2xs'
                           : 'hover:bg-slate-100 text-slate-600'
                       }`}
                     >
-                      <span>🛡️</span> System Logs
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
+                      <ShieldCheck size={15} /> System Audit Logs
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
                     </button>
                   )}
                 </nav>
 
                 <div className="hidden xl:flex items-center gap-2 pr-2">
-                  <span className="text-[11px] text-slate-400 font-mono">View: Real-Time</span>
+                  <span className="text-[11px] text-slate-400 font-mono">View: Real-Time Synced</span>
                 </div>
               </div>
             </section>
@@ -2793,6 +2840,63 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                     </button>
                   </div>
                 </div>
+
+                {/* Executive Scheme Financial Performance Summary */}
+                {selectedGroup && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-5 bg-slate-50/70 border-b border-slate-100">
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-200/70 shadow-2xs">
+                      <div className="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+                        <span>SCHEME POOL</span>
+                        <Layers size={14} className="text-slate-400" />
+                      </div>
+                      <div className="text-lg font-black text-slate-900 font-mono mt-1">
+                        ₹{(Number(selectedGroup.total_value || 0)).toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                        {selectedGroup.duration_months || 0} Months · {activeGroupMembers.length} Tickets
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-200/70 shadow-2xs">
+                      <div className="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+                        <span>NET PRIZE DISBURSED</span>
+                        <Award size={14} className="text-emerald-500" />
+                      </div>
+                      <div className="text-lg font-black text-emerald-700 font-mono mt-1">
+                        ₹{payoutsStats.totalNetPaid.toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                        {payoutsStats.winnersCount} of {payoutsStats.totalMembers} Winners Disbursed
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-200/70 shadow-2xs">
+                      <div className="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+                        <span>DISCOUNT POOL</span>
+                        <Sparkles size={14} className="text-amber-500" />
+                      </div>
+                      <div className="text-lg font-black text-amber-700 font-mono mt-1">
+                        ₹{(Number(selectedGroup.kai_iruppu_pool || 0)).toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                        Target: ₹{(Number(selectedGroup.total_value || 0)).toLocaleString('en-IN')} (Laaba Seetu)
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-200/70 shadow-2xs">
+                      <div className="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+                        <span>ORGANIZER PROFIT</span>
+                        <Coins size={14} className="text-brand-600" />
+                      </div>
+                      <div className="text-lg font-black text-brand-700 font-mono mt-1">
+                        ₹{earningsStats.organizerProfit.toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                        Reserved Month 0 Launch Pool
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Full-Width High-Density Ledger Table */}
                 <div className="overflow-x-auto">
@@ -3048,369 +3152,320 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
               </section>
             )}
 
-            {/* Subtab 2: Defaulters */}
+            {/* Subtab 2: Defaulters & Reliability (Unified Hub) */}
             {activeSubtab === 'defaulters' && (
               <section className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Defaulter &amp; Overdue Tracker</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Ranked by highest outstanding arrears</p>
+                {/* Header & Actions */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 shadow-2xs shrink-0">
+                      <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                        Defaulters &amp; Member Reliability
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Credit risk evaluation, auction delay tracking &amp; algorithmic trust scores (0–100)
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleShareText} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 cursor-pointer">Share</button>
-                    <button onClick={handleWhatsAppPDF} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer">WhatsApp PDF</button>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-200/60">
-                    <span className="text-xs font-bold text-rose-800 uppercase">CUMULATIVE DUES</span>
-                    <span className="text-2xl font-black text-rose-700 block font-mono mt-1">₹{defaultersStats.cumulativeDues.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200/60">
-                    <span className="text-xs font-bold text-amber-800 uppercase">THIS MONTH DUES</span>
-                    <span className="text-2xl font-black text-amber-700 block font-mono mt-1">₹{defaultersStats.thisMonthDues.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-100 border border-slate-200">
-                    <span className="text-xs font-bold text-slate-600 uppercase">DEFAULTERS COUNT</span>
-                    <span className="text-2xl font-black text-slate-900 block font-mono mt-1">{defaultersStats.defaultersCount}</span>
-                  </div>
-                </div>
+                  <div className="flex items-center flex-wrap gap-2.5">
+                    {/* Member Quick Search */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search member, ticket, phone..."
+                        value={defaulterSearchQuery}
+                        onChange={(e) => setDefaulterSearchQuery(e.target.value)}
+                        className="pl-8 pr-3 py-1.5 bg-slate-50 hover:bg-slate-100 focus:bg-white text-xs rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all w-56 font-medium"
+                      />
+                      {defaulterSearchQuery && (
+                        <button
+                          onClick={() => setDefaulterSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
 
-                <div className="divide-y divide-slate-100">
-                  {defaultersStats.defaultersList.length === 0 ? (
-                    <div className="py-8 text-center text-xs text-slate-500">Zero overdue defaulters for this cycle!</div>
-                  ) : (
-                    defaultersStats.defaultersList.map(d => (
-                      <div key={d.id} className="py-3 flex items-center justify-between hover:bg-slate-50 px-3 rounded-xl">
-                        <div className="flex items-center gap-3">
-                          <span className="w-5 font-mono text-xs text-slate-400">{d.rank}</span>
-                          <div>
-                            <span className="font-bold text-sm text-slate-900 block">{d.name}</span>
-                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                              <span className="text-xs text-rose-600 font-medium">{d.monthsOverdue}m overdue · since {d.sinceDateLabel}</span>
-                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-rose-50 text-rose-700 border border-rose-200">
-                                {d.delayLabel}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-base font-black text-rose-600 font-mono block">₹{d.cumulativeDue.toLocaleString('en-IN')}</span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase">TOTAL OWED</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-            )}
-
-            {/* Subtab 3: Period Analysis */}
-            {activeSubtab === 'period' && (
-              <section className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-6 space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Period &amp; Date-Range Analysis</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">{periodDateLabel}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleShareText} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 cursor-pointer">Share</button>
-                    <button onClick={handleWhatsAppPDF} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer">WhatsApp PDF</button>
-                  </div>
-                </div>
-
-                {/* Presets */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                  {[
-                    { id: 'this_month', label: 'This Month' },
-                    { id: 'last_month', label: 'Last Month' },
-                    { id: 'this_quarter', label: 'This Quarter' },
-                    { id: 'this_fy', label: 'This FY' },
-                    { id: '30_days', label: '30 Days' },
-                    { id: 'custom', label: 'Custom' },
-                  ].map((p) => (
                     <button
-                      key={p.id}
-                      onClick={() => handlePresetChange(p.id as any)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                        periodPreset === p.id
-                          ? 'bg-brand-50 text-brand-700 font-bold border border-brand-200/60 shadow-2xs'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                      }`}
+                      onClick={handleShareText}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200/80 transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
                     >
-                      {p.label}
+                      <Share2 size={13} /> Share
                     </button>
-                  ))}
+
+                    <button
+                      onClick={handleWhatsAppPDF}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <FileText size={13} /> PDF Report
+                    </button>
+                  </div>
                 </div>
 
-                {/* 3 Metric Cards */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200/60">
-                    <span className="text-xs font-bold text-emerald-800 uppercase">COLLECTED</span>
-                    <span className="text-2xl font-black text-emerald-700 block font-mono mt-1">₹{periodStats.totalCollected.toLocaleString('en-IN')}</span>
+                {/* 4-Tile Executive Risk Bento */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Tile 1: Cumulative Arrears */}
+                  <div className="p-4 rounded-xl bg-rose-50/70 border border-rose-200/70 shadow-2xs">
+                    <div className="flex items-center justify-between text-rose-800 text-[11px] font-bold uppercase tracking-wider">
+                      <span>CUMULATIVE ARREARS</span>
+                      <AlertTriangle size={15} className="text-rose-600" />
+                    </div>
+                    <span className="text-2xl font-black text-rose-700 block font-mono mt-1">
+                      ₹{defaultersStats.cumulativeDues.toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-xs text-rose-600/80 font-medium block mt-0.5">
+                      {defaultersStats.defaultersCount} Members with overdue dues
+                    </span>
                   </div>
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200/60">
-                    <span className="text-xs font-bold text-amber-800 uppercase">PAID OUT</span>
-                    <span className="text-2xl font-black text-amber-700 block font-mono mt-1">₹{periodStats.totalPaidOut.toLocaleString('en-IN')}</span>
+
+                  {/* Tile 2: Auction Date & Delay */}
+                  <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/70 shadow-2xs">
+                    <div className="flex items-center justify-between text-amber-800 text-[11px] font-bold uppercase tracking-wider">
+                      <span>CYCLE AUCTION</span>
+                      <Clock size={15} className="text-amber-600" />
+                    </div>
+                    <span className="text-2xl font-black text-amber-800 block font-mono mt-1">
+                      {defaultersStats.auctionDateFormatted || 'M' + selectedMonth}
+                    </span>
+                    <span className="text-xs text-amber-700/80 font-medium block mt-0.5">
+                      {defaultersStats.daysPastAuction > 0 ? `+${defaultersStats.daysPastAuction} days post-auction` : 'Auction on schedule'}
+                    </span>
                   </div>
-                  <div className="p-4 rounded-xl bg-slate-100 border border-slate-200">
-                    <span className="text-xs font-bold text-slate-600 uppercase">NET FLOW</span>
-                    <span className={`text-2xl font-black block font-mono mt-1 ${periodStats.netFlow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                      ₹{periodStats.netFlow.toLocaleString('en-IN')}
+
+                  {/* Tile 3: Trust Rating Breakdown */}
+                  <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200/70 shadow-2xs">
+                    <div className="flex items-center justify-between text-emerald-800 text-[11px] font-bold uppercase tracking-wider">
+                      <span>TRUST DISTRIBUTION</span>
+                      <ShieldCheck size={15} className="text-emerald-600" />
+                    </div>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className="text-2xl font-black text-emerald-700 font-mono">
+                        {reliabilityStats.reliableCount}
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium font-mono">
+                        / {reliabilityStats.memberList.length} Reliable
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium mt-0.5">
+                      <span className="text-amber-700 font-bold">{reliabilityStats.watchCount} Watch</span>
+                      <span>·</span>
+                      <span className="text-rose-700 font-bold">{reliabilityStats.atRiskCount} At Risk</span>
+                    </div>
+                  </div>
+
+                  {/* Tile 4: On-Time Rate */}
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 shadow-2xs">
+                    <div className="flex items-center justify-between text-slate-600 text-[11px] font-bold uppercase tracking-wider">
+                      <span>ON-TIME RATE</span>
+                      <CheckCircle2 size={15} className="text-slate-500" />
+                    </div>
+                    <span className="text-2xl font-black text-slate-900 block font-mono mt-1">
+                      {riskCounts.allCount > 0 ? Math.round((riskCounts.punctualCount / riskCounts.allCount) * 100) : 100}%
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium block mt-0.5">
+                      {riskCounts.punctualCount} Subscribers fully prompt
                     </span>
                   </div>
                 </div>
 
-                {/* Monthly breakdown */}
-                <div className="space-y-3 pt-2">
-                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">Monthly Progression</span>
-                  <div className="space-y-2">
-                    {periodStats.monthsInPeriod.map((m, idx) => (
-                      <div key={idx} className="flex items-center gap-3 text-xs">
-                        <span className="w-16 font-semibold text-slate-600 font-mono">{m.label}</span>
-                        <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                          <div className="bg-brand-600 h-full rounded-full" style={{ width: `${periodStats.maxMonthVal > 0 ? (m.collected / periodStats.maxMonthVal) * 100 : 0}%` }}></div>
-                        </div>
-                        <span className="font-mono font-bold text-slate-900">₹{m.collected.toLocaleString('en-IN')}</span>
-                      </div>
-                    ))}
+                {/* Filter Chips Bar */}
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setDefaulterFilter('all')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        defaulterFilter === 'all'
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      All Subscribers ({riskCounts.allCount})
+                    </button>
+                    <button
+                      onClick={() => setDefaulterFilter('overdue')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        defaulterFilter === 'overdue'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/60'
+                      }`}
+                    >
+                      <AlertTriangle size={13} /> Overdue Arrears ({riskCounts.overdueCount})
+                    </button>
+                    <button
+                      onClick={() => setDefaulterFilter('delayed')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        defaulterFilter === 'delayed'
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/60'
+                      }`}
+                    >
+                      <Clock size={13} /> Delayed (&gt;3d) ({riskCounts.delayedCount})
+                    </button>
+                    <button
+                      onClick={() => setDefaulterFilter('punctual')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        defaulterFilter === 'punctual'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60'
+                      }`}
+                    >
+                      <CheckCircle2 size={13} /> Punctual / On-Time ({riskCounts.punctualCount})
+                    </button>
                   </div>
-                </div>
-              </section>
-            )}
 
-            {/* Subtab 4: Organizer Earnings */}
-            {activeSubtab === 'earnings' && (
-              <section className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Organizer Earnings &amp; Pool Growth</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Realized Organizer Profit from Launch Month + Kai Iruppu Reserve</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleShareText} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 cursor-pointer">Share</button>
-                    <button onClick={handleWhatsAppPDF} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer">WhatsApp PDF</button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-brand-50 border border-brand-200/60">
-                    <span className="text-xs font-bold text-brand-800 uppercase">TOTAL EARNED</span>
-                    <span className="text-2xl font-black text-brand-700 block font-mono mt-1">₹{earningsStats.totalEarned.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200/60">
-                    <span className="text-xs font-bold text-emerald-800 uppercase">ORGANIZER PROFIT (M0)</span>
-                    <span className="text-2xl font-black text-emerald-700 block font-mono mt-1">₹{earningsStats.organizerProfit.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200/60">
-                    <span className="text-xs font-bold text-indigo-800 uppercase">DISCOUNT POOL (LAABA SEETU)</span>
-                    <span className="text-2xl font-black text-indigo-700 block font-mono mt-1">₹{earningsStats.discountPool.toLocaleString('en-IN')}</span>
-                  </div>
-                </div>
-
-                <div className="divide-y divide-slate-100">
-                  {earningsStats.byChitList.map(g => (
-                    <div key={g.id} className="py-3 flex items-center justify-between hover:bg-slate-50 px-3 rounded-xl">
-                      <div>
-                        <span className="font-bold text-sm text-slate-900 block">{g.name}</span>
-                        <span className="text-xs text-slate-500">{g.subtitle}</span>
-                      </div>
-                      <span className="font-mono font-black text-slate-900 text-base">₹{g.total.toLocaleString('en-IN')}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Subtab 5: Payouts */}
-            {activeSubtab === 'payouts' && (
-              <section className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Prize Pot Disbursals</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Auction prize distributions and settlement status</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleShareText} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 cursor-pointer">Share</button>
-                    <button onClick={handleWhatsAppPDF} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer">WhatsApp PDF</button>
-                  </div>
+                  <span className="text-xs text-slate-400 font-mono">
+                    Showing {unifiedRiskMembers.length} of {riskCounts.allCount} members
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200/60">
-                    <span className="text-xs font-bold text-amber-800 uppercase">TOTAL PRIZE VALUE</span>
-                    <span className="text-2xl font-black text-amber-700 block font-mono mt-1">₹{payoutsStats.totalPrizeValue.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200/60">
-                    <span className="text-xs font-bold text-emerald-800 uppercase">NET PAID OUT</span>
-                    <span className="text-2xl font-black text-emerald-700 block font-mono mt-1">₹{payoutsStats.totalNetPaid.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-200/60">
-                    <span className="text-xs font-bold text-rose-800 uppercase">PENDING OWED</span>
-                    <span className="text-2xl font-black text-rose-700 block font-mono mt-1">₹{payoutsStats.totalPending.toLocaleString('en-IN')}</span>
-                  </div>
-                </div>
-
-                <div className="divide-y divide-slate-100">
-                  {payoutsStats.payoutRows.map((p, idx) => (
-                    <div key={idx} className="py-3 flex items-center justify-between hover:bg-slate-50 px-3 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <span className="w-8 font-mono text-xs font-bold text-slate-400">M{p.month}</span>
-                        <div>
-                          <span className="font-bold text-sm text-slate-900 block">{p.winnerName}</span>
-                          <span className="text-xs text-slate-500 font-mono">Gross ₹{(p.awardedAmount || 0).toLocaleString('en-IN')} - Discount ₹{((p.awardedAmount || 0) - (p.netPayout || 0)).toLocaleString('en-IN')}</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-base font-black text-slate-900 font-mono block">₹{p.netPayout.toLocaleString('en-IN')}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${p.status === 'Complete' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
-                          {p.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Subtab 6: Member Statement */}
-            {activeSubtab === 'member' && (
-              <section className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-6 space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Individual Member Statement</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Select subscriber to view complete ledger passbook</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleShareText} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 cursor-pointer">Share</button>
-                    <button onClick={handleWhatsAppPDF} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer">WhatsApp PDF</button>
-                  </div>
-                </div>
-
-                {/* Member Search / Selector */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search subscriber name or ticket number..."
-                    value={memberSearchQuery}
-                    onChange={(e) => {
-                      setMemberSearchQuery(e.target.value);
-                      setIsSearchDropdownOpen(true);
-                    }}
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-brand-500"
-                  />
-                  {isSearchDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg z-30 divide-y divide-slate-100">
-                      {activeGroupMembers
-                        .filter(m => (m.alias_name || m.profiles?.full_name || '').toLowerCase().includes(memberSearchQuery.toLowerCase()) || String(m.ticket_number).includes(memberSearchQuery))
-                        .map(m => (
-                          <div
+                {/* Member Risk & Overdue Roster Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th className="py-3 px-4">Member / Ticket</th>
+                        <th className="py-3 px-4 text-center">Trust Score</th>
+                        <th className="py-3 px-4">Auction Delay &amp; Discipline</th>
+                        <th className="py-3 px-4 text-right">Outstanding Arrears</th>
+                        <th className="py-3 px-4 text-right">Quick Contact</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {unifiedRiskMembers.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center text-slate-400">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <CheckCircle2 size={24} className="text-emerald-500" />
+                              <p className="font-bold text-slate-700 text-sm">No members match this filter</p>
+                              <p className="text-xs text-slate-400">All evaluated subscribers meet your selected criteria.</p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        unifiedRiskMembers.map((m) => (
+                          <tr
                             key={m.id}
-                            onClick={() => {
-                              setSelectedMemberId(m.id);
-                              setIsSearchDropdownOpen(false);
-                            }}
-                            className="p-2.5 hover:bg-slate-50 cursor-pointer flex items-center justify-between text-xs"
+                            className={`transition-colors hover:bg-slate-50/80 ${
+                              m.hasOverdue ? 'bg-rose-50/20' : ''
+                            }`}
                           >
-                            <span className="font-bold text-slate-900">{m.alias_name || m.profiles?.full_name}</span>
-                            <span className="font-mono text-slate-500">Ticket #{m.ticket_number}</span>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-3">
+                                <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-mono font-bold text-[11px] flex items-center justify-center shrink-0 border border-slate-200">
+                                  #{m.ticket}
+                                </span>
+                                <div>
+                                  <span className="font-bold text-sm text-slate-900 block leading-tight">{m.name}</span>
+                                  <span className="text-[11px] text-slate-400 font-mono mt-0.5 block">
+                                    {m.phone || 'No phone registered'}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
 
-                {/* Member Overview Card */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-slate-100 border border-slate-200">
-                    <span className="text-xs font-bold text-slate-600 uppercase">TOTAL DUE</span>
-                    <span className="text-2xl font-black text-slate-900 block font-mono mt-1">₹{memberStatementStats.totalDue.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200/60">
-                    <span className="text-xs font-bold text-emerald-800 uppercase">TOTAL PAID</span>
-                    <span className="text-2xl font-black text-emerald-700 block font-mono mt-1">₹{memberStatementStats.totalPaid.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-200/60">
-                    <span className="text-xs font-bold text-rose-800 uppercase">OUTSTANDING</span>
-                    <span className="text-2xl font-black text-rose-700 block font-mono mt-1">₹{memberStatementStats.totalOwes.toLocaleString('en-IN')}</span>
-                  </div>
-                </div>
+                            <td className="py-3.5 px-4 text-center">
+                              <div className="inline-flex flex-col items-center gap-1">
+                                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                                  m.status === 'Reliable'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : m.status === 'Watch'
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                    : 'bg-rose-50 text-rose-700 border-rose-200'
+                                }`}>
+                                  {m.status} · {m.score}/100
+                                </span>
+                                <div className="w-16 bg-slate-100 rounded-full h-1 overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      m.score >= 80 ? 'bg-emerald-500' : m.score >= 40 ? 'bg-amber-500' : 'bg-rose-500'
+                                    }`}
+                                    style={{ width: `${m.score}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
 
-                {/* Monthly rows */}
-                <div className="divide-y divide-slate-100">
-                  {memberStatementStats.monthRows.map(r => (
-                    <div key={r.month} className="py-2.5 flex items-center justify-between hover:bg-slate-50 px-3 rounded-xl">
-                      <span className="font-mono text-xs font-semibold text-slate-600">{r.dateLabel}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-xs font-bold text-slate-900">₹{r.paid.toLocaleString('en-IN')} / ₹{r.expected.toLocaleString('en-IN')}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${r.status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
-                          {r.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                            <td className="py-3.5 px-4">
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[11px] font-bold ${
+                                    m.delayDays > 3 ? 'text-rose-600' : m.delayDays > 0 ? 'text-amber-700' : 'text-emerald-700'
+                                  }`}>
+                                    {m.delayLabel}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-mono block">
+                                  {m.onTimeCount}/{m.evaluatedMonthsCount} cycles on-time · {m.unpaidCount} unpaid
+                                </span>
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-4 text-right">
+                              {m.hasOverdue ? (
+                                <div>
+                                  <span className="text-base font-black text-rose-600 font-mono block">
+                                    ₹{m.cumulativeDue.toLocaleString('en-IN')}
+                                  </span>
+                                  <span className="text-[10px] text-rose-500 font-bold uppercase tracking-wider block">
+                                    {m.monthsOverdue}m overdue ({m.sinceDateLabel})
+                                  </span>
+                                </div>
+                              ) : (
+                                <div>
+                                  <span className="text-sm font-bold text-emerald-600 font-mono block">
+                                    ₹0 Owed
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-semibold uppercase block">
+                                    Up to date
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => handleWhatsAppRiskMember(m)}
+                                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                                    m.hasOverdue
+                                      ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                  }`}
+                                  title={m.hasOverdue ? 'Send Overdue Reminder' : 'Send Payment Acknowledgment'}
+                                >
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.698c.974.551 1.794.813 2.802.813 3.179 0 5.767-2.587 5.767-5.766.001-3.187-2.575-5.769-5.773-5.769zm3.376 8.212c-.14.394-.712.724-1.002.771-.284.045-.632.067-1.026-.06-.239-.077-.552-.187-.954-.361-1.699-.738-2.812-2.464-2.898-2.577-.084-.114-.697-.927-.697-1.768 0-.841.442-1.255.6-.1426.157-.17.342-.213.456-.213.114 0 .228.001.328.006.105.006.246-.04.385.293.143.342.487 1.189.53 1.275.043.085.071.185.014.298-.057.114-.085.185-.17.285-.086.099-.181.222-.259.299-.086.085-.176.177-.076.348.1.171.444.733.953 1.187.656.584 1.209.765 1.38.85.171.085.271.071.371-.043.1-.114.428-.499.542-.67.114-.171.228-.142.385-.085.157.057.998.47 1.17.556.171.085.285.128.328.2.043.071.043.414-.097.808z" />
+                                  </svg>
+                                  <span>{m.hasOverdue ? 'Remind' : 'Thanks'}</span>
+                                </button>
+
+                                {m.phone && (
+                                  <a
+                                    href={`tel:${m.phone}`}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 rounded-xl transition-colors border border-slate-200/70"
+                                    title={`Call ${m.name}`}
+                                  >
+                                    <Phone size={13} />
+                                  </a>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </section>
             )}
 
-            {/* Subtab 7: Reliability */}
-            {activeSubtab === 'reliability' && (
-              <section className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Member Trust &amp; Reliability Score</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Algorithmically calculated punctuality and commitment score (0–100)</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleShareText} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 cursor-pointer">Share</button>
-                    <button onClick={handleWhatsAppPDF} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer">WhatsApp PDF</button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200/60">
-                    <span className="text-xs font-bold text-emerald-800 uppercase">RELIABLE (80-100)</span>
-                    <span className="text-2xl font-black text-emerald-700 block font-mono mt-1">{reliabilityStats.reliableCount}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200/60">
-                    <span className="text-xs font-bold text-amber-800 uppercase">WATCH (40-79)</span>
-                    <span className="text-2xl font-black text-amber-700 block font-mono mt-1">{reliabilityStats.watchCount}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-200/60">
-                    <span className="text-xs font-bold text-rose-800 uppercase">AT RISK (&lt;40)</span>
-                    <span className="text-2xl font-black text-rose-700 block font-mono mt-1">{reliabilityStats.atRiskCount}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-100 border border-slate-200">
-                    <span className="text-xs font-bold text-slate-600 uppercase">NEED ATTENTION</span>
-                    <span className="text-2xl font-black text-slate-900 block font-mono mt-1">{reliabilityStats.attentionCount}</span>
-                  </div>
-                </div>
-
-                <div className="divide-y divide-slate-100">
-                  {reliabilityStats.memberList.map((m: any) => (
-                    <div key={m.id} className="py-3 flex items-center justify-between hover:bg-slate-50 px-3 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <span className="w-8 font-mono text-sm font-black text-slate-900">{m.score}</span>
-                        <div>
-                          <span className="font-bold text-sm text-slate-900 block">{m.name}</span>
-                          <span className="text-xs text-slate-500 font-mono">Ticket #{m.ticket} · {m.onTimeCount}/{m.evaluatedMonthsCount} on-time · {m.avgLateDays > 0 ? `+${m.avgLateDays}d avg delay past auction` : '0d delay (punctual)'}</span>
-                        </div>
-                      </div>
-                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                        m.status === 'Reliable' 
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                          : m.status === 'Watch' 
-                          ? 'bg-amber-50 text-amber-800 border-amber-200' 
-                          : 'bg-rose-50 text-rose-700 border-rose-200'
-                      }`}>
-                        {m.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+            {/* Subtab: Receipts Archive & Search */}
 
             {/* Subtab: Receipts Archive & Search */}
             {activeSubtab === 'receipts' && (
@@ -3490,97 +3545,66 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
             ))}
           </div>
 
-          {/* Horizontal Swipeable Subtabs (Dynamic Permissions) */}
-          <div className="px-3 pb-2 overflow-x-auto no-scrollbar flex items-center space-x-1.5 text-xs border-t border-slate-100 pt-1.5">
-            {canExportChecklist && (
-              <button
-                onClick={() => handleSelectSubtab('monthly')}
-                className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                  activeSubtab === 'monthly' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-                }`}
-              >
-                Monthly Ledger
-              </button>
-            )}
-            {canViewDefaulters && (
-              <button
-                onClick={() => handleSelectSubtab('defaulters')}
-                className={`flex-shrink-0 px-3 py-1 rounded-xl flex items-center gap-1 cursor-pointer transition-all ${
-                  activeSubtab === 'defaulters' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-                }`}
-              >
-                Defaulters <span className="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 font-bold text-[9px]">{defaultersStats.defaultersCount}</span>
-              </button>
-            )}
-            {canViewPnl && (
-              <>
+          {/* Responsive 4-Hub Segmented Navigation Bar */}
+          <div className="px-3 pb-2 pt-1.5 border-t border-slate-100">
+            <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-2xl">
+              {canExportChecklist && (
                 <button
-                  onClick={() => handleSelectSubtab('period')}
-                  className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                    activeSubtab === 'period' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                  onClick={() => handleSelectSubtab('monthly')}
+                  className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeSubtab === 'monthly'
+                      ? 'bg-brand-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 font-medium'
                   }`}
                 >
-                  Period Analysis
+                  Ledger
                 </button>
+              )}
+              {canViewDefaulters && (
                 <button
-                  onClick={() => handleSelectSubtab('earnings')}
-                  className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                    activeSubtab === 'earnings' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                  onClick={() => handleSelectSubtab('defaulters')}
+                  className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all relative flex items-center justify-center gap-1 cursor-pointer ${
+                    activeSubtab === 'defaulters'
+                      ? 'bg-brand-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 font-medium'
                   }`}
                 >
-                  Pool &amp; Earnings
+                  <span>Risk</span>
+                  {defaultersStats.defaultersCount > 0 && (
+                    <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
+                      activeSubtab === 'defaulters' ? 'bg-white text-rose-600' : 'bg-rose-500 text-white'
+                    }`}>
+                      {defaultersStats.defaultersCount}
+                    </span>
+                  )}
                 </button>
+              )}
+              {canViewReceipts && (
                 <button
-                  onClick={() => handleSelectSubtab('payouts')}
-                  className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                    activeSubtab === 'payouts' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                  onClick={() => handleSelectSubtab('receipts')}
+                  className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeSubtab === 'receipts'
+                      ? 'bg-brand-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 font-medium'
                   }`}
                 >
-                  Prize Disbursals
+                  Receipts
                 </button>
-              </>
-            )}
-            {canExportLedger && (
-              <button
-                onClick={() => handleSelectSubtab('member')}
-                className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                  activeSubtab === 'member' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-                }`}
-              >
-                Member
-              </button>
-            )}
-            {canViewPnl && (
-              <button
-                onClick={() => handleSelectSubtab('reliability')}
-                className={`flex-shrink-0 px-3 py-1 rounded-xl cursor-pointer transition-all ${
-                  activeSubtab === 'reliability' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-                }`}
-              >
-                Trust Score
-              </button>
-            )}
-            {canViewReceipts && (
-              <button
-                onClick={() => handleSelectSubtab('receipts')}
-                className={`flex-shrink-0 px-3 py-1 rounded-xl flex items-center gap-1 cursor-pointer transition-all ${
-                  activeSubtab === 'receipts' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-                }`}
-              >
-                <span>🧾</span> Receipts
-              </button>
-            )}
-            {canViewAuditLogs && (
-              <button
-                onClick={() => handleSelectSubtab('system_log')}
-                className={`flex-shrink-0 px-3 py-1 rounded-xl flex items-center gap-1 cursor-pointer transition-all ${
-                  activeSubtab === 'system_log' ? 'bg-brand-600 text-white font-bold shadow-2xs' : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
-                }`}
-              >
-                <span>🛡️</span> System Logs
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              </button>
-            )}
+              )}
+              {canViewAuditLogs && (
+                <button
+                  onClick={() => handleSelectSubtab('system_log')}
+                  className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                    activeSubtab === 'system_log'
+                      ? 'bg-brand-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 font-medium'
+                  }`}
+                >
+                  <span>Audit</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                </button>
+              )}
+            </div>
           </div>
         </header>
 
@@ -3658,6 +3682,51 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                   {selectedMonth} / {selectedGroup?.duration_months || 0} Months
                 </span>
               </div>
+
+              {/* Scheme Financial Health 2x2 Bento */}
+              {selectedGroup && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Scheme Pool</span>
+                    <p className="text-base font-black text-slate-900 font-mono mt-0.5">
+                      ₹{(Number(selectedGroup.total_value || 0)).toLocaleString('en-IN')}
+                    </p>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {selectedGroup.duration_months || 0}m · {activeGroupMembers.length} Tickets
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Prize Disbursed</span>
+                    <p className="text-base font-black text-emerald-700 font-mono mt-0.5">
+                      ₹{payoutsStats.totalNetPaid.toLocaleString('en-IN')}
+                    </p>
+                    <span className="text-[10px] text-emerald-600 font-medium">
+                      {payoutsStats.winnersCount} of {payoutsStats.totalMembers} Winners
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Discount Pool</span>
+                    <p className="text-base font-black text-amber-700 font-mono mt-0.5">
+                      ₹{(Number(selectedGroup.kai_iruppu_pool || 0)).toLocaleString('en-IN')}
+                    </p>
+                    <span className="text-[10px] text-amber-600 font-medium">
+                      Target: ₹{(Number(selectedGroup.total_value || 0)).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Organizer Profit</span>
+                    <p className="text-base font-black text-brand-700 font-mono mt-0.5">
+                      ₹{earningsStats.organizerProfit.toLocaleString('en-IN')}
+                    </p>
+                    <span className="text-[10px] text-brand-600 font-medium">
+                      Month 0 Launch
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {allCyclesLedgerRows.length === 0 ? (
                 <div className="p-6 bg-white rounded-2xl border border-slate-200 text-center space-y-1.5 shadow-card">
@@ -3759,127 +3828,221 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
             </section>
           )}
 
-          {/* Subtab 2 on Mobile: Defaulters */}
+          {/* Subtab 2 on Mobile: Defaulters & Reliability (Unified Hub) */}
           {activeSubtab === 'defaulters' && (
             <section className="space-y-3">
+              {/* 2x2 Risk Bento */}
               <div className="grid grid-cols-2 gap-2">
-                <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
-                  <span className="text-[10px] font-bold text-rose-800 uppercase">Total Arrears</span>
-                  <p className="text-lg font-black text-rose-700 font-mono">₹{defaultersStats.cumulativeDues.toLocaleString('en-IN')}</p>
+                <div className="p-3 bg-rose-50 rounded-xl border border-rose-200/70 shadow-2xs">
+                  <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Total Arrears</span>
+                  <p className="text-lg font-black text-rose-700 font-mono mt-0.5">
+                    ₹{defaultersStats.cumulativeDues.toLocaleString('en-IN')}
+                  </p>
+                  <span className="text-[10px] text-rose-600 font-medium">
+                    {defaultersStats.defaultersCount} Overdue Members
+                  </span>
                 </div>
-                <div className="p-3 bg-slate-100 rounded-xl border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-600 uppercase">Defaulters</span>
-                  <p className="text-lg font-black text-slate-900 font-mono">{defaultersStats.defaultersCount} Members</p>
+
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/70 shadow-2xs">
+                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Cycle Auction</span>
+                  <p className="text-lg font-black text-amber-800 font-mono mt-0.5">
+                    {defaultersStats.auctionDateFormatted || `M${selectedMonth}`}
+                  </p>
+                  <span className="text-[10px] text-amber-700 font-medium">
+                    {defaultersStats.daysPastAuction > 0 ? `+${defaultersStats.daysPastAuction}d elapsed` : 'On schedule'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/70 shadow-2xs">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Reliable (80-100)</span>
+                  <p className="text-lg font-black text-emerald-700 font-mono mt-0.5">
+                    {reliabilityStats.reliableCount} Members
+                  </p>
+                  <span className="text-[10px] text-emerald-600 font-medium">
+                    Punctual &amp; Prompt
+                  </span>
+                </div>
+
+                <div className="p-3 bg-slate-100 rounded-xl border border-slate-200/70 shadow-2xs">
+                  <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">At Risk (&lt;40)</span>
+                  <p className="text-lg font-black text-slate-900 font-mono mt-0.5">
+                    {reliabilityStats.atRiskCount} Members
+                  </p>
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    {reliabilityStats.watchCount} On Watch
+                  </span>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                {defaultersStats.defaultersList.map(d => (
-                  <div key={d.id} className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-1">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="font-bold text-xs text-slate-900">{d.name}</span>
-                        <p className="text-[10px] text-rose-600 font-medium">{d.monthsOverdue}m overdue · {d.delayLabel}</p>
+              {/* Quick Filter Chips Row (Scrollable touch chips) */}
+              <div className="overflow-x-auto no-scrollbar flex items-center gap-1.5 py-1">
+                <button
+                  onClick={() => setDefaulterFilter('all')}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    defaulterFilter === 'all'
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'bg-white border border-slate-200 text-slate-600'
+                  }`}
+                >
+                  All ({riskCounts.allCount})
+                </button>
+                <button
+                  onClick={() => setDefaulterFilter('overdue')}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+                    defaulterFilter === 'overdue'
+                      ? 'bg-rose-600 text-white shadow-2xs'
+                      : 'bg-rose-50 border border-rose-200 text-rose-700'
+                  }`}
+                >
+                  <AlertTriangle size={12} /> Overdue ({riskCounts.overdueCount})
+                </button>
+                <button
+                  onClick={() => setDefaulterFilter('delayed')}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+                    defaulterFilter === 'delayed'
+                      ? 'bg-amber-600 text-white shadow-2xs'
+                      : 'bg-amber-50 border border-amber-200 text-amber-800'
+                  }`}
+                >
+                  <Clock size={12} /> Delayed ({riskCounts.delayedCount})
+                </button>
+                <button
+                  onClick={() => setDefaulterFilter('punctual')}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+                    defaulterFilter === 'punctual'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  }`}
+                >
+                  <CheckCircle2 size={12} /> Punctual ({riskCounts.punctualCount})
+                </button>
+              </div>
+
+              {/* Fast Search Input */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter by name, ticket, phone..."
+                  value={defaulterSearchQuery}
+                  onChange={(e) => setDefaulterSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 bg-white text-xs rounded-xl border border-slate-200 focus:border-brand-500 outline-none transition-all font-medium shadow-2xs"
+                />
+                {defaulterSearchQuery && (
+                  <button
+                    onClick={() => setDefaulterSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Mobile Member Cards */}
+              <div className="space-y-2.5">
+                {unifiedRiskMembers.length === 0 ? (
+                  <div className="p-6 bg-white rounded-2xl border border-slate-200 text-center space-y-1 shadow-card">
+                    <CheckCircle2 size={24} className="text-emerald-500 mx-auto" />
+                    <p className="text-xs font-bold text-slate-700">No matching members</p>
+                    <p className="text-[11px] text-slate-400">All members meet your filter criteria.</p>
+                  </div>
+                ) : (
+                  unifiedRiskMembers.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`p-3.5 bg-white rounded-2xl shadow-card space-y-2.5 ${
+                        m.hasOverdue ? 'border-2 border-rose-200/70' : 'border border-slate-200'
+                      }`}
+                    >
+                      {/* Top Row: Ticket + Name + Status */}
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-mono font-bold text-[10px] flex items-center justify-center shrink-0 border border-slate-200">
+                            #{m.ticket}
+                          </span>
+                          <div>
+                            <span className="font-bold text-xs text-slate-900 block leading-tight">{m.name}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{m.phone || 'No phone'}</span>
+                          </div>
+                        </div>
+
+                        <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
+                          m.status === 'Reliable'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : m.status === 'Watch'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        }`}>
+                          {m.status} · {m.score}
+                        </span>
                       </div>
-                      <span className="font-mono font-extrabold text-sm text-rose-600">₹{d.cumulativeDue.toLocaleString('en-IN')}</span>
+
+                      {/* Middle Row: Arrears & Delay */}
+                      <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                        <div>
+                          <span className={`text-xs font-bold block ${
+                            m.delayDays > 3 ? 'text-rose-600' : m.delayDays > 0 ? 'text-amber-700' : 'text-emerald-700'
+                          }`}>
+                            {m.delayLabel}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono block">
+                            {m.onTimeCount}/{m.evaluatedMonthsCount} on-time · {m.unpaidCount} unpaid
+                          </span>
+                        </div>
+
+                        <div className="text-right">
+                          {m.hasOverdue ? (
+                            <>
+                              <span className="font-mono font-extrabold text-sm text-rose-600 block">
+                                ₹{m.cumulativeDue.toLocaleString('en-IN')}
+                              </span>
+                              <span className="text-[9px] text-rose-500 font-bold uppercase">
+                                {m.monthsOverdue}m Overdue
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-mono font-bold text-xs text-emerald-600 block">
+                                ₹0 Owed
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-medium uppercase">
+                                Up to date
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bottom Row: Actions */}
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <button
+                          onClick={() => handleWhatsAppRiskMember(m)}
+                          className={`flex-1 py-1.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
+                            m.hasOverdue
+                              ? 'bg-rose-600 text-white'
+                              : 'bg-emerald-600 text-white'
+                          }`}
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.698c.974.551 1.794.813 2.802.813 3.179 0 5.767-2.587 5.767-5.766.001-3.187-2.575-5.769-5.773-5.773zm3.376 8.212c-.14.394-.712.724-1.002.771-.284.045-.632.067-1.026-.06-.239-.077-.552-.187-.954-.361-1.699-.738-2.812-2.464-2.898-2.577-.084-.114-.697-.927-.697-1.768 0-.841.442-1.255.6-.1426.157-.17.342-.213.456-.213.114 0 .228.001.328.006.105.006.246-.04.385.293.143.342.487 1.189.53 1.275.043.085.071.185.014.298-.057.114-.085.185-.17.285-.086.099-.181.222-.259.299-.086.085-.176.177-.076.348.1.171.444.733.953 1.187.656.584 1.209.765 1.38.85.171.085.271.071.371-.043.1-.114.428-.499.542-.67.114-.171.228-.142.385-.085.157.057.998.47 1.17.556.171.085.285.128.328.2.043.071.043.414-.097.808z" />
+                          </svg>
+                          <span>{m.hasOverdue ? 'WhatsApp Reminder' : 'WhatsApp Statement'}</span>
+                        </button>
+
+                        {m.phone && (
+                          <a
+                            href={`tel:${m.phone}`}
+                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-200"
+                            title="Call"
+                          >
+                            <Phone size={14} />
+                          </a>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
-            </section>
-          )}
-
-          {/* Subtab 3 on Mobile: Period Analysis */}
-          {activeSubtab === 'period' && (
-            <section className="space-y-3">
-              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2">
-                <span className="text-[11px] font-bold text-slate-800">Date Range Flow</span>
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className="p-2 bg-emerald-50 rounded-lg">
-                    <span className="text-[9px] text-emerald-800 font-bold uppercase">Collected</span>
-                    <p className="text-xs font-bold text-emerald-700 font-mono">₹{periodStats.totalCollected.toLocaleString('en-IN')}</p>
-                  </div>
-                  <div className="p-2 bg-amber-50 rounded-lg">
-                    <span className="text-[9px] text-amber-800 font-bold uppercase">Paid Out</span>
-                    <p className="text-xs font-bold text-amber-700 font-mono">₹{periodStats.totalPaidOut.toLocaleString('en-IN')}</p>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Subtab 4 on Mobile: Earnings */}
-          {activeSubtab === 'earnings' && (
-            <section className="space-y-3">
-              <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
-                <span className="text-xs font-bold text-slate-800 uppercase">Organizer Profit (M0)</span>
-                <p className="text-xl font-black text-emerald-700 font-mono">₹{earningsStats.organizerProfit.toLocaleString('en-IN')}</p>
-                <div className="pt-2 border-t border-slate-100 flex justify-between text-xs">
-                  <span className="text-slate-500">Discount Pool:</span>
-                  <span className="font-mono font-bold text-slate-800">₹{earningsStats.discountPool.toLocaleString('en-IN')}</span>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Subtab 5 on Mobile: Payouts */}
-          {activeSubtab === 'payouts' && (
-            <section className="space-y-2">
-              {payoutsStats.payoutRows.map((p, idx) => (
-                <div key={idx} className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex justify-between items-center">
-                  <div>
-                    <span className="text-xs font-bold text-slate-900">M{p.month} · {p.winnerName}</span>
-                    <p className="text-[10px] text-slate-500 font-mono">Net: ₹{p.netPayout.toLocaleString('en-IN')}</p>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${p.status === 'Complete' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
-                    {p.status}
-                  </span>
-                </div>
-              ))}
-            </section>
-          )}
-
-          {/* Subtab 6 on Mobile: Member */}
-          {activeSubtab === 'member' && (
-            <section className="space-y-3">
-              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-slate-900">{memberStatementStats.memberName}</span>
-                  <span className="text-[10px] font-mono text-slate-500">T#{memberStatementStats.ticketNumber}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                  <div className="p-2 bg-emerald-50 rounded-lg">
-                    <span className="text-[9px] text-emerald-800 uppercase font-bold">Paid</span>
-                    <p className="font-mono font-bold text-emerald-700">₹{memberStatementStats.totalPaid.toLocaleString('en-IN')}</p>
-                  </div>
-                  <div className="p-2 bg-rose-50 rounded-lg">
-                    <span className="text-[9px] text-rose-800 uppercase font-bold">Owes</span>
-                    <p className="font-mono font-bold text-rose-700">₹{memberStatementStats.totalOwes.toLocaleString('en-IN')}</p>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Subtab 7 on Mobile: Reliability */}
-          {activeSubtab === 'reliability' && (
-            <section className="space-y-2">
-              {reliabilityStats.memberList.slice(0, 15).map((m: any) => (
-                <div key={m.id} className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-xs flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-xs text-slate-900">{m.score}</span>
-                    <div>
-                      <span className="text-xs font-medium text-slate-900 block">{m.name}</span>
-                      <span className="text-[10px] text-slate-500 font-mono">T#{m.ticket} · {m.avgLateDays > 0 ? `+${m.avgLateDays}d delay` : 'on-time'}</span>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                    m.status === 'Reliable' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : m.status === 'Watch' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200'
-                  }`}>
-                    {m.status}
-                  </span>
-                </div>
-              ))}
             </section>
           )}
 
@@ -3977,6 +4140,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
                     selectedMonth={selectedMonth}
                     activeMonthInfo={activeMonthInfo}
                     defaultersStats={defaultersStats}
+                    reliabilityStats={reliabilityStats}
                     formatCurrency={formatCurrency}
                     organizerCompanyName={organizerCompanyName}
                     organizerInitials={organizerInitials}
@@ -4053,6 +4217,7 @@ export default function ReportsCenter({ initialSubtab, onSubtabChange }: Reports
               selectedMonth={selectedMonth}
               activeMonthInfo={activeMonthInfo}
               defaultersStats={defaultersStats}
+              reliabilityStats={reliabilityStats}
               formatCurrency={formatCurrency}
               organizerCompanyName={organizerCompanyName}
               organizerInitials={organizerInitials}
@@ -4366,6 +4531,7 @@ interface DefaultersPDFViewProps {
   formatCurrency: (val: number) => string;
   organizerCompanyName: string;
   organizerInitials: string;
+  reliabilityStats?: any;
 }
 
 function DefaultersPDFView({
@@ -4375,7 +4541,8 @@ function DefaultersPDFView({
   defaultersStats,
   formatCurrency,
   organizerCompanyName,
-  organizerInitials
+  organizerInitials,
+  reliabilityStats
 }: DefaultersPDFViewProps) {
   const generationDateStr = new Date().toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -4457,6 +4624,17 @@ function DefaultersPDFView({
           </span>
         </div>
       </div>
+
+      {reliabilityStats && (
+        <div className="pdf-section p-3 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl flex items-center justify-between text-xs font-semibold">
+          <span className="text-[#475569]">Overall Member Trust Health:</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[#16a34a] font-bold">{reliabilityStats.reliableCount} Reliable (80-100)</span>
+            <span className="text-[#d97706] font-bold">{reliabilityStats.watchCount} Watch (40-79)</span>
+            <span className="text-[#dc2626] font-bold">{reliabilityStats.atRiskCount} At Risk (&lt;40)</span>
+          </div>
+        </div>
+      )}
 
       {/* 3. DEFAULTERS Table Card */}
       <div className="pdf-section border border-[#e2e8f0] rounded-xl overflow-hidden bg-white">
