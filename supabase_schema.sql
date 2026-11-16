@@ -146,7 +146,7 @@ create table public.transactions (
   constraint check_collection_has_cycle_month check (type != 'collection' or cycle_month is not null)
 );
 
--- auction_logs: Monthly group bidding records
+-- auction_logs: Monthly group bidding records (bid_stream holds array of bids or { bids, attendingMembers, attendingMemberIds, quorumCount })
 create table public.auction_logs (
   id uuid primary key default gen_random_uuid(),
   group_id uuid not null references public.chit_groups(id) on delete cascade,

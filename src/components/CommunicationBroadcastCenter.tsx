@@ -860,7 +860,7 @@ export default function CommunicationBroadcastCenter({ onAddAuditLog }: Communic
             winnerName =
               latestLog.profiles?.full_name ||
               latestLog.winner_name ||
-              (Array.isArray(latestLog.bid_stream) && latestLog.bid_stream[0]?.memberName) ||
+              (Array.isArray(latestLog.bid_stream) ? latestLog.bid_stream[0]?.memberName : latestLog.bid_stream?.bids?.[0]?.memberName) ||
               'Winner Confirmed';
 
             if (latestLog.winning_member_id) {

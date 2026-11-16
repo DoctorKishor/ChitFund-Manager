@@ -2093,8 +2093,13 @@ export default function DashboardContent({ activeTab, setActiveTab }: DashboardC
             const prof = Array.isArray(l.winning_bidder) ? l.winning_bidder[0] : l.winning_bidder;
             let bidStreamWinner = '';
             let bidStreamTicket: number | null = null;
-            if (Array.isArray(l.bid_stream) && l.bid_stream.length > 0) {
-              const maxBid = l.bid_stream.reduce((prev: any, curr: any) => (Number(curr.amount) > Number(prev.amount) ? curr : prev), l.bid_stream[0]);
+            const bidsArr: any[] = Array.isArray(l.bid_stream)
+              ? l.bid_stream
+              : (l.bid_stream && typeof l.bid_stream === 'object' && Array.isArray(l.bid_stream.bids))
+              ? l.bid_stream.bids
+              : [];
+            if (bidsArr.length > 0) {
+              const maxBid = bidsArr.reduce((prev: any, curr: any) => (Number(curr.amount) > Number(prev.amount) ? curr : prev), bidsArr[0]);
               bidStreamWinner = maxBid?.memberName || '';
               bidStreamTicket = maxBid?.ticketNumber || null;
             }

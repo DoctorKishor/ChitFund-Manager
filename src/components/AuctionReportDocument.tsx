@@ -128,8 +128,14 @@ export default function AuctionReportDocument({
 
   // Normalise bid stream chronologically from 1st bid to winning bid
   const chronologicalBids = useMemo(() => {
-    if (!data.bidStream || data.bidStream.length === 0) return [];
-    const bidsCopy = [...data.bidStream];
+    const raw = data.bidStream;
+    const streamList = Array.isArray(raw)
+      ? raw
+      : (raw && typeof raw === 'object' && Array.isArray((raw as any).bids))
+      ? (raw as any).bids
+      : [];
+    if (!streamList || streamList.length === 0) return [];
+    const bidsCopy = [...streamList];
     if (bidsCopy.length > 1 && bidsCopy[0].amount > bidsCopy[bidsCopy.length - 1].amount) {
       return bidsCopy.reverse();
     }
@@ -562,9 +568,17 @@ export default function AuctionReportDocument({
                   }
 
                   return (
-                    <span key={m.ticketNumber || idx} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-800 text-[10px] font-bold border border-slate-200/60">
+                    <span 
+                      key={m.ticketNumber || idx} 
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                        m.attended
+                          ? 'bg-emerald-50/90 text-emerald-900 border-emerald-200/80'
+                          : 'bg-slate-100/70 text-slate-400 border-slate-200/50'
+                      }`}
+                    >
                       <span className={`w-1.5 h-1.5 rounded-full ${m.attended ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                       #{m.ticketNumber} {m.fullName}
+                      {!m.attended && <span className="text-[8px] text-slate-400 font-normal">(Absent)</span>}
                     </span>
                   );
                 })

@@ -120,6 +120,8 @@ export interface HistoricalAuctionLog {
   disbursalStatus: 'fully_disbursed' | 'partially_disbursed' | 'pending';
   isLaabaSeetu: boolean;
   bidStream?: Bid[];
+  attendingMembers?: { ticketNumber: number; fullName: string; attended: boolean; role?: string; phone?: string; memberId?: string; profileId?: string | null }[];
+  attendingMemberIds?: string[];
   createdAt: string;
 }
 
@@ -565,9 +567,22 @@ export default function LiveAuctionEngine() {
         });
         setMembers(parsedMembers);
         
-        // Default roll call: all non-winning eligible members are checked in initially
+        // Roll call: check if conductor already selected a custom quorum in local session, else default to all eligible
         const eligibleIds = parsedMembers.filter(m => !m.hasWonRegular).map(m => m.id);
-        setAttendingMemberIds(eligibleIds);
+        let savedActiveQuorum: string[] | null = null;
+        try {
+          const stored = localStorage.getItem(`chit_auction_quorum_${groupId}_${groupData?.current_month}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) savedActiveQuorum = parsed;
+          }
+        } catch {}
+
+        if (savedActiveQuorum !== null) {
+          setAttendingMemberIds(savedActiveQuorum);
+        } else {
+          setAttendingMemberIds(eligibleIds);
+        }
         if (eligibleIds.length > 0) {
           setSelectedContenderId(eligibleIds[0]);
         }
@@ -643,6 +658,59 @@ export default function LiveAuctionEngine() {
             ? 'partially_disbursed'
             : 'pending';
 
+          // Parse bid_stream and attendance metadata
+          let parsedBids: Bid[] = [];
+          let savedAttendingMembers: any[] | null = null;
+          let savedAttendingMemberIds: string[] | null = null;
+
+          if (Array.isArray(l.bid_stream)) {
+            parsedBids = l.bid_stream;
+          } else if (l.bid_stream && typeof l.bid_stream === 'object') {
+            if (Array.isArray(l.bid_stream.bids)) {
+              parsedBids = l.bid_stream.bids;
+            }
+            if (Array.isArray(l.bid_stream.attendingMembers)) {
+              savedAttendingMembers = l.bid_stream.attendingMembers;
+            }
+            if (Array.isArray(l.bid_stream.attendingMemberIds)) {
+              savedAttendingMemberIds = l.bid_stream.attendingMemberIds;
+            }
+          }
+
+          // Check localStorage archive fallback for this group & month
+          if (!savedAttendingMembers) {
+            try {
+              const cached = localStorage.getItem(`chit_auction_archived_quorum_${groupId}_${monthNum}`);
+              if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed)) {
+                  savedAttendingMembers = parsed;
+                }
+              }
+            } catch {}
+          }
+
+          // If still null, intelligently derive attendance for older historical logs:
+          // Members who placed shouts or won were actively attending
+          if (!savedAttendingMembers && memberRows && memberRows.length > 0) {
+            const shoutingMemberIds = new Set(parsedBids.map((b: any) => b.memberId).filter(Boolean));
+            if (l.winning_member_id) shoutingMemberIds.add(l.winning_member_id);
+            if (matchingMember) shoutingMemberIds.add(matchingMember.id);
+
+            savedAttendingMembers = memberRows.map((m: any) => {
+              const isWinner = m.id === l.winning_member_id || (matchingMember && m.id === matchingMember.id);
+              const didBid = shoutingMemberIds.has(m.id);
+              const attended = shoutingMemberIds.size > 0 ? (didBid || isWinner) : true;
+              return {
+                ticketNumber: m.ticket_number,
+                fullName: m.profiles?.full_name || m.alias_name || `Ticket #${m.ticket_number}`,
+                attended,
+                memberId: m.id,
+                profileId: m.profile_id,
+              };
+            });
+          }
+
           return {
             id: l.id,
             groupId: l.group_id,
@@ -656,7 +724,9 @@ export default function LiveAuctionEngine() {
             remainingPrizeDue,
             disbursalStatus,
             isLaabaSeetu: !!l.is_laaba_seetu,
-            bidStream: Array.isArray(l.bid_stream) ? l.bid_stream : [],
+            bidStream: parsedBids,
+            attendingMembers: savedAttendingMembers || [],
+            attendingMemberIds: savedAttendingMemberIds || (savedAttendingMembers ? savedAttendingMembers.filter((a: any) => a.attended).map((a: any) => a.memberId).filter(Boolean) : []),
             createdAt: l.created_at,
           };
         });
@@ -1280,6 +1350,7 @@ export default function LiveAuctionEngine() {
       organizerName: organizationName || (profile?.fullName ? `${profile.fullName}'s Chit Funds` : "ANBAZHAKAN CHIT FUNDS"),
       organizerTagline: organizationTagline || "TRUSTED CHIT FUNDS MANAGEMENT",
       organizerInitials: organizationInitials || "CF",
+      attendingMembers: selectedHistoricalLog.attendingMembers || [],
       bidStream: selectedHistoricalLog.bidStream || [],
     };
   }, [selectedHistoricalLog, group, profile, organizationName, organizationTagline, organizationInitials]);
@@ -1298,7 +1369,6 @@ export default function LiveAuctionEngine() {
       alert("Cannot conclude auction with a placeholder slot ticket as the winning bidder. Please assign a registered member.");
       return;
     }
-    await fetchGroupDetails(group.id);
     setShowCloseModal(true);
   };
 
@@ -1343,6 +1413,30 @@ export default function LiveAuctionEngine() {
 
     const finalSessionDuration = formatSessionDuration(sessionElapsedSecs);
 
+    const finalAttendingMembers = members.map(m => ({
+      ticketNumber: m.ticketNumber,
+      fullName: m.fullName,
+      attended: attendingMemberIds.includes(m.id),
+      memberId: m.id,
+      profileId: m.profileId || null,
+    }));
+
+    const bidStreamPayload = {
+      bids: [...bids],
+      attendingMemberIds: [...attendingMemberIds],
+      attendingMembers: finalAttendingMembers,
+      quorumCount: attendingMemberIds.length,
+      totalEligible: members.filter(m => !m.hasWonRegular).length,
+    };
+
+    // Cache permanently in localStorage as archive backup
+    if (group.id) {
+      try {
+        localStorage.setItem(`chit_auction_archived_quorum_${group.id}_${recordedMonth}`, JSON.stringify(finalAttendingMembers));
+        localStorage.removeItem(`chit_auction_quorum_${group.id}_${group.currentMonth}`);
+      } catch {}
+    }
+
     // Prepare full rich concluded report data
     const concludedReport: AuctionReportData = {
       groupName: group.name,
@@ -1365,11 +1459,7 @@ export default function LiveAuctionEngine() {
       organizerName: organizationName || (profile?.fullName ? `${profile.fullName}'s Chit Funds` : "ANBAZHAKAN CHIT FUNDS"),
       organizerTagline: organizationTagline || "TRUSTED CHIT FUNDS MANAGEMENT",
       organizerInitials: organizationInitials || "CF",
-      attendingMembers: members.map(m => ({
-        ticketNumber: m.ticketNumber,
-        fullName: m.fullName,
-        attended: attendingMemberIds.includes(m.id),
-      })),
+      attendingMembers: finalAttendingMembers,
       bidStream: [...bids],
     };
 
@@ -1387,7 +1477,7 @@ export default function LiveAuctionEngine() {
           p_is_completing: isCompleting,
           p_is_laaba_seetu: effectiveIsLaaba,
           p_next_pool: nextPool,
-          p_bid_stream: bids,
+          p_bid_stream: bidStreamPayload,
           p_admin_id: profile?.id || null,
         });
 
@@ -1412,7 +1502,7 @@ export default function LiveAuctionEngine() {
           await supabase.from('auction_logs').insert({
             group_id: group.id,
             month: group.currentMonth,
-            bid_stream: bids,
+            bid_stream: bidStreamPayload,
             winning_bidder_id: winningMember?.profileId || null,
             winning_member_id: (winnerId && !winnerId.startsWith('slot-')) ? winnerId : null,
             winning_discount: highestBid,
@@ -1747,17 +1837,34 @@ export default function LiveAuctionEngine() {
   };
 
   const toggleAttendingMember = (memberId: string) => {
-    setAttendingMemberIds(prev => 
-      prev.includes(memberId) ? prev.filter(id => id !== memberId) : [...prev, memberId]
-    );
+    setAttendingMemberIds(prev => {
+      const next = prev.includes(memberId) ? prev.filter(id => id !== memberId) : [...prev, memberId];
+      if (group?.id) {
+        try {
+          localStorage.setItem(`chit_auction_quorum_${group.id}_${group.currentMonth}`, JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
   };
 
   const selectAllEligibleAttendees = () => {
-    setAttendingMemberIds(members.filter(m => !m.hasWonRegular).map(m => m.id));
+    const allEligible = members.filter(m => !m.hasWonRegular).map(m => m.id);
+    setAttendingMemberIds(allEligible);
+    if (group?.id) {
+      try {
+        localStorage.setItem(`chit_auction_quorum_${group.id}_${group.currentMonth}`, JSON.stringify(allEligible));
+      } catch {}
+    }
   };
 
   const clearAllAttendees = () => {
     setAttendingMemberIds([]);
+    if (group?.id) {
+      try {
+        localStorage.setItem(`chit_auction_quorum_${group.id}_${group.currentMonth}`, JSON.stringify([]));
+      } catch {}
+    }
   };
 
   // Loading and Empty State handling
@@ -2804,40 +2911,58 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
                             </div>
 
                             {/* Attendance Quorum Tracker */}
-                            <div className="p-4 bg-slate-50 rounded-xl flex flex-col gap-3 border border-slate-100">
-                              <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-                                <span className="flex items-center gap-1.5">
-                                  <Users className="w-3.5 h-3.5 text-indigo-600" />
-                                  Roll Call Quorum
-                                </span>
-                                <span className="text-indigo-600 font-mono">
-                                  {members.length} / {group.memberCount} Attending (100%)
-                                </span>
-                              </div>
-                              <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                                <div className="bg-indigo-600 h-full rounded-full" style={{ width: '100%' }} />
-                              </div>
+                            {(() => {
+                              const attendeesList = currentInspectedLog.attendingMembers && currentInspectedLog.attendingMembers.length > 0
+                                ? currentInspectedLog.attendingMembers
+                                : members.map(m => ({
+                                    ticketNumber: m.ticketNumber,
+                                    fullName: m.fullName,
+                                    attended: true,
+                                  }));
+                              const presentCount = attendeesList.filter(a => a.attended).length;
+                              const totalCount = attendeesList.length || group.memberCount || 20;
+                              const quorumPct = Math.round((presentCount / (totalCount || 1)) * 100);
 
-                              {/* Attendees Chips */}
-                              <div className="flex flex-wrap gap-1.5 mt-1 max-h-28 overflow-y-auto overflow-x-hidden no-scrollbar pr-1">
-                                {members.map((m) => {
-                                  const isLogWinner = m.fullName === currentInspectedLog.winningBidderName || m.ticketNumber === currentInspectedLog.ticketNumber;
-                                  return (
-                                    <span
-                                      key={m.id}
-                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs border ${
-                                        isLogWinner
-                                          ? 'bg-indigo-600 text-white border-indigo-700 font-bold'
-                                          : 'bg-white text-slate-700 border-slate-200/80'
-                                      }`}
-                                    >
-                                      <span className={`w-1.5 h-1.5 rounded-full ${isLogWinner ? 'bg-amber-300' : 'bg-emerald-500'}`} />
-                                      {m.fullName} (#{m.ticketNumber})
+                              return (
+                                <div className="p-4 bg-slate-50 rounded-xl flex flex-col gap-3 border border-slate-100">
+                                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                                    <span className="flex items-center gap-1.5">
+                                      <Users className="w-3.5 h-3.5 text-indigo-600" />
+                                      Roll Call Quorum
                                     </span>
-                                  );
-                                })}
-                              </div>
-                            </div>
+                                    <span className="text-indigo-600 font-mono">
+                                      {presentCount} / {totalCount} Attending ({quorumPct}%)
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                    <div className="bg-indigo-600 h-full rounded-full transition-all" style={{ width: `${quorumPct}%` }} />
+                                  </div>
+
+                                  {/* Attendees Chips */}
+                                  <div className="flex flex-wrap gap-1.5 mt-1 max-h-28 overflow-y-auto overflow-x-hidden no-scrollbar pr-1">
+                                    {attendeesList.map((m, idx) => {
+                                      const isLogWinner = m.fullName === currentInspectedLog.winningBidderName || m.ticketNumber === currentInspectedLog.ticketNumber;
+                                      return (
+                                        <span
+                                          key={m.ticketNumber || idx}
+                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium shadow-2xs border ${
+                                            isLogWinner
+                                              ? 'bg-indigo-600 text-white border-indigo-700 font-bold'
+                                              : m.attended
+                                              ? 'bg-white text-slate-700 border-slate-200/80'
+                                              : 'bg-slate-100 text-slate-400 border-slate-200/50'
+                                          }`}
+                                        >
+                                          <span className={`w-1.5 h-1.5 rounded-full ${isLogWinner ? 'bg-amber-300' : m.attended ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                                          {m.fullName} (#{m.ticketNumber})
+                                          {!m.attended && !isLogWinner && <span className="text-[9px] text-slate-400 font-normal">(Absent)</span>}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
 
                             {/* Bidding Floor Event Logs */}
                             <div className="flex flex-col gap-3">
@@ -4865,9 +4990,10 @@ Conducted on: ${new Date(selectedHistoricalLog.createdAt).toLocaleDateString('en
               <button
                 type="button"
                 onClick={() => setShowRollCallModal(true)}
-                className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded-md border border-slate-200 font-bold text-[11px] text-emerald-700 hover:bg-slate-50 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-slate-200 font-bold text-[11px] text-emerald-700 hover:bg-slate-50 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                title="Select Participating Members (Quorum)"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <Users className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span>{attendingMemberIds.length}/{eligibleCount} Quorum</span>
               </button>
               {liveViewerCount > 0 && (
