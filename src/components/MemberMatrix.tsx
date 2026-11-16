@@ -13,18 +13,18 @@ import PassbookInventoryModal from './PassbookInventoryModal';
 import PassbookQrCenterModal from './PassbookQrCenterModal';
 import { useBackHandler } from '@/context/BackNavigationContext';
 import { getPassbookScanUrl } from '@/utils/qrCodeGenerator';
-import { 
-  Users, 
-  Search, 
-  UserPlus, 
-  Check, 
-  Phone, 
-  Mail, 
-  Edit3, 
-  Trash2, 
+import {
+  Users,
+  Search,
+  UserPlus,
+  Check,
+  Phone,
+  Mail,
+  Edit3,
+  Trash2,
   ChevronRight,
   ShieldCheck,
-  CheckCircle2, 
+  CheckCircle2,
   XCircle,
   X,
   Plus,
@@ -690,8 +690,8 @@ export default function MemberMatrix({ onAddAuditLog, defaultSubtab = 'directory
       (t: any) => t.type === 'payout' && (
         (t.profile_id === member.id || t.group_member_id === member.id || (member.groups && member.groups.some((g: any) => t.notes?.includes(`#${g.ticket}`)))) &&
         (
-          (t.cycle_month !== null && t.cycle_month !== undefined 
-            ? Number(t.cycle_month) === Number(wonLog.month) 
+          (t.cycle_month !== null && t.cycle_month !== undefined
+            ? Number(t.cycle_month) === Number(wonLog.month)
             : (t.notes ? (t.notes.includes(`Month ${wonLog.month}`) || t.notes.includes(`M${wonLog.month}`)) : true)
           )
         )
@@ -1342,7 +1342,7 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-slate-50 rounded-2xl sm:rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs animate-in fade-in duration-200">
-      
+
       {/* ── DESKTOP HEADER (hidden md:flex) ── */}
       <header className="hidden md:flex min-h-16 bg-white border-b border-slate-200/80 px-4 sm:px-8 py-3 items-center justify-between gap-4 flex-shrink-0 z-20">
         {/* Header Left: Clean Title & Badge */}
@@ -1364,11 +1364,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
             <button
               type="button"
               onClick={() => setGroupFilter('all')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all whitespace-nowrap cursor-pointer ${
-                groupFilter === 'all'
-                  ? 'bg-white text-xs font-bold text-slate-900 shadow-xs border border-slate-200/60'
-                  : 'text-xs font-medium text-slate-600 hover:text-slate-900'
-              }`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all whitespace-nowrap cursor-pointer ${groupFilter === 'all'
+                ? 'bg-white text-xs font-bold text-slate-900 shadow-xs border border-slate-200/60'
+                : 'text-xs font-medium text-slate-600 hover:text-slate-900'
+                }`}
             >
               <span>All Groups</span>
               <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">
@@ -1380,11 +1379,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                 key={g.id}
                 type="button"
                 onClick={() => setGroupFilter(g.id)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap cursor-pointer ${
-                  groupFilter === g.id
-                    ? 'bg-white text-xs font-bold text-slate-900 shadow-xs border border-slate-200/60'
-                    : 'text-xs font-medium text-slate-600 hover:text-slate-900'
-                }`}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap cursor-pointer ${groupFilter === g.id
+                  ? 'bg-white text-xs font-bold text-slate-900 shadow-xs border border-slate-200/60'
+                  : 'text-xs font-medium text-slate-600 hover:text-slate-900'
+                  }`}
               >
                 <span className={`w-2 h-2 rounded-full ${idx % 2 === 0 ? 'bg-indigo-500' : 'bg-amber-400'}`}></span>
                 <span>{g.name}</span>
@@ -1429,839 +1427,307 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
         {/* Quick Filter Tabs (Directory only) */}
         <div className="px-4 pb-3 pt-2">
-            <div 
-              className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          <div
+            className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            <button
+              type="button"
+              onClick={() => setTableFilter('all')}
+              className={`flex-shrink-0 px-3 py-1 rounded-full font-semibold transition-all cursor-pointer ${tableFilter === 'all'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+                }`}
             >
-              <button
-                type="button"
-                onClick={() => setTableFilter('all')}
-                className={`flex-shrink-0 px-3 py-1 rounded-full font-semibold transition-all cursor-pointer ${
-                  tableFilter === 'all'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+              All ({scopedCounts.all})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTableFilter('paired')}
+              className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${tableFilter === 'paired'
+                ? 'bg-slate-900 text-white shadow-xs font-semibold'
+                : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
                 }`}
-              >
-                All ({scopedCounts.all})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTableFilter('paired')}
-                className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${
-                  tableFilter === 'paired'
-                    ? 'bg-slate-900 text-white shadow-xs font-semibold'
-                    : 'bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50'
+            >
+              Linked QR ({scopedCounts.paired})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTableFilter('unpaired')}
+              className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${tableFilter === 'unpaired'
+                ? 'bg-slate-900 text-white shadow-xs font-semibold'
+                : 'bg-white border border-slate-200 text-amber-700 font-medium hover:bg-slate-50'
                 }`}
-              >
-                Linked QR ({scopedCounts.paired})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTableFilter('unpaired')}
-                className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${
-                  tableFilter === 'unpaired'
-                    ? 'bg-slate-900 text-white shadow-xs font-semibold'
-                    : 'bg-white border border-slate-200 text-amber-700 font-medium hover:bg-slate-50'
+            >
+              Unlinked ({scopedCounts.unpaired})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTableFilter('pending_mpin')}
+              className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${tableFilter === 'pending_mpin'
+                ? 'bg-slate-900 text-white shadow-xs font-semibold'
+                : 'bg-white border border-slate-200 text-slate-500 font-medium hover:bg-slate-50'
                 }`}
-              >
-                Unlinked ({scopedCounts.unpaired})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTableFilter('pending_mpin')}
-                className={`flex-shrink-0 px-3 py-1 rounded-full transition-all cursor-pointer ${
-                  tableFilter === 'pending_mpin'
-                    ? 'bg-slate-900 text-white shadow-xs font-semibold'
-                    : 'bg-white border border-slate-200 text-slate-500 font-medium hover:bg-slate-50'
-                }`}
-              >
-                Pending MPIN ({scopedCounts.pendingMpin})
-              </button>
-            </div>
+            >
+              Pending MPIN ({scopedCounts.pendingMpin})
+            </button>
           </div>
-        </header>
+        </div>
+      </header>
 
       {/* ── MEMBERS DIRECTORY VIEW ── */}
       <main className="flex-1 overflow-y-auto p-4 sm:p-7">
-          <div className="w-full max-w-[1550px] mx-auto space-y-6">
+        <div className="w-full max-w-[1550px] mx-auto space-y-6">
 
-            {/* Top Stat KPI Strip with Contextual Actions Relocated from Header */}
-            <section className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              
-              {/* KPI 1: Subscribers Roster */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Subscribers Roster</span>
-                    <span className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-xs font-bold font-display">
-                      {stats.total}
-                    </span>
-                  </div>
-                  <div className="mt-2.5 flex items-baseline gap-2">
-                    <span className="text-2xl font-black font-display text-slate-900">{stats.total}</span>
-                    <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
-                      {stats.subscriberCount} Subscribers / {stats.adminCount + stats.managerCount} Staff
-                    </span>
-                  </div>
+          {/* Top Stat KPI Strip with Contextual Actions Relocated from Header */}
+          <section className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+
+            {/* KPI 1: Subscribers Roster */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Subscribers Roster</span>
+                  <span className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-xs font-bold font-display">
+                    {stats.total}
+                  </span>
                 </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  <span>
-                    {stats.blockedCount === 0 ? '100% active account standing' : `${stats.total - stats.blockedCount} active standing (${stats.blockedCount} blocked)`}
+                <div className="mt-2.5 flex items-baseline gap-2">
+                  <span className="text-2xl font-black font-display text-slate-900">{stats.total}</span>
+                  <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
+                    {stats.subscriberCount} Subscribers / {stats.adminCount + stats.managerCount} Staff
                   </span>
                 </div>
               </div>
-
-              {/* KPI 2: Physical Passbook QRs */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Physical Passbook QRs</span>
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200/60 whitespace-nowrap">
-                      {stats.qrLinkedCount} Paired
-                    </span>
-                  </div>
-                  <div className="mt-2.5 flex items-baseline gap-2">
-                    <span className="text-2xl font-black font-display text-slate-900">
-                      {stats.qrLinkedCount} <span className="text-base font-normal text-slate-400">/ {stats.total}</span>
-                    </span>
-                    <span className="text-xs text-amber-600 font-semibold whitespace-nowrap">
-                      ({stats.total - stats.qrLinkedCount} Unlinked)
-                    </span>
-                  </div>
-                </div>
-                {/* Integrated Contextual Logistics Action Pills */}
-                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
-                  {canBatchQr ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedSubscribersForPrint(null);
-                          setQrCenterTab('batches');
-                          setIsQrCenterOpen(true);
-                        }}
-                        className="inline-flex items-center gap-1 text-[11px] text-slate-600 hover:text-slate-900 font-semibold bg-slate-100 hover:bg-slate-200/80 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <Layers size={13} className="text-slate-500" />
-                        <span>QR Inventory</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedSubscribersForPrint(null);
-                          setQrCenterTab('subscribers');
-                          setIsQrCenterOpen(true);
-                        }}
-                        className="inline-flex items-center gap-1 text-[11px] text-brand-600 hover:text-brand-700 font-semibold bg-brand-50 hover:bg-brand-100 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <Printer size={13} className="text-brand-600" />
-                        <span>Print Sheet</span>
-                      </button>
-                    </>
-                  ) : (
-                    <span className="text-[11px] text-slate-400 font-medium">Physical Passbook Status</span>
-                  )}
-                </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-emerald-600 font-medium flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span>
+                  {stats.blockedCount === 0 ? '100% active account standing' : `${stats.total - stats.blockedCount} active standing (${stats.blockedCount} blocked)`}
+                </span>
               </div>
-
-              {/* KPI 3: MPIN Security Set */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">MPIN Security Set</span>
-                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-brand-700 text-[10px] font-bold border border-brand-200/60 whitespace-nowrap">
-                      {stats.customMpinCount} / {stats.total} Ready
-                    </span>
-                  </div>
-                  <div className="mt-2.5 flex items-baseline gap-2">
-                    <span className="text-2xl font-black font-display text-slate-900">{stats.mpinPercent}%</span>
-                    <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Quick Login Enabled</span>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
-                  <span>{stats.total - stats.customMpinCount} pending self-service MPIN</span>
-                  <span
-                    onClick={() => {
-                      const firstPending = members.find(m => !m.mpin || m.mpin === defaultMpin);
-                      if (firstPending) handleNotifyMpin(firstPending);
-                    }}
-                    className="text-brand-600 font-semibold cursor-pointer hover:underline text-[11px]"
-                  >
-                    Notify
-                  </span>
-                </div>
-              </div>
-
-              {/* KPI 4: Multi-Group Tickets */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Multi-Group Tickets</span>
-                    <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-xs font-bold">
-                      🎟️
-                    </span>
-                  </div>
-                  <div className="mt-2.5 flex items-baseline gap-2">
-                    <span className="text-2xl font-black font-display text-slate-900">{stats.totalTickets}</span>
-                    <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Active Subscriptions</span>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-indigo-600 font-medium">
-                  {stats.dualTicketHolders} members hold dual tickets in secondary group
-                </div>
-              </div>
-            </section>
-
-            {/* ── DESKTOP MASTER LAYOUT: Table (68%) + Live Member Profile Drawer (32%) ── */}
-            <div className="hidden md:grid grid-cols-1 xl:grid-cols-12 gap-7 items-start">
-              
-              {/* Table Section: 8 cols out of 12 */}
-              <section className="xl:col-span-8 bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden flex flex-col justify-between">
-                <div>
-                  {/* Table Header Toolbar */}
-                  <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <div className="relative w-60">
-                        <input
-                          type="text"
-                          placeholder="Search name, ticket or phone..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-brand-500 focus:border-brand-500 transition-all focus:outline-none"
-                        />
-                        <Search size={14} className="text-slate-400 absolute left-2.5 top-2.5" />
-                      </div>
-
-                      {/* Chit Group Scope Filter Selector */}
-                      <select
-                        value={groupFilter}
-                        onChange={(e) => setGroupFilter(e.target.value)}
-                        className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold text-slate-700 focus:bg-white focus:ring-brand-500 focus:border-brand-500 transition-all focus:outline-none cursor-pointer"
-                        title="Filter members by Chit Group"
-                      >
-                        <option value="all">All Groups ({members.length})</option>
-                        {allChitGroups.map((g) => {
-                          const enrolledCount = members.filter((m) => m.groups.some((gm) => gm.id === g.id)).length;
-                          return (
-                            <option key={g.id} value={g.id}>
-                              {g.name} ({enrolledCount})
-                            </option>
-                          );
-                        })}
-                      </select>
-
-                      {/* Filter Pills */}
-                      <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTableFilter('all');
-                            if (groupFilter !== 'all') {
-                              setGroupFilter('all');
-                            }
-                          }}
-                          className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors cursor-pointer ${
-                            tableFilter === 'all'
-                              ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          All ({scopedCounts.all})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTableFilter('paired')}
-                          className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors cursor-pointer ${
-                            tableFilter === 'paired'
-                              ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          QR Paired ({scopedCounts.paired})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTableFilter('unpaired')}
-                          className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors cursor-pointer ${
-                            tableFilter === 'unpaired'
-                              ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          Unpaired ({scopedCounts.unpaired})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTableFilter('blocked')}
-                          className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors cursor-pointer ${
-                            tableFilter === 'blocked'
-                              ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          Blocked ({scopedCounts.blocked})
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <div className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs">
-                        <span className={`w-2 h-2 rounded-full ${isMaintenanceMode ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
-                        <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
-                          {isMaintenanceMode ? 'Maintenance Mode' : 'Portal Active'}
-                        </span>
-                        <div className="h-3 w-px bg-slate-200"></div>
-                        <label className="inline-flex items-center cursor-pointer" title="Toggle subscriber audit maintenance lock">
-                          <span className="text-[10px] uppercase font-semibold text-slate-400 mr-1.5 whitespace-nowrap">Audit Lock</span>
-                          <button
-                            type="button"
-                            disabled={isTogglingMaintenance}
-                            onClick={handleToggleMaintenance}
-                            className={`w-6 h-3.5 rounded-full relative transition-colors p-0.5 flex items-center cursor-pointer ${
-                              isMaintenanceMode ? 'bg-amber-500 justify-end' : 'bg-slate-300 justify-start'
-                            }`}
-                          >
-                            <div className="w-2.5 h-2.5 bg-white rounded-full shadow-xs"></div>
-                          </button>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Active Group Filter Banner */}
-                  {groupFilter !== 'all' && (
-                    <div className="px-6 py-2.5 bg-indigo-50/80 border-b border-indigo-100 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 text-indigo-950 font-semibold">
-                        <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />
-                        <span>
-                          Showing members of: <strong>{allChitGroups.find((g) => g.id === groupFilter)?.name || 'Chit Pool'}</strong>
-                        </span>
-                        <span className="text-[10px] bg-indigo-200/80 text-indigo-900 px-1.5 py-0.2 rounded font-bold font-mono">
-                          {filteredMembers.length} of {members.length} members
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGroupFilter('all');
-                          setTableFilter('all');
-                        }}
-                        className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-100/70 px-2.5 py-1 rounded-lg border border-indigo-200 shadow-2xs transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <span>✕ Clear Group Filter (Show All {members.length})</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Members List Table Stream */}
-                  <div className="divide-y divide-slate-100 text-xs">
-                    {filteredMembers.length === 0 ? (
-                      <div className="py-14 text-center text-slate-400 text-xs font-medium">
-                        No members found matching your search. Use &quot;Enroll Member&quot; to add new subscribers.
-                      </div>
-                    ) : (
-                      filteredMembers.map((member) => {
-                        const initial = member.fullName.charAt(0).toUpperCase();
-                        const isSelected = member.id === activeDrawerMember?.id;
-                        const avatarClass = getAvatarStyle(member.fullName, member.role);
-                        const isCurrentAdmin = member.id === currentAdminProfile?.id;
-
-                        return (
-                          <div
-                            key={member.id}
-                            onClick={() => setDrawerMemberId(member.id)}
-                            className={`grid grid-cols-12 px-6 py-4 items-center transition-colors cursor-pointer ${
-                              isSelected
-                                ? 'bg-indigo-50/30 ring-1 ring-inset ring-brand-500/20'
-                                : 'hover:bg-slate-50/70'
-                            }`}
-                          >
-                            {/* Member Name, Role & Avatar (col-span-4) */}
-                            <div className="col-span-4 flex items-center gap-3 min-w-0 pr-2">
-                              <div className={`w-10 h-10 rounded-full font-bold flex items-center justify-center font-display shadow-xs shrink-0 ${avatarClass}`}>
-                                {initial}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className={`font-bold text-slate-900 truncate ${member.isBlocked ? 'line-through text-slate-400' : ''}`}>
-                                    {member.fullName}
-                                  </span>
-                                  <span className="text-[10px] uppercase font-bold py-0.5 px-1.5 rounded leading-tight bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-mono">
-                                    Subscriber
-                                  </span>
-                                </div>
-                                <p className="text-slate-500 font-mono text-[11px] mt-0.5">
-                                  {member.phoneNumber ? `+91 ${member.phoneNumber}` : '—'}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Enrolled Chits (col-span-3) */}
-                            <div className="col-span-3 pr-2">
-                              {member.groups.length > 0 ? (
-                                <div className="flex flex-wrap gap-1.5">
-                                  {member.groups.map((g, idx) => (
-                                    <span
-                                      key={idx}
-                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-semibold text-[11px] whitespace-nowrap ${
-                                        idx % 2 === 0
-                                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200/60'
-                                          : 'bg-amber-50 text-amber-800 border-amber-200/60'
-                                      }`}
-                                    >
-                                      <span className="font-bold">{g.name}:</span> #{g.ticket}{g.aliasName ? ` · ${g.aliasName}` : ''}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 italic text-[11px]">No active groups</span>
-                              )}
-                            </div>
-
-                            {/* Passbook QR Status (col-span-2) */}
-                            <div className="col-span-2 pr-2" onClick={(e) => e.stopPropagation()}>
-                              {member.passbookToken ? (
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                                    <span className="font-mono text-slate-800 font-semibold whitespace-nowrap text-[11px]">
-                                      {member.passbookToken}
-                                    </span>
-                                  </div>
-                                  <span className="text-[10px] text-slate-400 block truncate">
-                                    Linked Booklet
-                                  </span>
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setPairingMember(member)}
-                                  className="inline-flex items-center gap-1 text-[11px] text-amber-700 font-bold bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-lg border border-amber-200 whitespace-nowrap cursor-pointer transition-colors"
-                                >
-                                  <Plus size={12} className="text-amber-600" />
-                                  <span>Pair QR</span>
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Status Pill (col-span-1) */}
-                            <div className="col-span-1 text-center" onClick={(e) => e.stopPropagation()}>
-                              {member.isBlocked ? (
-                                <button
-                                  type="button"
-                                  disabled={isCurrentAdmin}
-                                  onClick={() => handleToggleBlock(member)}
-                                  className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 cursor-pointer whitespace-nowrap"
-                                  title="Blocked portal access: Click to unblock"
-                                >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Blocked
-                                </button>
-                              ) : (!member.mpin || member.mpin === defaultMpin) ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleNotifyMpin(member)}
-                                  className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 cursor-pointer whitespace-nowrap"
-                                  title="Default MPIN active: Click to notify via WhatsApp"
-                                >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Pending
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  disabled={isCurrentAdmin}
-                                  onClick={() => handleToggleBlock(member)}
-                                  className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 cursor-pointer whitespace-nowrap"
-                                  title="Active standing: Click to suspend"
-                                >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Row Actions: WhatsApp & Passbook (col-span-2) */}
-                            <div className="col-span-2 flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                type="button"
-                                onClick={(e) => handleShareWhatsApp(e, member)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
-                                title="WhatsApp Message"
-                              >
-                                <Share2 size={15} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedMemberId(member.id)}
-                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition-colors whitespace-nowrap cursor-pointer"
-                              >
-                                Passbook
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                {/* Pagination / Summary Footer */}
-                <div className="px-6 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <div className="flex items-center gap-2">
-                    <span>
-                      Showing {filteredMembers.length} {groupFilter !== 'all' || roleFilter !== 'all' || searchQuery ? `of ${members.length}` : ''} registered users
-                    </span>
-                    {(groupFilter !== 'all' || roleFilter !== 'all' || searchQuery) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGroupFilter('all');
-                          setRoleFilter('all');
-                          setSearchQuery('');
-                          setTableFilter('all');
-                        }}
-                        className="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline cursor-pointer"
-                      >
-                        (Reset filters & show all {members.length})
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-400">All data synchronized in real-time with Supabase</span>
-                  </div>
-                </div>
-              </section>
-
-              {/* Right Panel: Subscriber Inspection & Security Hub (4 cols out of 12) */}
-              <aside className="xl:col-span-4 space-y-5">
-                {activeDrawerMember ? (
-                  <>
-                    {/* Member Detail Card */}
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-                      {/* Member Profile Header with Edit Profile and Role Selection */}
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-12 h-12 rounded-2xl font-bold flex items-center justify-center font-display text-base shadow-sm shrink-0 ${getAvatarStyle(activeDrawerMember.fullName, activeDrawerMember.role)}`}>
-                            {activeDrawerMember.fullName.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-display font-bold text-base text-slate-900 leading-tight truncate">
-                                {activeDrawerMember.fullName}
-                              </h3>
-                              {/* Edit Profile Trigger */}
-                              {canEdit && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleOpenEditModal(e, activeDrawerMember)}
-                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded-md border border-brand-200/60 transition-colors whitespace-nowrap cursor-pointer"
-                                >
-                                  <Edit3 size={11} />
-                                  <span>Edit</span>
-                                </button>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-500 mt-0.5 truncate">
-                              📞 +91 {activeDrawerMember.phoneNumber || '—'}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Member Standing Badge */}
-                        <div className="text-right shrink-0">
-                          <label className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Account Standing</label>
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            Subscriber
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Physical QR Binding Card with Re-bind & Revoke Lifecycle Actions */}
-                      <div className="mt-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 bg-white border border-slate-200 rounded-lg p-1 flex items-center justify-center shadow-2xs shrink-0">
-                              <QrCode size={22} className={activeDrawerMember.passbookToken ? 'text-slate-800' : 'text-slate-400'} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded whitespace-nowrap ${
-                                  activeDrawerMember.passbookToken
-                                    ? 'text-emerald-700 bg-emerald-100/70'
-                                    : 'text-amber-700 bg-amber-100/70'
-                                }`}>
-                                  {activeDrawerMember.passbookToken ? 'Passbook Linked' : 'Unlinked Passbook'}
-                                </span>
-                              </div>
-                              <p className="font-mono text-xs font-bold text-slate-800 mt-0.5 truncate">
-                                {activeDrawerMember.passbookToken || 'No QR paired'}
-                              </p>
-                              <p className="text-[10px] text-slate-400 truncate">
-                                {activeDrawerMember.passbookToken ? 'Physical passbook booklet paired' : 'Scan blank QR to pair'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {canPairQr && (
-                              <button
-                                type="button"
-                                onClick={() => setPairingMember(activeDrawerMember)}
-                                className="text-[11px] font-semibold text-brand-600 hover:text-brand-700 bg-white border border-slate-200 px-2 py-1 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                              >
-                                {activeDrawerMember.passbookToken ? 'Re-bind' : 'Pair QR'}
-                              </button>
-                            )}
-                            {canRevokeQr && activeDrawerMember.passbookToken && (
-                              <button
-                                type="button"
-                                onClick={(e) => handleUnlinkPassbook(e, activeDrawerMember)}
-                                title="Revoke physical passbook authorization"
-                                className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors cursor-pointer"
-                              >
-                                Revoke
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Financial Ledger Aggregates (2x2 Grid) */}
-                      <div className="mt-4 pt-3 border-t border-slate-100">
-                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">Passbook Financial Summary</h4>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                            <span className="text-[10px] font-semibold text-slate-500 uppercase">Total Paid</span>
-                            <p className="text-sm font-bold text-emerald-600 font-display mt-0.5">
-                              ₹{activeDrawerFinancials.totalPaid.toLocaleString('en-IN')}
-                            </p>
-                            <span className="text-[10px] text-slate-400">Ledger Collections</span>
-                          </div>
-                          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                            <span className="text-[10px] font-semibold text-slate-500 uppercase">Outstanding Due</span>
-                            <p className="text-sm font-bold text-rose-600 font-display mt-0.5">
-                              ₹{activeDrawerFinancials.outstandingDue.toLocaleString('en-IN')}
-                            </p>
-                            <span className="text-[10px] text-amber-600 font-semibold">
-                              {activeDrawerFinancials.outstandingDue === 0 ? 'Fully Paid' : 'Cycle Pending'}
-                            </span>
-                          </div>
-                          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                            <span className="text-[10px] font-semibold text-slate-500 uppercase">Enrolled Chit Value</span>
-                            <p className="text-sm font-bold text-slate-900 font-display mt-0.5">
-                              ₹{activeDrawerFinancials.enrolledValue.toLocaleString('en-IN')}
-                            </p>
-                            <span className="text-[10px] text-slate-400">
-                              {activeDrawerMember.groups.length} Slot{activeDrawerMember.groups.length !== 1 ? 's' : ''} Enrolled
-                            </span>
-                          </div>
-                          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                            <span className="text-[10px] font-semibold text-slate-500 uppercase">Prize Pot Won</span>
-                            <p className="text-sm font-bold text-slate-700 font-display mt-0.5">
-                              {activeDrawerFinancials.prizeWon}
-                            </p>
-                            <span className="text-[10px] text-emerald-600 font-semibold">
-                              {activeDrawerFinancials.prizeWonSub}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Account Moderation & Controls with Active/Suspended Segmented Control */}
-                      <div className="mt-4 pt-3 border-t border-slate-100 space-y-2.5">
-                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Account Moderation &amp; Controls</h4>
-                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 text-xs border border-slate-100">
-                          <div>
-                            <p className="font-semibold text-slate-800">Quick Login MPIN</p>
-                            <p className="text-[10px] text-slate-400">
-                              {(!activeDrawerMember.mpin || activeDrawerMember.mpin === defaultMpin)
-                                ? `Default PIN ${defaultMpin} active`
-                                : 'Initialized on member mobile device'}
-                            </p>
-                          </div>
-                          {canResetMpin && (
-                            <button
-                              type="button"
-                              onClick={() => handleResetMpin(activeDrawerMember)}
-                              className="text-xs font-bold text-brand-600 hover:text-brand-700 px-2.5 py-1 bg-white border border-slate-200 rounded-lg transition-colors cursor-pointer"
-                            >
-                              Reset MPIN
-                            </button>
-                          )}
-                        </div>
-
-                        {/* High-visibility Active / Suspended Cutoff Toggle Control */}
-                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-semibold text-slate-800">Account Access State</p>
-                              <p className="text-[10px] text-slate-400">Instant subscriber portal &amp; auction bidding cutoff</p>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/60 rounded-xl">
-                            <button
-                              type="button"
-                              disabled={!canSuspend || activeDrawerMember.id === currentAdminProfile?.id}
-                              onClick={() => {
-                                if (activeDrawerMember.isBlocked) handleToggleBlock(activeDrawerMember);
-                              }}
-                              className={`py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 text-xs transition-colors ${
-                                !activeDrawerMember.isBlocked
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'text-slate-600 hover:text-slate-900'
-                              } ${!canSuspend ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
-                            >
-                              <span className={`w-1.5 h-1.5 rounded-full ${!activeDrawerMember.isBlocked ? 'bg-white' : 'bg-slate-400'}`}></span>
-                              <span>Active (Allowed)</span>
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!canSuspend || activeDrawerMember.id === currentAdminProfile?.id}
-                              onClick={() => {
-                                if (!activeDrawerMember.isBlocked) handleToggleBlock(activeDrawerMember);
-                              }}
-                              className={`py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 text-xs transition-colors ${
-                                activeDrawerMember.isBlocked
-                                  ? 'bg-rose-600 text-white shadow-xs'
-                                  : 'hover:bg-white text-slate-600 hover:text-rose-700'
-                              } ${!canSuspend ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
-                            >
-                              <span className={`w-1.5 h-1.5 rounded-full ${activeDrawerMember.isBlocked ? 'bg-white' : 'bg-slate-400'}`}></span>
-                              <span>Suspended</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Featured Secondary Actions: Full Passbook Ledger & Messaging */}
-                      <div className="mt-5 space-y-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedMemberId(activeDrawerMember.id)}
-                          className="w-full py-2.5 px-3 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-sm shadow-brand-500/25 flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                        >
-                          <BookOpen size={16} />
-                          <span>View Subscriber Ledger &amp; Passbook</span>
-                        </button>
-                        <div className={`grid ${canExport ? 'grid-cols-2' : 'grid-cols-1'} gap-2 text-xs`}>
-                          <button
-                            type="button"
-                            onClick={(e) => handleShareWhatsApp(e, activeDrawerMember)}
-                            className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <Share2 size={14} />
-                            <span>WhatsApp Notice</span>
-                          </button>
-                          {canExport && (
-                            <button
-                              type="button"
-                              data-action="members:export"
-                              onClick={(e) => handlePrintMemberStickers(e, activeDrawerMember)}
-                              className="py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                            >
-                              <Printer size={14} />
-                              <span>Export PDF</span>
-                            </button>
-                          )}
-                        </div>
-
-                        {canDelete && activeDrawerMember.id !== currentAdminProfile?.id && (
-                          <button
-                            type="button"
-                            data-action="members:delete"
-                            onClick={(e) => handleDeleteMember(e, activeDrawerMember)}
-                            className="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl border border-rose-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <Trash2 size={14} />
-                            <span>Archive / Delete Subscriber Profile</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Batch QR Logistics Widget */}
-                    {canBatchQr && (
-                      <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
-                            Physical Logistics
-                          </span>
-                          <span className="text-xs text-amber-300 font-semibold">
-                            {stats.total - stats.qrLinkedCount} Awaiting Bind
-                          </span>
-                        </div>
-                        <h4 className="font-display font-bold text-sm mt-2">Print Passbook QR Sticker Labels</h4>
-                        <p className="text-xs text-slate-300 mt-1">
-                          Generate high-density A4 label sheets (3x8 grid) with member names, ticket IDs, and encrypted QR check tokens for direct booklet pasting.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedSubscribersForPrint(null);
-                            setQrCenterTab('batches');
-                            setIsQrCenterOpen(true);
-                          }}
-                          className="mt-4 w-full py-2.5 px-4 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <Printer size={15} />
-                          <span>Download PDF Sticker Sheet (A4)</span>
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center text-slate-400 text-xs">
-                    Select a member from the directory to inspect their profile.
-                  </div>
-                )}
-              </aside>
             </div>
 
-            {/* ── MOBILE MEMBER CARDS STREAM (md:hidden from Stitch) ── */}
-            <div className="md:hidden space-y-3.5 pb-28">
-              {/* Search Input Bar & Mobile Chit Group Scope */}
-              <div className="space-y-2">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search by name, ticket # or mobile..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full text-xs bg-white border border-slate-200/90 rounded-2xl pl-9 pr-4 py-3 text-slate-800 placeholder-slate-400 shadow-[0_4px_20px_-2px_rgba(15,23,42,0.05),0_2px_6px_-1px_rgba(15,23,42,0.02)] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                  <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                  </svg>
+            {/* KPI 2: Physical Passbook QRs */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Physical Passbook QRs</span>
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200/60 whitespace-nowrap">
+                    {stats.qrLinkedCount} Paired
+                  </span>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <select
-                    value={groupFilter}
-                    onChange={(e) => setGroupFilter(e.target.value)}
-                    className="w-full text-xs bg-white border border-slate-200/90 rounded-xl px-3 py-2 font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs cursor-pointer"
-                    title="Filter members by Chit Group"
-                  >
-                    <option value="all">All Groups ({members.length})</option>
-                    {allChitGroups.map((g) => {
-                      const enrolledCount = members.filter((m) => m.groups.some((gm) => gm.id === g.id)).length;
-                      return (
-                        <option key={g.id} value={g.id}>
-                          {g.name} ({enrolledCount})
-                        </option>
-                      );
-                    })}
-                  </select>
+                <div className="mt-2.5 flex items-baseline gap-2">
+                  <span className="text-2xl font-black font-display text-slate-900">
+                    {stats.qrLinkedCount} <span className="text-base font-normal text-slate-400">/ {stats.total}</span>
+                  </span>
+                  <span className="text-xs text-amber-600 font-semibold whitespace-nowrap">
+                    ({stats.total - stats.qrLinkedCount} Unlinked)
+                  </span>
                 </div>
+              </div>
+              {/* Integrated Contextual Logistics Action Pills */}
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                {canBatchQr ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSubscribersForPrint(null);
+                        setQrCenterTab('batches');
+                        setIsQrCenterOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] text-slate-600 hover:text-slate-900 font-semibold bg-slate-100 hover:bg-slate-200/80 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Layers size={13} className="text-slate-500" />
+                      <span>QR Inventory</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSubscribersForPrint(null);
+                        setQrCenterTab('subscribers');
+                        setIsQrCenterOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] text-brand-600 hover:text-brand-700 font-semibold bg-brand-50 hover:bg-brand-100 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Printer size={13} className="text-brand-600" />
+                      <span>Print Sheet</span>
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-[11px] text-slate-400 font-medium">Physical Passbook Status</span>
+                )}
+              </div>
+            </div>
 
-                {/* Mobile Active Group Filter Banner */}
-                {groupFilter !== 'all' && (
-                  <div className="p-2.5 bg-indigo-50/90 border border-indigo-100 rounded-xl flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5 text-indigo-950 font-semibold truncate pr-2">
-                      <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />
-                      <span className="truncate">
-                        {allChitGroups.find((g) => g.id === groupFilter)?.name || 'Chit Pool'}
+            {/* KPI 3: MPIN Security Set */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">MPIN Security Set</span>
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-brand-700 text-[10px] font-bold border border-brand-200/60 whitespace-nowrap">
+                    {stats.customMpinCount} / {stats.total} Ready
+                  </span>
+                </div>
+                <div className="mt-2.5 flex items-baseline gap-2">
+                  <span className="text-2xl font-black font-display text-slate-900">{stats.mpinPercent}%</span>
+                  <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Quick Login Enabled</span>
+                </div>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+                <span>{stats.total - stats.customMpinCount} pending self-service MPIN</span>
+                <span
+                  onClick={() => {
+                    const firstPending = members.find(m => !m.mpin || m.mpin === defaultMpin);
+                    if (firstPending) handleNotifyMpin(firstPending);
+                  }}
+                  className="text-brand-600 font-semibold cursor-pointer hover:underline text-[11px]"
+                >
+                  Notify
+                </span>
+              </div>
+            </div>
+
+            {/* KPI 4: Multi-Group Tickets */}
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Multi-Group Tickets</span>
+                  <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-xs font-bold">
+                    🎟️
+                  </span>
+                </div>
+                <div className="mt-2.5 flex items-baseline gap-2">
+                  <span className="text-2xl font-black font-display text-slate-900">{stats.totalTickets}</span>
+                  <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Active Subscriptions</span>
+                </div>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-indigo-600 font-medium">
+                {stats.dualTicketHolders} members hold dual tickets in secondary group
+              </div>
+            </div>
+          </section>
+
+          {/* ── DESKTOP MASTER LAYOUT: Table (68%) + Live Member Profile Drawer (32%) ── */}
+          <div className="hidden md:grid grid-cols-1 xl:grid-cols-12 gap-7 items-start">
+
+            {/* Table Section: 8 cols out of 12 */}
+            <section className="xl:col-span-8 bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden flex flex-col justify-between">
+              <div>
+                {/* Table Header Toolbar */}
+                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <div className="relative w-60">
+                      <input
+                        type="text"
+                        placeholder="Search name, ticket or phone..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-brand-500 focus:border-brand-500 transition-all focus:outline-none"
+                      />
+                      <Search size={14} className="text-slate-400 absolute left-2.5 top-2.5" />
+                    </div>
+
+                    {/* Chit Group Scope Filter Selector */}
+                    <select
+                      value={groupFilter}
+                      onChange={(e) => setGroupFilter(e.target.value)}
+                      className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold text-slate-700 focus:bg-white focus:ring-brand-500 focus:border-brand-500 transition-all focus:outline-none cursor-pointer"
+                      title="Filter members by Chit Group"
+                    >
+                      <option value="all">All Groups ({members.length})</option>
+                      {allChitGroups.map((g) => {
+                        const enrolledCount = members.filter((m) => m.groups.some((gm) => gm.id === g.id)).length;
+                        return (
+                          <option key={g.id} value={g.id}>
+                            {g.name} ({enrolledCount})
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    {/* Filter Pills */}
+                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTableFilter('all');
+                          if (groupFilter !== 'all') {
+                            setGroupFilter('all');
+                          }
+                        }}
+                        className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors cursor-pointer ${tableFilter === 'all'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                      >
+                        All ({scopedCounts.all})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTableFilter('paired')}
+                        className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors cursor-pointer ${tableFilter === 'paired'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                      >
+                        QR Paired ({scopedCounts.paired})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTableFilter('unpaired')}
+                        className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors cursor-pointer ${tableFilter === 'unpaired'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                      >
+                        Unpaired ({scopedCounts.unpaired})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTableFilter('blocked')}
+                        className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors cursor-pointer ${tableFilter === 'blocked'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                      >
+                        Blocked ({scopedCounts.blocked})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs">
+                      <span className={`w-2 h-2 rounded-full ${isMaintenanceMode ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
+                      <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
+                        {isMaintenanceMode ? 'Maintenance Mode' : 'Portal Active'}
                       </span>
-                      <span className="text-[10px] bg-indigo-200/80 text-indigo-900 px-1.5 py-0.2 rounded font-bold font-mono shrink-0">
-                        {filteredMembers.length} of {members.length}
+                      <div className="h-3 w-px bg-slate-200"></div>
+                      <label className="inline-flex items-center cursor-pointer" title="Toggle subscriber audit maintenance lock">
+                        <span className="text-[10px] uppercase font-semibold text-slate-400 mr-1.5 whitespace-nowrap">Audit Lock</span>
+                        <button
+                          type="button"
+                          disabled={isTogglingMaintenance}
+                          onClick={handleToggleMaintenance}
+                          className={`w-6 h-3.5 rounded-full relative transition-colors p-0.5 flex items-center cursor-pointer ${isMaintenanceMode ? 'bg-amber-500 justify-end' : 'bg-slate-300 justify-start'
+                            }`}
+                        >
+                          <div className="w-2.5 h-2.5 bg-white rounded-full shadow-xs"></div>
+                        </button>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active Group Filter Banner */}
+                {groupFilter !== 'all' && (
+                  <div className="px-6 py-2.5 bg-indigo-50/80 border-b border-indigo-100 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 text-indigo-950 font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />
+                      <span>
+                        Showing members of: <strong>{allChitGroups.find((g) => g.id === groupFilter)?.name || 'Chit Pool'}</strong>
+                      </span>
+                      <span className="text-[10px] bg-indigo-200/80 text-indigo-900 px-1.5 py-0.2 rounded font-bold font-mono">
+                        {filteredMembers.length} of {members.length} members
                       </span>
                     </div>
                     <button
@@ -2270,110 +1736,627 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         setGroupFilter('all');
                         setTableFilter('all');
                       }}
-                      className="text-[11px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-indigo-200 shadow-2xs whitespace-nowrap shrink-0 cursor-pointer"
+                      className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-100/70 px-2.5 py-1 rounded-lg border border-indigo-200 shadow-2xs transition-all cursor-pointer flex items-center gap-1"
                     >
-                      Clear
+                      <span>✕ Clear Group Filter (Show All {members.length})</span>
                     </button>
                   </div>
                 )}
-              </div>
 
-              {/* Subscriber Cards Roster (Clean & Decongested) */}
-              {filteredMembers.length === 0 ? (
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center text-slate-500 text-xs shadow-2xs">
-                  No members found matching your search. Use &quot;Add Member&quot; to enroll new subscribers.
-                </div>
-              ) : (
-                filteredMembers.map((member, idx) => {
-                  const initial = getInitials(member.fullName);
-                  const cleanPhone = normalizePhoneDigits(member.phoneNumber);
-                  const avatarStyle = getMobileCardAvatar(member, idx);
-                  const firstTicket = member.groups[0]?.ticket;
-                  const statusInfo = getMemberStatusInfo(member);
+                {/* Members List Table Stream */}
+                <div className="divide-y divide-slate-100 text-xs">
+                  {filteredMembers.length === 0 ? (
+                    <div className="py-14 text-center text-slate-400 text-xs font-medium">
+                      No members found matching your search. Use &quot;Enroll Member&quot; to add new subscribers.
+                    </div>
+                  ) : (
+                    filteredMembers.map((member) => {
+                      const initial = member.fullName.charAt(0).toUpperCase();
+                      const isSelected = member.id === activeDrawerMember?.id;
+                      const avatarClass = getAvatarStyle(member.fullName, member.role);
+                      const isCurrentAdmin = member.id === currentAdminProfile?.id;
 
-                  return (
-                    <div
-                      key={member.id}
-                      onClick={() => setSelectedMemberId(member.id)}
-                      className="p-4 bg-white rounded-2xl border border-slate-200 shadow-[0_4px_20px_-2px_rgba(15,23,42,0.05),0_2px_6px_-1px_rgba(15,23,42,0.02)] hover:border-indigo-200 transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3.5">
-                          <div className={`w-12 h-12 rounded-2xl ${avatarStyle.bg} font-bold flex flex-col items-center justify-center shadow-xs shrink-0`}>
-                            <span className="text-sm leading-none">{initial}</span>
-                            {firstTicket && (
-                              <span className={`text-[9px] font-mono mt-0.5 ${avatarStyle.ticketText}`}>
-                                #{firstTicket}
-                              </span>
+                      return (
+                        <div
+                          key={member.id}
+                          onClick={() => setDrawerMemberId(member.id)}
+                          className={`grid grid-cols-12 px-6 py-4 items-center transition-colors cursor-pointer ${isSelected
+                            ? 'bg-indigo-50/30 ring-1 ring-inset ring-brand-500/20'
+                            : 'hover:bg-slate-50/70'
+                            }`}
+                        >
+                          {/* Member Name, Role & Avatar (col-span-4) */}
+                          <div className="col-span-4 flex items-center gap-3 min-w-0 pr-2">
+                            <div className={`w-10 h-10 rounded-full font-bold flex items-center justify-center font-display shadow-xs shrink-0 ${avatarClass}`}>
+                              {initial}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className={`font-bold text-slate-900 truncate ${member.isBlocked ? 'line-through text-slate-400' : ''}`}>
+                                  {member.fullName}
+                                </span>
+                                <span className="text-[10px] uppercase font-bold py-0.5 px-1.5 rounded leading-tight bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-mono">
+                                  Subscriber
+                                </span>
+                              </div>
+                              <p className="text-slate-500 font-mono text-[11px] mt-0.5">
+                                {member.phoneNumber ? `+91 ${member.phoneNumber}` : '—'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Enrolled Chits (col-span-3) */}
+                          <div className="col-span-3 pr-2">
+                            {member.groups.length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {member.groups.map((g, idx) => (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-semibold text-[11px] whitespace-nowrap ${idx % 2 === 0
+                                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200/60'
+                                      : 'bg-amber-50 text-amber-800 border-amber-200/60'
+                                      }`}
+                                  >
+                                    <span className="font-bold">{g.name}:</span> #{g.ticket}{g.aliasName ? ` · ${g.aliasName}` : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic text-[11px]">No active groups</span>
                             )}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-bold text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors">
-                                {member.fullName}
-                              </h4>
+
+                          {/* Passbook QR Status (col-span-2) */}
+                          <div className="col-span-2 pr-2" onClick={(e) => e.stopPropagation()}>
+                            {member.passbookToken ? (
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                                  <span className="font-mono text-slate-800 font-semibold whitespace-nowrap text-[11px]">
+                                    {member.passbookToken}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 block truncate">
+                                  Linked Booklet
+                                </span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setPairingMember(member)}
+                                className="inline-flex items-center gap-1 text-[11px] text-amber-700 font-bold bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-lg border border-amber-200 whitespace-nowrap cursor-pointer transition-colors"
+                              >
+                                <Plus size={12} className="text-amber-600" />
+                                <span>Pair QR</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Status Pill (col-span-1) */}
+                          <div className="col-span-1 text-center" onClick={(e) => e.stopPropagation()}>
+                            {member.isBlocked ? (
+                              <button
+                                type="button"
+                                disabled={isCurrentAdmin}
+                                onClick={() => handleToggleBlock(member)}
+                                className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 cursor-pointer whitespace-nowrap"
+                                title="Blocked portal access: Click to unblock"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Blocked
+                              </button>
+                            ) : (!member.mpin || member.mpin === defaultMpin) ? (
+                              <button
+                                type="button"
+                                onClick={() => handleNotifyMpin(member)}
+                                className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 cursor-pointer whitespace-nowrap"
+                                title="Default MPIN active: Click to notify via WhatsApp"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Pending
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isCurrentAdmin}
+                                onClick={() => handleToggleBlock(member)}
+                                className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 cursor-pointer whitespace-nowrap"
+                                title="Active standing: Click to suspend"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Row Actions: WhatsApp & Passbook (col-span-2) */}
+                          <div className="col-span-2 flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={(e) => handleShareWhatsApp(e, member)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                              title="WhatsApp Message"
+                            >
+                              <Share2 size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMemberId(member.id)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition-colors whitespace-nowrap cursor-pointer"
+                            >
+                              Passbook
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Pagination / Summary Footer */}
+              <div className="px-6 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <div className="flex items-center gap-2">
+                  <span>
+                    Showing {filteredMembers.length} {groupFilter !== 'all' || roleFilter !== 'all' || searchQuery ? `of ${members.length}` : ''} registered users
+                  </span>
+                  {(groupFilter !== 'all' || roleFilter !== 'all' || searchQuery) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroupFilter('all');
+                        setRoleFilter('all');
+                        setSearchQuery('');
+                        setTableFilter('all');
+                      }}
+                      className="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline cursor-pointer"
+                    >
+                      (Reset filters & show all {members.length})
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-400">All data synchronized in real-time with Supabase</span>
+                </div>
+              </div>
+            </section>
+
+            {/* Right Panel: Subscriber Inspection & Security Hub (4 cols out of 12) */}
+            <aside className="xl:col-span-4 space-y-5">
+              {activeDrawerMember ? (
+                <>
+                  {/* Member Detail Card */}
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs relative overflow-hidden">
+                    {/* Member Profile Header with Edit Profile and Role Selection */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-12 h-12 rounded-2xl font-bold flex items-center justify-center font-display text-base shadow-sm shrink-0 ${getAvatarStyle(activeDrawerMember.fullName, activeDrawerMember.role)}`}>
+                          {activeDrawerMember.fullName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-display font-bold text-base text-slate-900 leading-tight truncate">
+                              {activeDrawerMember.fullName}
+                            </h3>
+                            {/* Edit Profile Trigger */}
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleOpenEditModal(e, activeDrawerMember)}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded-md border border-brand-200/60 transition-colors whitespace-nowrap cursor-pointer"
+                              >
+                                <Edit3 size={11} />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5 truncate">
+                            📞 +91 {activeDrawerMember.phoneNumber || '—'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Member Standing Badge */}
+                      <div className="text-right shrink-0">
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Account Standing</label>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          Subscriber
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Physical QR Binding Card with Re-bind & Revoke Lifecycle Actions */}
+                    <div className="mt-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 bg-white border border-slate-200 rounded-lg p-1 flex items-center justify-center shadow-2xs shrink-0">
+                            <QrCode size={22} className={activeDrawerMember.passbookToken ? 'text-slate-800' : 'text-slate-400'} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded whitespace-nowrap ${activeDrawerMember.passbookToken
+                                ? 'text-emerald-700 bg-emerald-100/70'
+                                : 'text-amber-700 bg-amber-100/70'
+                                }`}>
+                                {activeDrawerMember.passbookToken ? 'Passbook Linked' : 'Unlinked Passbook'}
+                              </span>
                             </div>
-                            <p className="text-xs text-slate-500 font-mono mt-0.5">
-                              {cleanPhone ? `+91 ${cleanPhone}` : 'No phone recorded'}
+                            <p className="font-mono text-xs font-bold text-slate-800 mt-0.5 truncate">
+                              {activeDrawerMember.passbookToken || 'No QR paired'}
+                            </p>
+                            <p className="text-[10px] text-slate-400 truncate">
+                              {activeDrawerMember.passbookToken ? 'Physical passbook booklet paired' : 'Scan blank QR to pair'}
                             </p>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          {statusInfo.isWinner ? (
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              statusInfo.isDisbursed
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-purple-50 text-purple-700 border border-purple-200'
-                            }`}>
-                              Prize: ₹{statusInfo.netPayout.toLocaleString('en-IN')}
-                            </span>
-                          ) : statusInfo.outstandingDue > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              Due: ₹{statusInfo.outstandingDue.toLocaleString('en-IN')}
-                            </span>
-                          ) : !statusInfo.isPassbookLinked ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              QR Unlinked
-                            </span>
-                          ) : (
-                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {canPairQr && (
+                            <button
+                              type="button"
+                              onClick={() => setPairingMember(activeDrawerMember)}
+                              className="text-[11px] font-semibold text-brand-600 hover:text-brand-700 bg-white border border-slate-200 px-2 py-1 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                            >
+                              {activeDrawerMember.passbookToken ? 'Re-bind' : 'Pair QR'}
+                            </button>
                           )}
-
-                          <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                          </svg>
+                          {canRevokeQr && activeDrawerMember.passbookToken && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleUnlinkPassbook(e, activeDrawerMember)}
+                              title="Revoke physical passbook authorization"
+                              className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors cursor-pointer"
+                            >
+                              Revoke
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
-                  );
-                })
-              )}
 
-              {/* Mobile Summary Footer */}
-              <div className="pt-2 text-center text-xs text-slate-500 flex flex-col items-center gap-1.5">
-                <span>
-                  Showing {filteredMembers.length} {groupFilter !== 'all' || roleFilter !== 'all' || searchQuery ? `of ${members.length}` : ''} registered users
-                </span>
-                {(groupFilter !== 'all' || roleFilter !== 'all' || searchQuery) && (
+                    {/* Financial Ledger Aggregates (2x2 Grid) */}
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">Passbook Financial Summary</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-[10px] font-semibold text-slate-500 uppercase">Total Paid</span>
+                          <p className="text-sm font-bold text-emerald-600 font-display mt-0.5">
+                            ₹{activeDrawerFinancials.totalPaid.toLocaleString('en-IN')}
+                          </p>
+                          <span className="text-[10px] text-slate-400">Ledger Collections</span>
+                        </div>
+                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-[10px] font-semibold text-slate-500 uppercase">Outstanding Due</span>
+                          <p className="text-sm font-bold text-rose-600 font-display mt-0.5">
+                            ₹{activeDrawerFinancials.outstandingDue.toLocaleString('en-IN')}
+                          </p>
+                          <span className="text-[10px] text-amber-600 font-semibold">
+                            {activeDrawerFinancials.outstandingDue === 0 ? 'Fully Paid' : 'Cycle Pending'}
+                          </span>
+                        </div>
+                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-[10px] font-semibold text-slate-500 uppercase">Enrolled Chit Value</span>
+                          <p className="text-sm font-bold text-slate-900 font-display mt-0.5">
+                            ₹{activeDrawerFinancials.enrolledValue.toLocaleString('en-IN')}
+                          </p>
+                          <span className="text-[10px] text-slate-400">
+                            {activeDrawerMember.groups.length} Slot{activeDrawerMember.groups.length !== 1 ? 's' : ''} Enrolled
+                          </span>
+                        </div>
+                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-[10px] font-semibold text-slate-500 uppercase">Prize Pot Won</span>
+                          <p className="text-sm font-bold text-slate-700 font-display mt-0.5">
+                            {activeDrawerFinancials.prizeWon}
+                          </p>
+                          <span className="text-[10px] text-emerald-600 font-semibold">
+                            {activeDrawerFinancials.prizeWonSub}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Account Moderation & Controls with Active/Suspended Segmented Control */}
+                    <div className="mt-4 pt-3 border-t border-slate-100 space-y-2.5">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Account Moderation &amp; Controls</h4>
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 text-xs border border-slate-100">
+                        <div>
+                          <p className="font-semibold text-slate-800">Quick Login MPIN</p>
+                          <p className="text-[10px] text-slate-400">
+                            {(!activeDrawerMember.mpin || activeDrawerMember.mpin === defaultMpin)
+                              ? `Default PIN ${defaultMpin} active`
+                              : 'Initialized on member mobile device'}
+                          </p>
+                        </div>
+                        {canResetMpin && (
+                          <button
+                            type="button"
+                            onClick={() => handleResetMpin(activeDrawerMember)}
+                            className="text-xs font-bold text-brand-600 hover:text-brand-700 px-2.5 py-1 bg-white border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Reset MPIN
+                          </button>
+                        )}
+                      </div>
+
+                      {/* High-visibility Active / Suspended Cutoff Toggle Control */}
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-slate-800">Account Access State</p>
+                            <p className="text-[10px] text-slate-400">Instant subscriber portal &amp; auction bidding cutoff</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/60 rounded-xl">
+                          <button
+                            type="button"
+                            disabled={!canSuspend || activeDrawerMember.id === currentAdminProfile?.id}
+                            onClick={() => {
+                              if (activeDrawerMember.isBlocked) handleToggleBlock(activeDrawerMember);
+                            }}
+                            className={`py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 text-xs transition-colors ${!activeDrawerMember.isBlocked
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                              } ${!canSuspend ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${!activeDrawerMember.isBlocked ? 'bg-white' : 'bg-slate-400'}`}></span>
+                            <span>Active (Allowed)</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!canSuspend || activeDrawerMember.id === currentAdminProfile?.id}
+                            onClick={() => {
+                              if (!activeDrawerMember.isBlocked) handleToggleBlock(activeDrawerMember);
+                            }}
+                            className={`py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 text-xs transition-colors ${activeDrawerMember.isBlocked
+                              ? 'bg-rose-600 text-white shadow-xs'
+                              : 'hover:bg-white text-slate-600 hover:text-rose-700'
+                              } ${!canSuspend ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${activeDrawerMember.isBlocked ? 'bg-white' : 'bg-slate-400'}`}></span>
+                            <span>Suspended</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Featured Secondary Actions: Full Passbook Ledger & Messaging */}
+                    <div className="mt-5 space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMemberId(activeDrawerMember.id)}
+                        className="w-full py-2.5 px-3 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-sm shadow-brand-500/25 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                      >
+                        <BookOpen size={16} />
+                        <span>View Subscriber Ledger &amp; Passbook</span>
+                      </button>
+                      <div className={`grid ${canExport ? 'grid-cols-2' : 'grid-cols-1'} gap-2 text-xs`}>
+                        <button
+                          type="button"
+                          onClick={(e) => handleShareWhatsApp(e, activeDrawerMember)}
+                          className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Share2 size={14} />
+                          <span>WhatsApp Notice</span>
+                        </button>
+                        {canExport && (
+                          <button
+                            type="button"
+                            data-action="members:export"
+                            onClick={(e) => handlePrintMemberStickers(e, activeDrawerMember)}
+                            className="py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Printer size={14} />
+                            <span>Export PDF</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {canDelete && activeDrawerMember.id !== currentAdminProfile?.id && (
+                        <button
+                          type="button"
+                          data-action="members:delete"
+                          onClick={(e) => handleDeleteMember(e, activeDrawerMember)}
+                          className="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl border border-rose-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={14} />
+                          <span>Archive / Delete Subscriber Profile</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Batch QR Logistics Widget */}
+                  {canBatchQr && (
+                    <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 text-indigo-100">
+                          Physical Logistics
+                        </span>
+                        <span className="text-xs text-amber-300 font-semibold">
+                          {stats.total - stats.qrLinkedCount} Awaiting Bind
+                        </span>
+                      </div>
+                      <h4 className="font-display font-bold text-sm mt-2">Print Passbook QR Sticker Labels</h4>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Generate high-density A4 label sheets (3x8 grid) with member names, ticket IDs, and encrypted QR check tokens for direct booklet pasting.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSubscribersForPrint(null);
+                          setQrCenterTab('batches');
+                          setIsQrCenterOpen(true);
+                        }}
+                        className="mt-4 w-full py-2.5 px-4 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Printer size={15} />
+                        <span>Download PDF Sticker Sheet (A4)</span>
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center text-slate-400 text-xs">
+                  Select a member from the directory to inspect their profile.
+                </div>
+              )}
+            </aside>
+          </div>
+
+          {/* ── MOBILE MEMBER CARDS STREAM (md:hidden from Stitch) ── */}
+          <div className="md:hidden space-y-3.5 pb-28">
+            {/* Search Input Bar & Mobile Chit Group Scope */}
+            <div className="space-y-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by name, ticket # or mobile..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-200/90 rounded-2xl pl-9 pr-4 py-3 text-slate-800 placeholder-slate-400 shadow-[0_4px_20px_-2px_rgba(15,23,42,0.05),0_2px_6px_-1px_rgba(15,23,42,0.02)] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                </svg>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={groupFilter}
+                  onChange={(e) => setGroupFilter(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-200/90 rounded-xl px-3 py-2 font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs cursor-pointer"
+                  title="Filter members by Chit Group"
+                >
+                  <option value="all">All Groups ({members.length})</option>
+                  {allChitGroups.map((g) => {
+                    const enrolledCount = members.filter((m) => m.groups.some((gm) => gm.id === g.id)).length;
+                    return (
+                      <option key={g.id} value={g.id}>
+                        {g.name} ({enrolledCount})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Mobile Active Group Filter Banner */}
+              {groupFilter !== 'all' && (
+                <div className="p-2.5 bg-indigo-50/90 border border-indigo-100 rounded-xl flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 text-indigo-950 font-semibold truncate pr-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />
+                    <span className="truncate">
+                      {allChitGroups.find((g) => g.id === groupFilter)?.name || 'Chit Pool'}
+                    </span>
+                    <span className="text-[10px] bg-indigo-200/80 text-indigo-900 px-1.5 py-0.2 rounded font-bold font-mono shrink-0">
+                      {filteredMembers.length} of {members.length}
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
                       setGroupFilter('all');
-                      setRoleFilter('all');
-                      setSearchQuery('');
                       setTableFilter('all');
                     }}
-                    className="text-[11px] text-indigo-600 font-bold hover:underline cursor-pointer"
+                    className="text-[11px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-indigo-200 shadow-2xs whitespace-nowrap shrink-0 cursor-pointer"
                   >
-                    Reset filters &amp; show all {members.length}
+                    Clear
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
+            {/* Subscriber Cards Roster (Clean & Decongested) */}
+            {filteredMembers.length === 0 ? (
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center text-slate-500 text-xs shadow-2xs">
+                No members found matching your search. Use &quot;Add Member&quot; to enroll new subscribers.
+              </div>
+            ) : (
+              filteredMembers.map((member, idx) => {
+                const initial = getInitials(member.fullName);
+                const cleanPhone = normalizePhoneDigits(member.phoneNumber);
+                const avatarStyle = getMobileCardAvatar(member, idx);
+                const firstTicket = member.groups[0]?.ticket;
+                const statusInfo = getMemberStatusInfo(member);
+
+                return (
+                  <div
+                    key={member.id}
+                    onClick={() => setSelectedMemberId(member.id)}
+                    className="p-4 bg-white rounded-2xl border border-slate-200 shadow-[0_4px_20px_-2px_rgba(15,23,42,0.05),0_2px_6px_-1px_rgba(15,23,42,0.02)] hover:border-indigo-200 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3.5">
+                        <div className={`w-12 h-12 rounded-2xl ${avatarStyle.bg} font-bold flex flex-col items-center justify-center shadow-xs shrink-0`}>
+                          <span className="text-sm leading-none">{initial}</span>
+                          {firstTicket && (
+                            <span className={`text-[9px] font-mono mt-0.5 ${avatarStyle.ticketText}`}>
+                              #{firstTicket}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors">
+                              {member.fullName}
+                            </h4>
+                          </div>
+                          <p className="text-xs text-slate-500 font-mono mt-0.5">
+                            {cleanPhone ? `+91 ${cleanPhone}` : 'No phone recorded'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {statusInfo.isWinner ? (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusInfo.isDisbursed
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-purple-50 text-purple-700 border border-purple-200'
+                            }`}>
+                            Prize: ₹{statusInfo.netPayout.toLocaleString('en-IN')}
+                          </span>
+                        ) : statusInfo.outstandingDue > 0 ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            Due: ₹{statusInfo.outstandingDue.toLocaleString('en-IN')}
+                          </span>
+                        ) : !statusInfo.isPassbookLinked ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            QR Unlinked
+                          </span>
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        )}
+
+                        <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            {/* Mobile Summary Footer */}
+            <div className="pt-2 text-center text-xs text-slate-500 flex flex-col items-center gap-1.5">
+              <span>
+                Showing {filteredMembers.length} {groupFilter !== 'all' || roleFilter !== 'all' || searchQuery ? `of ${members.length}` : ''} registered users
+              </span>
+              {(groupFilter !== 'all' || roleFilter !== 'all' || searchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGroupFilter('all');
+                    setRoleFilter('all');
+                    setSearchQuery('');
+                    setTableFilter('all');
+                  }}
+                  className="text-[11px] text-indigo-600 font-bold hover:underline cursor-pointer"
+                >
+                  Reset filters &amp; show all {members.length}
+                </button>
+              )}
+            </div>
           </div>
-        </main>
+
+        </div>
+      </main>
 
       {/* ── ADD / EDIT MEMBER MODAL ── */}
       {isAddModalOpen && (
@@ -2451,13 +2434,12 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     10-Digit Mobile Number <span className="text-rose-500">*</span>
                   </label>
                   {newPhoneNumber.trim() && (
-                    <span className={`text-[10px] font-bold ${
-                      normalizePhoneDigits(newPhoneNumber).length === 10
-                        ? 'text-emerald-700'
-                        : normalizePhoneDigits(newPhoneNumber).length < 10
-                          ? 'text-amber-700'
-                          : 'text-rose-600'
-                    }`}>
+                    <span className={`text-[10px] font-bold ${normalizePhoneDigits(newPhoneNumber).length === 10
+                      ? 'text-emerald-700'
+                      : normalizePhoneDigits(newPhoneNumber).length < 10
+                        ? 'text-amber-700'
+                        : 'text-rose-600'
+                      }`}>
                       {normalizePhoneDigits(newPhoneNumber).length === 10
                         ? '✓ Valid 10 digits'
                         : `${normalizePhoneDigits(newPhoneNumber).length}/10 digits`}
@@ -2475,15 +2457,14 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                     maxLength={10}
                     value={newPhoneNumber}
                     onChange={(e) => setNewPhoneNumber(e.target.value)}
-                    className={`w-full bg-gray-50 border rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 placeholder:text-gray-400 focus:outline-none transition-colors font-mono shadow-2xs ${
-                      !editingMember && duplicatePhoneMember
-                        ? 'border-amber-400 focus:border-amber-500 bg-amber-50/50'
-                        : !newPhoneNumber.trim()
-                          ? 'border-gray-200 focus:border-indigo-500 focus:bg-white'
-                          : normalizePhoneDigits(newPhoneNumber).length === 10
-                            ? 'border-emerald-400 focus:border-emerald-500 bg-emerald-50/50'
-                            : 'border-amber-400 focus:border-amber-500 bg-amber-50/50'
-                    }`}
+                    className={`w-full bg-gray-50 border rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 placeholder:text-gray-400 focus:outline-none transition-colors font-mono shadow-2xs ${!editingMember && duplicatePhoneMember
+                      ? 'border-amber-400 focus:border-amber-500 bg-amber-50/50'
+                      : !newPhoneNumber.trim()
+                        ? 'border-gray-200 focus:border-indigo-500 focus:bg-white'
+                        : normalizePhoneDigits(newPhoneNumber).length === 10
+                          ? 'border-emerald-400 focus:border-emerald-500 bg-emerald-50/50'
+                          : 'border-amber-400 focus:border-amber-500 bg-amber-50/50'
+                      }`}
                   />
                 </div>
                 {newPhoneNumber.trim() && normalizePhoneDigits(newPhoneNumber).length !== 10 && (
@@ -2535,11 +2516,10 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
 
               {/* Block Portal Access Toggle in Edit Mode */}
               {editingMember && (
-                <div className={`p-3.5 rounded-2xl border transition-all ${
-                  editIsBlocked
-                    ? 'bg-rose-50 border-rose-200 ring-1 ring-rose-200'
-                    : 'bg-gray-50/80 border-gray-200'
-                }`}>
+                <div className={`p-3.5 rounded-2xl border transition-all ${editIsBlocked
+                  ? 'bg-rose-50 border-rose-200 ring-1 ring-rose-200'
+                  : 'bg-gray-50/80 border-gray-200'
+                  }`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-1.5">
@@ -2548,9 +2528,8 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                         ) : (
                           <ShieldCheck size={15} className="text-emerald-600 shrink-0" />
                         )}
-                        <span className={`text-xs font-bold ${
-                          editIsBlocked ? 'text-rose-900' : 'text-gray-900'
-                        }`}>
+                        <span className={`text-xs font-bold ${editIsBlocked ? 'text-rose-900' : 'text-gray-900'
+                          }`}>
                           Block Portal Access
                         </span>
                         {editIsBlocked && (
@@ -2575,14 +2554,12 @@ _(Point any camera at your physical pocket book QR sticker to log in instantly)_
                       type="button"
                       disabled={editingMember.id === currentAdminProfile?.id}
                       onClick={() => setEditIsBlocked(!editIsBlocked)}
-                      className={`w-11 h-6 rounded-full p-0.5 transition-colors shrink-0 ${
-                        editIsBlocked ? 'bg-rose-600' : 'bg-gray-300'
-                      } ${editingMember.id === currentAdminProfile?.id ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                      className={`w-11 h-6 rounded-full p-0.5 transition-colors shrink-0 ${editIsBlocked ? 'bg-rose-600' : 'bg-gray-300'
+                        } ${editingMember.id === currentAdminProfile?.id ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       <div
-                        className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
-                          editIsBlocked ? 'translate-x-5' : 'translate-x-0'
-                        }`}
+                        className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${editIsBlocked ? 'translate-x-5' : 'translate-x-0'
+                          }`}
                       />
                     </button>
                   </div>

@@ -170,9 +170,10 @@ export default function ReceiptsVaultViewer() {
 
     rawTransactions.forEach((tx) => {
       const receiptNo = extractReceiptNumber(tx);
-      const group = tx.group_id ? groupsMap[tx.group_id] : null;
-      const profileInfo = tx.profile_id ? profilesMap[tx.profile_id] : null;
       const memberEnroll = tx.group_member_id ? membersMap[tx.group_member_id] : null;
+      const effectiveGroupId = tx.group_id || memberEnroll?.group_id;
+      const group = effectiveGroupId ? groupsMap[effectiveGroupId] : null;
+      const profileInfo = tx.profile_id ? profilesMap[tx.profile_id] : null;
 
       const memberName = profileInfo?.name || 'Subscriber';
       const memberPhone = profileInfo?.phone || '';
@@ -230,7 +231,7 @@ export default function ReceiptsVaultViewer() {
           memberId: tx.profile_id || null,
           memberName,
           memberPhone,
-          groupId: tx.group_id || null,
+          groupId: effectiveGroupId || null,
           groupName,
           ticketNumber: ticketNum,
           cycleMonth: tx.cycle_month ?? 1,
@@ -1006,13 +1007,15 @@ export default function ReceiptsVaultViewer() {
           onClose={() => setSelectedReceipt(null)}
           transaction={selectedReceipt.transaction}
           member={selectedReceipt.memberObj}
-          group={selectedReceipt.groupObj || {
+          group={selectedReceipt.groupObj || (selectedReceipt.groupId ? groupsMap[selectedReceipt.groupId] : null) || {
             id: selectedReceipt.groupId,
             name: selectedReceipt.groupName,
             monthly_installment: selectedReceipt.totalAmount,
+            start_date: (selectedReceipt.groupId && groupsMap[selectedReceipt.groupId]?.start_date) || null,
           }}
           month={selectedReceipt.cycleMonth}
           totalDue={selectedReceipt.totalAmount}
+          organizerCompanyName={organizationName}
           allocations={selectedReceipt.allocations}
           totalCollectedAmount={selectedReceipt.totalAmount}
           pastPendingDues={0}

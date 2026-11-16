@@ -3791,6 +3791,7 @@ Thank you for your prompt payment! 🙏`;
       const batchId = generateReceiptNumber();
       const fifoNote = `[FIFO] ₹${amountNum.toLocaleString('en-IN')} via ${paymentMode} from ${member.name} — oldest arrears cleared first [Batch:${batchId}]`;
       const { error: txErr } = await supabase.from('transactions').insert({
+        group_id: activeDashboardGroupId || null,
         profile_id: member.id || null,
         wallet_type: targetWallet,
         type: 'collection',
@@ -4684,8 +4685,13 @@ Thank you for your prompt payment! 🙏`;
                           return (
                             <div
                               key={member.id}
-                              className={`p-4 hover:bg-slate-50/75 transition-colors flex items-center justify-between gap-4 ${member.status === 'partial' ? 'bg-amber-50/20' : ''
-                                }`}
+                              className={`p-4 transition-colors flex items-center justify-between gap-4 ${
+                                member.status === 'paid'
+                                  ? 'bg-emerald-50/25 hover:bg-emerald-50/45'
+                                  : member.status === 'partial'
+                                    ? 'bg-amber-50/25 hover:bg-amber-50/45'
+                                    : 'bg-rose-50/25 hover:bg-rose-50/45'
+                              }`}
                             >
                               <div className="flex items-center gap-3 min-w-0">
                                 <div className={`w-10 h-10 rounded-full font-bold text-xs flex items-center justify-center shrink-0 font-display ${isWinner
@@ -5446,7 +5452,13 @@ Thank you for your prompt payment! 🙏`;
                           return (
                             <div
                               key={member.id}
-                              className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-card hover:border-slate-300 transition-all space-y-2.5"
+                              className={`p-3.5 rounded-2xl border shadow-card transition-all space-y-2.5 ${
+                                isPaid
+                                  ? 'bg-emerald-50/40 border-emerald-200/50 hover:bg-emerald-50/60 hover:border-emerald-300/60'
+                                  : isPartial
+                                    ? 'bg-amber-50/40 border-amber-200/50 hover:bg-amber-50/60 hover:border-amber-300/60'
+                                    : 'bg-rose-50/40 border-rose-200/50 hover:bg-rose-50/60 hover:border-rose-300/60'
+                              }`}
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3 min-w-0">

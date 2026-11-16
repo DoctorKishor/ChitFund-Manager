@@ -56,6 +56,8 @@ export function useBackHandler(
 export function BackNavigationProvider({ children }: { children: React.ReactNode }) {
   const handlersRef = useRef<BackHandlerRegistration[]>([]);
   const [showExitModal, setShowExitModal] = useState<boolean>(false);
+  const showExitModalRef = useRef<boolean>(false);
+  showExitModalRef.current = showExitModal;
   const isExitingRef = useRef<boolean>(false);
 
   const registerBackHandler = useCallback((id: string, priority: number, handler: BackHandler) => {
@@ -70,23 +72,32 @@ export function BackNavigationProvider({ children }: { children: React.ReactNode
     };
   }, []);
 
-  // Initialize browser history entry buffer
+  // Initialize browser history entry buffer and listen on capture phase
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // Use native History prototype methods to prevent Next.js App Router from treating
+    // buffer pushState calls as route changes / page refreshes
+    const nativePushState = History.prototype.pushState;
+    const nativeReplaceState = History.prototype.replaceState;
+
     try {
-      window.history.replaceState({ cf_page: 'cf_root' }, '');
-      window.history.pushState({ cf_page: 'cf_app' }, '');
+      nativeReplaceState.call(window.history, { cf_page: 'cf_root' }, '', window.location.href);
+      nativePushState.call(window.history, { cf_page: 'cf_app' }, '', window.location.href);
     } catch {}
 
     const onPopState = (e: PopStateEvent) => {
       if (isExitingRef.current) return;
 
+      // CRITICAL: Stop immediate propagation so Next.js App Router listener does NOT receive popstate
+      // and does NOT trigger an App Router page reload / re-render / fetch!
+      e.stopImmediatePropagation();
+
       // 1. If Exit Modal is currently open, pressing back closes it
-      if (showExitModal) {
+      if (showExitModalRef.current) {
         setShowExitModal(false);
         try {
-          window.history.pushState({ cf_page: 'cf_app' }, '');
+          nativePushState.call(window.history, { cf_page: 'cf_app' }, '', window.location.href);
         } catch {}
         return;
       }
@@ -98,9 +109,9 @@ export function BackNavigationProvider({ children }: { children: React.ReactNode
         try {
           const handled = item.handler();
           if (handled) {
-            // Re-push history entry so subsequent back presses are captured
+            // Re-push history entry natively so subsequent back presses are captured without Next.js reload
             try {
-              window.history.pushState({ cf_page: 'cf_app' }, '');
+              nativePushState.call(window.history, { cf_page: 'cf_app' }, '', window.location.href);
             } catch {}
             return;
           }
@@ -110,20 +121,21 @@ export function BackNavigationProvider({ children }: { children: React.ReactNode
       }
 
       // 3. Absolute Root Reached (Overview tab with zero open modals or subviews):
-      // Re-push history buffer and trigger the Exit Confirmation Dialog
+      // Re-push history buffer natively and trigger the Exit Confirmation Dialog
       try {
-        window.history.pushState({ cf_page: 'cf_app' }, '');
+        nativePushState.call(window.history, { cf_page: 'cf_app' }, '', window.location.href);
       } catch {}
       setShowExitModal(true);
       triggerHapticFeedback('light');
     };
 
-    window.addEventListener('popstate', onPopState);
+    // Capture phase listener ensures our back interceptor runs BEFORE Next.js's router listeners
+    window.addEventListener('popstate', onPopState, { capture: true });
 
     return () => {
-      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('popstate', onPopState, { capture: true });
     };
-  }, [showExitModal]);
+  }, []);
 
   const confirmExitApp = useCallback(() => {
     isExitingRef.current = true;
