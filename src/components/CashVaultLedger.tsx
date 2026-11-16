@@ -42,7 +42,8 @@ import {
   Crown,
   RotateCcw,
   ArrowUpDown,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Trash2
 } from 'lucide-react';
 import WithdrawOrganizerProfitModal from './WithdrawOrganizerProfitModal';
 
@@ -106,6 +107,7 @@ export default function CashVaultLedger() {
   const canConfirmAtm = canPerformAction('treasury:confirm_atm');
   const canPersonalDraw = canPerformAction('treasury:personal_draw');
   const canWithdrawProfit = canPerformAction('treasury:withdraw_organizer_profit');
+  const canDeleteTransaction = canPerformAction('treasury:delete_transaction') || profile?.role === 'admin';
   const canSettleDraw = canPerformAction('treasury:settle_draw');
   const canReconcile = canPerformAction('treasury:reconcile');
   const { securityConfig } = useSystemSettings();
@@ -243,7 +245,7 @@ export default function CashVaultLedger() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [{ data: txs }, { data: grps }] = await Promise.all([
+      const [{ data: rawTxs }, { data: grps }] = await Promise.all([
         supabase
           .from('transactions')
           .select('*')
@@ -255,9 +257,35 @@ export default function CashVaultLedger() {
           .order('created_at', { ascending: false })
       ]);
 
-      if (txs) {
-        setRecentTransactions(txs);
+      let txs = rawTxs || [];
+
+      // Auto-purge any false automated Month 0 launch transactions from transactions ledger
+      const falseMonth0Entries = txs.filter((t: any) => 
+        t.type === 'organizer_profit' && 
+        (t.notes?.includes('[Organizer Profit] Month 0 Launch — Full chit value') || 
+         t.notes?.includes('Month 0 Launch — Full chit value') ||
+         (t.notes?.includes('[Organizer Profit] Month 0 Launch') && Number(t.cycle_month) === 0))
+      );
+
+      if (falseMonth0Entries.length > 0) {
+        console.warn(`[Treasury] Detected ${falseMonth0Entries.length} false automated Month 0 launch entries. Auto-purging...`);
+        const idsToDelete = falseMonth0Entries.map((e: any) => e.id);
+        const { error: delErr } = await supabase
+          .from('transactions')
+          .delete()
+          .in('id', idsToDelete);
+
+        if (!delErr) {
+          txs = txs.filter((t: any) => !idsToDelete.includes(t.id));
+          await logAuditEvent({
+            actionDescription: `LEDGER RECONCILIATION: Purged ${idsToDelete.length} false automated Month 0 launch entries from transactions table (${idsToDelete.map((id: string) => '#' + id.slice(0, 6)).join(', ')}).`,
+            targetTable: 'transactions',
+            adminId: profile?.id || null,
+          });
+        }
       }
+
+      setRecentTransactions(txs);
       if (grps) {
         setChitGroups(grps.map((g: any) => ({
           id: g.id,
@@ -301,6 +329,46 @@ export default function CashVaultLedger() {
       window.removeEventListener('chitfund:treasury_updated', handleRealtimeUpdate);
     };
   }, []);
+
+  // Void / Delete Transaction Entry
+  const handleDeleteTransaction = async (tx: TreasuryTx) => {
+    if (!canDeleteTransaction) {
+      alert('Permission Denied: You do not have permission to delete ledger transactions.');
+      return;
+    }
+    const confirmPrompt = window.confirm(
+      `Are you sure you want to void/delete this transaction entry from the ledger?\n\n` +
+      `TX ID: #${tx.id?.slice(0, 8)}\n` +
+      `Type: ${tx.type}\n` +
+      `Amount: ₹${Number(tx.amount || 0).toLocaleString('en-IN')}\n` +
+      `Notes: ${tx.notes || 'None'}\n\n` +
+      `This action permanently removes the entry from the ledger.`
+    );
+    if (!confirmPrompt) return;
+
+    try {
+      triggerHapticFeedback('light');
+      const { error: delErr } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', tx.id);
+
+      if (delErr) throw delErr;
+
+      await logAuditEvent({
+        actionDescription: `TRANSACTION VOIDED: Deleted entry #${tx.id?.slice(0, 8)} (${tx.type}, ₹${Number(tx.amount || 0).toLocaleString('en-IN')}) by ${profile?.fullName || 'Admin'}.`,
+        targetTable: 'transactions',
+        adminId: profile?.id || null,
+      });
+
+      triggerHapticFeedback('success');
+      await fetchData();
+      alert('✓ Transaction entry has been deleted from the ledger.');
+    } catch (err: any) {
+      console.error('Failed to delete transaction:', err);
+      alert('Failed to delete transaction: ' + (err.message || 'Unknown error'));
+    }
+  };
 
   // Format INR Currency
   const formatCurrency = (val: number) => {
@@ -1909,13 +1977,25 @@ export default function CashVaultLedger() {
                         </div>
                       </div>
                     </div>
-                    <div className="text-right font-mono flex-shrink-0">
-                      <span className={`text-xs font-bold ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
-                      </span>
-                      <div className="text-[9px] text-slate-400">
-                        {new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    <div className="text-right font-mono flex-shrink-0 flex items-center gap-1.5">
+                      <div>
+                        <span className={`text-xs font-bold ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
+                        </span>
+                        <div className="text-[9px] text-slate-400">
+                          {new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </div>
                       </div>
+                      {canDeleteTransaction && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTransaction(tx)}
+                          title="Void / Delete Entry"
+                          className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 active:scale-90 rounded-lg transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -2725,7 +2805,7 @@ export default function CashVaultLedger() {
                       </span>
                     </div>
 
-                    <div className="col-span-1 text-center">
+                    <div className="col-span-1 text-center flex items-center justify-center gap-1.5">
                       <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border whitespace-nowrap ${
                         tx.status === 'pending_verification'
                           ? 'bg-amber-100 text-amber-800 border-amber-200'
@@ -2733,6 +2813,16 @@ export default function CashVaultLedger() {
                       }`}>
                         {tx.status === 'pending_verification' ? 'In-Transit' : 'Verified'}
                       </span>
+                      {canDeleteTransaction && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTransaction(tx)}
+                          title="Void / Delete Transaction"
+                          className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 active:scale-90 rounded-md transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

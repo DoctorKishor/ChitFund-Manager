@@ -1234,31 +1234,42 @@ export default function LiveAuctionEngine() {
         .eq('type', 'collection');
 
       if (!month0TxCount || month0TxCount === 0) {
-        const walletName = WALLET_OPTIONS.find(w => w.id === month0PayoutWallet)?.name || month0PayoutWallet;
         const proceedAnyway = window.confirm(
-          `⚠️ Note: Zero Month 0 collection records found for "${group.name}".\n\nAdvancing will deduct ₹${group.totalValue.toLocaleString('en-IN')} as Organizer Profit from ${walletName} and advance to Month 1.\n\nDo you want to proceed?`
+          `⚠️ Note: Zero Month 0 collection records found for "${group.name}".\n\nDo you want to proceed and advance to Month 1 for live auction bidding?`
         );
         if (!proceedAnyway) return;
       }
 
-      // Atomic Month 0 Launch RPC in PostgreSQL (CRIT-06)
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('confirm_month0_launch', {
-        p_group_id: group.id,
-        p_wallet: month0PayoutWallet,
-        p_admin_id: profile?.id || null,
-      });
+      // Advance group to Month 1 in Supabase (CRIT-06: No automated vault deductions or transactions)
+      const { error: updateErr } = await supabase
+        .from('chit_groups')
+        .update({
+          current_month: 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', group.id);
 
-      if (rpcErr || !rpcData?.success) {
-        alert('Failed to launch Month 0: ' + (rpcData?.error || rpcErr?.message));
-        return;
+      if (updateErr) {
+        throw updateErr;
       }
 
-      const walletName = WALLET_OPTIONS.find(w => w.id === month0PayoutWallet)?.name || month0PayoutWallet;
+      // Immutable security audit log
+      await supabase.from('security_audit_logs').insert({
+        admin_id: profile?.id || null,
+        action_description: `MONTH 0 CONCLUDED: Group "${group.name}" advanced to Month 1 (1st Live Auction). All Month 0 collections sealed as Organizer Profit in Treasury.`,
+        target_table: 'chit_groups',
+        timestamp: new Date().toISOString(),
+      });
+
       setGroup(prev => prev ? ({ ...prev, currentMonth: 1 }) : null);
       setAllGroups(prev => prev.map(g => g.id === group.id ? { ...g, currentMonth: 1 } : g));
       setShowMonth0Modal(false);
       await fetchGroupDetails(group.id);
-      alert(`✓ Month 0 Launch Confirmed! ₹${group.totalValue.toLocaleString('en-IN')} Organizer Profit recorded from ${walletName}. Group advanced to Month 1.`);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chitfund:group_updated'));
+      }
+      triggerHapticFeedback('success');
+      alert(`✓ Month 0 Completed! Group "${group.name}" has advanced to Month 1 (1st Live Auction). All Month 0 collections remain safely in the treasury as Organizer Profit and can be withdrawn at any time via Treasury > Withdraw Organizer Profit.`);
     } catch (err: any) {
       console.error('Error confirming launch:', err);
       alert('Error confirming launch: ' + (err.message || 'Unknown error'));
@@ -6254,8 +6265,8 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
                   <Crown size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold font-display text-slate-900">Confirm Launch (Month 0)</h3>
-                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Organizer Profit Payout</span>
+                  <h3 className="text-base font-bold font-display text-slate-900">Conclude Launch (Month 0)</h3>
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Advance to Month 1</span>
                 </div>
               </div>
               <button onClick={() => setShowMonth0Modal(false)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer">
@@ -6274,36 +6285,18 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
                   <span>₹{group.totalValue.toLocaleString('en-IN')}</span>
                 </div>
                 <p className="text-[11px] text-slate-600 pt-1 leading-snug">
-                  All 1st-month collections ({group.memberCount || 20} × ₹{(group.totalValue / (group.memberCount || 1)).toLocaleString('en-IN')}) are taken by the Organizer. Please select the vault/account from which this payout is recorded.
+                  All 1st-month collections ({group.memberCount || 20} × ₹{(group.totalValue / (group.memberCount || 1)).toLocaleString('en-IN')}) are earned as Organizer Profit. Advancing moves this group to Month 1 for the 1st live bidding auction.
                 </p>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Payout Source Vault</label>
-                <div className="space-y-1.5">
-                  {WALLET_OPTIONS.map((w) => {
-                    const isSelected = month0PayoutWallet === w.id;
-                    const bal = balances[w.id] || 0;
-                    return (
-                      <button
-                        key={w.id}
-                        type="button"
-                        onClick={() => setMonth0PayoutWallet(w.id)}
-                        className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                          isSelected 
-                            ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/30' 
-                            : 'bg-slate-50/50 hover:bg-slate-100/70 border-slate-200'
-                        }`}
-                      >
-                        <div>
-                          <span className="text-xs font-bold text-slate-900 block">{w.name}</span>
-                          <span className="text-[10px] text-slate-500 font-mono">Available: ₹{bal.toLocaleString('en-IN')}</span>
-                        </div>
-                        {isSelected && <CheckCircle2 size={16} className="text-amber-600 shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-[11px] text-slate-600 leading-relaxed space-y-1">
+                <p className="font-semibold text-slate-800 flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+                  Treasury Vault Safety:
+                </p>
+                <p>
+                  No funds will be automatically deducted. All collected money stays securely in your physical cash box or bank accounts. You can withdraw the organizer profit whenever you choose via the dedicated <strong>Treasury &gt; Withdraw Organizer Profit</strong> pipeline.
+                </p>
               </div>
             </div>
 
@@ -6321,7 +6314,7 @@ Official record sealed on ${new Date().toLocaleDateString('en-IN')}. 🎉`;
                 disabled={isRecording}
                 className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
               >
-                {isRecording ? 'Processing...' : 'Confirm & Disburse'}
+                {isRecording ? 'Advancing...' : 'Confirm & Advance to M1'}
               </button>
             </div>
           </div>

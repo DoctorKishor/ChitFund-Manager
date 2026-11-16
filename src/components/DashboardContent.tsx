@@ -3156,21 +3156,9 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
         throw updateErr;
       }
 
-      // 2. Insert audit transaction record for Organizer Profit
-      await supabase.from('transactions').insert({
-        group_id: grpId,
-        wallet_type: 'cash_in_hand',
-        type: 'organizer_profit',
-        status: 'completed',
-        amount: grpTotal,
-        notes: `[Organizer Profit] Month 0 Launch — Full chit value ₹${grpTotal.toLocaleString('en-IN')} collected and sealed as Organizer Profit for "${grpName}".`,
-        cycle_month: 0,
-        created_by: profile?.id || null,
-      });
-
-      // 3. Security Audit Log
+      // 2. Security Audit Log (No automated withdrawal is inserted — funds remain in treasury until manually withdrawn)
       await logAuditEvent({
-        actionDescription: `MONTH 0 CONCLUDED: Group "${grpName}" advanced to Month 1 (1st Live Auction). All Month 0 collections (₹${grpTotal.toLocaleString('en-IN')}) sealed as Organizer Profit.`,
+        actionDescription: `MONTH 0 CONCLUDED: Group "${grpName}" advanced to Month 1 (1st Live Auction). All Month 0 collections (₹${grpTotal.toLocaleString('en-IN')}) sealed as Organizer Profit in Treasury.`,
         targetTable: 'chit_groups',
         adminId: profile?.id || null,
       });
@@ -3186,7 +3174,7 @@ Thank you for being a valued member of our Chit Fund family! 🙏`
         window.dispatchEvent(new CustomEvent('chitfund:group_updated'));
       }
       triggerHapticFeedback('success');
-      alert(`✓ Month 0 Completed! Group "${grpName}" has advanced to Month 1 (1st Live Auction). All Month 0 collections are sealed as Organizer Profit.`);
+      alert(`✓ Month 0 Completed! Group "${grpName}" has advanced to Month 1 (1st Live Auction). All Month 0 collections are sealed as Organizer Profit in the Treasury and can be manually withdrawn at any time.`);
     } catch (err: any) {
       console.error('Error confirming Month 0 launch:', err);
       alert('Error confirming launch: ' + (err.message || 'Unknown error'));
@@ -9688,7 +9676,7 @@ Thank you for your prompt payment! 🙏`;
                   Organizer Profit Rule (Month 0):
                 </p>
                 <p>
-                  All collections received from members in Month 0 are retained directly by the Organizer as profit. Advancing this group moves it to Month 1 where the first live auction and member bidding begin.
+                  All collections received from members in Month 0 are retained directly by the Organizer as profit. Advancing this group moves it to Month 1 where the first live auction and member bidding begin. Month 0 funds remain safely inside the Treasury until you choose to withdraw them via the dedicated Profit Withdrawal pipeline.
                 </p>
               </div>
 

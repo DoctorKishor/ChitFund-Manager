@@ -1639,10 +1639,10 @@ begin
 end;
 $$;
 
--- Atomic Month 0 Launch Confirmation & Organizer Profit Allocation
+-- Atomic Month 0 Launch Confirmation (Advances group to Month 1 without premature automated deductions)
 create or replace function public.confirm_month0_launch(
   p_group_id uuid,
-  p_wallet text,
+  p_wallet text default null,
   p_admin_id uuid default auth.uid()
 )
 returns jsonb
@@ -1652,9 +1652,6 @@ set search_path = public
 as $$
 declare
   v_group record;
-  v_current_bal numeric;
-  v_new_bal numeric;
-  v_payout_note text;
 begin
   select id, name, total_value, current_month
   into v_group
@@ -1670,70 +1667,60 @@ begin
     return jsonb_build_object('success', false, 'error', 'Group is already advanced past Month 0.');
   end if;
 
-  insert into public.global_treasury (wallet_type, current_balance, pending_verification_balance, last_updated_by)
-  values (p_wallet, 0, 0, p_admin_id)
-  on conflict (wallet_type) do nothing;
-
-  select current_balance into v_current_bal
-  from public.global_treasury
-  where wallet_type = p_wallet
-  for update;
-
-  if v_current_bal < v_group.total_value then
-    return jsonb_build_object(
-      'success', false,
-      'error', 'Insufficient balance in ' || p_wallet || '. Available: ₹' || v_current_bal || ', Required: ₹' || v_group.total_value
-    );
-  end if;
-
-  v_new_bal := v_current_bal - v_group.total_value;
-  update public.global_treasury
-  set current_balance = v_new_bal,
-      last_updated_by = p_admin_id
-  where wallet_type = p_wallet;
-
+  -- Advance group to Month 1 (Month 0 collections remain in treasury as organizer profit until manually withdrawn)
   update public.chit_groups
   set current_month = 1,
       updated_at = timezone('utc'::text, now())
   where id = p_group_id;
 
-  v_payout_note := '[Organizer Profit] Month 0 Launch — Full chit value ₹' || v_group.total_value || ' collected and allocated as Organizer Profit for "' || v_group.name || '".';
-  insert into public.transactions (
-    group_id,
-    wallet_type,
-    from_wallet,
-    type,
-    status,
-    amount,
-    notes,
-    cycle_month,
-    created_by
-  ) values (
-    p_group_id,
-    p_wallet,
-    p_wallet,
-    'organizer_profit',
-    'completed',
-    v_group.total_value,
-    v_payout_note,
-    0,
-    p_admin_id
-  );
-
   insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
   values (
     p_admin_id,
-    'LAUNCH CONFIRMED: "' || v_group.name || '" — ₹' || v_group.total_value || ' Organizer Profit recorded from ' || p_wallet || '. Group advanced to Month 1.',
+    'MONTH 0 CONCLUDED: Group "' || coalesce(v_group.name, 'Group') || '" advanced to Month 1 (1st Live Auction). All Month 0 collections sealed as Organizer Profit in Treasury.',
     'chit_groups',
     now()
   );
 
   return jsonb_build_object(
     'success', true,
-    'new_month', 1,
-    'wallet', p_wallet,
-    'new_balance', v_new_bal
+    'message', 'Group "' || v_group.name || '" successfully advanced to Month 1.'
   );
+end;
+$$;
+
+-- Utility RPC to purge false automated Month 0 launch entries from transactions
+create or replace function public.purge_false_month0_launch_entries(
+  p_admin_id uuid default auth.uid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_deleted_count int;
+begin
+  delete from public.transactions
+  where type = 'organizer_profit'
+    and (
+      notes ilike '%[Organizer Profit] Month 0 Launch — Full chit value%'
+      or notes ilike '%Month 0 Launch — Full chit value%'
+      or (notes ilike '%[Organizer Profit] Month 0 Launch%' and cycle_month = 0)
+    );
+  
+  get diagnostics v_deleted_count = row_count;
+
+  if v_deleted_count > 0 then
+    insert into public.security_audit_logs (admin_id, action_description, target_table, timestamp)
+    values (
+      p_admin_id,
+      'LEDGER RECONCILIATION: Purged ' || v_deleted_count || ' false automated Month 0 launch entries from transactions table.',
+      'transactions',
+      now()
+    );
+  end if;
+
+  return jsonb_build_object('success', true, 'deleted_count', v_deleted_count);
 end;
 $$;
 
