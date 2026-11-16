@@ -43,7 +43,13 @@ import {
   RotateCcw,
   ArrowUpDown,
   SlidersHorizontal,
-  Trash2
+  Trash2,
+  Copy,
+  User,
+  Building2,
+  Tag,
+  Calendar,
+  Layers
 } from 'lucide-react';
 import WithdrawOrganizerProfitModal from './WithdrawOrganizerProfitModal';
 
@@ -70,6 +76,22 @@ interface TreasuryTx {
   group_id?: string;
   profile_id?: string;
   group_member_id?: string;
+  cycle_month?: number | null;
+  denomination_log?: any;
+  voice_note_text?: string | null;
+  verification_proof_url?: string | null;
+  created_by?: string | null;
+  profiles?: {
+    full_name?: string;
+    phone_number?: string;
+  } | null;
+  staff?: {
+    full_name?: string;
+  } | null;
+  chit_groups?: {
+    name?: string;
+    total_value?: number;
+  } | null;
 }
 
 interface PersonalDraw {
@@ -128,10 +150,15 @@ export default function CashVaultLedger() {
   // Active Modal Dialog States
   const [activeModal, setActiveModal] = useState<'none' | 'atm' | 'spend' | 'deposit' | 'transfer' | 'denominations' | 'settle' | 'recover'>('none');
   const [showWithdrawProfitModal, setShowWithdrawProfitModal] = useState<boolean>(false);
+  const [selectedTx, setSelectedTx] = useState<TreasuryTx | null>(null);
 
   // ── Hierarchical Back Navigation Handlers ──
   // Priority 100: Treasury Modals
   useBackHandler('treasury_modal', 100, () => {
+    if (selectedTx !== null) {
+      setSelectedTx(null);
+      return true;
+    }
     if (activeModal !== 'none') {
       setActiveModal('none');
       return true;
@@ -141,7 +168,7 @@ export default function CashVaultLedger() {
       return true;
     }
     return false;
-  }, activeModal !== 'none' || showWithdrawProfitModal);
+  }, activeModal !== 'none' || showWithdrawProfitModal || selectedTx !== null);
 
   // Priority 50: Expanded wallet card back to full grid
   useBackHandler('treasury_expanded_card', 50, () => {
@@ -248,7 +275,7 @@ export default function CashVaultLedger() {
       const [{ data: rawTxs }, { data: grps }] = await Promise.all([
         supabase
           .from('transactions')
-          .select('*')
+          .select('*, chit_groups:group_id(name, total_value), profiles:profile_id(full_name, phone_number), staff:created_by(full_name)')
           .order('created_at', { ascending: false })
           .limit(500),
         supabase
@@ -504,6 +531,138 @@ export default function CashVaultLedger() {
     }
 
     return { isCredit: false, badgeLabel: '💸 Outflow (-)', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200/60' };
+  };
+
+  interface ParsedTxInfo {
+    title: string;
+    subtitle: string;
+    batchId?: string;
+    memberOrPayee?: string;
+    ticketNo?: string;
+    groupName?: string;
+    groupPool?: number;
+    cycleMonth?: number;
+    recordedBy?: string;
+    memberPhone?: string;
+  }
+
+  // Parse transaction notes into human-readable, at-a-glance titles & subtitles
+  const parseTxDetails = (tx: TreasuryTx): ParsedTxInfo => {
+    const notes = (tx.notes || tx.description || '').trim();
+
+    // Group info resolution
+    const group = tx.chit_groups || chitGroups.find(g => g.id === tx.group_id);
+    const groupName = group?.name || undefined;
+    const groupPool = group?.total_value || (group as any)?.totalValue || undefined;
+
+    const memberName = tx.profiles?.full_name;
+    const memberPhone = tx.profiles?.phone_number;
+    const recordedBy = tx.staff?.full_name;
+
+    if (tx.type === 'collection') {
+      if (notes) {
+        // e.g. "Month 1 collection payment - Ticket #5 (Indirani) [Batch: RCP-20261116-1219-P6JR]"
+        const batchMatch = notes.match(/\[(?:Batch|RCP):\s*([^\]]+)\]/i);
+        const batchId = batchMatch ? batchMatch[1].trim() : undefined;
+
+        // Extract ticket number
+        const ticketMatch = notes.match(/Ticket\s*#?(\d+)/i);
+        const ticketNo = ticketMatch ? ticketMatch[1] : undefined;
+
+        // Extract member name inside parentheses
+        const parenMatch = notes.match(/\(([^)]+)\)/);
+        const memberOrPayee = memberName || (parenMatch ? parenMatch[1].trim() : undefined);
+
+        // Strip [Batch: ...] for the clean primary title
+        const cleanTitle = notes.replace(/\s*\[(?:Batch|RCP):[^\]]+\]/i, '').trim();
+
+        const subParts: string[] = [];
+        if (batchId) subParts.push(`Receipt: ${batchId}`);
+        if (groupName) subParts.push(groupName);
+        subParts.push('Member Installment Collection');
+
+        return {
+          title: cleanTitle || 'Member Installment Collection',
+          subtitle: subParts.join(' · '),
+          batchId,
+          memberOrPayee,
+          ticketNo,
+          groupName,
+          groupPool,
+          cycleMonth: tx.cycle_month ?? undefined,
+          recordedBy,
+          memberPhone,
+        };
+      }
+
+      const defaultTitle = tx.cycle_month !== null && tx.cycle_month !== undefined
+        ? `Month ${tx.cycle_month} Member Installment Payment`
+        : 'Member Installment Collection';
+      return {
+        title: defaultTitle,
+        subtitle: groupName ? `${groupName} · Member Collection` : 'Member Installment Collection',
+        groupName,
+        groupPool,
+        memberOrPayee: memberName,
+        cycleMonth: tx.cycle_month ?? undefined,
+        recordedBy,
+        memberPhone,
+      };
+    }
+
+    if (tx.type === 'payout') {
+      return {
+        title: notes || 'Month Winner Prize Pot Payout',
+        subtitle: groupName ? `${groupName} · Prize Disbursal Pot (-)` : 'Prize Pot Disbursal Outflow (-)',
+        groupName,
+        groupPool,
+        cycleMonth: tx.cycle_month ?? undefined,
+        recordedBy,
+      };
+    }
+
+    if (tx.type === 'personal_draw') {
+      return {
+        title: notes || 'Personal Draw Expense',
+        subtitle: 'Personal Spends / Draws (-) · Cash Outflow',
+        groupName,
+        recordedBy,
+      };
+    }
+
+    if (tx.type === 'atm_withdrawal') {
+      return {
+        title: notes || 'ATM Cash Relocation to Safe Box',
+        subtitle: 'Bank to Cash Box Relocation · Safe Replenishment',
+        groupName,
+        recordedBy,
+      };
+    }
+
+    if (tx.type === 'organizer_profit') {
+      return {
+        title: notes || 'Organizer Profit Payout',
+        subtitle: groupName ? `${groupName} · Realized Profit Withdrawal` : 'Realized Organizer Profit Withdrawal',
+        groupName,
+        recordedBy,
+      };
+    }
+
+    if (tx.type === 'transfer' || tx.type === 'transfer_in') {
+      return {
+        title: notes || 'Inter-Vault Liquidity Balancing',
+        subtitle: 'Internal Vault Transfer',
+        groupName,
+        recordedBy,
+      };
+    }
+
+    return {
+      title: notes || 'Treasury Movement',
+      subtitle: groupName ? `${groupName} · Treasury Movement` : 'Treasury Movement',
+      groupName,
+      recordedBy,
+    };
   };
 
   // ATM Relocations awaiting Physical Cash Box Verification
@@ -1956,30 +2115,38 @@ export default function CashVaultLedger() {
             ) : (
               filteredTransactions.slice(0, mobileTxLimit).map((tx) => {
                 const { isCredit, badgeLabel } = getTxDirection(tx, selectedWalletFilter);
+                const parsed = parseTxDetails(tx);
                 return (
-                  <div key={tx.id} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
+                  <div 
+                    key={tx.id} 
+                    onClick={() => {
+                      setSelectedTx(tx);
+                      triggerHapticFeedback('light');
+                    }}
+                    className="p-3 bg-white hover:bg-indigo-50/40 border border-slate-200/90 hover:border-indigo-300 rounded-2xl flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all shadow-2xs group"
+                  >
                     <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                      <span className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 flex items-center justify-center text-xs flex-shrink-0">
+                      <span className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-indigo-100 border border-slate-200/80 flex items-center justify-center text-sm flex-shrink-0 transition-colors">
                         {tx.type === 'atm_withdrawal' ? '🏧' : tx.type === 'collection' ? '💰' : tx.type === 'personal_draw' ? '💼' : tx.type === 'organizer_profit' ? '👑' : '🔄'}
                       </span>
                       <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-900 truncate">
-                          {tx.notes || tx.description || 'Treasury Movement'}
+                        <div className="text-xs font-bold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">
+                          {parsed.title}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] text-slate-500 truncate">
+                          <span className="text-[10px] font-semibold text-slate-600 truncate">
                             {WALLET_META[tx.wallet_type]?.shortName || tx.wallet_type}
                           </span>
                           <span className="text-slate-300">•</span>
-                          <span className="text-[9px] font-semibold text-slate-400">
-                            {badgeLabel.replace(/[+\-()]/g, '').trim()}
+                          <span className="text-[10px] text-slate-400 truncate">
+                            {parsed.batchId ? `Receipt: ${parsed.batchId}` : badgeLabel.replace(/[+\-()]/g, '').trim()}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <div className="text-right font-mono flex-shrink-0 flex items-center gap-1.5">
+                    <div className="text-right font-mono flex-shrink-0 flex items-center gap-2">
                       <div>
-                        <span className={`text-xs font-bold ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        <span className={`text-xs font-black ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {isCredit ? '+' : '-'}{formatCurrency(Number(tx.amount || 0))}
                         </span>
                         <div className="text-[9px] text-slate-400">
@@ -1989,7 +2156,10 @@ export default function CashVaultLedger() {
                       {canDeleteTransaction && (
                         <button
                           type="button"
-                          onClick={() => handleDeleteTransaction(tx)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTransaction(tx);
+                          }}
                           title="Void / Delete Entry"
                           className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 active:scale-90 rounded-lg transition-all cursor-pointer"
                         >
@@ -2744,6 +2914,7 @@ export default function CashVaultLedger() {
             ) : (
               filteredTransactions.map((tx) => {
                 const { isCredit, badgeLabel, badgeColor } = getTxDirection(tx, selectedWalletFilter);
+                const parsed = parseTxDetails(tx);
                 const dateObj = new Date(tx.created_at);
                 const dateStr = dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
                 const timeStr = dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -2752,26 +2923,25 @@ export default function CashVaultLedger() {
                 return (
                   <div 
                     key={tx.id} 
-                    className={`grid grid-cols-12 px-6 py-2.5 items-center hover:bg-slate-50/80 transition-colors ${
+                    onClick={() => {
+                      setSelectedTx(tx);
+                      triggerHapticFeedback('light');
+                    }}
+                    className={`grid grid-cols-12 px-6 py-3 items-center hover:bg-indigo-50/40 transition-all cursor-pointer group ${
                       tx.type === 'atm_withdrawal' && tx.status === 'pending_verification' ? 'bg-amber-50/20' : ''
                     }`}
                   >
                     <div className="col-span-2 font-mono text-slate-600">
-                      <div className="font-bold text-slate-900 leading-tight">{dateStr}, {timeStr}</div>
+                      <div className="font-bold text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors">{dateStr}, {timeStr}</div>
                       <span className="text-[10px] text-slate-400">{txIdShort}</span>
                     </div>
 
                     <div className="col-span-3 pr-2">
-                      <div className="font-bold text-slate-900 leading-tight">
-                        {tx.type === 'collection' ? 'Member Installment Collection' : 
-                         tx.type === 'payout' ? 'Month Winner Prize Pot Payout' :
-                         tx.type === 'atm_withdrawal' ? 'ATM Withdrawal for Safe Cash' :
-                         tx.type === 'personal_draw' ? 'Personal Draw Expense' :
-                         tx.type === 'organizer_profit' ? 'Organizer Profit Payout' :
-                         'Inter-Vault Liquidity Balancing'}
+                      <div className="font-bold text-slate-900 leading-tight truncate group-hover:text-indigo-600 transition-colors" title={parsed.title}>
+                        {parsed.title}
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate">
-                        {tx.notes || tx.description || 'Treasury Movement'}
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5" title={parsed.subtitle}>
+                        {parsed.subtitle}
                       </p>
                     </div>
 
@@ -2816,7 +2986,10 @@ export default function CashVaultLedger() {
                       {canDeleteTransaction && (
                         <button
                           type="button"
-                          onClick={() => handleDeleteTransaction(tx)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTransaction(tx);
+                          }}
                           title="Void / Delete Transaction"
                           className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 active:scale-90 rounded-md transition-all cursor-pointer"
                         >
@@ -3406,6 +3579,261 @@ export default function CashVaultLedger() {
           </div>
         </div>
       )}
+
+      {/* ── MODAL 8: TRANSACTION RECORD DETAILS POP-UP CARD ── */}
+      {selectedTx && (() => {
+        const parsed = parseTxDetails(selectedTx);
+        const { isCredit, badgeLabel, badgeColor } = getTxDirection(selectedTx, selectedWalletFilter);
+        const dateObj = new Date(selectedTx.created_at);
+        const formattedFullDate = dateObj.toLocaleDateString('en-IN', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+        const formattedTime = dateObj.toLocaleTimeString('en-IN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+
+        return (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto"
+            onClick={() => setSelectedTx(null)}
+          >
+            <div 
+              className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg max-h-[92dvh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 my-auto text-left"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/80">
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-xl border ${
+                    isCredit 
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                      : 'bg-rose-50 text-rose-600 border-rose-200'
+                  }`}>
+                    {selectedTx.type === 'collection' ? <Coins size={18} /> :
+                     selectedTx.type === 'payout' ? <Crown size={18} /> :
+                     selectedTx.type === 'atm_withdrawal' ? <Landmark size={18} /> :
+                     selectedTx.type === 'personal_draw' ? <Wallet size={18} /> :
+                     selectedTx.type === 'organizer_profit' ? <Crown size={18} /> :
+                     <ArrowRightLeft size={18} />}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">
+                      Treasury Ledger Record
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      TXN #{selectedTx.id.slice(0, 8).toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTx(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/80 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto text-xs">
+                
+                {/* Hero Amount & Direction Banner */}
+                <div className={`p-4 rounded-2xl border flex items-center justify-between ${
+                  isCredit ? 'bg-emerald-50/60 border-emerald-200/70' : 'bg-rose-50/60 border-rose-200/70'
+                }`}>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">
+                      {isCredit ? 'Vault Cash Inflow (+)' : 'Vault Fund Outflow (-)'}
+                    </span>
+                    <div className={`text-2xl font-black font-mono tracking-tight mt-0.5 ${
+                      isCredit ? 'text-emerald-700' : 'text-rose-700'
+                    }`}>
+                      {isCredit ? '+' : '-'}{formatCurrency(Number(selectedTx.amount || 0))}
+                    </div>
+                  </div>
+                  <div className="text-right space-y-1">
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border shadow-2xs ${badgeColor}`}>
+                      {badgeLabel}
+                    </span>
+                    <div className="text-[10px] font-semibold text-slate-500 flex items-center justify-end gap-1">
+                      <CheckCircle2 size={12} className="text-emerald-500" />
+                      <span>{selectedTx.status === 'pending_verification' ? 'Pending Count' : 'Cryptographically Verified'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Primary Transaction Description Box */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                    Transaction Details &amp; Memo
+                  </label>
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                    <p className="text-xs font-bold text-slate-900 leading-relaxed font-sans">
+                      {parsed.title}
+                    </p>
+                    
+                    {/* Context Badges / Metadata Chips */}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-200/60">
+                      {parsed.memberOrPayee && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                          <User size={12} className="text-slate-400" />
+                          <span>{parsed.memberOrPayee}</span>
+                          {parsed.ticketNo && <span className="text-slate-400 font-mono">(Ticket #{parsed.ticketNo})</span>}
+                        </span>
+                      )}
+                      {parsed.groupName && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 shadow-2xs">
+                          <Building2 size={12} className="text-indigo-400" />
+                          <span>{parsed.groupName}</span>
+                          {parsed.groupPool && <span className="font-mono text-[10px] text-indigo-500">({formatCurrency(parsed.groupPool)})</span>}
+                        </span>
+                      )}
+                      {parsed.cycleMonth !== undefined && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 shadow-2xs">
+                          <Calendar size={12} className="text-amber-500" />
+                          <span>Month {parsed.cycleMonth} Cycle</span>
+                        </span>
+                      )}
+                      {parsed.batchId && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs font-mono">
+                          <FileText size={12} className="text-slate-400" />
+                          <span>Receipt: {parsed.batchId}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Key-Value Information Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Vault / Channel */}
+                  <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Settlement Vault</span>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="font-bold text-xs text-slate-900">
+                        {WALLET_META[selectedTx.wallet_type]?.name || selectedTx.wallet_type}
+                      </span>
+                      {selectedTx.to_wallet && selectedTx.to_wallet !== selectedTx.wallet_type && (
+                        <>
+                          <span className="text-brand-600 font-bold">➔</span>
+                          <span className="font-bold text-xs text-slate-900">
+                            {WALLET_META[selectedTx.to_wallet as WalletType]?.name || selectedTx.to_wallet}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                      {WALLET_META[selectedTx.wallet_type]?.bankName || 'Verified Physical Box'}
+                    </p>
+                  </div>
+
+                  {/* Exact Timestamp */}
+                  <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Recorded Timestamp</span>
+                    <p className="font-bold text-xs text-slate-900 mt-1">{formattedTime}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{formattedFullDate}</p>
+                  </div>
+
+                  {/* Operator / Staff Attribution */}
+                  <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Recorded By (Staff / Admin)</span>
+                    <p className="font-bold text-xs text-slate-900 mt-1">
+                      {parsed.recordedBy || profile?.fullName || 'Dr. Kishor Anbazhakan (Admin)'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Role: Administrator</p>
+                  </div>
+
+                  {/* Ledger Category */}
+                  <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Entry Classification</span>
+                    <p className="font-bold text-xs text-slate-900 capitalize mt-1">
+                      {selectedTx.type.replace(/_/g, ' ')}
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {selectedTx.transfer_pair_id ? `Linked Transfer Pair: #${selectedTx.transfer_pair_id.slice(0, 6)}` : 'Direct Ledger Entry'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Denominations (if physical note tally exists) */}
+                {selectedTx.denomination_log && typeof selectedTx.denomination_log === 'object' && Object.keys(selectedTx.denomination_log).length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                      Physical Currency Note Breakdown
+                    </label>
+                    <div className="p-3 bg-amber-50/50 border border-amber-200/80 rounded-2xl grid grid-cols-3 gap-2">
+                      {Object.entries(selectedTx.denomination_log).map(([note, count]) => (
+                        <div key={note} className="bg-white p-2 rounded-xl border border-amber-100 shadow-2xs text-center">
+                          <span className="text-[10px] font-bold text-slate-500 font-mono block">₹{note}</span>
+                          <span className="text-xs font-black text-amber-900 font-mono">× {String(count)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Full Raw Memo */}
+                {selectedTx.notes && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                      Full Immutable Transaction Note
+                    </label>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] font-mono text-slate-700 break-words leading-relaxed select-all">
+                      {selectedTx.notes}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedTx.id);
+                      triggerHapticFeedback('light');
+                      alert(`✓ Copied Transaction UUID:\n${selectedTx.id}`);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Copy size={13} />
+                    <span>Copy TX ID</span>
+                  </button>
+
+                  {canDeleteTransaction && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const txToDelete = selectedTx;
+                        setSelectedTx(null);
+                        handleDeleteTransaction(txToDelete);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      <Trash2 size={13} />
+                      <span>Void Entry</span>
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedTx(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── WITHDRAW ORGANIZER PROFIT MODAL (Realized Month 0 Launch Earnings) ── */}
       <WithdrawOrganizerProfitModal
